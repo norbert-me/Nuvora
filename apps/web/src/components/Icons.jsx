@@ -172,7 +172,7 @@ export const ICONS = {
 //   pageForm — Formular-/Auth-/Bestätigungsseiten (Login, Kontakt, Profil …).
 //   pageFull — Vollbild-Flächen (Tafel, Sitzplan-Canvas, Live-Session/Beamer).
 export const pageApp = { maxWidth: 960, margin: "0 auto", width: "100%", boxSizing: "border-box" };
-export const pageForm = { maxWidth: 480, margin: "0 auto", width: "100%", boxSizing: "border-box" };
+export const pageForm = { maxWidth: 560, margin: "0 auto", width: "100%", boxSizing: "border-box" };
 export const pageFull = { maxWidth: "100%", margin: "0 auto", width: "100%", boxSizing: "border-box" };
 
 export const iconBtn = { cursor: "pointer", padding: "6px", border: "none", background: "transparent", borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" };
@@ -246,15 +246,20 @@ export function DownloadLink({ children, style, ...props }) {
 // Lagen frueher in jeder Seite einzeln und sind auseinandergelaufen: vier
 // Varianten von btnPrimary, fuenf von btnSecondary — mal 14px, mal 13.5px,
 // mal mit, mal ohne letterSpacing. Verbindlich ist ab hier diese eine Quelle.
+// boxSizing gehoert hierher und nicht an die Aufrufer: ein Knopf mit
+// `width: "100%"` und Polsterung ragte sonst um die Polsterung aus seinem
+// Kasten heraus — genau das erzeugte auf den Formularseiten (Kontakt, Anmelden,
+// Passwort) die waagerechte Bildlaufleiste auf dem Handy.
 export const btnPrimary = {
   padding: "9px 18px", cursor: "pointer", fontSize: 14, border: "none",
   borderRadius: CONTROL_R, background: "var(--text)", color: "var(--bg)",
-  fontWeight: 600, letterSpacing: "-0.1px",
+  fontWeight: 600, letterSpacing: "-0.1px", boxSizing: "border-box",
 };
 
 export const btnSecondary = {
   padding: "9px 18px", cursor: "pointer", fontSize: 14,
   border: "1px solid var(--border2)", borderRadius: CONTROL_R,
+  boxSizing: "border-box",
   background: "var(--card)", color: "var(--text)",
   fontWeight: 500, letterSpacing: "-0.1px",
 };

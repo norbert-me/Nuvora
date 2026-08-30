@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
@@ -108,7 +109,6 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   // Anzeigename, Notenschlüssel und Tendenz sind EIN Entwurf: sie hängen an
   // demselben PUT und gehen gemeinsam hinaus.
   const [profilBasis, setProfilBasis] = useState({
-    marketplaceName: user.marketplace_name || "",
     gradeScale: user.grade_scale || DEFAULT_SCALE,
     gradeTendency: user.grade_tendency !== false,   // Voreinstellung: mit Tendenz (2+)
     // Schuljahr. Am Konto und nicht an der Klasse: es ist fuer alle Klassen
@@ -117,7 +117,27 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     hj1: user.hj1_start || "", hj2: user.hj2_start || "", ende: user.jahr_ende || "",
   });
   const profil = useEntwurf(profilBasis, (w) => saveProfile(w));
-  const { marketplaceName, gradeScale, gradeTendency } = profil.wert;
+  const { gradeScale, gradeTendency } = profil.wert;
+  // Der Name, unter dem Beiträge im Marktplatz stehen. Er hängt an keinem
+  // zweiten Wert und wirkt sofort — deshalb steht er bei den Umschaltern und
+  // nicht im Entwurf; geschrieben wird beim Verlassen des Feldes und mit Enter.
+  const [marktName, setMarktName] = useState(user.marketplace_name || "");
+  const [marktStand, setMarktStand] = useState(user.marketplace_name || "");
+  const marktSpeichern = async () => {
+    const wert = marktName.trim();
+    if (wert === marktStand) return;
+    const res = await fetch(`${API}/auth/profile`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name, salutation, marketplace_name: wert }),
+    }).catch(() => null);
+    if (!res || !res.ok) { setProfileMsg(t("profile.saveError")); return; }
+    const data = await res.json();
+    setMarktStand(wert); setMarktName(wert);
+    const updated = { ...user, ...data };
+    localStorage.setItem("user", JSON.stringify(updated));
+    onUserUpdate?.(updated);
+  };
   const [showPw, setShowPw] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminMsg, setAdminMsg] = useState("");
@@ -171,7 +191,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     const res = await fetch(`${API}/auth/profile`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name, salutation, grade_scale: w.gradeScale, grade_tendency: w.gradeTendency, marketplace_name: w.marketplaceName,
+      body: JSON.stringify({ name, salutation, grade_scale: w.gradeScale, grade_tendency: w.gradeTendency,
                              hj1_start: w.hj1 || "", hj2_start: w.hj2 || "", jahr_ende: w.ende || "" }),
     });
     if (res.ok) {
@@ -334,12 +354,6 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             options={[["an", t("profile.gradeTendencyOn")], ["aus", t("profile.gradeTendencyOff")]]} />
         </Zeile>
 
-        <Zeile label={t("profile.username")} hint={t("profile.usernameHint")}>
-          <input placeholder={t("profile.usernamePlaceholder")} value={marketplaceName} onChange={(e) => profil.setz({ marketplaceName: e.target.value })}
-            onKeyDown={(e) => { if (e.key === "Enter") profil.speichern(); }}
-            style={{ ...feldStyle, marginBottom: 0, width: 220 }} />
-        </Zeile>
-
         {profileMsg && <div style={{ fontSize: 13, color: profileMsg === t("profile.saved") ? C.success : C.danger, marginTop: 12 }}>{profileMsg}</div>}
         {/* Ohne `immer`: die Leiste erscheint erst, wenn wirklich etwas offen
             ist. Dauerhaft sichtbar stand dort ein Speichern-Knopf, der nichts
@@ -360,7 +374,20 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             ))}
           </select>
         </Zeile>
+        {/* Zwei verschiedene Dinge, deshalb zwei Knöpfe: die Tutorial-SEITE zum
+            Nachlesen und der Neustart der eingeblendeten Führung. Der Weg zur
+            Seite hing bisher in der Fußzeile — dort sucht ihn niemand, und
+            neben dem Neustart steht er bei der Frage, zu der er gehört. */}
+        <Zeile label={t("profile.username")} hint={t("profile.usernameHint")}>
+          <input placeholder={t("profile.usernamePlaceholder")} value={marktName}
+            onChange={(e) => setMarktName(e.target.value)} onBlur={marktSpeichern}
+            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            style={{ ...feldStyle, marginBottom: 0, width: 220 }} />
+        </Zeile>
         <Zeile label={t("profile.tutorialTitle")}>
+          <Link to="/tutorial" style={{ ...btnSecondary, display: "inline-block", textDecoration: "none", marginRight: 8 }}>
+            {t("profile.tutorialOpen")}
+          </Link>
           <button type="button" onClick={() => {
             try { localStorage.removeItem(`nuvora_onboarded_${user?.id ?? "x"}`); } catch { /* egal */ }
             window.location.href = "/";

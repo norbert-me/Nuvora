@@ -112,19 +112,9 @@ export default function Fehlermelder() {
                 <input type="checkbox" checked={mitUmg} onChange={(e) => setMitUmg(e.target.checked)} />
                 {t("melder.mitUmgebung")}
               </label>
-              <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 8px" }}>{t("melder.logHinweis")}</p>
-
-              {/* Datenschutz-Hinweis. Er steht hier und nicht im Kleingedruckten
-                  irgendeiner anderen Seite: mitgeschickt wird JETZT, also muss
-                  hier stehen, was mitgeht, wohin es geht und wie lange es
-                  bleibt. Der Knopf daneben zeigt es im Klartext — ein Hinweis,
-                  den man nicht nachpruefen kann, ist eine Behauptung. */}
-              <div style={{ ...cardStyle, padding: 10, margin: "0 0 8px", fontSize: 12,
-                lineHeight: 1.5, color: "var(--text2)", display: "flex", gap: 8 }}>
-                <Icon d={ICONS.info} size={14} color="var(--text3)" />
-                <span>{t("melder.datenschutz")}</span>
-              </div>
-
+              {/* Kein Hinweistext mehr: der Knopf darunter zeigt im Klartext,
+                  was mitgeht, und beide Häkchen lassen sich abwählen —
+                  nachlesbar schlägt beschrieben. */}
               <button onClick={() => setLogOffen((v) => !v)}
                 style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13, marginBottom: 8 }}>
                 {logOffen ? t("melder.logZu") : t("melder.wasGeht")}
