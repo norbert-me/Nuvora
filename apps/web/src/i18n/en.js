@@ -340,7 +340,7 @@ export default {
   "profile.emailInfo": "We'll send a confirmation link to the new address. It only becomes active after confirmation.",
   "profile.sendLink": "Send confirmation link",
   "profile.linkSent": "Confirmation link sent to the new address.",
-  "profile.username": "Name on Nuvora",
+  "profile.username": "Marketplace name",
   "profile.settings": "Teaching",
   "profile.sofort": "Takes effect at once",
   "profile.account": "Account",

@@ -341,7 +341,7 @@ export default {
   "profile.emailInfo": "Enviaremos un enlace de confirmación a la nueva dirección. Solo se activará tras confirmarla.",
   "profile.sendLink": "Enviar enlace de confirmación",
   "profile.linkSent": "Enlace de confirmación enviado a la nueva dirección.",
-  "profile.username": "Nombre en Nuvora",
+  "profile.username": "Nombre en el mercado",
   "profile.settings": "Docencia",
   "profile.sofort": "Efecto inmediato",
   "profile.account": "Cuenta",

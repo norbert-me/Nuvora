@@ -342,7 +342,7 @@ export default {
   "profile.emailInfo": "Wir senden einen Bestätigungslink an die neue Adresse. Erst nach Bestätigung wird sie aktiv.",
   "profile.sendLink": "Bestätigungslink senden",
   "profile.linkSent": "Bestätigungslink an die neue Adresse gesendet.",
-  "profile.username": "Name zu Nuvora",
+  "profile.username": "Name im Marktplatz",
   "profile.settings": "Unterricht",
   "profile.sofort": "Wirkt sofort",
   "profile.account": "Konto",

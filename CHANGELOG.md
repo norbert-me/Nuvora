@@ -1,6 +1,9 @@
 # Änderungen
 
-Was in jeder Fassung dazugekommen ist — kurz, in der Sprache der Oberfläche.
+Was in jeder Fassung dazugekommen ist — **eine Zeile je Änderung**, in der
+Sprache der Oberfläche. Keine Begründungen: eine Fassung, die man in einer
+halben Minute überfliegt, wird gelesen; drei Absätze je Punkt nicht, und bei
+einer Zwischenfassung stehen zehn solcher Abschnitte untereinander.
 Die technischen Begründungen stehen in [CLAUDE.md](CLAUDE.md), die
 Entwicklungsgeschichte in `git log`.
 
@@ -13,41 +16,22 @@ Notiz zur größten Fassung die dünnste.
 
 **Kalender**
 
-- Termine aus abonnierten fremden Kalendern gehen auf Wunsch im eigenen Export
-  mit hinaus — im Abo und im CalDAV-Kalender. Der Schalter steht im Teilen-Dialog
-  bei den externen Kalendern und ist **aus**: wer seinen iCloud-Kalender in
-  Nuvora einblendet und Nuvora zurück aufs selbe Handy spiegelt, sähe sonst
-  jeden Termin doppelt.
-- Einen fremden Termin im Handy zu löschen blendet ihn in Nuvora aus — im
-  fremden Kalender bleibt er unangetastet. Ändern geht nicht: das gehört dorthin,
-  wo der Termin herkommt.
-- Über dem Kalender erscheint eine Zeile, wenn im gezeigten Zeitraum etwas
-  ausgeblendet ist — entfallene Stunden und weggeblendete fremde Termine. Ein
-  Klick zeigt sie im Popup, dort lassen sie sich zurückholen. Vorher lagen sie
-  verstreut: als durchgestrichene Chips über jedem Tag und als Sammelknopf im
-  Auge-Menü.
-- Freie Tage lassen sich auf **Kommende / Vergangene / Alle** umschalten und
-  zeigen voreingestellt nur das Kommende. Die Liste wächst mit jedem Schuljahr;
-  Vergangenes ist nicht weg, es steht nur nicht mehr im Weg.
+- Fremde (abonnierte) Termine gehen auf Wunsch im Abo und im CalDAV-Kalender mit
+  hinaus. Schalter im Teilen-Dialog, aus als Vorgabe.
+- Einen fremden Termin im Handy löschen blendet ihn in Nuvora aus.
+- Über dem Kalender steht, was im gezeigten Zeitraum ausgeblendet ist — ein Klick
+  holt es zurück.
+- Freie Tage: Kommende / Vergangene / Alle.
 
 **CalDAV**
 
-- Auf iPhone und iPad richtet ein Konfigurationsprofil das Konto ein: ein Tipp
-  statt Serveradresse, Port, Pfad, Benutzername und Passwort abzutippen. Der
-  Knopf erscheint direkt nach dem Anlegen eines Gerätepassworts; der Link gilt
-  einmal und zehn Minuten. iOS meldet dabei „Nicht signiert“ — das ist erwartet.
-- Der Teilen-Dialog läuft auf schmalen Bildschirmen nicht mehr aus dem Rand.
+- iPhone und iPad richten sich per Konfigurationsprofil ein, statt alles
+  abzutippen.
 
 **Oberfläche**
 
-- Kontakt, Anmelden und Passwort zurücksetzen erzeugen auf dem Handy keine
-  waagerechte Bildlaufleiste mehr, und die Formularseiten sind etwas breiter.
-- Eine neue Seite fängt oben an. Wer unten auf „Impressum“ klickte, landete
-  bisher in der Mitte des Impressums. Bei „Zurück“ bleibt die alte Stelle.
-- Das Tutorial steht im Profil neben „Tutorial neu starten“ statt in der
-  Fußzeile.
-- „Name im Marktplatz“ heißt „Name zu Nuvora“ und steht bei den Einstellungen,
-  die sofort wirken.
-- Weniger Erklärtext: der Protokoll-Abschnitt im Profil und die beiden
-  Hinweisabsätze im Melde-Dialog sind weg. Was mitgeschickt wird, zeigt dort
-  weiterhin der Knopf im Klartext, und beide Häkchen lassen sich abwählen.
+- Kein waagerechtes Scrollen mehr auf Kontakt, Anmelden und Passwort; die
+  Formularseiten sind etwas breiter.
+- Ein Seitenwechsel fängt oben an.
+- Tutorial steht im Profil statt in der Fußzeile.
+- Weniger Erklärtext im Profil und im Melde-Dialog.
