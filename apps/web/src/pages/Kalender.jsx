@@ -1550,7 +1550,10 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUp
             <>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 16 }}>{e.kurs || e.klasse || "—"}{e.title ? ` · ${e.title}` : ""}</div>
-                <div style={{ fontSize: 12, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}{e.period ? ` · ${e.period}. ${t("kalender.period")}` : ""}</div>
+                {/* Die Kalenderwoche steht dabei: Schulen planen in Wochen ("die
+                    Arbeit liegt in KW 9"), und aus einem Datum liest man sie
+                    nicht ab. */}
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · {t("kalender.kw")} {isoWeek(new Date(e.date)).week}{e.period ? ` · ${e.period}. ${t("kalender.period")}` : ""}</div>
                 {/* Die Themen der Arbeit: beim Vorbereiten steht damit da,
                     worüber geschrieben wird — und beim Planen der letzten
                     Stunden davor, was noch drankommen muss. */}
