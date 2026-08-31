@@ -38,7 +38,7 @@ export default function Kurse() {
   // Jahresfolge: Schuljahr und der Kurs des Vorjahres. Die Daten bleiben
   // getrennt (Zeugnisnoten gelten je Schuljahr) — verbunden wird nur die Kette,
   // damit „6.5 Mathe" und „7.5 Mathe" nicht als zwei fremde Gruppen dastehen.
-  const LEER = { name: "", jahr: "", fach: "", jahrgang: "", vorgaenger: "", niveauAktiv: false, archiviert: false, klassen: [] };
+  const LEER = { name: "", jahr: "", fach: "", jahrgang: "", raum: "", vorgaenger: "", niveauAktiv: false, archiviert: false, klassen: [] };
   const [kursBasis, setKursBasis] = useState(LEER);
   const kurs = useEntwurf(kursBasis, (w) => kursSpeichern(w));
   const kursUebernehmen = (stand) => { setKursBasis(stand); kurs.setz(stand); };
@@ -72,7 +72,7 @@ export default function Kurse() {
     if (kurs.geaendert && !window.confirm(t("speichern.verlassen"))) return;
     setEditKurs(k.id);
     kursUebernehmen({
-      name: k.name, jahr: k.schuljahr || "", fach: k.fach || "", jahrgang: k.jahrgang ? String(k.jahrgang) : "",
+      name: k.name, jahr: k.schuljahr || "", fach: k.fach || "", jahrgang: k.jahrgang ? String(k.jahrgang) : "", raum: k.raum || "",
       vorgaenger: k.vorgaenger_id ? String(k.vorgaenger_id) : "",
       niveauAktiv: !!k.niveau_aktiv, archiviert: archiv, klassen: k.classes.map((c) => c.id),
     });
@@ -93,7 +93,8 @@ export default function Kurse() {
     const name = w.name.trim();
     if (!name) return false;
     const koerper = { name, schuljahr: w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv,
-                      fach: (w.fach || "").trim(), jahrgang: w.jahrgang ? Number(w.jahrgang) : 0 };
+                      fach: (w.fach || "").trim(), jahrgang: w.jahrgang ? Number(w.jahrgang) : 0,
+                      raum: (w.raum || "").trim() };
     if (!(await sende(`${API}/kurse/${k.id}`, alsJson("PUT", koerper), t("kurse.editName")))) return false;
     for (const id of w.klassen.filter((x) => !kursBasis.klassen.includes(x)))
       if (!(await sende(`${API}/kurse/${k.id}/classes/${id}`, { method: "POST" }, t("kurse.addClass")))) return false;
@@ -156,6 +157,7 @@ export default function Kurse() {
               <strong style={{ fontSize: 16 }}>{k.name}</strong>
               {k.schuljahr && <span style={chipStyle}>{k.schuljahr}</span>}
               {k.fach && <span style={chipStyle}>{k.fach}</span>}
+              {k.raum && <span style={chipStyle}>{k.raum}</span>}
               {k.jahrgang ? <span style={chipStyle}>{t("topics.jahrgangN", { n: k.jahrgang })}</span> : null}
               <span style={{ flex: 1 }} />
               {/* Archivieren steht jetzt IM Bearbeiten-Bereich und wartet dort
@@ -216,6 +218,12 @@ export default function Kurse() {
                     <input type="number" min="1" max="13" value={kurs.wert.jahrgang}
                       onChange={(e) => kurs.setz({ jahrgang: e.target.value })} placeholder={t("topics.jahrgang")}
                       style={{ ...inputStyle, width: 110 }} />
+                    {/* Der Stammraum. Am Kurs und nicht je Stundenplan-Stunde:
+                        derselbe Kurs hat vier Stunden in der Woche und meist
+                        denselben Raum. Der Kalender setzt ihn als Ort ein. */}
+                    <input value={kurs.wert.raum} maxLength={60}
+                      onChange={(e) => kurs.setz({ raum: e.target.value })} placeholder={t("kurse.raum")}
+                      style={{ ...inputStyle, width: 140 }} />
                   </div>
                   <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("kurse.fachHint")}</div>
                 </div>

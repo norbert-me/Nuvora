@@ -2019,6 +2019,7 @@ export default {
   "sitzplan.zoomOut": "Kleiner",
   "kurse.loadError": "Die Kurse konnten nicht geladen werden.",
   "kurse.editFach": "Fach und Jahrgang",
+  "kurse.raum": "Raum",
   "kurse.fachHint": "Verbindet den Kurs mit den Themen desselben Fachs und Jahrgangs — Grundlage für den Stoffverteilungsplan.",
   "trash.loadError": "Der Papierkorb konnte nicht geladen werden.",
   "todo.toggle": "Aufgabe abhaken",

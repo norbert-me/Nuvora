@@ -290,6 +290,13 @@ class Kurs(Base):
     # Schuljahr als Text, z.B. "2025/26". Bewusst kein Datumsbereich: das
     # Schuljahr ist eine Beschriftung, kein Zeitraum, mit dem gerechnet wird.
     schuljahr: Mapped[str] = mapped_column(String(9), default="", server_default="")
+    # Der Raum, in dem dieser Kurs normalerweise stattfindet ("B204", "Sporthalle").
+    # Am Kurs und nicht am Stundenplan-Slot: derselbe Kurs hat vier Stunden in
+    # der Woche und meist denselben Raum — vier Mal dasselbe einzutragen waere
+    # dieselbe Angabe vierfach, und beim ersten Abweichen wuesste niemand,
+    # welche stimmt. Der Kalender setzt ihn als Ort (LOCATION) ein; eine
+    # einzelne Stunde kann ihn am Eintrag ueberschreiben (Raumtausch).
+    raum: Mapped[str] = mapped_column(String(60), default="", server_default="")
     # Dieselbe Lerngruppe im Vorjahr. Die Daten bleiben getrennt (Zeugnisnoten
     # gelten je Schuljahr) — verbunden wird nur die Kette, damit „6.5 Mathe" und
     # „7.5 Mathe" nicht als zwei fremde Gruppen dastehen. SET NULL: wird das

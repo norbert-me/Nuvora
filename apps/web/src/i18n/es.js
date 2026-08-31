@@ -2034,6 +2034,7 @@ export default {
   "sitzplan.zoomOut": "Alejar",
   "kurse.loadError": "No se pudieron cargar los cursos.",
   "kurse.editFach": "Asignatura y curso",
+  "kurse.raum": "Aula",
   "kurse.fachHint": "Conecta el curso con los temas de la misma asignatura y nivel — base de la programación.",
   "trash.loadError": "No se pudo cargar la papelera.",
   "todo.toggle": "Marcar tarea",

@@ -351,6 +351,8 @@ def _ensure_columns(sync_conn):
         ("school_classes", "archived_at", "TIMESTAMPTZ"),
         ("students", "position", "INTEGER DEFAULT 0 NOT NULL"),
         ("kurse", "archived_at", "TIMESTAMPTZ"),
+        # Stammraum des Kurses — der Kalender setzt ihn als Ort ein.
+        ("kurse", "raum", "VARCHAR(60) DEFAULT '' NOT NULL"),
         ("materials", "rolle", "VARCHAR(20) DEFAULT '' NOT NULL"),
         ("cards", "deleted_at", "TIMESTAMP WITH TIME ZONE"),
         ("cards", "front_image", "BYTEA"),

@@ -49,6 +49,8 @@ class KursIn(BaseModel):
     # Zusammenhang zu raten waere genau der Fehler, den die Taxonomie vermeidet.
     fach: Optional[str] = None
     jahrgang: Optional[int] = None
+    # Stammraum ("B204"). Der Kalender setzt ihn als Ort der Stunde ein.
+    raum: Optional[str] = None
 
 
 class NiveauIn(BaseModel):
@@ -71,6 +73,7 @@ class KursOut(BaseModel):
     schuljahr: str = ""
     fach: str = ""
     jahrgang: Optional[int] = None
+    raum: str = ""
     vorgaenger_id: Optional[int] = None
     vorgaenger_name: str = ""       # damit die Liste nicht je Kurs nachfragen muss
     nachfolger_id: Optional[int] = None
@@ -177,7 +180,7 @@ async def list_kurse(archiviert: bool = False, user: User = Depends(get_current_
     return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv,
                     color=k.color, member_count=int(mc.get(k.id, 0)),
                     schuljahr=k.schuljahr, fach=k.fach or "", jahrgang=k.jahrgang,
-                    vorgaenger_id=k.vorgaenger_id,
+                    raum=k.raum or "", vorgaenger_id=k.vorgaenger_id,
                     vorgaenger_name=alle.get(k.vorgaenger_id, "") if k.vorgaenger_id else "",
                     nachfolger_id=(nachfolger.get(k.id) or (None, ""))[0],
                     nachfolger_name=(nachfolger.get(k.id) or (None, ""))[1]) for k in kurse]
@@ -244,10 +247,12 @@ async def rename_kurs(kurs_id: int, body: KursIn, user: User = Depends(get_curre
         # 0 heisst „keine Angabe" — die Oberflaeche schickt bei geleertem Feld
         # keine Null, sondern nichts; beides muss hier dasselbe bedeuten.
         k.jahrgang = body.jahrgang or None
+    if body.raum is not None:
+        k.raum = (body.raum or "").strip()[:60]
     await db.commit()
     return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color,
                    schuljahr=k.schuljahr, fach=k.fach or "", jahrgang=k.jahrgang,
-                   vorgaenger_id=k.vorgaenger_id)
+                   raum=k.raum or "", vorgaenger_id=k.vorgaenger_id)
 
 
 class ColorIn(BaseModel):

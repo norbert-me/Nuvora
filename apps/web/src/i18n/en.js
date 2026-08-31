@@ -2033,6 +2033,7 @@ export default {
   "sitzplan.zoomOut": "Zoom out",
   "kurse.loadError": "Courses could not be loaded.",
   "kurse.editFach": "Subject and year group",
+  "kurse.raum": "Room",
   "kurse.fachHint": "Links the course to the topics of the same subject and year — the basis for the scheme of work.",
   "trash.loadError": "The trash could not be loaded.",
   "todo.toggle": "Tick off task",
