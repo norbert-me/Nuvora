@@ -984,7 +984,7 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
     # auch zusätzliche/verschobene, die nicht im wiederkehrenden Raster stehen.
     planned = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.period.is_not(None)))).scalars().all()
     id2cls, _ = await _class_maps(db, user)
-    kurse = {k.id: k.name for k in (await db.execute(select(Kurs).where(Kurs.owner_id == user.id))).scalars().all()}
+    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(Kurs.owner_id == user.id))).scalars().all()}
     # Themen der Termine mit Namen versehen. Ein inzwischen geloeschtes Thema
     # faellt hier heraus, statt als Nummer ohne Namen anzukommen — die Termine
     # muessen davon nichts wissen.
@@ -1025,7 +1025,11 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
         out.append({
             "id": ex.id, "date": ex.date.isoformat(), "title": ex.title,
             "kurs_id": ex.kurs_id, "class_id": ex.class_id, "work_id": ex.work_id, "period": ex.period,
-            "kurs": kurse.get(ex.kurs_id) if ex.kurs_id else None,
+            "kurs": getattr(kurse.get(ex.kurs_id), "name", None) if ex.kurs_id else None,
+            # Das Fach steht am Kurs. Die Liste laesst sich danach sortieren:
+            # wer Mathe und Deutsch unterrichtet, plant die Arbeiten fachweise,
+            # nicht in der Reihenfolge, in der sie im Kalender stehen.
+            "fach": getattr(kurse.get(ex.kurs_id), "fach", "") or "" if ex.kurs_id else "",
             "klasse": id2cls.get(ex.class_id) if ex.class_id else None,
             "stunden": stunden,
             "topic_ids": list(ex.topic_ids or []),

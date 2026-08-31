@@ -1060,6 +1060,8 @@ export default {
   "kalender.examTitle": "Título (opcional)",
   "kalender.examAllDay": "Todo el día",
   "kalender.examPeriodHint": "Opcional: vincular a una hora del día.",
+  "kalender.sortDate": "Fecha",
+  "kalender.sortFach": "Asignatura",
   "kalender.examsEmpty": "Aún no hay exámenes próximos.",
   "kalender.examStunden": "horas restantes",
   "kalender.examMeasures": "Adaptaciones para {{n}} alumnos",

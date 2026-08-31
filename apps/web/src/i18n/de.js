@@ -1044,6 +1044,8 @@ export default {
   "kalender.examTitle": "Titel (optional)",
   "kalender.examAllDay": "Ganztägig",
   "kalender.examPeriodHint": "Optional an eine Stunde des Tages binden.",
+  "kalender.sortDate": "Datum",
+  "kalender.sortFach": "Fach",
   "kalender.examsEmpty": "Noch keine kommenden Klassenarbeiten.",
   "kalender.examStunden": "Std. bis dahin",
   "kalender.examMeasures": "Abweichungen für {{n}} Schüler",

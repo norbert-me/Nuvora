@@ -1450,6 +1450,18 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUp
   const [eKursId, setEKursId] = useState(null);
   const [ePeriod, setEPeriod] = useState("");
   const pOpts = Array.from({ length: Math.max(1, periods) }, (_, i) => i + 1);
+  // Wonach die Liste sortiert ist. Vorgabe bleibt das Datum — das ist die
+  // Frage „was kommt als Naechstes?". Wer mehrere Faecher unterrichtet, plant
+  // die Arbeiten dagegen fachweise; innerhalb eines Fachs zaehlt wieder das
+  // Datum. Im Browser gemerkt: es ist eine Ansicht, kein Inhalt.
+  const [sortierung, setSortierung] = useState(() => {
+    try { return localStorage.getItem("kal_exam_sort") === "fach" ? "fach" : "datum"; } catch { return "datum"; }
+  });
+  const setzeSortierung = (v) => { setSortierung(v); try { localStorage.setItem("kal_exam_sort", v); } catch { /* egal */ } };
+  const liste = sortierung === "fach"
+    ? [...overview].sort((a, b) => (a.fach || "\uffff").localeCompare(b.fach || "\uffff", undefined, { sensitivity: "base" })
+        || new Date(a.date) - new Date(b.date))
+    : overview;
   const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); setEPeriod(e.period ? String(e.period) : ""); setEThemen(e.topic_ids || []); };
   const saveEdit = (e) => {
     if (!eDate || !eClassId) return;
@@ -1494,9 +1506,21 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUp
         <button onClick={save} disabled={!classId || !date} style={{ ...toolbarBtnPrimary, opacity: (classId && date) ? 1 : 0.5 }}>{t("common.add")}</button>
       </Werkzeugleiste>
 
-      {overview.length === 0 ? (
+      {overview.length > 1 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <Segment>
+            {[["datum", t("kalender.sortDate")], ["fach", t("kalender.sortFach")]].map(([k, label]) => (
+              <button key={k} onClick={() => setzeSortierung(k)}
+                style={{ ...segmentBtn, fontWeight: sortierung === k ? 700 : 500,
+                  color: sortierung === k ? "var(--accent)" : "var(--text2)" }}>{label}</button>
+            ))}
+          </Segment>
+        </div>
+      )}
+
+      {liste.length === 0 ? (
         <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("kalender.examsEmpty")}</p>
-      ) : overview.map((e) => (
+      ) : liste.map((e) => (
         <div key={e.id} style={{ ...cardStyle, padding: 12, marginBottom: 8 }}>
          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {editId === e.id ? (
