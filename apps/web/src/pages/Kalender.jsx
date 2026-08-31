@@ -446,7 +446,13 @@ export default function Kalender() {
     // bearbeitet den vorhandenen Eintrag statt einen neuen anzulegen.
     const vorhanden = entries.find((e) => ymd(new Date(e.date)) === ymd(day) && e.period != null && e.period === s.period);
     if (vorhanden) setEditing({ ...vorhanden, date: new Date(vorhanden.date) });
-    else setEditing({ date: startOfDay(day), period: s.period, title: s.title || "", class_id: s.class_id || null, kurs_id: s.kurs_id ?? null, topic_id: s.topic_id || null });
+    else {
+      // Ort vorbelegen: der Stammraum des Kurses. Er ist die Regel, der
+      // Raumtausch die Ausnahme — und die laesst sich am Eintrag ueberschreiben.
+      const kid = s.kurs_id ?? (classes.find((c) => c.id === s.class_id) || {}).kurs_id ?? null;
+      const raum = (kurse.find((k) => k.id === kid) || {}).raum || "";
+      setEditing({ date: startOfDay(day), period: s.period, title: s.title || "", class_id: s.class_id || null, kurs_id: s.kurs_id ?? null, topic_id: s.topic_id || null, location: raum });
+    }
   };
 
   // Farbe aus dem Stundenplan setzen: am FACH (Fach-Klasse), damit verschiedene

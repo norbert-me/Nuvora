@@ -364,7 +364,8 @@ async def _ressourcen(db: AsyncSession, u: User, fenster=None) -> list:
         tag = v["tag"]
         out.append({"name": _slot_name(v["slot"], tag), "text": X.baue_vevent(
             uid=f"nuvora-slot-{v['slot'].id}-{tag.strftime('%Y%m%d')}-t@nuvora",
-            tag=tag, titel=v["titel"], start_time=v["start"], end_time=v["ende"],
+            tag=tag, titel=v["titel"], ort=v.get("raum") or "",
+            start_time=v["start"], end_time=v["ende"],
             # Fester Zeitstempel statt „jetzt": das ETag entsteht aus dem
             # Inhalt, und ein wanderndes DTSTAMP liesse es bei jedem Abruf
             # anders ausfallen. Der Client hielte dann jede Stunde fuer

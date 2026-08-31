@@ -915,8 +915,10 @@ async def stundenplan_vorkommen(db: AsyncSession, user: User, start: date, ende:
       Vorlage bereits zu einem echten Termin geworden, und beide zusammen
       waeren derselbe Unterricht doppelt.
 
-    Rueckgabe je Vorkommen: {"slot", "tag", "titel", "start", "ende"} mit
-    Uhrzeiten als "HH:MM" (leer, wenn fuer die Stunde keine hinterlegt ist).
+    Rueckgabe je Vorkommen: {"slot", "tag", "titel", "raum", "start", "ende"}
+    mit Uhrzeiten als "HH:MM" (leer, wenn fuer die Stunde keine hinterlegt ist).
+    `raum` ist der Stammraum des Kurses (kurse.raum) und wird als Ort (LOCATION)
+    ausgegeben — im Handykalender ist „wo?" die zweite Frage nach „was?".
     """
     slots = (await db.execute(select(TimetableSlot).where(
         TimetableSlot.owner_id == user.id))).scalars().all()
@@ -961,6 +963,7 @@ async def stundenplan_vorkommen(db: AsyncSession, user: User, start: date, ende:
                 z = zeiten[s.period - 1] if 0 < s.period <= len(zeiten) else None
                 out.append({
                     "slot": s, "tag": tag, "titel": titel,
+                    "raum": getattr(kurs, "raum", "") or "",
                     "start": (z or {}).get("start", "") if isinstance(z, dict) else "",
                     "ende": (z or {}).get("end", "") if isinstance(z, dict) else "",
                 })
@@ -1759,20 +1762,23 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
         # faelschlich ganztaegigen Slot-Events durch die getakteten ERSETZT
         # werden — sonst behaelt Apple pro UID stur den Ganztags-Typ.
         uid = f"UID:nuvora-slot-{s.id}-{d8(day)}-t@nuvora"
+        # Der Stammraum des Kurses als Ort — dieselbe Angabe, die auch im
+        # CalDAV-Kalender steht.
+        ort = [f"LOCATION:{_ics_escape(v['raum'])}"] if v.get("raum") else []
         if a and b2:
             # Getaktete Stunde: Anfang und Ende am selben Tag. KEIN "+1 Tag" —
             # DTEND ist hier ein Zeitpunkt, kein Folgetag; ein Zuschlag machte
             # aus jeder Stunde einen Tagestermin.
             lines += ["BEGIN:VEVENT", uid, f"DTSTAMP:{now}",
                       f"DTSTART:{d8(day)}T{a}", f"DTEND:{d8(day)}T{b2}",
-                      f"SUMMARY:{_ics_escape(v['titel'])}", "END:VEVENT"]
+                      f"SUMMARY:{_ics_escape(v['titel'])}"] + ort + ["END:VEVENT"]
         else:
             # Ohne hinterlegte Uhrzeit bleibt nur der Tag. Ganztaegig, also
             # DTEND exklusiv = Folgetag (genau ein "+1").
             lines += ["BEGIN:VEVENT", uid, f"DTSTAMP:{now}",
                       f"DTSTART;VALUE=DATE:{d8(day)}",
                       f"DTEND;VALUE=DATE:{d8(day + timedelta(days=1))}",
-                      f"SUMMARY:{_ics_escape(v['titel'])}", "END:VEVENT"]
+                      f"SUMMARY:{_ics_escape(v['titel'])}"] + ort + ["END:VEVENT"]
 
     # Die Termine der abonnierten fremden Kalender — nur wenn ausdruecklich
     # eingeschaltet (users.feed_external). Sie sind hier Beifang und bleiben
