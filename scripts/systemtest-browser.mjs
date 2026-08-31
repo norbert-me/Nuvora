@@ -134,20 +134,10 @@ const verbindungen = (td) => [
     allein: ["cardvote"],
     zusammen: ["cardvote", "auswertung"],
   },
-  {
-    name: "CardVote-Auswertung → „Karten-Deck anlegen\" (braucht Karten)",
-    pfad: `/cardvote/evaluation/${td.session?.id}`,
-    marker: "Karten-Deck anlegen",
-    allein: ["cardvote"],
-    zusammen: ["cardvote", "karten"],
-  },
-  {
-    name: "CardVote-Auswertung → „Lernpfad-Aufgabe\" (braucht Lernpfad)",
-    pfad: `/cardvote/evaluation/${td.session?.id}`,
-    marker: "Lernpfad-Aufgabe",
-    allein: ["cardvote"],
-    zusammen: ["cardvote", "lernpfad"],
-  },
+  // Der Abschnitt „Schwache Themen" in der CardVote-Auswertung ist entfallen
+  // (seine beiden Knoepfe legten etwas Leeres an). Die beiden Proben dazu
+  // stehen deshalb nicht mehr hier — die Startseiten-Bruecken „Deck erstellen"
+  // und „Aufgabe anlegen" weiter unten pruefen dieselbe Regel weiter.
   {
     name: "Notenbuch → „Aus Code-Detektiv\" (braucht Code-Detektiv)",
     pfad: `/auswertung?tab=noten${klassenParam(td, "&")}`,
@@ -280,6 +270,12 @@ const verbindungen = (td) => [
 async function terminDialogOeffnen(seite) {
   await seite.locator("[title='Neuer Eintrag']").first().click({ timeout: 8000 });
   await seite.waitForTimeout(700);
+  // Die Modul-Selektoren (Quiz, Deck, Lernleiter, Einstieg) liegen unter
+  // „Erweitert" — bei einem NEUEN Eintrag ist der Bereich zugeklappt, weil dort
+  // noch nichts steht. Ohne diesen Klick meldete der Lauf vier tote Bruecken,
+  // obwohl die Selektoren nur eine Ebene tiefer standen.
+  await seite.getByRole("button", { name: "Erweitert" }).first().click({ timeout: 5000 }).catch(() => {});
+  await seite.waitForTimeout(400);
 }
 
 /**
