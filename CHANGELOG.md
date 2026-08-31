@@ -37,6 +37,11 @@ Notiz zur größten Fassung die dünnste.
 - Eine gelöschte Auswertung führt auf die Startseite statt auf
   „Verbindungsfehler".
 
+**Aufgaben**
+
+- Das Fälligkeitsdatum trägt eine Ampel: vorbei rot, innerhalb einer Woche gelb,
+  sonst blau.
+
 **Lernpfad**
 
 - Lernpfade lassen sich umbenennen.
