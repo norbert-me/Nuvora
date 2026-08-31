@@ -1315,7 +1315,10 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
               return (
                 <Fragment key={p}>
                   <tr>
-                    <td style={{ ...tdBase, textAlign: "center", padding: showTimes ? 4 : "4px 0", background: "transparent", border: "none", width: showTimes ? 96 : 26 }}>
+                    {/* Senkrecht mittig: die Zahl stand oben in der Zelle,
+                        waehrend die Stunde daneben mittig sitzt — bei einer
+                        Doppelstunde lagen beide sichtbar auseinander. */}
+                    <td style={{ ...tdBase, textAlign: "center", verticalAlign: "middle", padding: showTimes ? 4 : "4px 0", background: "transparent", border: "none", width: showTimes ? 96 : 26 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{p}.</div>
                       {showTimes && (<>
                         <input type="time" value={timeVal(p - 1, "start")} onChange={(e) => commitTime(p - 1, "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
