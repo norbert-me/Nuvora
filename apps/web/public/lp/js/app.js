@@ -2823,10 +2823,23 @@
         const rowH = 12;
 
         const pdfTitle = entry.unterthema ? entry.thema + ' – ' + entry.unterthema : entry.thema;
+        // Der Titel lief rechts aus dem Blatt: 18pt fett und ein langer
+        // Themenname passen nicht in 180 mm, und jsPDF schneidet nicht ab,
+        // sondern schreibt weiter. Erst kleiner werden (bis 12pt), dann
+        // umbrechen — abschneiden waere der falsche Ausweg, der Titel sagt,
+        // welche Leiter das Kind vor sich hat.
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(18);
-        doc.text('Lernleiter: ' + pdfTitle, marginL, y);
-        y += 9;
+        let titelGroesse = 18;
+        const titelText = 'Lernleiter: ' + pdfTitle;
+        while (titelGroesse > 12) {
+            doc.setFontSize(titelGroesse);
+            if (doc.getTextWidth(titelText) <= contentW) break;
+            titelGroesse -= 1;
+        }
+        doc.setFontSize(titelGroesse);
+        const titelZeilen = doc.splitTextToSize(titelText, contentW);
+        doc.text(titelZeilen, marginL, y);
+        y += 9 + (titelZeilen.length - 1) * (titelGroesse * 0.42);
 
         // Name links, Datum rechts auf derselben Zeile - so kollidiert das
         // Datum nicht mehr mit langen Titeln.
@@ -2859,7 +2872,6 @@
         y += 5;
 
         let zusatzHeadingDone = false, wdhHeadingDone = false;
-        const regSekPage = ['Basis', 'G-Niveau', 'E-Niveau'];
         selectedTasks.forEach((task, idx) => {
             if (y > 272) { doc.addPage(); y = 15; }
 
@@ -2908,9 +2920,14 @@
             doc.text(String(idx + 1), numX, y + 1.5);
             doc.setTextColor(0);
 
-            // Selbsteinschätzung: zwei Smileys zum Ankreisen — nur bei PFLICHT-
-            // Aufgaben (regulaer, kein Zusatz), nicht bei Wiederholung/Erklaerung.
-            if (regSekPage.includes(task.section) && !task.zusatz) {
+            // Selbsteinschätzung: zwei Smileys zum Ankreisen. Sie standen nur
+            // bei den Pflichtaufgaben, weil nur die fuer die Zusatz-Entscheidung
+            // zaehlen — auf einem reinen Wiederholungsblatt fehlte damit jede
+            // Einschaetzung. Jetzt stehen sie ueberall ausser bei Erklaerungen
+            // (dort gibt es nichts einzuschaetzen); GEZAEHLT wird weiter nur bei
+            // den Pflichtaufgaben, und genau das sagt der Kasten auch.
+            const istErklaerung = task.section === 'Erklärung' || getKategorie(task) === 'Erklärung';
+            if (!istErklaerung) {
                 drawSmiley(doc, smileyX + 2.5, y, 2.2, true);
                 drawSmiley(doc, smileyX + 9, y, 2.2, false);
             }
@@ -2928,8 +2945,7 @@
 
             // Ankreuzfelder: Lösung geprüft + korrigiert
             // Bei Erklärungen weglassen (nichts zu prüfen/korrigieren)
-            const istErkl = task.section === 'Erklärung' || getKategorie(task) === 'Erklärung';
-            if (!istErkl) {
+            if (!istErklaerung) {
                 doc.setDrawColor(0);
                 doc.setLineWidth(0.4);
                 doc.rect(pruefX + 4, y - cbSize / 2, cbSize, cbSize);

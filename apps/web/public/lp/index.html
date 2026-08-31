@@ -475,8 +475,12 @@
                     <input type="checkbox" id="gen-group-edit" checked>
                     Änderungen auf ganze Gruppe anwenden (gleiches Niveau + gleiche Tags)
                 </label>
+                <!-- Angehakt als Vorgabe: der QR-Code ist der einzige Weg des
+                     Kindes in die Karten-App, und ein Blatt ohne ihn merkt man
+                     erst, wenn es ausgeteilt ist. Sichtbar nur bei aktivem
+                     Karten-Modul (checkKartenModul). -->
                 <label class="chip" id="gen-qr-wrap" style="margin-bottom:0.75rem;margin-left:0.5rem;display:none">
-                    <input type="checkbox" id="gen-qr">
+                    <input type="checkbox" id="gen-qr" checked>
                     QR-Code der Karten-App aufdrucken
                 </label>
                 <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin:2px 0 12px;font-size:0.8rem;color:var(--text-muted)">
