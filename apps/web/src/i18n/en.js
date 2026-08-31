@@ -1061,6 +1061,7 @@ export default {
   "kalender.examPeriodHint": "Optionally bind to a lesson of the day.",
   "kalender.sortDate": "Date",
   "kalender.sortFach": "Subject",
+  "kalender.examNotiz": "Note",
   "kalender.examsEmpty": "No upcoming class tests yet.",
   "kalender.examStunden": "lessons left",
   "kalender.examMeasures": "Adjustments for {{n}} students",

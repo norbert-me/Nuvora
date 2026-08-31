@@ -1062,6 +1062,7 @@ export default {
   "kalender.examPeriodHint": "Opcional: vincular a una hora del día.",
   "kalender.sortDate": "Fecha",
   "kalender.sortFach": "Asignatura",
+  "kalender.examNotiz": "Nota",
   "kalender.examsEmpty": "Aún no hay exámenes próximos.",
   "kalender.examStunden": "horas restantes",
   "kalender.examMeasures": "Adaptaciones para {{n}} alumnos",

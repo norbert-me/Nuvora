@@ -986,6 +986,10 @@ class ExamDate(Base):
     title: Mapped[str] = mapped_column(String(200), default="", server_default="")
     # Optional an eine Stunde des Tages gebunden (Stundennummer). NULL = ganztägig.
     period: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Freie Notiz zum Termin ("Zweitkorrektur bis Freitag", "Ersatztermin für
+    # Lena"). Der Titel ist die Bezeichnung der Arbeit und bleibt kurz; alles,
+    # was man sich zum Termin merkt, hat sonst keinen Ort.
+    notiz: Mapped[str] = mapped_column(Text, default="", server_default="")
     # Worueber geschrieben wird: Themen aus dem KERN. Eine Arbeit prueft meist
     # mehrere Unterthemen, deshalb eine Liste von topic_id.
     #

@@ -1442,6 +1442,8 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUp
   const [title, setTitle] = useState("");
   const [period, setPeriod] = useState("");   // "" = ganztägig, sonst Stundennummer
   const [themen, setThemen] = useState([]);   // Themen der neuen Arbeit
+  const [notiz, setNotiz] = useState("");     // freie Notiz zum Termin
+  const [eNotiz, setENotiz] = useState("");
   const [eThemen, setEThemen] = useState([]);
   const [editId, setEditId] = useState(null);
   const [eDate, setEDate] = useState("");
@@ -1462,18 +1464,18 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUp
     ? [...overview].sort((a, b) => (a.fach || "\uffff").localeCompare(b.fach || "\uffff", undefined, { sensitivity: "base" })
         || new Date(a.date) - new Date(b.date))
     : overview;
-  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); setEPeriod(e.period ? String(e.period) : ""); setEThemen(e.topic_ids || []); };
+  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); setEPeriod(e.period ? String(e.period) : ""); setENotiz(e.notiz || ""); setEThemen(e.topic_ids || []); };
   const saveEdit = (e) => {
     if (!eDate || !eClassId) return;
     const [y, m, d] = eDate.split("-").map(Number);
-    onUpd(e.id, { class_id: Number(eClassId), kurs_id: eKursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: eTitle.trim(), period: ePeriod ? Number(ePeriod) : null, topic_ids: eThemen });
+    onUpd(e.id, { class_id: Number(eClassId), kurs_id: eKursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: eTitle.trim(), period: ePeriod ? Number(ePeriod) : null, notiz: eNotiz, topic_ids: eThemen });
     setEditId(null);
   };
   const save = () => {
     if (!classId || !date) return;
     const [y, m, d] = date.split("-").map(Number);
-    onAdd({ class_id: Number(classId), kurs_id: kursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: title.trim(), period: period ? Number(period) : null, topic_ids: themen });
-    setDate(""); setTitle(""); setPeriod(""); setThemen([]);
+    onAdd({ class_id: Number(classId), kurs_id: kursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: title.trim(), period: period ? Number(period) : null, notiz, topic_ids: themen });
+    setDate(""); setTitle(""); setPeriod(""); setNotiz(""); setThemen([]);
   };
   // Eine Höhe, eine Form: Felder aus den gemeinsamen Bausteinen (CONTROL_H /
   // CONTROL_R), keine eigene Polsterung je Feld.
@@ -1535,6 +1537,11 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUp
                 </select>
                 <input value={eTitle} onChange={(ev) => setETitle(ev.target.value)} placeholder={t("kalender.examTitle")} style={{ ...toolbarInput, flex: 1, minWidth: 120 }} />
                 <ThemenWahl topics={topics} value={eThemen} onChange={setEThemen} />
+                {/* Die Notiz steht in der Bearbeiten-Zeile und nicht in der
+                    Anlegen-Leiste: beim Anlegen kennt man meist nur Datum und
+                    Bezeichnung, das Merkenswerte kommt spaeter dazu. */}
+                <input value={eNotiz} onChange={(ev) => setENotiz(ev.target.value)} placeholder={t("kalender.examNotiz")}
+                  style={{ ...toolbarInput, flex: 1, minWidth: 160 }} />
               </div>
               <button onClick={() => saveEdit(e)} style={toolbarBtnPrimary}>{t("common.save")}</button>
               <button onClick={() => setEditId(null)} style={toolbarBtn}>{t("common.abort")}</button>
@@ -1547,6 +1554,7 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUp
                 {/* Die Themen der Arbeit: beim Vorbereiten steht damit da,
                     worüber geschrieben wird — und beim Planen der letzten
                     Stunden davor, was noch drankommen muss. */}
+                {e.notiz && <div style={{ fontSize: 13, color: "var(--text2)", marginTop: 4, whiteSpace: "pre-wrap" }}>{e.notiz}</div>}
                 {(e.topics || []).length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
                     {e.topics.map((tp) => (

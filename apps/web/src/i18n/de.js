@@ -1046,6 +1046,7 @@ export default {
   "kalender.examPeriodHint": "Optional an eine Stunde des Tages binden.",
   "kalender.sortDate": "Datum",
   "kalender.sortFach": "Fach",
+  "kalender.examNotiz": "Notiz",
   "kalender.examsEmpty": "Noch keine kommenden Klassenarbeiten.",
   "kalender.examStunden": "Std. bis dahin",
   "kalender.examMeasures": "Abweichungen für {{n}} Schüler",

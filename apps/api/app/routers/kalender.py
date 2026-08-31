@@ -633,6 +633,10 @@ class ExamIn(BaseModel):
     class_id: Optional[int] = None
     kurs_id: Optional[int] = None
     period: Optional[int] = None   # an eine Stunde binden; None = ganztägig
+    # Freie Notiz zum Termin. Der Titel ist die Bezeichnung der Arbeit und
+    # bleibt kurz; alles Weitere ("Zweitkorrektur bis Freitag") hatte bisher
+    # keinen Ort und landete im Titel.
+    notiz: str = ""
     # Worüber wird geschrieben? Themen aus dem KERN (Regel 3: der Kalender
     # besitzt keine Taxonomie, er zeigt auf sie). Eine Arbeit prüft meist
     # mehrere Unterthemen, deshalb eine Liste. Leer bleiben darf sie immer —
@@ -1032,6 +1036,7 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
             "fach": getattr(kurse.get(ex.kurs_id), "fach", "") or "" if ex.kurs_id else "",
             "klasse": id2cls.get(ex.class_id) if ex.class_id else None,
             "stunden": stunden,
+            "notiz": ex.notiz or "",
             "topic_ids": list(ex.topic_ids or []),
             "topics": [{"id": tid, "label": _thema_label(tid)}
                        for tid in (ex.topic_ids or []) if _thema_label(tid)],
