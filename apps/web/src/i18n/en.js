@@ -1026,6 +1026,7 @@ export default {
   "kalender.extRefreshing": "Refreshing …",
   "kalender.extRefreshHint": "Fetch the external calendar fresh — shows deleted events immediately, no wait.",
   "kalender.toggleAllDay": "Toggle all-day events",
+  "kalender.timeFromPeriod": "Empty = the period's time ({{von}}–{{bis}}).",
   "kalender.timeInvalid": "The end time must be after the start time.",
   "kalender.entryTime": "Time (optional)",
   "kalender.entryTitle": "Title",

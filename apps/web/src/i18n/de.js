@@ -1011,6 +1011,7 @@ export default {
   "kalender.extRefreshing": "Aktualisiere …",
   "kalender.extRefreshHint": "Externen Kalender frisch abrufen — zeigt gelöschte Termine sofort ohne Wartezeit.",
   "kalender.toggleAllDay": "Ganztägige ein-/ausblenden",
+  "kalender.timeFromPeriod": "Leer = Zeit der Stunde ({{von}}–{{bis}}).",
   "kalender.timeInvalid": "Die Endzeit muss nach der Startzeit liegen.",
   "kalender.entryTime": "Uhrzeit (optional)",
   "kalender.entryTitle": "Titel",

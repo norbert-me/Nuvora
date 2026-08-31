@@ -736,7 +736,7 @@ export default function Kalender() {
       )}
       {view === "timetable" && <TimetableView tt={tt} showTimes={showTimes} stichtag={stichtag} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
-      {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
+      {editing && <EntryModal entry={editing} zeiten={tt.times || []} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
         <Modal onClose={() => setAbo(null)} width={500} label={t("kalender.subscribeTitle")}>
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>{t("kalender.subscribeTitle")}</h3>
@@ -1783,7 +1783,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
   );
 }
 
-function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, topicName = () => "", kursName = () => "", onSave, onDelete, onClose, t }) {
+function EntryModal({ entry, zeiten = [], classes, topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, topicName = () => "", kursName = () => "", onSave, onDelete, onClose, t }) {
   const navigate = useNavigate();
   // "Ergebnis als Note": die gelaufene Session zum verknüpften Quiz suchen und
   // deren Auswertung mit direkt geöffnetem Noten-Import ansteuern.
@@ -1823,6 +1823,18 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
     return [`FREQ=${freq}`, iv ? `INTERVAL=${iv}` : "", rrBis ? `UNTIL=${rrBis.replaceAll("-", "")}` : ""].filter(Boolean).join(";");
   };
   const timeInvalid = !!(startTime && endTime && endTime <= startTime); // Ende vor/gleich Start
+  // Ein Eintrag an einer Stundenplan-Stunde hat eine Uhrzeit — die der Stunde.
+  // Sie stand nirgends: der Dialog zeigte bei genau diesen Eintraegen gar kein
+  // Zeitfeld, und im Popup fehlte die Zeile. Die eigene Zeit hat Vorrang (so
+  // rechnet es auch der Tagesplan und der ICS-Feed); leer heisst „die der
+  // Stunde" — genau so laesst sich eine einzelne Stunde verlegen, ohne den
+  // Stundenplan anzufassen.
+  const stunde = entry.period != null ? (zeiten[entry.period - 1] || null) : null;
+  const stundeVon = (stunde && stunde.start) || "";
+  const stundeBis = (stunde && stunde.end) || "";
+  const zeitText = (startTime || endTime)
+    ? `${startTime || "?"}–${endTime || "?"}`
+    : ((stundeVon || stundeBis) ? `${stundeVon || "?"}–${stundeBis || "?"}` : null);
   const [dateVal, setDateVal] = useState(entry.date ? ymd(new Date(entry.date)) : ymd(new Date()));
   const [decks, setDecks] = useState([]); // Karten-Decks der gewaehlten Klasse
   // Decks haengen an der Klasse: neu laden, wenn Klasse wechselt und Modul aktiv.
@@ -1914,7 +1926,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={{ padding: "6px 24px 22px" }}>
         {!edit && (
           <div>
-            {(clsName || topName || startTime || endTime || ort || entry.rrule) && (
+            {(clsName || topName || zeitText || ort || entry.rrule) && (
               <div style={{ marginTop: 4 }}>
                 {clsName && (
                   <div style={{ display: "flex", gap: 8, fontSize: 14, padding: "3px 0" }}>
@@ -1927,7 +1939,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
                 )}
                 {zeile(t("kalender.topic"), topName)}
                 {/* Einstieg (Methode) steht jetzt als anklickbarer Link unter „Öffnen". */}
-                {zeile(t("kalender.time"), (startTime || endTime) ? `${startTime || "?"}–${endTime || "?"}` : null)}
+                {zeile(t("kalender.time"), zeitText)}
                 {zeile(t("kalender.place"), ort)}
                 {zeile(t("kalender.repeat"), entry.rrule ? t("kalender.repeatOn") : null)}
               </div>
@@ -2003,19 +2015,34 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         </>)}
         <div style={lbl}>{t("kalender.entryTitle")}</div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus placeholder={t("kalender.entryTitlePlaceholder")} style={fld} />
-        {entry.period == null && (<>
-          <div style={lbl}>{t("kalender.entryTime")}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.start")} />
-            <span style={{ color: "var(--text3)" }}>–</span>
-            <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.end")} />
-            {(startTime || endTime) && <button onClick={() => { setStartTime(""); setEndTime(""); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.close} size={15} /></button>}
+        {/* Auch bei einer Stundenplan-Stunde: morgen faengt der Unterricht
+            einmalig frueher an, und dafuer den ganzen Stundenplan zu aendern
+            waere die falsche Ebene. Leer heisst „die Zeit der Stunde"; der
+            Knopf setzt genau darauf zurueck. */}
+        <div style={lbl}>{t("kalender.entryTime")}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.start")} />
+          <span style={{ color: "var(--text3)" }}>–</span>
+          <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.end")} />
+          {(startTime || endTime) && <button onClick={() => { setStartTime(""); setEndTime(""); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.close} size={15} /></button>}
+        </div>
+        {entry.period != null && !startTime && !endTime && (stundeVon || stundeBis) && (
+          <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>
+            {t("kalender.timeFromPeriod", { von: stundeVon || "?", bis: stundeBis || "?" })}
           </div>
-          {timeInvalid && <div style={{ fontSize: 12, color: C.danger, marginTop: 5 }}>{t("kalender.timeInvalid")}</div>}
-        </>)}
+        )}
+        {timeInvalid && <div style={{ fontSize: 12, color: C.danger, marginTop: 5 }}>{t("kalender.timeInvalid")}</div>}
         <div style={lbl}>{t("kalender.kursOrClass")}</div>
         <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={kursId} allowNone noneLabel={`– ${t("kalender.noClass")} –`}
           onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }} onKurs={setKursId} style={dialogSelect} />
+        {/* Der Raum steht bei einer Unterrichtsstunde oben und nicht unter
+            „Erweitert": „heute in B204" ist der haeufigste Handgriff am
+            fertigen Stundenplan-Eintrag. Bei allen anderen Terminen bleibt er
+            unten — dort ist er die Ausnahme. */}
+        {entry.period != null && (<>
+          <div style={lbl}>{t("kalender.place")}</div>
+          <input value={ort} onChange={(e) => setOrt(e.target.value)} placeholder={t("kalender.placePlaceholder")} style={fld} />
+        </>)}
         <div style={lbl}>{t("kalender.notes")}</div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
 
@@ -2029,8 +2056,10 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           {t("kalender.more")} <Icon d={erweitert ? ICONS.chevronUp : ICONS.chevronDown} size={12} />
         </button>
         {erweitert && (<>
-        <div style={lbl}>{t("kalender.place")}</div>
-        <input value={ort} onChange={(e) => setOrt(e.target.value)} placeholder={t("kalender.placePlaceholder")} style={fld} />
+        {entry.period == null && (<>
+          <div style={lbl}>{t("kalender.place")}</div>
+          <input value={ort} onChange={(e) => setOrt(e.target.value)} placeholder={t("kalender.placePlaceholder")} style={fld} />
+        </>)}
         {entry.period == null && (<>
           <div style={lbl}>{t("kalender.repeat")}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
