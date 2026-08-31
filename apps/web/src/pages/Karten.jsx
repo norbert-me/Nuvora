@@ -301,7 +301,15 @@ export default function Karten() {
       { method: "POST" }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
     if (r) setTokens(r);
   };
-  const loadTokens = () => hol(`${API}/classes/${classId}/tokens${subsetKurs ? `?subset_kurs=${subsetKurs}` : ""}`, { method: "POST" }).then(setTokens);
+  // Die Tokens kommen per POST (der Aufruf legt fehlende an). `hol` macht
+  // immer ein GET und gab sein ZWEITES Argument als Ersatzwert zurueck — hier
+  // stand dort versehentlich `{ method: "POST" }`, also landete dieses Objekt
+  // als "Liste" im Zustand und die Seite stuerzte beim `.map` ab: der QR-Reiter
+  // zeigte nur noch "Diese Seite konnte nicht geladen werden".
+  const loadTokens = () => fetch(`${API}/classes/${classId}/tokens${subsetKurs ? `?subset_kurs=${subsetKurs}` : ""}`, { method: "POST" })
+    .then((r) => (r.ok ? r.json() : []))
+    .catch(() => [])
+    .then((d) => setTokens(Array.isArray(d) ? d : []));
   // Daten laden, wenn der Tab (aus der Navbar) oder die Klasse wechselt.
   useEffect(() => {
     if (!classId) return;
