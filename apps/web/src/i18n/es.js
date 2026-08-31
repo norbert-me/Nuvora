@@ -2208,6 +2208,8 @@ export default {
   "stoffplan.verplant": "{{soll}} de {{gesamt}} horas planificadas",
   "stoffplan.zuViel": "{{n}} horas de más para este periodo",
   "stoffplan.keinHalbjahr": "No hay semestres en el perfil — se cuenta desde hoy.",
+  "stoffplan.planLoeschen": "Borrar el plan",
+  "stoffplan.planLoeschenFrage": "¿Descartar todo el plan con {n} temas? No se guarda nada hasta pulsar Guardar.",
   "stoffplan.leer": "Aún no hay programación para este curso",
   "stoffplan.leerHint": "Abajo están los temas que encajan con la asignatura y el nivel del curso. Haz clic, indica las horas y guarda.",
   "stoffplan.soll": "Previsto",

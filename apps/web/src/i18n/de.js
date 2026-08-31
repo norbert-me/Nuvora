@@ -2193,6 +2193,8 @@ export default {
   "stoffplan.verplant": "{{soll}} von {{gesamt}} Stunden verplant",
   "stoffplan.zuViel": "{{n}} Stunden zu viel für diesen Zeitraum",
   "stoffplan.keinHalbjahr": "Kein Halbjahr im Profil hinterlegt — gerechnet wird ab heute.",
+  "stoffplan.planLoeschen": "Plan löschen",
+  "stoffplan.planLoeschenFrage": "Den ganzen Plan mit {n} Themen verwerfen? Gespeichert wird erst mit „Speichern“.",
   "stoffplan.leer": "Noch kein Plan für diesen Kurs",
   "stoffplan.leerHint": "Unten stehen die Themen, die zu Fach und Jahrgang des Kurses passen. Anklicken, Stunden eintragen, speichern.",
   "stoffplan.soll": "Soll",

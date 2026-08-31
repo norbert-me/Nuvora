@@ -2207,6 +2207,8 @@ export default {
   "stoffplan.verplant": "{{soll}} of {{gesamt}} lessons planned",
   "stoffplan.zuViel": "{{n}} lessons too many for this period",
   "stoffplan.keinHalbjahr": "No term dates in your profile — counting from today.",
+  "stoffplan.planLoeschen": "Delete plan",
+  "stoffplan.planLoeschenFrage": "Discard the whole plan with {n} topics? Nothing is written until you save.",
   "stoffplan.leer": "No plan for this course yet",
   "stoffplan.leerHint": "Below are the topics matching the course subject and year. Click one, enter lessons, save.",
   "stoffplan.soll": "Planned",

@@ -20,6 +20,7 @@ import {
 } from "./Icons.jsx";
 import Speicherleiste, { useEntwurf } from "./Speichern.jsx";
 import Werkzeugleiste from "./Werkzeugleiste.jsx";
+import { askConfirm } from "../core/dialog.jsx";
 import { hol, alsJson } from "../core/melden.js";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -108,6 +109,14 @@ export default function Stoffplan() {
   const entfernen = (i) => setz((v) => v.filter((_, k) => k !== i));
   const dazu = (topic_id, label) => setz((v) => [...v, { topic_id, label, stunden: 4, term: "", notiz: "", start_date: "", end_date: "", exam_id: null, niveau: "" }]);
   const aendern = (i, patch) => setz((v) => v.map((x, k) => (k === i ? { ...x, ...patch } : x)));
+  // Den ganzen Plan verwerfen. Zeile fuer Zeile zu loeschen ist bei zwanzig
+  // Themen zwanzig Klicks — und wer im neuen Schuljahr neu plant, will genau
+  // das. Wie jede Aenderung am Plan geht es erst mit „Speichern" zum Server:
+  // ein Fehlgriff ist bis dahin ein „Abbrechen" entfernt.
+  const planLoeschen = async () => {
+    if (!(await askConfirm(t("stoffplan.planLoeschenFrage", { n: zeilen.length }), { danger: true, ok: t("common.delete") }))) return;
+    setz(() => []);
+  };
 
   // Die errechneten Zeiträume kommen vom Server und gelten für den GESPEICHERTEN
   // Stand. Solange etwas offen ist, wäre die Anzeige daneben — deshalb steht
@@ -136,6 +145,10 @@ export default function Stoffplan() {
             </select>
           </>
         )}
+        mehr={daten && zeilen.length ? [{
+          key: "plan-leeren", label: t("stoffplan.planLoeschen"), icon: ICONS.trash, gefahr: true,
+          onClick: planLoeschen,
+        }] : []}
       >
         <Speicherleiste entwurf={ent} klein />
       </Werkzeugleiste>
