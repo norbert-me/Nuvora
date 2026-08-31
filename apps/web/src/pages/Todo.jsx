@@ -9,7 +9,7 @@ import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { alsJson, hol, sende } from "../core/melden.js";
 import { useAktiv } from "../core/modules.js";
-import { heuteYmd } from "../core/datum.js";
+import { heuteYmd, ymd } from "../core/datum.js";
 import { useZiehVorschau } from "../core/ziehsortieren.js";
 
 const API = "/api/todo";
@@ -103,6 +103,20 @@ export default function Todo({ embedded } = {}) {
   };
 
   const fmtDate = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "short" }); } catch { return iso; } };
+  // Die Farbe des Datums-Etiketts sagt, wie dringend es ist: vorbei = rot, in
+  // den naechsten sieben Tagen = gelb, alles Weitere = blau wie bisher. Ohne
+  // das stand jedes Datum gleich da, und ein ueberfaelliger Punkt sah aus wie
+  // einer im naechsten Monat. Sieben Tage, weil eine Schulwoche der Takt ist,
+  // in dem geplant wird.
+  const heuteVergleich = heuteYmd();
+  const faelligFarbe = (iso) => {
+    const heute = heuteVergleich;
+    if (!iso) return null;
+    if (iso < heute) return C.danger;
+    const grenze = new Date();
+    grenze.setDate(grenze.getDate() + 7);
+    return iso <= ymd(grenze) ? C.warning : null;   // null = die blaue Vorgabe
+  };
   // Angezeigt wird der ENTWURF, nicht der Serverstand.
   const offen = items.filter((i) => !istErledigt(i)).sort((a, b) => platz(a) - platz(b));
   const erledigt = items.filter((i) => istErledigt(i));
@@ -130,11 +144,18 @@ export default function Todo({ embedded } = {}) {
         {dnd && <span className="drag-handle" title={t("todo.reorderHint")} style={{ color: "var(--text3)", flexShrink: 0, display: "inline-flex", cursor: "grab" }}><Icon d={ICONS.grip} size={15} /></span>}
         <input type="checkbox" checked={istErledigt(it)} onChange={() => toggle(it)} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
         <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: istErledigt(it) ? "line-through" : "none", color: istErledigt(it) ? "var(--text3)" : "var(--text)" }}>{it.text}</span>
-        {it.due_date && (
-          <span style={{ ...chipStyle, background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)", flexShrink: 0, whiteSpace: "nowrap" }}>
-            {fmtDate(it.due_date)}{it.due_time ? ` · ${it.due_time}` : ""}
-          </span>
-        )}
+        {it.due_date && (() => {
+          // Erledigtes bleibt neutral: eine abgehakte Aufgabe ist nicht mehr
+          // ueberfaellig, ein rotes Etikett daneben waere nur Laerm.
+          const f = istErledigt(it) ? null : faelligFarbe(it.due_date);
+          return (
+            <span style={{ ...chipStyle, flexShrink: 0, whiteSpace: "nowrap",
+              background: f ? f + "1f" : "var(--accent-bg, rgba(10,132,255,0.12))",
+              color: f || "var(--accent)" }}>
+              {fmtDate(it.due_date)}{it.due_time ? ` · ${it.due_time}` : ""}
+            </span>
+          );
+        })()}
         <button onClick={() => startEdit(it)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
         <button onClick={() => del(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
       </div>

@@ -88,6 +88,7 @@ function OffeneTodos() {
   useEffect(() => { hol("/api/todo").then((d) => setRows(Array.isArray(d) ? d : [])); }, []);
   if (rows === null) return null;
   const heute = ymd(new Date());
+  const inEinerWoche = ymd(new Date(Date.now() + 7 * 86400000));
   // Fällige zuerst, dann der Rest — und höchstens fünf: eine Liste, die man
   // scrollen muss, liest morgens niemand.
   const offen = rows.filter((x) => !x.done)
@@ -102,13 +103,19 @@ function OffeneTodos() {
       {offen.length > 0 && (
         <div>
           {offen.map((x) => {
-            const faellig = x.due_date && x.due_date <= heute;
+            // Dieselbe Ampel wie auf der Aufgabenseite (pages/Todo.jsx): vorbei
+            // = rot, innerhalb einer Woche = gelb, sonst neutral. Zwei Regeln
+            // fuer dasselbe Datum hiessen, dass der Punkt hier anders aussieht
+            // als dort, wo man ihn abhakt.
+            const faellig = x.due_date && x.due_date < heute;
+            const bald = x.due_date && !faellig && x.due_date <= inEinerWoche;
+            const farbe = faellig ? C.danger : bald ? C.warning : "var(--text3)";
             return (
               <Link key={x.id} to="/notizbrett?tab=aufgaben" style={zeile}>
-                <Icon d={ICONS.check} size={14} color={faellig ? C.danger : "var(--text3)"} />
+                <Icon d={ICONS.check} size={14} color={farbe} />
                 <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.text}</span>
                 {x.due_date && (
-                  <span style={{ fontSize: 12, color: faellig ? C.danger : "var(--text3)", whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: 12, color: farbe, whiteSpace: "nowrap" }}>
                     {new Date(x.due_date).toLocaleDateString()}
                   </span>
                 )}
