@@ -94,14 +94,17 @@ function OffeneTodos() {
     .sort((a, b) => (a.due_date || "9999").localeCompare(b.due_date || "9999"))
     .slice(0, 5);
   return (
-    <WidgetKarte titel={t("widget.todo")} zu="/notizbrett" zuLabel={t("widget.zumNotizbrett")}
+    // Beide Wege fuehren auf den Reiter AUFGABEN, nicht auf die Notizen: das
+    // Widget zeigt offene Aufgaben, und wer darauf klickt, will sie abhaken —
+    // bisher landete er auf den Notizzetteln und musste noch einmal wechseln.
+    <WidgetKarte titel={t("widget.todo")} zu="/notizbrett?tab=aufgaben" zuLabel={t("notizbrett.tabTodos")}
       leer={t("widget.todoLeer")}>
       {offen.length > 0 && (
         <div>
           {offen.map((x) => {
             const faellig = x.due_date && x.due_date <= heute;
             return (
-              <Link key={x.id} to="/notizbrett" style={zeile}>
+              <Link key={x.id} to="/notizbrett?tab=aufgaben" style={zeile}>
                 <Icon d={ICONS.check} size={14} color={faellig ? C.danger : "var(--text3)"} />
                 <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.text}</span>
                 {x.due_date && (
