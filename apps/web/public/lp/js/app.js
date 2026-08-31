@@ -745,9 +745,20 @@
         // werden kann.
         const kurse = kuRes && kuRes.ok ? await kuRes.json() : [];
         kurseData = Array.isArray(kurse) ? kurse : [];
+        // Welcher Kurs gehoert zu einer Fach-Klasse? Zuerst ihr EIGENER
+        // (school_classes.kurs_id — die Lerngruppe, deren SuS sie teilt), erst
+        // dann die lose Mehrfach-Zugehoerigkeit (KursTag).
+        //
+        // Vorher gewann schlicht der erste Kurs, in dem die Klasse irgendwie
+        // vorkam. Eine Klasse darf aber zusaetzlich als Etikett in fremden
+        // Kursen stehen — und dann trugen ihre Schueler den falschen Kursnamen,
+        // die daraus gebaute Lernleiter zeigte im Reiter „Lernpfade" einen
+        // fremden Kurs an („immer 6.5 Mathematik").
+        const kursName = {};
+        kurse.forEach(k => { kursName[k.id] = k.name; });
         const classKurs = {};
         kurse.forEach(k => (k.classes || []).forEach(c => { if (!(c.id in classKurs)) classKurs[c.id] = k.name; }));
-        const kursOf = c => classKurs[c.id] || c.name;
+        const kursOf = c => (c.kurs_id != null && kursName[c.kurs_id]) || classKurs[c.id] || c.name;
         schueler = [];
         const gesehen = new Set();
         klassenRaw.forEach(c => (c.students || []).forEach(st => {
