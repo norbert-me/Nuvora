@@ -12,6 +12,36 @@ Zwischenfassung (x.y.0) hängt sie **alle Abschnitte der vorigen Reihe** an: wer
 von 4.1.0 auf 4.2.0 geht, hat 4.1.1 bis 4.1.9 nie gesehen — sonst wäre die
 Notiz zur größten Fassung die dünnste.
 
+## 4.1.5 — 31.08.2026
+
+**Module**
+
+- Das Modul „Unterrichtsplanung" heißt „Einstiege".
+
+**Kalender**
+
+- Der Raum lässt sich im Stundenplan eintragen.
+- Klassenarbeiten haben ein Suchfeld und einen Kurs-Filter.
+- Ein Quiz aus einem Ordner ließ sich nicht an eine Stunde hängen („Verknüpfter
+  Eintrag nicht gefunden").
+
+**Noten**
+
+- Die Übernahme eines CardVote-Tests bot Abschnitte fremder Fächer an; die
+  Spalte landete im falschen Notenbuch.
+- Eine Beobachtung lässt sich anlegen, ohne vorher eine Spalte zu bauen.
+- Der Satz „Der Gesamtschnitt ist eine Rechenhilfe" unter der Tabelle ist weg.
+
+**CardVote**
+
+- Eine gelöschte Auswertung führt auf die Startseite statt auf
+  „Verbindungsfehler".
+
+**Lernpfad**
+
+- Lernpfade lassen sich umbenennen.
+- Eine Lernleiter zeigte im Reiter „Lernpfade" einen fremden Kurs an.
+
 ## 4.1.4 — 31.08.2026
 
 **Kurse**
