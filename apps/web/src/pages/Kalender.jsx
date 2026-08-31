@@ -38,6 +38,11 @@ const API = "/api/kalender";
 // Vorgabe im Farbwaehler eines externen Kalenders. Bewusst ein Hexwert: ein
 // <input type="color"> nimmt keine CSS-Variable an.
 const EXT_FARBE = "#8e8e93";
+// Fremde Kalender ohne eigene Farbe bekommen eine aus dieser Reihe — sonst
+// standen drei abonnierte Kalender alle im selben Grau, und im Monatsraster
+// war nicht zu erkennen, was aus welchem kommt. Wer eine Farbe setzt, behaelt
+// sie; die Reihe ist nur die Vorgabe, keine Zuweisung.
+const EXT_PALETTE = ["#ff9f0a", "#30d158", "#bf5af2", "#64d2ff", "#ff375f", "#ffd60a"];
 
 
 // Gilt die (versionierte) Stundenplan-Stunde am Tag d? valid_from/valid_to sind
@@ -118,8 +123,16 @@ export default function Kalender() {
   const [extCals, setExtCals] = useState([]); // [{url,color,name}]
   const [extEvents, setExtEvents] = useState([]); // [{date,title,color,key,…}]
   const [todoEvents, setTodoEvents] = useState([]); // datierte To-dos [{id,date,time,text,done}]
-  // Fallback-Farbe (Kalender ohne eigene Farbe): erste gesetzte Kalenderfarbe.
-  const extColor = extCals.find((c) => c.color)?.color || "";
+  // Farbe je Kalender: die eigene, sonst eine aus der Reihe — nach der
+  // POSITION in der Liste, damit derselbe Kalender seine Farbe behaelt,
+  // solange die Liste steht.
+  const extFarbe = (url) => {
+    const i = extCals.findIndex((c) => c.url === url);
+    if (i < 0) return EXT_FARBE;
+    return extCals[i].color || EXT_PALETTE[i % EXT_PALETTE.length];
+  };
+  // Fallback fuer Termine ohne zuordenbaren Kalender.
+  const extColor = EXT_FARBE;
   const openAbo = async () => {
     const r = await fetch(`${API}/subscribe`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
     if (r) { const ex = await fetch(`${API}/external`).then((x) => (x.ok ? x.json() : {})).catch(() => ({})); setAbo({ ...r, cals: (ex.calendars || []), mit: !!ex.mitschicken }); }
@@ -327,7 +340,8 @@ export default function Kalender() {
   const byDayV = (d) => showAllDay ? byDay(d) : byDay(d).filter((e) => !isAllDayEntry(e));
   const extByDayV = (d) => {
     if (!showExt) return [];
-    const list = extByDay(d).filter((ev) => !extAus.has(ev.cal || ""));
+    const list = extByDay(d).filter((ev) => !extAus.has(ev.cal || ""))
+      .map((ev) => ({ ...ev, color: ev.color || extFarbe(ev.cal || "") }));
     return showAllDay ? list : list.filter((ev) => hmToMin(ev.time) != null);
   };
 
@@ -566,7 +580,7 @@ export default function Kalender() {
                   <label key={c.url} style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500, paddingLeft: 26 }}>
                     <input type="checkbox" checked={!extAus.has(c.url)} onChange={() => toggleExtCal(c.url)} />
                     <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
-                      background: c.color || "var(--text3)" }} />
+                      background: extFarbe(c.url) }} />
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {c.name || c.url.replace(/^\w+:\/\//, "").slice(0, 28)}
                     </span>
@@ -857,7 +871,7 @@ function ExtCalEditor({ cals, mit, onChange, onMit, onSave, t }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {rows.map((c, i) => (
           <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <input type="color" value={c.color || EXT_FARBE} onChange={(e) => setRow(i, { color: e.target.value })}
+            <input type="color" value={c.color || EXT_PALETTE[i % EXT_PALETTE.length]} onChange={(e) => setRow(i, { color: e.target.value })}
               title={t("kalender.extColor")} style={{ width: 26, height: 26, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }} />
             <input value={c.url || ""} onChange={(e) => setRow(i, { url: e.target.value })} placeholder="https://…/basic.ics"
               style={{ ...inputStyle, flex: 1, fontSize: 12, minWidth: 0 }} />
