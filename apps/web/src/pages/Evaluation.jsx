@@ -523,7 +523,7 @@ const gradeDistribution = (() => {
         )}
       </Werkzeugleiste>
 
-      {(kartenAktiv || lernpfadAktiv) && data.class_id && <WeakTopics sessionId={Number(id)} classId={data.class_id} karten={kartenAktiv} lernpfad={lernpfadAktiv} t={t} />}
+      {kartenAktiv && data.class_id && <WeakTopics sessionId={Number(id)} classId={data.class_id} karten={kartenAktiv} t={t} />}
 
       {/* Dasselbe Blatt wie zur Klassenarbeit, nur aus dem Quiz: was sass, was
           fehlt, je Kind eines. Der Bogen haengt per Portal am <body> und ist am
@@ -1116,23 +1116,14 @@ function TopicAnalysis({ questions, presentStudents }) {
   })).filter((r) => r.total > 0).sort((a, b) => a.pct - b.pct);
   if (rows.length === 0) return null;
 
-  // Kernaussage regelbasiert: schwaechste Themen benennen und eine Empfehlung
-  // geben — die Zusammenfassung, die die Lehrkraft sonst selbst aus der Liste
-  // ziehen muesste. Kein Automatismus, nur ein Satz.
-  const weakRows = rows.filter((r) => r.pct < 60);
-  const verdict = weakRows.length > 0
-    ? t("analyse.verdictWeak", { list: weakRows.map((r) => `${label(r.tid)} (${r.pct}%)`).join(", ") })
-    : t("analyse.verdictOk");
+  // Kein Satz mehr, der die Liste darunter noch einmal vorliest ("Unter 60 %
+  // liegen: …"). Die Liste ist nach Quote sortiert, rot eingefaerbt und
+  // beschriftet — wer sie ansieht, sieht dasselbe schneller.
 
   return (
     <div style={{ ...cardStyle, marginBottom: 16 }}>
       <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("analyse.title")}</h3>
       <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12 }}>{t("analyse.intro")}</p>
-      <p style={{
-        fontSize: 13, lineHeight: 1.6, marginBottom: 12, padding: "10px 12px", borderRadius: CONTROL_R,
-        background: (weakRows.length > 0 ? C.warning : C.success) + "1a",
-        border: `1px solid ${(weakRows.length > 0 ? C.warning : C.success)}59`,
-      }}>{verdict}</p>
       {rows.map((r) => {
         const weak = r.pct < 60;
         const n = exCount[r.tid] || 0;
@@ -1157,10 +1148,13 @@ function TopicAnalysis({ questions, presentStudents }) {
 
 // Ziel-2-Brücke: schwache Themen aus dem Test → ein Übungs-Deck im Modul Karten
 // anlegen (themengebunden, Entwurf). Nur wenn das Karten-Modul aktiv ist.
-function WeakTopics({ sessionId, classId, karten, lernpfad, t }) {
+function WeakTopics({ sessionId, classId, karten, t }) {
   const [topics, setTopics] = useState([]);
-  const [busy, setBusy] = useState(null);        // `${topic_id}:${art}`
-  const [done, setDone] = useState({});          // { `${topic_id}:${art}`: true }
+  const [busy, setBusy] = useState(null);        // topic_id
+  // Was angelegt wurde, samt Ziel: { topic_id: deckId }. Ein Haken allein sagte
+  // nur „passiert" — das Deck ist leer und will gefuellt werden, und der Weg
+  // dorthin war ein Modulwechsel und eine Suche in der Stapelliste.
+  const [angelegt, setAngelegt] = useState({});
 
   useEffect(() => {
     hol(`/api/sessions/${sessionId}/topic-stats`, null)
@@ -1171,39 +1165,38 @@ function WeakTopics({ sessionId, classId, karten, lernpfad, t }) {
   const schwach = topics.filter((tp) => tp.topic_id && tp.pct < 60);
   if (!schwach.length) return null;
 
-  const run = async (tp, art, req) => {
-    const key = `${tp.topic_id}:${art}`;
-    setBusy(key);
-    const r = await fetch(req.url, alsJson("POST", req.body)).catch(() => null);
+  const deckAnlegen = async (tp) => {
+    setBusy(tp.topic_id);
+    const r = await fetch(`/api/karten/classes/${classId}/decks`,
+      alsJson("POST", { name: tp.name, topic_id: tp.topic_id })).catch(() => null);
+    const d = r && r.ok ? await r.json().catch(() => null) : null;
     setBusy(null);
-    if (r && r.ok) setDone((d) => ({ ...d, [key]: true }));
-  };
-  const deckAnlegen = (tp) => run(tp, "karten", { url: `/api/karten/classes/${classId}/decks`, body: { name: tp.name, topic_id: tp.topic_id } });
-  const aufgabeAnlegen = (tp) => run(tp, "lernpfad", {
-    url: `/api/lernpfad/exercises`,
-    body: { topic_id: tp.topic_id, kategorie: "Basis", aufgabentext: t("weak.repTitle", { thema: tp.name }) },
-  });
-
-  const Btn = ({ tp, art, onClick, label }) => {
-    const key = `${tp.topic_id}:${art}`;
-    if (done[key]) return <Icon d={ICONS.check} size={16} color={C.success} />;
-    return (
-      <button onClick={() => onClick(tp)} disabled={busy === key}
-        style={{ ...toolbarBtn, opacity: busy === key ? 0.6 : 1 }}>{label}</button>
-    );
+    if (d && d.id) setAngelegt((a) => ({ ...a, [tp.topic_id]: d.id }));
   };
 
   return (
     <div style={{ ...cardStyle, marginBottom: 16 }}>
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("weak.title")}</div>
-      <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12 }}>{t("weak.hint2")}</div>
+      <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12 }}>{t("weak.hint")}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {schwach.map((tp) => (
           <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: CONTROL_R, flexWrap: "wrap" }}>
             <span style={{ flex: 1, fontWeight: 600, minWidth: 120 }}>{tp.name}</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: tp.pct < 40 ? C.danger : C.warning }}>{tp.pct}%</span>
-            {karten && <Btn tp={tp} art="karten" onClick={deckAnlegen} label={t("weak.makeDeck")} />}
-            {lernpfad && <Btn tp={tp} art="lernpfad" onClick={aufgabeAnlegen} label={t("weak.makeExercise")} />}
+            {/* Nur noch das Karten-Deck. Die "Lernpfad-Aufgabe" legte eine
+                Aufgabe mit einem Titel und ohne Inhalt an — ein Platzhalter,
+                den man danach ohnehin von Hand ausfuellen musste. */}
+            {karten && (angelegt[tp.topic_id]
+              ? (
+                <Link to={`/karten?class=${classId}&deck=${angelegt[tp.topic_id]}`}
+                  style={{ ...toolbarBtn, display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "var(--accent)" }}>
+                  <Icon d={ICONS.check} size={15} color={C.success} /> {t("weak.toDeck")}
+                </Link>
+              )
+              : (
+                <button onClick={() => deckAnlegen(tp)} disabled={busy === tp.topic_id}
+                  style={{ ...toolbarBtn, opacity: busy === tp.topic_id ? 0.6 : 1 }}>{t("weak.makeDeck")}</button>
+              ))}
           </div>
         ))}
       </div>

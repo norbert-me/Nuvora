@@ -1569,6 +1569,7 @@ export default {
   "weak.title": "Temas flojos",
   "weak.hint": "Temas por debajo del 60% de aciertos. Un clic crea un mazo de práctica (borrador) vinculado al tema en el módulo Tarjetas.",
   "weak.makeDeck": "Crear mazo",
+  "weak.toDeck": "Ir al mazo",
   "weak.created": "Mazo creado ✓",
   "anwesenheit.onlyToday": "Solo clases de hoy",
   "anwesenheit.classPdf": "Informe de faltas (PDF)",

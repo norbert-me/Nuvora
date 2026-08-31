@@ -1568,6 +1568,7 @@ export default {
   "weak.title": "Weak topics",
   "weak.hint": "Topics below 60% correct. One click creates a topic-bound practice deck (draft) in the Cards module.",
   "weak.makeDeck": "Create card deck",
+  "weak.toDeck": "Open deck",
   "weak.created": "Deck created ✓",
   "anwesenheit.onlyToday": "Only today's classes",
   "anwesenheit.classPdf": "Absence report (PDF)",

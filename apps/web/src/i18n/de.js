@@ -1530,6 +1530,7 @@ export default {
   "weak.title": "Schwache Themen",
   "weak.hint": "Themen unter 60 % Trefferquote. Ein Klick legt ein themengebundenes Übungs-Deck (Entwurf) im Modul Karten an.",
   "weak.makeDeck": "Karten-Deck anlegen",
+  "weak.toDeck": "Zum Deck",
   "weak.created": "Deck angelegt ✓",
   "anwesenheit.onlyToday": "Nur heutige Klassen",
   "anwesenheit.classPdf": "Fehlzeiten-Report (PDF)",
