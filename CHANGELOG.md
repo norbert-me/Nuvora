@@ -47,12 +47,18 @@ Notiz zur größten Fassung die dünnste.
 - Lernleiter-PDF: der Titel läuft nicht mehr rechts aus dem Blatt.
 - Lernleiter-PDF: der QR-Code der Karten-App ist voreingestellt angehakt.
 - Lernleiter-PDF: Smileys stehen an allen Aufgaben außer Erklärungen.
+- Lernleiter-PDF: Kästchen, Smileys und Text sitzen auf einer Mitte; der
+  Trennstrich liegt genau zwischen den Zeilen.
 
 **CardVote**
 
-- Schwache Themen: das angelegte Karten-Deck lässt sich direkt öffnen.
-- Schwache Themen: „Lernpfad-Aufgabe" ist weggefallen — sie entstand ohne Inhalt.
+- Der Abschnitt „Schwache Themen" ist weggefallen — seine beiden Knöpfe legten
+  etwas Leeres an, und die Themen-Analyse darüber sagt dasselbe.
 - Themen-Analyse: der Satz, der die Liste darunter noch einmal vorlas, ist weg.
+
+**Karten-App (Schülerseite)**
+
+- „Das üben wir noch" heißt jetzt „Das musst du noch üben".
 
 **Startseite**
 
