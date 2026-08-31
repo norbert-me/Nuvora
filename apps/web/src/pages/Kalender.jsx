@@ -1475,10 +1475,26 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUp
     try { return localStorage.getItem("kal_exam_sort") === "fach" ? "fach" : "datum"; } catch { return "datum"; }
   });
   const setzeSortierung = (v) => { setSortierung(v); try { localStorage.setItem("kal_exam_sort", v); } catch { /* egal */ } };
+  // Suche und Kurs-Filter. Die Liste waechst mit jedem Halbjahr, und die Frage
+  // ist fast immer „was steht in DIESEM Kurs an?" oder „wo war noch mal die
+  // Arbeit ueber Dreiecke?". Gesucht wird in Titel, Kurs/Klasse und den Themen
+  // — also in allem, was auf der Karte steht.
+  const [suche, setSuche] = useState("");
+  const [filterKurs, setFilterKurs] = useState("");
+  const kursListe = [...new Set(overview.map((e) => e.kurs || e.klasse).filter(Boolean))].sort(
+    (a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  const q = suche.trim().toLowerCase();
+  const gefiltert = overview.filter((e) => {
+    if (filterKurs && (e.kurs || e.klasse || "") !== filterKurs) return false;
+    if (!q) return true;
+    const heu = [e.title, e.kurs, e.klasse, e.notiz, ...(e.topics || []).map((tp) => tp.label)]
+      .filter(Boolean).join(" ").toLowerCase();
+    return heu.includes(q);
+  });
   const liste = sortierung === "fach"
-    ? [...overview].sort((a, b) => (a.fach || "\uffff").localeCompare(b.fach || "\uffff", undefined, { sensitivity: "base" })
+    ? [...gefiltert].sort((a, b) => (a.fach || "\uffff").localeCompare(b.fach || "\uffff", undefined, { sensitivity: "base" })
         || new Date(a.date) - new Date(b.date))
-    : overview;
+    : gefiltert;
   const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); setEPeriod(e.period ? String(e.period) : ""); setENotiz(e.notiz || ""); setEThemen(e.topic_ids || []); };
   const saveEdit = (e) => {
     if (!eDate || !eClassId) return;
@@ -1524,7 +1540,15 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUp
       </Werkzeugleiste>
 
       {overview.length > 1 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+          <input value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("kalender.examSearch")}
+            style={{ ...toolbarInput, flex: 1, minWidth: 160 }} />
+          {kursListe.length > 1 && (
+            <select value={filterKurs} onChange={(e) => setFilterKurs(e.target.value)} style={pSel}>
+              <option value="">{t("kalender.examAllKurse")}</option>
+              {kursListe.map((k) => <option key={k} value={k}>{k}</option>)}
+            </select>
+          )}
           <Segment>
             {[["datum", t("kalender.sortDate")], ["fach", t("kalender.sortFach")]].map(([k, label]) => (
               <button key={k} onClick={() => setzeSortierung(k)}
@@ -1536,7 +1560,9 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUp
       )}
 
       {liste.length === 0 ? (
-        <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("kalender.examsEmpty")}</p>
+        <p style={{ fontSize: 14, color: "var(--text3)" }}>
+          {overview.length ? t("kalender.examsNoMatch") : t("kalender.examsEmpty")}
+        </p>
       ) : liste.map((e) => (
         <div key={e.id} style={{ ...cardStyle, padding: 12, marginBottom: 8 }}>
          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
