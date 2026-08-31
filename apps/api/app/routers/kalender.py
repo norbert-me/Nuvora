@@ -230,8 +230,22 @@ async def _check_verknuepfungen(db: AsyncSession, user: User, body) -> None:
         obj = await db.get(modell, wert)
         # Die Lernleiter haengt am Pfad, nicht direkt am Konto — dort prueft der
         # Lernpfad-Router; hier reicht, dass es sie gibt.
-        if not obj or (eigner and getattr(obj, eigner, None) != user.id):
+        if not obj:
             raise HTTPException(404, "Verknüpfter Eintrag nicht gefunden")
+        if eigner and getattr(obj, eigner, None) != user.id:
+            # Ein Quiz IN einem Ordner traegt seinen Besitzer nicht selbst
+            # (`question_sets.owner_id` ist nullable — der Ordner haelt ihn).
+            # Ohne diesen Weg gab jede Planung eines solchen Quiz 404
+            # „Verknuepfter Eintrag nicht gefunden", obwohl das Quiz in der
+            # Auswahl stand: der Selektor liest den Ordnerbaum, die Pruefung
+            # las nur die Spalte.
+            besitzer = getattr(obj, eigner, None)
+            if besitzer is None and getattr(obj, "folder_id", None) is not None:
+                from ..models import Folder
+                ordner = await db.get(Folder, obj.folder_id)
+                besitzer = ordner.owner_id if ordner else None
+            if besitzer != user.id:
+                raise HTTPException(404, "Verknüpfter Eintrag nicht gefunden")
 
 
 @router.post("/entries", response_model=EntryOut, status_code=201)
