@@ -999,6 +999,7 @@ export default {
   "kalender.toggleExt": "Externe Termine ein-/ausblenden",
   "kalender.extColor": "Farbe externer",
   "kalender.viewMenu": "Anzeigen",
+  "kalender.startView": "Startansicht",
   "kalender.showHide": "Ein-/Ausblenden",
   "kalender.extEvents": "Externe Termine",
   "kalender.extRefresh": "Extern aktualisieren",

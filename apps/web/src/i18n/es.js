@@ -1015,6 +1015,7 @@ export default {
   "kalender.toggleExt": "Mostrar/ocultar eventos externos",
   "kalender.extColor": "Color externo",
   "kalender.viewMenu": "Mostrar",
+  "kalender.startView": "Vista inicial",
   "kalender.showHide": "Mostrar / ocultar",
   "kalender.extEvents": "Eventos externos",
   "kalender.extRefresh": "Actualizar externo",

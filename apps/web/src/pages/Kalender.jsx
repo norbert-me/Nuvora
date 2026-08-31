@@ -80,8 +80,16 @@ export default function Kalender() {
   const [params, setParams] = useSearchParams();
   // „today" gibt es als Ansicht nicht mehr — alte Lesezeichen und Deep-Links
   // landen auf dem Tag, statt auf einer leeren Seite.
-  const view = (params.get("view") === "today" ? "day" : params.get("view")) || "month";
-  const setView = (v) => setParams((p) => { const n = new URLSearchParams(p); if (v === "month") n.delete("view"); else n.set("view", v); return n; }, { replace: true });
+  // Welche Ansicht ohne ?view= erscheint, entscheidet die Lehrkraft: wer den
+  // Kalender taeglich zum Planen der naechsten Stunde aufmacht, will nicht
+  // jedes Mal erst vom Monat auf den Tag klicken. Im Browser gemerkt und nicht
+  // am Konto — es ist eine Ansicht, kein Inhalt.
+  const [startAnsicht, setStartAnsicht] = useState(() => {
+    try { const v = localStorage.getItem("kal_view_start"); return ["month", "week", "day"].includes(v) ? v : "month"; } catch { return "month"; }
+  });
+  const setzeStartAnsicht = (v) => { setStartAnsicht(v); try { localStorage.setItem("kal_view_start", v); } catch { /* egal */ } };
+  const view = (params.get("view") === "today" ? "day" : params.get("view")) || startAnsicht;
+  const setView = (v) => setParams((p) => { const n = new URLSearchParams(p); if (v === startAnsicht) n.delete("view"); else n.set("view", v); return n; }, { replace: true });
   // Startdatum optional per ?date=YYYY-MM-DD (Deep-Link, z.B. aus den Einstiegen).
   const [cursor, setCursor] = useState(() => { const p = params.get("date"); return p && /^\d{4}-\d{2}-\d{2}$/.test(p) ? startOfDay(new Date(p + "T00:00:00")) : startOfDay(new Date()); });
   const [abo, setAbo] = useState(null); // Abo-URLs { url, webcal }
@@ -564,6 +572,17 @@ export default function Kalender() {
                     </span>
                   </label>
                 ))}
+                {/* Welche Ansicht beim Aufschlagen erscheint. Eine Auswahl und
+                    keine drei Schalter: es ist eine Frage mit genau einer
+                    Antwort (siehe ViewMenu, art "wahl"). */}
+                <div style={{ ...sectionLabel, padding: "10px 12px 4px" }}>{t("kalender.startView")}</div>
+                <div style={{ padding: "0 12px 8px" }}>
+                  <select value={startAnsicht} onChange={(e) => setzeStartAnsicht(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
+                    <option value="month">{t("kalender.month")}</option>
+                    <option value="week">{t("kalender.week")}</option>
+                    <option value="day">{t("kalender.day")}</option>
+                  </select>
+                </div>
                 {extCals.length > 0 && (
                   <button onClick={() => loadExt(true)} disabled={extBusy}
                     style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500, cursor: extBusy ? "default" : "pointer", opacity: extBusy ? 0.6 : 1 }}
