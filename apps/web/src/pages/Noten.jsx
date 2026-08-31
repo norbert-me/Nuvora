@@ -412,6 +412,29 @@ export default function Noten() {
   const istEndOverride = (s) => entwurf.wert[`to:${s.student_id}`] != null;
 
   const allCats = sections.flatMap((s) => s.categories || []);
+
+  // Beobachtungen brauchen eine Spalte, weil ein Eintrag an einer Spalte
+  // haengt (grade_entries.category_id). Das war eine Sackgasse: „Lege zuerst
+  // eine Spalte an" — und man musste den Dialog verlassen, im Notenbuch einen
+  // Abschnitt und eine Spalte anlegen und zurueckkommen, nur um „hat geholfen"
+  // festzuhalten. Jetzt entsteht beides an Ort und Stelle: ein Abschnitt mit
+  // Gewicht 0 (er darf den Schnitt nicht verschieben) und darin eine Spalte
+  // „Beobachtungen". Fuer Noten gilt weiter der normale Weg.
+  const beobSpalteAnlegen = async () => {
+    let secId = sections[0]?.id ?? null;
+    if (secId == null) {
+      const r = await fetch(`${API}/classes/${classId}/sections?term=${term}${kp}`,
+        alsJson("POST", { name: t("noten.obsSection"), weight: 0, position: 0 })).catch(() => null);
+      if (!r || !r.ok) return;
+      secId = (await r.json()).id;
+    }
+    const sec = sections.find((x) => x.id === secId);
+    const pos = (sec?.categories || []).length;
+    const r2 = await fetch(`${API}/categories`,
+      alsJson("POST", { name: t("noten.obsColumn"), section_id: secId, position: pos })).catch(() => null);
+    if (!r2 || !r2.ok) return;
+    await load(classId);
+  };
   const gewichtSumme = sections.reduce((n, s) => n + (s.weight || 0), 0);
   const notenVon = (sid, cid) => entries.filter((e) => e.student_id === sid && e.category_id === cid && e.kind === "grade");
   // Auswertung je Spalte: Anzahl, Schnitt, Spanne über alle eingetragenen Noten.
@@ -867,6 +890,7 @@ export default function Noten() {
 
       {beobFuer && (
         <Beobachtungen t={t} student={summary.find((s) => s.student_id === beobFuer)} cats={allCats}
+          onSpalteAnlegen={beobSpalteAnlegen}
           entries={entries.filter((e) => e.student_id === beobFuer && e.kind === "observation")}
           onClose={() => setBeobFuer(null)}
           onSave={(b) => call(() => fetch(`${API}/entries`, alsJson("POST", b)))}
@@ -1601,8 +1625,11 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
   );
 }
 
-function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete }) {
+function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete, onSpalteAnlegen }) {
   const [catId, setCatId] = useState(cats[0]?.id ?? null);
+  const [legt, setLegt] = useState(false);
+  // Kommt die Spalte erst waehrend des Dialogs dazu, muss sie auch gewaehlt sein.
+  useEffect(() => { if (catId == null && cats[0]) setCatId(cats[0].id); }, [cats]); // eslint-disable-line
   const [tendency, setTendency] = useState(1);
   const [note, setNote] = useState("");
   return (
@@ -1610,7 +1637,11 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{student?.name}</h3>
         <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{t("noten.obsSub")}</p>
         {cats.length === 0 ? (
-          <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("noten.needColumnFirst")}</p>
+          <div>
+            <p style={{ fontSize: 14, color: "var(--text3)", marginBottom: 12 }}>{t("noten.needColumnFirst")}</p>
+            <button onClick={async () => { setLegt(true); await onSpalteAnlegen(); setLegt(false); }} disabled={legt}
+              style={{ ...btnPrimary, opacity: legt ? 0.6 : 1 }}>{t("noten.obsColumnAdd")}</button>
+          </div>
         ) : (
           <>
             <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useAktiv } from "../core/modules.js";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -86,6 +86,10 @@ export default function Evaluation() {
   // Lehrer-Übersicht nach Kursniveau filtern ("" = alle).
   const [niveauFilter, setNiveauFilter] = useState("");
   const [loadError, setLoadError] = useState(false);
+  const navigate = useNavigate();
+  // Gibt es die Sitzung nicht (mehr)? Dann wird nicht gerendert, sondern
+  // umgeleitet — ein Ref, weil der Zustand erst nach dem Rendern ankaeme.
+  const weg = useRef(false);
 
   // Alles, was an dieser Auswertung einstellbar ist, ist EIN Entwurf mit EINER
   // Speicherleiste: Gewichte, Notenschluessel und die Einstufung krank/anwesend.
@@ -125,12 +129,20 @@ export default function Evaluation() {
   useEffect(() => {
     const timer = setTimeout(() => { if (!data) setLoadError(true); }, 15000);
     Promise.all([
-      fetch(`${API}/sessions/${id}/evaluation`).then((r) => r.json()),
+      // Eine geloeschte oder fremde Sitzung ist kein Verbindungsfehler. Vorher
+      // ging die 404-Antwort durch `r.json()` als `{detail: …}` durch, hatte
+      // keine `questions` — und nach 15 Sekunden stand "Verbindungsfehler" da,
+      // obwohl die Verbindung stand. Jetzt fuehrt sie auf die Startseite.
+      fetch(`${API}/sessions/${id}/evaluation`).then((r) => {
+        if (r.status === 404 || r.status === 403) { weg.current = true; return null; }
+        return r.json();
+      }),
       fetch(`${API}/sessions/${id}/eval-config`).then((r) => r.json()),
       fetch(`${API}/sessions/${id}/rueckmeldung`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ]).then(([evalData, config, rm]) => {
       setBogen(rm && Array.isArray(rm.students) ? rm.students : []);
       clearTimeout(timer);
+      if (weg.current) { navigate("/", { replace: true }); return; }
       if (evalData && evalData.questions && evalData.students) setData({ ...evalData, _evalConfig: config || {} });
       const { weights: _w, grade_scale: _g, krank: _k, anwesend: _a, ...rest } = config || {};
       restConfig.current = rest;
@@ -486,7 +498,7 @@ const gradeDistribution = (() => {
       </Link>
       {notenDialog && (
         <NotenImport
-          sessionId={Number(id)} classId={data.class_id} sessionName={data.session_name}
+          sessionId={Number(id)} classId={data.class_id} kursId={data.kurs_id ?? null} sessionName={data.session_name}
           grades={presentStudents.map((st) => ({
             card_id: st.card_id, name: st.name,
             value: gradeMode === "tendency"
@@ -1003,7 +1015,7 @@ function SchliessenBtn({ onClick, t }) {
 
 
 // Dialog: CardVote-Testnoten in eine Kategorie des Notenmoduls uebernehmen.
-function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
+function NotenImport({ sessionId, classId, kursId = null, sessionName, grades, onClose }) {
   const { t } = useLanguage();
   const heute = () => { const d = new Date(); return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`; };
   const [sectionId, setSectionId] = useState(null);
@@ -1042,7 +1054,10 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
             {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>}
             {(() => { const fld = { ...inputStyle, width: "100%" }; const lbl = { fontSize: 13, color: "var(--text2)", marginBottom: 6, marginTop: 12 }; return (
               <>
-                <AbschnittWahl classId={classId} value={sectionId} onChange={setSectionId} />
+                {/* Mit kursId: ohne ihn standen hier die Abschnitte ALLER
+                    Faecher dieser Klasse, und die Spalte landete im Notenbuch
+                    eines anderen Fachs — dort, wo sie niemand sucht. */}
+                <AbschnittWahl classId={classId} kursId={kursId} value={sectionId} onChange={setSectionId} />
 
                 <div style={lbl}>{t("notenimp.colName")}</div>
                 <div style={{ display: "flex", gap: 6 }}>

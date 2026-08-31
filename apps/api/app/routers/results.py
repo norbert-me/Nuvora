@@ -258,11 +258,14 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
                         verboten="Kein Zugriff auf diese Session")
 
     students = []
+    kurs_id = None
     if session.class_id:
         # Roster kursweit (gleichnamige Fach-Klassen-SuS = eine Person). Die
         # Kartennummern (card_id) sind bei gleicher Lerngruppe deckungsgleich.
         students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""}
                     for s in await _kurs_roster(db, session.class_id)]
+        sc = await db.get(SchoolClass, session.class_id)
+        kurs_id = sc.kurs_id if sc else None
 
     # E/G-Differenzierung und Minuspunkte haengen am Quiz, nicht an der Session.
     niveau_aktiv = False
@@ -341,6 +344,10 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
         "session_id": session_id,
         "session_name": session.name,
         "class_id": session.class_id,
+        # Der Kurs (Fach) der Klasse. Ohne ihn schlaegt die Uebernahme ins
+        # Notenbuch die Abschnitte ALLER Faecher dieser Klasse vor — und die
+        # Spalte landete im Notenbuch eines anderen Fachs, wo sie niemand sucht.
+        "kurs_id": kurs_id,
         "niveau_aktiv": niveau_aktiv,
         "minuspunkte": minuspunkte,
         "questions": questions,
