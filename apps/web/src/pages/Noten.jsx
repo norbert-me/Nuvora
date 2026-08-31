@@ -856,8 +856,13 @@ export default function Noten() {
         </div>
       )}
 
+      {/* Der Satz „Der Gesamtschnitt ist eine Rechenhilfe, keine Zeugnisnote"
+          stand hier unter jeder Tabelle. Er beantwortet eine Frage, die sich
+          beim Eintragen niemand stellt — und wer sie stellt, findet die
+          Antwort in der Hilfe (help.nt.avg). Der Hinweis auf den Klick am
+          Namen bleibt: den sieht man der Tabelle nicht an. */}
       <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 12, lineHeight: 1.6 }}>
-        {t("noten.cellHint", { a: "2", b: "2,3" })} {t("noten.clickStudent")}
+        {t("noten.clickStudent")}
       </p>
 
       {beobFuer && (

@@ -201,7 +201,11 @@ REGISTRY: List[ModuleDef] = [
     ModuleDef(
         key="unterrichtsplanung",
         group="unterricht",
-        name="Unterrichtsplanung",
+        # Angezeigt heisst das Modul „Einstiege" — es hat genau einen Reiter, und
+        # „Unterrichtsplanung" versprach die ganze Jahresplanung. Der SCHLUESSEL
+        # bleibt: an ihm haengen die Aktivierungen in `user_modules`, die Route
+        # und jede Probe der Testsuite.
+        name="Einstiege",
         description=(
             "Ideen für den Unterrichtseinstieg sammeln: Idee, Ablauf, Material, "
             "Dauer — an Kalender-Stunden zuweisbar und themen-getaggt. Die "
