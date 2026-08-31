@@ -37,6 +37,27 @@ Notiz zur größten Fassung die dünnste.
 
 - Der ganze Plan lässt sich in einem Zug verwerfen.
 
+**Karteikarten**
+
+- Der QR-Reiter stürzte ab und zeigte nur noch „Diese Seite konnte nicht geladen
+  werden".
+
+**Lernpfad**
+
+- Lernleiter-PDF: der Titel läuft nicht mehr rechts aus dem Blatt.
+- Lernleiter-PDF: der QR-Code der Karten-App ist voreingestellt angehakt.
+- Lernleiter-PDF: Smileys stehen an allen Aufgaben außer Erklärungen.
+
+**CardVote**
+
+- Schwache Themen: das angelegte Karten-Deck lässt sich direkt öffnen.
+- Schwache Themen: „Lernpfad-Aufgabe" ist weggefallen — sie entstand ohne Inhalt.
+- Themen-Analyse: der Satz, der die Liste darunter noch einmal vorlas, ist weg.
+
+**Startseite**
+
+- „Offene Aufgaben" führt zum Aufgaben-Reiter statt auf die Notizzettel.
+
 ## 4.1.3 — 30.08.2026
 
 **Kalender**
