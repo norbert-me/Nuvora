@@ -523,7 +523,6 @@ const gradeDistribution = (() => {
         )}
       </Werkzeugleiste>
 
-      {kartenAktiv && data.class_id && <WeakTopics sessionId={Number(id)} classId={data.class_id} karten={kartenAktiv} t={t} />}
 
       {/* Dasselbe Blatt wie zur Klassenarbeit, nur aus dem Quiz: was sass, was
           fehlt, je Kind eines. Der Bogen haengt per Portal am <body> und ist am
@@ -1146,60 +1145,9 @@ function TopicAnalysis({ questions, presentStudents }) {
   );
 }
 
-// Ziel-2-Brücke: schwache Themen aus dem Test → ein Übungs-Deck im Modul Karten
-// anlegen (themengebunden, Entwurf). Nur wenn das Karten-Modul aktiv ist.
-function WeakTopics({ sessionId, classId, karten, t }) {
-  const [topics, setTopics] = useState([]);
-  const [busy, setBusy] = useState(null);        // topic_id
-  // Was angelegt wurde, samt Ziel: { topic_id: deckId }. Ein Haken allein sagte
-  // nur „passiert" — das Deck ist leer und will gefuellt werden, und der Weg
-  // dorthin war ein Modulwechsel und eine Suche in der Stapelliste.
-  const [angelegt, setAngelegt] = useState({});
-
-  useEffect(() => {
-    hol(`/api/sessions/${sessionId}/topic-stats`, null)
-      .then((d) => setTopics(d && Array.isArray(d.topics) ? d.topics : []));
-  }, [sessionId]);
-
-  // Schwach = unter 60 % Trefferquote.
-  const schwach = topics.filter((tp) => tp.topic_id && tp.pct < 60);
-  if (!schwach.length) return null;
-
-  const deckAnlegen = async (tp) => {
-    setBusy(tp.topic_id);
-    const r = await fetch(`/api/karten/classes/${classId}/decks`,
-      alsJson("POST", { name: tp.name, topic_id: tp.topic_id })).catch(() => null);
-    const d = r && r.ok ? await r.json().catch(() => null) : null;
-    setBusy(null);
-    if (d && d.id) setAngelegt((a) => ({ ...a, [tp.topic_id]: d.id }));
-  };
-
-  return (
-    <div style={{ ...cardStyle, marginBottom: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("weak.title")}</div>
-      <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12 }}>{t("weak.hint")}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {schwach.map((tp) => (
-          <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: CONTROL_R, flexWrap: "wrap" }}>
-            <span style={{ flex: 1, fontWeight: 600, minWidth: 120 }}>{tp.name}</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: tp.pct < 40 ? C.danger : C.warning }}>{tp.pct}%</span>
-            {/* Nur noch das Karten-Deck. Die "Lernpfad-Aufgabe" legte eine
-                Aufgabe mit einem Titel und ohne Inhalt an — ein Platzhalter,
-                den man danach ohnehin von Hand ausfuellen musste. */}
-            {karten && (angelegt[tp.topic_id]
-              ? (
-                <Link to={`/karten?class=${classId}&deck=${angelegt[tp.topic_id]}`}
-                  style={{ ...toolbarBtn, display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "var(--accent)" }}>
-                  <Icon d={ICONS.check} size={15} color={C.success} /> {t("weak.toDeck")}
-                </Link>
-              )
-              : (
-                <button onClick={() => deckAnlegen(tp)} disabled={busy === tp.topic_id}
-                  style={{ ...toolbarBtn, opacity: busy === tp.topic_id ? 0.6 : 1 }}>{t("weak.makeDeck")}</button>
-              ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+// Der Abschnitt „Schwache Themen" mit seinen zwei Knoepfen ist entfallen. Beide
+// legten etwas Leeres an — ein Deck ohne Karten, eine Aufgabe ohne Inhalt —, und
+// was danach zu tun war, stand nirgends. Welche Themen schwach sind, sagt die
+// Themen-Analyse darueber schon: sortiert, eingefaerbt und mit „Uebung
+// empfohlen" beschriftet. Ein zweiter Kasten mit derselben Liste war eine
+// Wiederholung mit Knoepfen.
