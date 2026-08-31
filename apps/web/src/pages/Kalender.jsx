@@ -495,6 +495,18 @@ export default function Kalender() {
     }
   };
 
+  // Raum des Kurses aus dem Stundenplan heraus setzen. Wie die Farbe: die
+  // Angabe gehoert dem Kurs, die Gelegenheit sie einzutragen ist der
+  // Stundenplan. PUT /api/kurse/{id} braucht den Namen mit — er bleibt, wie
+  // er ist.
+  const setKursRaum = async (kursId, raum) => {
+    const k = kurse.find((x) => x.id === kursId);
+    if (!k) return;
+    setKurse((prev) => prev.map((x) => (x.id === kursId ? { ...x, raum } : x)));
+    const r = await fetch(`/api/kurse/${kursId}`, alsJson("PUT", { name: k.name, raum })).catch(() => null);
+    await pruefeAntwort(r, t("kurse.raum"));
+  };
+
   const saveSlot = async (s) => {
     const body = { weekday: s.weekday, period: s.period, title: s.title || "", class_id: s.class_id || null, kurs_id: s.kurs_id ?? null, topic_id: s.topic_id || null, term };
     const res = await fetch(`${API}/timetable/slot`, alsJson("PUT", body)).catch(() => null);
@@ -771,7 +783,7 @@ export default function Kalender() {
             </div>
         </Modal>
       )}
-      {slotEdit && <SlotModal slot={slotEdit} classes={classes} kurse={kurse} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setSlotColor} onClose={() => setSlotEdit(null)} t={t} />}
+      {slotEdit && <SlotModal slot={slotEdit} classes={classes} kurse={kurse} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setSlotColor} onRaum={setKursRaum} onClose={() => setSlotEdit(null)} t={t} />}
       {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} onHide={(k) => { hideExtEvent(k); setExtInfo(null); }} t={t} />}
     </div>
   );
@@ -1743,13 +1755,20 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
   );
 }
 
-function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClose, t }) {
+function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onRaum, onClose, t }) {
   const [classId, setClassId] = useState(slot.class_id || "");
   const [kursId, setKursId] = useState(slot.kurs_id ?? null); // gewaehlter Kurs (Anzeige)
   // Farbe gehört dem KURS: aus dem gewählten Kurs, sonst (ohne Kurs) der Klasse.
   const clsColorOf = (kid, cid) => (kurse.find((k) => k.id === kid) || {}).color || (classes.find((c) => c.id === Number(cid)) || {}).color || C.info;
   const [color, setColor] = useState(clsColorOf(kursId, classId));
   useEffect(() => { setColor(clsColorOf(kursId, classId)); }, [classId, kursId]); // eslint-disable-line
+  // Der Raum gehoert wie die Farbe dem KURS und nicht der einzelnen Stunde:
+  // derselbe Kurs hat vier Stunden in der Woche und meist denselben Raum. Er
+  // steht trotzdem hier, weil man ihn beim Eintragen des Stundenplans zur Hand
+  // hat — gespeichert wird er am Kurs, wie die Farbe auch.
+  const raumOf = (kid) => (kurse.find((k) => k.id === kid) || {}).raum || "";
+  const [raum, setRaum] = useState(raumOf(kursId));
+  useEffect(() => { setRaum(raumOf(kursId)); }, [kursId]); // eslint-disable-line
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
   const lbl = { fontSize: 12, color: "var(--text2)", margin: "12px 0 4px" };
   return (
@@ -1772,9 +1791,16 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
             <Link to={`/classes?open=${classId}`} onClick={onClose} style={{ fontSize: 13, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{t("kalender.toClass")} ↗</Link>
           </div>
         )}
+        {kursId && (<>
+          <div style={lbl}>{t("kurse.raum")}</div>
+          <input value={raum} maxLength={60} onChange={(e) => setRaum(e.target.value)}
+            placeholder={t("kalender.placePlaceholder")} style={{ ...inputStyle, width: "100%" }} />
+        </>)}
         <DialogFuss onAbbrechen={onClose} onSpeichern={() => {
             // Farbe erst beim Speichern anwenden — und nur, wenn sie sich geändert hat.
             if ((kursId || classId) && color && color !== clsColorOf(kursId, classId)) onColor && onColor(kursId, classId ? Number(classId) : null, color);
+            // Der Raum geht an den Kurs — und nur, wenn er sich geaendert hat.
+            if (kursId && raum !== raumOf(kursId)) onRaum && onRaum(kursId, raum.trim());
             onSave({ weekday: slot.weekday, period: slot.period, title: "", class_id: classId ? Number(classId) : null, kurs_id: classId ? kursId : null, topic_id: null });
           }}>
           {slot.id && <button onClick={() => onDelete(slot.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
