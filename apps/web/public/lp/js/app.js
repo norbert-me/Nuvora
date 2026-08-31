@@ -3739,6 +3739,7 @@
                             <button class="btn small" data-action="export-vorlage" data-id="${escAttr(p._id)}" title="Ohne Schülerdaten (teilbar)">${ICON.download} Vorlage</button>
                         </div>
                     </details>
+                    <button class="btn icon" data-action="rename" data-id="${escAttr(p._id)}" title="Umbenennen">${ICON.edit}</button>
                     <button class="btn icon danger" data-action="delete" data-id="${escAttr(p._id)}" title="Löschen">${ICON.delete}</button>
                 </div>
             </div>
@@ -3756,6 +3757,28 @@
             await api(`${LP}/paths/` + id, { method: 'DELETE' }).catch(() => {});
             loadLernpfade();
         };
+        // Umbenennen. Der Name ist je Konto eindeutig — savePfad findet den Pfad
+        // ueber ihn wieder —, deshalb geht das ueber den Server (PUT) und nicht
+        // nur lokal: ein zweiter Pfad gleichen Namens waere sonst die Folge.
+        const renamePfad = async (id) => {
+            const p = lernpfade.find(x => x._id === id);
+            if (!p) return;
+            const neu = prompt('Name des Lernpfads:', p.name || '');
+            if (neu == null) return;
+            const name = neu.trim();
+            if (!name || name === p.name) return;
+            const r = await api(`${LP}/paths/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }).catch(() => null);
+            if (!r || !r.ok) {
+                toast(r && r.status === 409 ? 'Ein Lernpfad mit diesem Namen existiert schon' : 'Umbenennen fehlgeschlagen');
+                return;
+            }
+            p.name = name;
+            if (currentPfad && currentPfad._id === id) currentPfad.name = name;
+            renderLernpfade();
+            renderGenPfade();
+            if (currentPfad && currentPfad._id === id) editPfad(currentPfad);
+            toast('Umbenannt');
+        };
         // Klick auf Balken öffnet; Icon-Buttons haben Vorrang via stopPropagation
         list.querySelectorAll('.list-row').forEach(row => {
             row.addEventListener('click', () => openPfad(row.dataset.id));
@@ -3768,6 +3791,7 @@
                 const act = btn.dataset.action;
                 if (act === 'export-full') exportPfad(lernpfade.find(p => p._id === btn.dataset.id), true);
                 else if (act === 'export-vorlage') exportPfad(lernpfade.find(p => p._id === btn.dataset.id), false);
+                else if (act === 'rename') renamePfad(btn.dataset.id);
                 else if (act === 'delete') deletePfad(btn.dataset.id);
                 btn.closest('details')?.removeAttribute('open');   // Export-Menü nach Wahl schliessen
             });

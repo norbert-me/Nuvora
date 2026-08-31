@@ -259,6 +259,30 @@ async def create_path(
     return path
 
 
+@router.put("/paths/{path_id}", response_model=PathOut)
+async def rename_path(
+    path_id: int,
+    body: PathIn,
+    user: User = Depends(require_module),
+    db: AsyncSession = Depends(get_db),
+):
+    """Einen Lernpfad umbenennen. Der Name ist je Konto eindeutig (der Pfad wird
+    beim Speichern ueber ihn wiedergefunden) — ein belegter Name gibt deshalb
+    409 statt still einen zweiten Pfad gleichen Namens entstehen zu lassen."""
+    path = await eigenes(db, LearningPath, path_id, user, "Lernpfad nicht gefunden")
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(400, "Name fehlt")
+    dup = await db.execute(select(LearningPath.id).where(
+        LearningPath.owner_id == user.id, LearningPath.name == name, LearningPath.id != path_id))
+    if dup.scalar_one_or_none():
+        raise HTTPException(409, "Ein Lernpfad mit diesem Namen existiert schon")
+    path.name = name[:200]
+    await db.commit()
+    await db.refresh(path, ["ladders"])
+    return path
+
+
 @router.delete("/paths/{path_id}", status_code=204)
 async def delete_path(
     path_id: int,
