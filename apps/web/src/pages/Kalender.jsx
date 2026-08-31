@@ -1832,6 +1832,29 @@ function EntryModal({ entry, zeiten = [], classes, topics, methods = [], quizze 
   const stunde = entry.period != null ? (zeiten[entry.period - 1] || null) : null;
   const stundeVon = (stunde && stunde.start) || "";
   const stundeBis = (stunde && stunde.end) || "";
+  // Die Regel im Klartext. „wiederholt sich" stand da und beantwortete die
+  // Frage nicht, die man an einen Serientermin stellt: WIE oft, und bis wann.
+  // Was der Dialog nicht anbietet (BYDAY-Listen aus Apple), wird nicht
+  // ausgedacht — dann bleibt es beim allgemeinen Satz.
+  const rrText = (() => {
+    if (!entry.rrule) return null;
+    const teile = Object.fromEntries(entry.rrule.split(";").filter((x) => x.includes("=")).map((x) => x.split("=")));
+    const iv = Number(teile.INTERVAL || 1);
+    const grund = {
+      DAILY: iv === 2 ? null : t("kalender.repeatDaily"),
+      WEEKLY: iv === 2 ? t("kalender.repeatWeekly2") : iv > 1 ? null : t("kalender.repeatWeekly"),
+      MONTHLY: iv > 1 ? null : t("kalender.repeatMonthly"),
+      YEARLY: iv > 1 ? null : t("kalender.repeatYearly"),
+    }[teile.FREQ];
+    if (!grund) return t("kalender.repeatOn");
+    if (teile.UNTIL && teile.UNTIL.length >= 8) {
+      const u = teile.UNTIL;
+      const d = new Date(Number(u.slice(0, 4)), Number(u.slice(4, 6)) - 1, Number(u.slice(6, 8)));
+      return `${grund}, ${t("kalender.repeatUntil")} ${d.toLocaleDateString()}`;
+    }
+    if (teile.COUNT) return `${grund} (${teile.COUNT}×)`;
+    return grund;
+  })();
   const zeitText = (startTime || endTime)
     ? `${startTime || "?"}–${endTime || "?"}`
     : ((stundeVon || stundeBis) ? `${stundeVon || "?"}–${stundeBis || "?"}` : null);
@@ -1941,7 +1964,7 @@ function EntryModal({ entry, zeiten = [], classes, topics, methods = [], quizze 
                 {/* Einstieg (Methode) steht jetzt als anklickbarer Link unter „Öffnen". */}
                 {zeile(t("kalender.time"), zeitText)}
                 {zeile(t("kalender.place"), ort)}
-                {zeile(t("kalender.repeat"), entry.rrule ? t("kalender.repeatOn") : null)}
+                {zeile(t("kalender.repeat"), rrText)}
               </div>
             )}
             {aktiv.orga && classId && (
