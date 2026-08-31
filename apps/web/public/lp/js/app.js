@@ -2811,6 +2811,12 @@
             doc.setTextColor(0);
         }
         const cbSize = 5;
+        // Alles in einer Zeile sitzt auf DERSELBEN Mitte `y`: Kaestchen und
+        // Smileys werden um sie herum gezeichnet, Text braucht dafuer einen
+        // Grundlinien-Versatz (rund die halbe Versalhoehe von 11pt in mm).
+        // Vorher stand der Text 1.5 mm tiefer als die Kaestchen und die Zeile
+        // klebte am Trennstrich darueber.
+        const MITTE_11PT = 1.3;
         const cbX = marginL;
         const numX = marginL + cbSize + 3;
         const textX = numX + 10;
@@ -2917,7 +2923,7 @@
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
             doc.setTextColor(100);
-            doc.text(String(idx + 1), numX, y + 1.5);
+            doc.text(String(idx + 1), numX, y + MITTE_11PT);
             doc.setTextColor(0);
 
             // Selbsteinschätzung: zwei Smileys zum Ankreisen. Sie standen nur
@@ -2928,8 +2934,10 @@
             // den Pflichtaufgaben, und genau das sagt der Kasten auch.
             const istErklaerung = task.section === 'Erklärung' || getKategorie(task) === 'Erklärung';
             if (!istErklaerung) {
-                drawSmiley(doc, smileyX + 2.5, y, 2.2, true);
-                drawSmiley(doc, smileyX + 9, y, 2.2, false);
+                // So hoch wie die Kaestchen (Radius = halbe Kantenlaenge),
+                // damit die Zeile eine Linie hat und nicht drei Groessen.
+                drawSmiley(doc, smileyX + 2.5, y, cbSize / 2, true);
+                drawSmiley(doc, smileyX + 9, y, cbSize / 2, false);
             }
 
             doc.setFont('helvetica', 'normal');
@@ -2940,7 +2948,7 @@
                 const hmm = 7, wmm = hmm * (latexImg.w / latexImg.h);
                 doc.addImage(latexImg.url, 'PNG', textX, y - hmm / 2, wmm, hmm);
             } else {
-                doc.text(task.quelle, textX, y + 1.5);
+                doc.text(task.quelle, textX, y + MITTE_11PT);
             }
 
             // Ankreuzfelder: Lösung geprüft + korrigiert
@@ -2957,7 +2965,10 @@
             if (idx < selectedTasks.length - 1) {
                 doc.setDrawColor(220);
                 doc.setLineWidth(0.15);
-                doc.line(marginL, y - rowH / 2 + 3, marginL + contentW, y - rowH / 2 + 3);
+                // Genau in die Mitte zwischen zwei Zeilen. Er lag 3 mm tiefer,
+                // also dicht unter der naechsten Zeile — die Kaestchen klebten
+                // am Strich darueber.
+                doc.line(marginL, y - rowH / 2, marginL + contentW, y - rowH / 2);
                 doc.setDrawColor(0);
             }
         });
