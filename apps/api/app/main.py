@@ -231,6 +231,7 @@ def _ensure_columns(sync_conn):
         ("grade_entries", "class_id", "INTEGER"),
         ("grade_entries", "kurs_id", "INTEGER"),
         ("grade_entries", "term", "VARCHAR(10) DEFAULT '' NOT NULL"),
+        ("users", "tours_done", "JSON"),
         ("question_sets", "owner_id", "INTEGER"),
         ("card_decks", "folder_id", "INTEGER"),
         ("card_decks", "position", "INTEGER DEFAULT 0 NOT NULL"),

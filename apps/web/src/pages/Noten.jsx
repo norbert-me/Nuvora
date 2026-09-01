@@ -470,7 +470,7 @@ export default function Noten() {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <label data-tour="noten-class" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
           {t("nav.classes")}
-          <KursKlasseSelect value={subsetKurs ? null : classId} onChange={(id, kid) => wechseln(() => { setSubsetKurs(null); setClassId(id); setKursId(kid); })} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} />
+          <KursKlasseSelect value={subsetKurs ? null : classId} kursValue={subsetKurs ? null : kursId} onChange={(id, kid) => wechseln(() => { setSubsetKurs(null); setClassId(id); setKursId(kid); })} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} />
         </label>
         {subsetKurse.length > 0 && (
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>

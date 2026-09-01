@@ -1269,7 +1269,7 @@ export function KlassenarbeitVergleich() {
   return (
     <div style={{ ...pageApp, padding: "0 16px 40px" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
+        <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
         {works.length > 0 && (
           <select value={workId || ""} onChange={(e) => setWorkId(Number(e.target.value))} style={{ ...selectStyle, minWidth: 180 }}>
             {works.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}

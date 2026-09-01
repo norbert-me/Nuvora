@@ -491,6 +491,8 @@ def _user_dict(user):
         # oder ernannt (app/rollen.py).
         "is_admin": ist_admin(user),
         "display_name": display or user.email, "grade_scale": user.grade_scale, "grade_tendency": user.grade_tendency,
+        # Gesehene Touren: am Konto, damit sie nicht auf jedem Geraet neu laufen.
+        "tours_done": list(getattr(user, "tours_done", None) or []),
         "marketplace_name": getattr(user, "marketplace_name", "") or "",
         "pending_email": getattr(user, "pending_email", None),
         # Schuljahr — die Shell braucht es fuer alles, was „dieses Halbjahr" sagt.
@@ -728,6 +730,30 @@ async def confirm_email_change(body: ConfirmEmailChangeBody, request: Request, d
     user.token_version = (user.token_version or 0) + 1  # meldet bestehende Sitzungen ab
     await db.commit()
     return {"ok": True}
+
+
+class TourBody(BaseModel):
+    tour: str
+
+
+@router.post("/tour-done")
+async def tour_done(body: TourBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Eine gefuehrte Tour als gesehen merken — am Konto, nicht am Geraet.
+
+    Vorher stand das nur im localStorage: wer zwei Geraete benutzt, sah die
+    Tour auf jedem einmal, und auf dem Handy immer wieder, weil Safari den
+    Speicher einer Seite nach ein paar Tagen ohne Besuch loescht.
+    """
+    key = (body.tour or "").strip()[:40]
+    if not key:
+        raise HTTPException(400, "Keine Tour angegeben")
+    done = list(getattr(user, "tours_done", None) or [])
+    if key not in done:
+        # Neue Liste statt anhaengen: die ORM erkennt eine Aenderung an einer
+        # JSON-Spalte sonst nicht (kein Mutable-Tracking) und schriebe nichts.
+        user.tours_done = [*done, key][:100]
+        await db.commit()
+    return {"ok": True, "tours_done": list(user.tours_done or [])}
 
 
 @router.put("/profile")

@@ -1962,22 +1962,22 @@
     function refreshGenUnterthemen() {
         const thema = document.getElementById('gen-thema').value;
         const container = document.getElementById('gen-unterthema-container');
-        if (!thema) { container.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem">Erst Thema wählen</span>'; return; }
+        if (!thema) { container.innerHTML = '<span style="color:var(--text-muted);font-size:var(--control-font)">Erst Thema wählen</span>'; return; }
         // Unterthemen aus Aufgaben UND aus den Kind-Themen des Kern-Themas —
         // sonst fehlen sie bei frischen Themen ohne Aufgaben (wie im Aufgabe-Formular).
         const ober = topics.find(t => !t.parent_id && t.name === thema);
         const kernKinder = ober ? topics.filter(t => t.parent_id === ober.id).map(t => t.name) : [];
         const unterthemen = [...new Set([...aufgaben.filter(a => a.thema === thema).map(a => a.unterthema).filter(Boolean), ...kernKinder])].sort();
-        if (!unterthemen.length) { container.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem">Keine Unterthemen</span>'; return; }
+        if (!unterthemen.length) { container.innerHTML = '<span style="color:var(--text-muted);font-size:var(--control-font)">Keine Unterthemen</span>'; return; }
         // Als Dropdown (aufklappbar) statt langer Chip-Reihe — Mehrfachauswahl
         // bleibt über dieselben .gen-ut-cb-Checkboxen erhalten.
         container.innerHTML = `
-            <details class="gen-ut-dd" style="position:relative;display:inline-block;min-width:220px">
-              <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card)">
+            <details class="gen-ut-dd" style="position:relative;display:block;min-width:220px">
+              <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:var(--control-pad-y) var(--control-pad-x);border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-size:var(--control-font);line-height:var(--control-line)">
                 <span id="gen-ut-summary">Alle Unterthemen</span><span style="color:var(--text-muted)">▾</span>
               </summary>
               <div style="position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:100%;max-height:260px;overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.18);padding:4px">
-                ${unterthemen.map(u => `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;border-radius:6px"><input type="checkbox" class="gen-ut-cb" value="${escAttr(u)}"> ${esc(u)}</label>`).join('')}
+                ${unterthemen.map(u => `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;border-radius:6px;font-size:var(--control-font);line-height:var(--control-line)"><input type="checkbox" class="gen-ut-cb" value="${escAttr(u)}"> ${esc(u)}</label>`).join('')}
               </div>
             </details>`;
         const summary = () => {
@@ -3625,6 +3625,16 @@
         } catch(e) { lernpfade = []; }
         renderLernpfade();
         renderGenPfade();
+        // Ist ein Pfad geoeffnet, muss er auf den frischen Stand zeigen: sonst
+        // steht im offenen Panel weiter das Objekt aus dem vorigen Laden — wer
+        // vom Panel aus in den Generator geht, dort eine Lernleiter speichert
+        // und zurueckkommt, sah seine neue Lernleiter nicht (sie war laengst am
+        // Server, nur nicht im gezeigten Objekt).
+        if (currentPfad) {
+            const frisch = lernpfade.find(p => p.id === currentPfad.id) || lernpfade.find(p => p._id === currentPfad._id);
+            if (frisch) { currentPfad = frisch; renderPfadLernleitern(); }
+            else { currentPfad = null; document.getElementById('pfad-edit-panel').style.display = 'none'; }
+        }
     }
 
     // Referenzierte Aufgaben einer Lernleiter (distinct über alle Schüler).
@@ -4136,6 +4146,9 @@
         const pfad = currentPfad;
         if (!pfad) return;
         editingLlId = null;
+        // Das Panel schliesst sich nicht: die Rueckkehr in den Reiter laedt neu
+        // (loadLernpfade bindet currentPfad frisch), und wer gerade an DIESEM
+        // Pfad arbeitet, will ihn danach offen wiederfinden.
         document.querySelector('.nav-link[data-tab="generator"]').click();
         const pfadSel = document.getElementById('gen-pfad');
         pfadSel.value = pfad._id;

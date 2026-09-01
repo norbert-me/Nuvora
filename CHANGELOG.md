@@ -26,6 +26,22 @@ Notiz zur größten Fassung die dünnste.
 - Ein Quiz aus einem Ordner ließ sich nicht an eine Stunde hängen („Verknüpfter
   Eintrag nicht gefunden").
 
+**Konto**
+
+- Die geführte Tour merkt sich am Konto, dass sie gelaufen ist — sie startete
+  auf jedem Gerät neu, auf dem Handy immer wieder.
+
+**Kurse**
+
+- Der Sprung aus einem Kurs ins Notenbuch (Sitzplan, Orga, Klassenarbeit) zeigte
+  den falschen Kurs, wenn zwei Kurse dieselbe Klasse haben.
+
+**Lernpfad**
+
+- Ein offener Lernpfad zeigte nach dem Anlegen einer Lernleiter im Generator die
+  neue Lernleiter erst nach dem Neuladen.
+- Die Unterthema-Auswahl im Generator war anders groß als die Felder daneben.
+
 **Noten**
 
 - Die Übernahme eines CardVote-Tests bot Abschnitte fremder Fächer an; die

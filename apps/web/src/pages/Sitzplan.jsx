@@ -510,7 +510,7 @@ export default function Sitzplan() {
   return (
     <div style={{ maxWidth: "none" }}>
       <Werkzeugleiste
-        links={<KursKlasseSelect value={classId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />}
+        links={<KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />}
         ansicht={(
           <ViewMenu title={t("sitzplan.view")} items={[
             { key: "fotos", label: t("sitzplan.photoToggle"), hint: t("sitzplan.photoHint"), value: fotosOn, onChange: (v) => { setFotosOn(v); saveView({ fotos: v }); } },

@@ -135,7 +135,7 @@ export default function Orga() {
           Handgriff (neuer Punkt). Das Feld hatte `inputStyle` Zeile fuer Zeile
           nachgebaut und stand dadurch hoeher als der Plus-Knopf daneben. */}
       <Werkzeugleiste style={{ marginBottom: 16 }}
-        links={<KursKlasseSelect value={classId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />}>
+        links={<KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />}>
         <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
           placeholder={t("orga.newPlaceholder")} style={{ ...toolbarInput, flex: 1, minWidth: 200 }} />
         <AddButton onClick={anlegen} title={t("orga.add")} />

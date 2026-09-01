@@ -606,6 +606,10 @@ function DarkModeToggle() {
 }
 
 function Nav({ user, onLogout }) {
+  // Der angemeldete Nutzer kommt als Eigenschaft herein, das Aktualisieren
+  // ueber den Kontext (dieselbe Quelle wie in Wurzel) — die Tour merkt sich am
+  // Konto, dass sie gelaufen ist.
+  const { setUser } = React.useContext(RahmenKontext);
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { t } = useLanguage();
@@ -634,7 +638,17 @@ function Nav({ user, onLogout }) {
   }, []);
 
   const [tourId, setTourId] = useState(null);
+  // „Schon gesehen" steht am KONTO (user.tours_done). Vorher nur im
+  // localStorage: mit zwei Geraeten lief jede Tour zweimal, und auf dem Handy
+  // immer wieder — Safari raeumt den Speicher einer Seite nach ein paar Tagen
+  // ohne Besuch. Der localStorage-Schluessel bleibt als Bestand gelesen (wer
+  // die Tour schon weggeklickt hat, soll sie nicht erneut sehen) und wird
+  // weiter mitgeschrieben, damit es auch offline haelt.
   const doneKey = (id) => (id === "kern" ? "nuvora_kerntour_done" : `nuvora_tour_${id}_done`);
+  const tourGesehen = (id) => {
+    if ((user?.tours_done || []).includes(id)) return true;
+    try { return !!localStorage.getItem(doneKey(id)); } catch { return false; }
+  };
   useEffect(() => {
     const h = (e) => setTourId((e.detail && e.detail.tour) || "kern");
     window.addEventListener("nuvora:start-tour", h);
@@ -645,11 +659,21 @@ function Nav({ user, onLogout }) {
     const hit = PATH_TOUR.find(([p]) => location.pathname.startsWith(p));
     if (!hit) return;
     const id = hit[1];
-    try { if (localStorage.getItem(doneKey(id))) return; } catch { /* egal */ }
+    if (tourGesehen(id)) return;
     const timer = setTimeout(() => setTourId((cur) => cur || id), 900);
     return () => clearTimeout(timer);
   }, [location.pathname, user]);
-  const endTour = () => { const id = tourId; setTourId(null); try { localStorage.setItem(doneKey(id), "1"); } catch { /* egal */ } };
+  const endTour = () => {
+    const id = tourId;
+    setTourId(null);
+    try { localStorage.setItem(doneKey(id), "1"); } catch { /* egal */ }
+    if (!id) return;
+    fetch("/api/auth/tour-done", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tour: id }),
+    }).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      if (d?.tours_done) setUser((u) => (u ? { ...u, tours_done: d.tours_done } : u));
+    }).catch(() => { /* offline: der localStorage-Eintrag reicht bis zum naechsten Mal */ });
+  };
 
   const navItems = getModuleNavItems(t, location, user);
   const allPages = [...navItems, { to: "/tutorial", label: t("nav.tutorial") }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/login", label: t("nav.login") }];

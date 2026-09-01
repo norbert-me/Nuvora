@@ -31,6 +31,11 @@ class User(Base):
     salutation: Mapped[str] = mapped_column(String(10), default="Hr.")
     marketplace_name: Mapped[str] = mapped_column(String(100), default="", server_default="")
     grade_scale: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Welche gefuehrten Touren dieses Konto schon gesehen hat (Liste von IDs:
+    # "kern", "noten", …). Am KONTO und nicht im localStorage: sie lief sonst je
+    # Geraet neu — auf dem Handy bei jedem Aufruf, weil Safari den Speicher der
+    # Seite nach ein paar Tagen raeumt.
+    tours_done: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Noten mit Tendenz (2+/2-) statt ganzer Note (2). Default an — Module (Klassen-
     # arbeit, CardVote) übernehmen das als Voreinstellung.
     grade_tendency: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")

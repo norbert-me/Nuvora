@@ -238,3 +238,30 @@ async def test_reset_meldet_offene_sitzungen_ab(s):
     await A.reset_password(A.ResetPasswordBody(token=A._make_reset_token(u), new_password="NeuesGeheim!9"),
                            _Anfrage(), s)
     assert (u.token_version or 0) == vorher + 1, "sonst bliebe ein gestohlenes Token gültig"
+
+
+# ─────────────────── Gefuehrte Touren am Konto ───────────────────
+#
+# "Schon gesehen" lag nur im localStorage: mit zwei Geraeten lief jede Tour
+# zweimal, und auf dem Handy immer wieder (Safari raeumt den Speicher einer
+# Seite nach ein paar Tagen ohne Besuch).
+
+@pytest.mark.asyncio
+async def test_tour_wird_am_konto_gemerkt(s):
+    u = await _konto(s)
+    r = await A.tour_done(A.TourBody(tour="kern"), user=u, db=s)
+    assert r["tours_done"] == ["kern"]
+    # Zweimal dieselbe Tour bleibt ein Eintrag.
+    r = await A.tour_done(A.TourBody(tour="kern"), user=u, db=s)
+    assert r["tours_done"] == ["kern"]
+    r = await A.tour_done(A.TourBody(tour="noten"), user=u, db=s)
+    assert r["tours_done"] == ["kern", "noten"]
+    # Und die Anmeldeantwort traegt sie, sonst wuesste die Oberflaeche nichts davon.
+    assert A._user_dict(u)["tours_done"] == ["kern", "noten"]
+
+
+@pytest.mark.asyncio
+async def test_tour_ohne_namen_wird_abgewiesen(s):
+    u = await _konto(s)
+    with pytest.raises(HTTPException):
+        await A.tour_done(A.TourBody(tour="  "), user=u, db=s)
