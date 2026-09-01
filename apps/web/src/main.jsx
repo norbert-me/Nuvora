@@ -324,10 +324,15 @@ const getModuleNavItems = (t, location, user) => {
   if (area === "auswertung") {
     const cur = params.get("tab");
     const verg = pathname.startsWith(`${AUSW}/vergleich`);
+    // Der Vergleich gehoert zu den Klassenarbeiten (er vergleicht Arbeiten
+    // ueber Klassen hinweg) und steht deshalb nur da, wo man gerade damit
+    // arbeitet — nicht als dritter Reiter neben dem Notenbuch, dem er nichts
+    // sagt.
+    const beiArbeiten = verg || cur === "klassenarbeit";
     return [
       { to: `${AUSW}?tab=noten`, label: t("auswertung.tabGrades"), active: !verg && cur !== "klassenarbeit" },
       { to: `${AUSW}?tab=klassenarbeit`, label: t("auswertung.tabWorks"), active: !verg && cur === "klassenarbeit" },
-      { to: `${AUSW}/vergleich`, label: t("klassenarbeit.navCompare"), active: verg },
+      ...(beiArbeiten ? [{ to: `${AUSW}/vergleich`, label: t("klassenarbeit.navCompare"), active: verg }] : []),
     ];
   }
   if (area === "kalender") {
