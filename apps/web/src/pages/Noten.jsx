@@ -626,10 +626,30 @@ export default function Noten() {
           onReset={(sid) => overrideReset(sid, null)}
           editing={zelle} setEditing={setZelle} onInfo={setInfoFuer} />
       ) : sections.length === 0 ? (
-        // Noch keine Abschnitte: nur der Hinweis, NICHT die SuS-Liste (die kommt
-        // erst mit einer Bewertungsstruktur — eine nackte Namensliste ohne Spalten
-        // verwirrt mehr als sie hilft).
-        <div style={{ marginBottom: 16 }}><Empty title={t("noten.noSections")} hint={t("noten.noSectionsHint")} /></div>
+        // Noch keine Abschnitte: Hinweis UND Namensliste. Ohne die Liste war
+        // eine Beobachtung erst moeglich, nachdem jemand eine Bewertungsstruktur
+        // angelegt hatte — dabei ist „hat heute geholfen" genau das, was am
+        // ersten Schultag anfaellt, lange vor der ersten Note. Die Spalte dafuer
+        // entsteht im Dialog (beobSpalteAnlegen).
+        <>
+          <div style={{ marginBottom: 16 }}><Empty title={t("noten.noSections")} hint={t("noten.noSectionsHint")} /></div>
+          {(summary || []).length > 0 && (
+            <div style={{ ...panelStyle, overflow: "hidden" }}>
+              {summary.map((s, i) => (
+                <div key={s.student_id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderTop: i === 0 ? "none" : "1px solid var(--border)" }}>
+                  <button onClick={() => setInfoFuer(s.student_id)} title={t("noten.studentInfo")}
+                    style={{ flex: 1, textAlign: "left", padding: "2px 0", border: "none", background: "none", color: "var(--text)", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+                    <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 8 }}>{i + 1}.</span>{s.name}
+                  </button>
+                  <button onClick={() => setBeobFuer(s.student_id)} title={t("noten.obsHeading")}
+                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4, border: "none", background: "none", cursor: "pointer", color: s.observations ? "var(--accent)" : "var(--text3)", fontSize: 13, padding: 4 }}>
+                    {s.observations || <Icon d={ICONS.plus} size={14} />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       ) : (
         // Eigener Scrollrahmen statt Seiten-Scroll: nur so kann der Kopf
         // wirklich stehen bleiben (ein Vorfahre mit overflow ist der Bezug fuer
@@ -1653,9 +1673,12 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete, o
               ))}
             </div>
             <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} placeholder={t("noten.obsPlaceholder")}
-              onKeyDown={(e) => { if (e.key === "Enter" && catId) { onSave({ category_id: catId, student_id: student.student_id, kind: "observation", tendency, note }); setNote(""); } }}
+              onKeyDown={(e) => { if (e.key === "Enter" && catId && note.trim()) { onSave({ category_id: catId, student_id: student.student_id, kind: "observation", tendency, note: note.trim() }); setNote(""); } }}
               style={{ ...inp, marginBottom: 12 }} />
-            <button onClick={() => { onSave({ category_id: catId, student_id: student.student_id, kind: "observation", tendency, note }); setNote(""); }} disabled={!catId} style={{ ...btnPrimary, opacity: catId ? 1 : 0.4, marginBottom: 16 }}>{t("noten.note")}</button>
+            {/* Eine Beobachtung ohne Text sagt nichts: der Knopf bleibt aus,
+                bis wirklich etwas dasteht — sonst sammeln sich leere Zeilen,
+                die niemand mehr zuordnen kann. */}
+            <button onClick={() => { onSave({ category_id: catId, student_id: student.student_id, kind: "observation", tendency, note: note.trim() }); setNote(""); }} disabled={!catId || !note.trim()} style={{ ...btnPrimary, opacity: catId && note.trim() ? 1 : 0.4, marginBottom: 16 }}>{t("noten.note")}</button>
           </>
         )}
         {entries.map((e) => {

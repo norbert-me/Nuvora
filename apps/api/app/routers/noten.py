@@ -533,6 +533,10 @@ async def _check_entry(db: AsyncSession, user: User, body: EntryIn) -> GradeCate
         raise HTTPException(400, "Eine Note braucht einen Wert")
     if body.kind == "observation" and body.value is not None:
         raise HTTPException(400, "Eine Beobachtung ist keine Note und darf keinen Notenwert haben")
+    # Eine Beobachtung ohne Text ist ein leerer Datensatz: sie traegt keinen
+    # Wert (das ist ja der Punkt) und ohne Notiz auch keine Aussage.
+    if body.kind == "observation" and not body.note.strip():
+        raise HTTPException(400, "Eine Beobachtung braucht einen Text")
     return cat
 
 
