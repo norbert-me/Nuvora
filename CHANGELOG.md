@@ -12,18 +12,24 @@ Zwischenfassung (x.y.0) hängt sie **alle Abschnitte der vorigen Reihe** an: wer
 von 4.1.0 auf 4.2.0 geht, hat 4.1.1 bis 4.1.9 nie gesehen — sonst wäre die
 Notiz zur größten Fassung die dünnste.
 
-## 4.1.8 — unveröffentlicht
-
-**Kalender**
-
-- Wird eine Klassenarbeit umbenannt, heißt die Aufgabe „… korrigieren" mit.
-  Ein selbst umformulierter Text bleibt unberührt.
+## 4.1.7 — 01.09.2026
 
 **Module**
 
 - Das Notizbrett ist nicht mehr „beta".
 
-## 4.1.7 — 01.09.2026
+**Notizbrett**
+
+- Stehen Aufgaben aus mehreren Jahren in der Liste, bekommt jedes Jahr eine
+  Farbe (Punkt am Datum) und darüber eine Legende. Bei nur einem Jahr erscheint
+  nichts.
+
+**Kalender**
+
+- Der Klick auf eine Aufgabe führt zu genau dieser Aufgabe, nicht nur in die
+  Liste.
+- Wird eine Klassenarbeit umbenannt, heißt die Aufgabe „… korrigieren" mit.
+  Ein selbst umformulierter Text bleibt unberührt.
 
 **Noten**
 
@@ -37,11 +43,6 @@ Notiz zur größten Fassung die dünnste.
   nächsten Namen. Jetzt steht sie vor dem eigenen Namen, mit Trennlinie
   zwischen den Spalten.
 - Der Jahrgang wird ausgewählt statt getippt; „andere …" legt einen neuen an.
-
-**Kalender**
-
-- Der Klick auf eine Aufgabe führt zu genau dieser Aufgabe, nicht nur in die
-  Liste.
 
 ## 4.1.6 — 01.09.2026
 

@@ -133,6 +133,23 @@ export default function Todo({ embedded } = {}) {
     grenze.setDate(grenze.getDate() + 7);
     return iso <= ymd(grenze) ? C.warning : null;   // null = die blaue Vorgabe
   };
+  // Liegen Faelligkeiten in mehreren Kalenderjahren, bekommt jedes Jahr eine
+  // Farbe — sonst sieht „14.01." aus wie „14.01." und man merkt nicht, dass
+  // eine der beiden Aufgaben ins naechste Jahr gehoert. Bei EINEM Jahr
+  // erscheint nichts: eine Legende, in der genau eine Zeile steht, erklaert
+  // eine Unterscheidung, die es nicht gibt.
+  //
+  // Die Farbe laeuft neben der Ampel, nicht statt ihr: die Ampel (rot =
+  // vorbei, gelb = diese Woche) beantwortet „wie dringend?", der Jahrespunkt
+  // „welches Jahr?". Zwei Fragen, zwei Kanaele — im Chip vermischt waeren
+  // beide unlesbar.
+  const jahre = [...new Set(items.map((i) => (i.due_date || "").slice(0, 4)).filter(Boolean))].sort();
+  const JAHRFARBEN = [C.info, C.success, C.warning, C.danger, "#8e44ad", "#16a085"];
+  const jahrFarbe = (iso) => {
+    if (jahre.length < 2 || !iso) return null;
+    const i = jahre.indexOf(iso.slice(0, 4));
+    return i < 0 ? null : JAHRFARBEN[i % JAHRFARBEN.length];
+  };
   // Angezeigt wird der ENTWURF, nicht der Serverstand.
   const offen = items.filter((i) => !istErledigt(i)).sort((a, b) => platz(a) - platz(b));
   const erledigt = items.filter((i) => istErledigt(i));
@@ -166,10 +183,12 @@ export default function Todo({ embedded } = {}) {
           // Erledigtes bleibt neutral: eine abgehakte Aufgabe ist nicht mehr
           // ueberfaellig, ein rotes Etikett daneben waere nur Laerm.
           const f = istErledigt(it) ? null : faelligFarbe(it.due_date);
+          const jf = jahrFarbe(it.due_date);
           return (
-            <span style={{ ...chipStyle, flexShrink: 0, whiteSpace: "nowrap",
+            <span style={{ ...chipStyle, flexShrink: 0, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6,
               background: f ? f + "1f" : "var(--accent-bg, rgba(10,132,255,0.12))",
               color: f || "var(--accent)" }}>
+              {jf && <span title={it.due_date.slice(0, 4)} style={{ width: 8, height: 8, borderRadius: "50%", background: jf, flexShrink: 0 }} />}
               {fmtDate(it.due_date)}{it.due_time ? ` · ${it.due_time}` : ""}
             </span>
           );
@@ -212,6 +231,20 @@ export default function Todo({ embedded } = {}) {
         <button onClick={add} disabled={!text.trim()} style={{ ...toolbarBtnPrimary, opacity: text.trim() ? 1 : 0.5 }}>{t("common.add")}</button>
       </Werkzeugleiste>
       {kalenderAktiv && <p style={{ fontSize: 13, color: "var(--text3)", marginTop: -8, marginBottom: 16 }}>{t("todo.calHint")}</p>}
+
+      {/* Legende — nur wenn wirklich mehrere Jahre in der Liste stehen. Sie
+          sagt, wofuer der Punkt am Datum steht; ohne sie waeren es bunte
+          Punkte ohne Bedeutung. */}
+      {jahre.length > 1 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 12, fontSize: 12, color: "var(--text3)" }}>
+          {jahre.map((j) => (
+            <span key={j} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: jahrFarbe(`${j}-01-01`) }} />
+              {j}
+            </span>
+          ))}
+        </div>
+      )}
 
       {items.length === 0 ? (
         <Empty title={t("todo.empty")} hint={t("todo.emptyHint")} />
