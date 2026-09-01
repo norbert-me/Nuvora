@@ -483,7 +483,13 @@ async def compare_category(category_id: int, user: User = Depends(require_module
 # ─── Eintraege: Noten und Beobachtungen ───
 
 class EntryIn(BaseModel):
-    category_id: int
+    # Note: Spalte pflicht. Beobachtung: Spalte leer, dafuer class_id (und je
+    # nach Kurs kurs_id/term) — sie zaehlt nie in einen Schnitt und braucht
+    # deshalb keine Zelle, in der sie sitzt.
+    category_id: Optional[int] = None
+    class_id: Optional[int] = None
+    kurs_id: Optional[int] = None
+    term: str = ""
     student_id: int
     kind: str = "grade"
     value: Optional[float] = None
@@ -513,7 +519,10 @@ class EntryIn(BaseModel):
 
 class EntryOut(BaseModel):
     id: int
-    category_id: int
+    category_id: Optional[int]
+    class_id: Optional[int] = None
+    kurs_id: Optional[int] = None
+    term: str = ""
     student_id: int
     kind: str
     value: Optional[float]
@@ -523,11 +532,29 @@ class EntryOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-async def _check_entry(db: AsyncSession, user: User, body: EntryIn) -> GradeCategory:
-    cat = await _owned_category(db, user, body.category_id)
-    # Kurs (Fach) der Spalte über ihren Abschnitt — für Teilkurse (kurs_students).
-    sec = await db.get(GradeSection, cat.section_id) if cat.section_id else None
-    if not await _student_in_kurs(db, cat.class_id, body.student_id, sec.kurs_id if sec else None):
+async def _check_entry(db: AsyncSession, user: User, body: EntryIn) -> Optional[GradeCategory]:
+    """Prüft Besitz und Zugehörigkeit — für beide Bauformen eines Eintrags.
+
+    Mit Spalte (jede Note, Beobachtungen aus dem Bestand): Klasse und Kurs
+    kommen über die Spalte und ihren Abschnitt. Ohne Spalte (neue
+    Beobachtungen): sie stehen am Eintrag selbst und werden hier geprüft.
+    """
+    cat = None
+    if body.category_id is not None:
+        cat = await _owned_category(db, user, body.category_id)
+        # Kurs (Fach) der Spalte über ihren Abschnitt — für Teilkurse (kurs_students).
+        sec = await db.get(GradeSection, cat.section_id) if cat.section_id else None
+        klasse_id, kurs_id = cat.class_id, (sec.kurs_id if sec else None)
+    else:
+        if body.kind != "observation":
+            raise HTTPException(400, "Eine Note braucht eine Spalte")
+        if body.class_id is None:
+            raise HTTPException(400, "Eine Beobachtung braucht eine Klasse")
+        await _owned_class(db, user, body.class_id)
+        klasse_id, kurs_id = body.class_id, body.kurs_id
+        if kurs_id is not None:
+            await eigener_kurs(db, user, kurs_id)
+    if not await _student_in_kurs(db, klasse_id, body.student_id, kurs_id):
         raise HTTPException(400, "Schüler gehört nicht zu diesem Kurs")
     if body.kind == "grade" and body.value is None:
         raise HTTPException(400, "Eine Note braucht einen Wert")
@@ -540,8 +567,25 @@ async def _check_entry(db: AsyncSession, user: User, body: EntryIn) -> GradeCate
     return cat
 
 
+def _obs_where(class_id, kurs_id, term: str = ""):
+    """WHERE fuer spaltenlose Beobachtungen — dieselbe Schluesselregel wie bei
+    den Abschnitten (`kurs_oder_klasse`), nur am Eintrag selbst."""
+    w = [GradeEntry.category_id.is_(None), *kurs_oder_klasse_ohne_owner(class_id, kurs_id)]
+    if term:
+        w.append(GradeEntry.term == term)
+    return w
+
+
+def kurs_oder_klasse_ohne_owner(class_id, kurs_id):
+    # GradeEntry traegt kein owner_id (es haengt am Schueler bzw. an der
+    # Klasse); den Besitz prueft der Aufrufer ueber die Klasse.
+    if kurs_id is not None:
+        return [GradeEntry.kurs_id == kurs_id]
+    return [GradeEntry.class_id == class_id, GradeEntry.kurs_id.is_(None)]
+
+
 @router.get("/classes/{class_id}/entries", response_model=List[EntryOut])
-async def list_entries(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def list_entries(class_id: int, kurs_id: Optional[int] = None, term: str = "", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     # Noten hängen (über Spalte→Abschnitt) am Kurs (Fach): nur die des Kurses.
     r = await db.execute(
@@ -551,7 +595,14 @@ async def list_entries(class_id: int, kurs_id: Optional[int] = None, user: User 
         .where(GradeCategory.owner_id == user.id, *_sec_kurs_where(user, class_id, kurs_id))
         .order_by(GradeEntry.date.desc(), GradeEntry.id.desc())
     )
-    return r.scalars().all()
+    mit_spalte = list(r.scalars().all())
+    # Beobachtungen ohne Spalte kommen ueber ihren eigenen Schluessel; ein Join
+    # ueber die Spalte wuerde sie stillschweigend weglassen.
+    r2 = await db.execute(
+        select(GradeEntry).where(*_obs_where(class_id, kurs_id, term))
+        .order_by(GradeEntry.date.desc(), GradeEntry.id.desc())
+    )
+    return mit_spalte + list(r2.scalars().all())
 
 
 @router.post("/entries", response_model=EntryOut, status_code=201)
@@ -635,7 +686,14 @@ async def delete_entry(entry_id: int, user: User = Depends(require_module), db: 
     entry = await db.get(GradeEntry, entry_id)
     if not entry:
         raise HTTPException(404, "Eintrag nicht gefunden")
-    await _owned_category(db, user, entry.category_id)
+    # Besitz haengt an der Spalte — oder, bei spaltenlosen Beobachtungen, an der
+    # Klasse. Ohne den zweiten Zweig liesse sich eine Beobachtung nie loeschen.
+    if entry.category_id is not None:
+        await _owned_category(db, user, entry.category_id)
+    elif entry.class_id is not None:
+        await _owned_class(db, user, entry.class_id)
+    else:
+        raise HTTPException(404, "Eintrag nicht gefunden")
     await db.delete(entry)
     await db.commit()
 
@@ -756,6 +814,11 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
         .where(GradeCategory.owner_id == user.id, GradeCategory.class_id == class_id)
     )).scalars().all()
 
+    # Beobachtungen ohne Spalte (der Normalfall seit sie keine mehr brauchen).
+    obs_frei = (await db.execute(
+        select(GradeEntry).where(*_obs_where(class_id, kurs_id, term))
+    )).scalars().all()
+
     overrides = (await db.execute(
         select(GradeOverride).where(GradeOverride.owner_id == user.id, GradeOverride.class_id == class_id)
     )).scalars().all()
@@ -813,7 +876,8 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
             section_overrides=sec_ovr, section_effective=sec_eff,
             weighted=weighted, total_override=total_over.get(st.id),
             unweighted_fallback=fallback,
-            observations=len([e for e in eigene if e.kind == "observation" and e.category_id in cat_ids]),
+            observations=(len([e for e in eigene if e.kind == "observation" and e.category_id in cat_ids])
+                          + len([e for e in obs_frei if e.student_id == st.id])),
         ))
     return sections, out
 
@@ -1161,6 +1225,13 @@ async def export_noten(class_id: int, term: str = "1", kurs_id: Optional[int] = 
             entries.append({"card_id": sid2card[e.student_id], "s": s_idx, "c": c_idx, "kind": e.kind,
                             "value": e.value, "tendency": e.tendency, "note": e.note,
                             "date": e.date.isoformat() if e.date else None})
+    # Beobachtungen ohne Spalte: s/c bleiben leer, sie haengen an Klasse/Kurs.
+    for e in (await db.execute(select(GradeEntry).where(*_obs_where(class_id, kurs_id, term)))).scalars().all():
+        if e.student_id not in sid2card:
+            continue
+        entries.append({"card_id": sid2card[e.student_id], "s": None, "c": None, "kind": e.kind,
+                        "value": None, "tendency": e.tendency, "note": e.note,
+                        "date": e.date.isoformat() if e.date else None})
     sec_idx = {sec.id: si for si, sec in enumerate(secs)}
     ov_rows = (await db.execute(select(GradeOverride).where(
         GradeOverride.class_id == class_id, GradeOverride.owner_id == user.id))).scalars().all()
@@ -1336,7 +1407,19 @@ async def import_noten(class_id: int, body: dict, term: str = "1", kurs_id: Opti
     for e in daten.entries:
         sid = card2sid.get(e.card_id)
         cid = cat_map.get((e.s, e.c))
-        if not sid or not cid:
+        if not sid:
+            continue
+        if cid is None:
+            # Spaltenlose Beobachtung (der Normalfall). Eine NOTE ohne Spalte
+            # gibt es nicht — die faellt wie bisher heraus.
+            if e.kind != "observation":
+                continue
+            ge = GradeEntry(category_id=None, student_id=sid, kind="observation",
+                            class_id=class_id, kurs_id=kurs_id, term=term,
+                            tendency=e.tendency, note=e.note)
+            if e.date:
+                ge.date = e.date
+            db.add(ge)
             continue
         ge = GradeEntry(category_id=cid, student_id=sid, kind=e.kind,
                         value=e.value, tendency=e.tendency, note=e.note)

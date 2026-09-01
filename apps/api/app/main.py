@@ -226,6 +226,11 @@ def _ensure_columns(sync_conn):
     existing_tables = inspector.get_table_names()
     # (Tabelle, Spalte, DDL-Typ inkl. Default)
     wanted = [
+        # Beobachtungen brauchen keine Spalte mehr (siehe GradeEntry): sie
+        # haengen an Klasse/Kurs/Halbjahr.
+        ("grade_entries", "class_id", "INTEGER"),
+        ("grade_entries", "kurs_id", "INTEGER"),
+        ("grade_entries", "term", "VARCHAR(10) DEFAULT '' NOT NULL"),
         ("question_sets", "owner_id", "INTEGER"),
         ("card_decks", "folder_id", "INTEGER"),
         ("card_decks", "position", "INTEGER DEFAULT 0 NOT NULL"),
@@ -431,7 +436,8 @@ def _ensure_columns(sync_conn):
     # No-op. Nur Postgres — SQLite kann eine bestehende Spalte nicht aendern,
     # dort entsteht die Tabelle ohnehin frisch aus dem Modell.
     if sync_conn.dialect.name == "postgresql":
-        for table, column in (("card_decks", "class_id"), ("card_folders", "class_id")):
+        for table, column in (("card_decks", "class_id"), ("card_folders", "class_id"),
+                              ("grade_entries", "category_id")):
             if table not in existing_tables:
                 continue
             try:
@@ -439,7 +445,8 @@ def _ensure_columns(sync_conn):
                     sync_conn.execute(text(f"ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL"))
             except Exception as e:  # noqa: BLE001 — darf den Start nicht kosten
                 print(f"[STARTUP-WARN] {table}.{column} bleibt NOT NULL: {type(e).__name__}: {e} "
-                      f"— Stapel ohne Klasse lassen sich dann nicht anlegen.", flush=True)
+                      f"— Zeilen ohne diesen Bezug lassen sich dann nicht anlegen "
+                      f"(Stapel ohne Klasse, Beobachtung ohne Spalte).", flush=True)
 
     # NULL, wo das Modell NOT NULL sagt — daran scheiterte das Zurueckspielen.
     #

@@ -1908,6 +1908,38 @@ def teste_noten(api, b, u, sch, spuren, cv):
 
     b.pruefe("Noten", "Beobachtung zaehlt nie mit", beobachtung)
 
+    def beobachtung_ohne_spalte():
+        # Eine Beobachtung haengt an keiner Spalte: sie muss auch dann gehen,
+        # wenn die Klasse noch gar keine Bewertungsstruktur hat.
+        vorher = _finde(api.call("GET", f"/api/noten/classes/{u.class_id}/summary", erwartet=(200,)),
+                        student_id=u.students[0])
+        angelegt = api.call("POST", "/api/noten/entries", {
+            "student_id": u.students[0], "class_id": u.class_id, "term": "1",
+            "kind": "observation", "tendency": 1, "note": f"{PRAEFIX} hat geholfen",
+        }, erwartet=(201,))
+        if angelegt.get("category_id") is not None:
+            raise AssertionError("Beobachtung haengt doch an einer Spalte")
+        # Unabhaengig neu lesen: Liste UND Zaehler muessen sie finden.
+        liste = api.call("GET", f"/api/noten/classes/{u.class_id}/entries?term=1", erwartet=(200,))
+        if not any(e["id"] == angelegt["id"] for e in liste):
+            raise AssertionError("spaltenlose Beobachtung fehlt in der Liste")
+        nachher = _finde(api.call("GET", f"/api/noten/classes/{u.class_id}/summary", erwartet=(200,)),
+                         student_id=u.students[0])
+        if nachher["observations"] != vorher["observations"] + 1:
+            raise AssertionError("spaltenlose Beobachtung wird nicht gezaehlt")
+        if nachher["weighted"] != vorher["weighted"]:
+            raise AssertionError("spaltenlose Beobachtung hat den Schnitt veraendert")
+        # Eine NOTE ohne Spalte gibt es nicht — sie IST der Inhalt einer Zelle.
+        status, _ = api.call("POST", "/api/noten/entries", {
+            "student_id": u.students[0], "class_id": u.class_id, "kind": "grade", "value": 2.0,
+        }, roh=True)
+        if status < 400:
+            raise AssertionError(f"Note ohne Spalte angenommen (HTTP {status})")
+        api.call("DELETE", f"/api/noten/entries/{angelegt['id']}", erwartet=(204,))
+        return "ohne Spalte angelegt, gelesen, gezaehlt; Note ohne Spalte abgewiesen"
+
+    b.pruefe("Noten", "Beobachtung braucht keine Spalte", beobachtung_ohne_spalte)
+
     def kommentar():
         """Kommentar an der Zelle: gehoert zur Note, zaehlt nie mit.
 

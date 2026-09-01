@@ -184,7 +184,9 @@ export default function Noten() {
     }
     const [sec, ent, sum] = await Promise.all([
       fetch(`${API}/classes/${id}/sections?term=${term}${kp}`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API}/classes/${id}/entries?x=1${kp}`).then((r) => (r.ok ? r.json() : [])),
+      // term wirkt nur auf die spaltenlosen Beobachtungen (sie tragen das
+      // Halbjahr selbst); Noten kommen ueber ihre Spalte ohnehin je Halbjahr.
+      fetch(`${API}/classes/${id}/entries?term=${term === "year" ? "" : term}${kp}`).then((r) => (r.ok ? r.json() : [])),
       fetch(`${API}/classes/${id}/summary?term=${term}&agg=${agg}${kp}`).then((r) => (r.ok ? r.json() : [])),
     ]);
     setSections(sec); setEntries(ent); setSummary(sum); setLoading(false);
@@ -413,28 +415,6 @@ export default function Noten() {
 
   const allCats = sections.flatMap((s) => s.categories || []);
 
-  // Beobachtungen brauchen eine Spalte, weil ein Eintrag an einer Spalte
-  // haengt (grade_entries.category_id). Das war eine Sackgasse: „Lege zuerst
-  // eine Spalte an" — und man musste den Dialog verlassen, im Notenbuch einen
-  // Abschnitt und eine Spalte anlegen und zurueckkommen, nur um „hat geholfen"
-  // festzuhalten. Jetzt entsteht beides an Ort und Stelle: ein Abschnitt mit
-  // Gewicht 0 (er darf den Schnitt nicht verschieben) und darin eine Spalte
-  // „Beobachtungen". Fuer Noten gilt weiter der normale Weg.
-  const beobSpalteAnlegen = async () => {
-    let secId = sections[0]?.id ?? null;
-    if (secId == null) {
-      const r = await fetch(`${API}/classes/${classId}/sections?term=${term}${kp}`,
-        alsJson("POST", { name: t("noten.obsSection"), weight: 0, position: 0 })).catch(() => null);
-      if (!r || !r.ok) return;
-      secId = (await r.json()).id;
-    }
-    const sec = sections.find((x) => x.id === secId);
-    const pos = (sec?.categories || []).length;
-    const r2 = await fetch(`${API}/categories`,
-      alsJson("POST", { name: t("noten.obsColumn"), section_id: secId, position: pos })).catch(() => null);
-    if (!r2 || !r2.ok) return;
-    await load(classId);
-  };
   const gewichtSumme = sections.reduce((n, s) => n + (s.weight || 0), 0);
   const notenVon = (sid, cid) => entries.filter((e) => e.student_id === sid && e.category_id === cid && e.kind === "grade");
   // Auswertung je Spalte: Anzahl, Schnitt, Spanne über alle eingetragenen Noten.
@@ -629,8 +609,8 @@ export default function Noten() {
         // Noch keine Abschnitte: Hinweis UND Namensliste. Ohne die Liste war
         // eine Beobachtung erst moeglich, nachdem jemand eine Bewertungsstruktur
         // angelegt hatte — dabei ist „hat heute geholfen" genau das, was am
-        // ersten Schultag anfaellt, lange vor der ersten Note. Die Spalte dafuer
-        // entsteht im Dialog (beobSpalteAnlegen).
+        // ersten Schultag anfaellt, lange vor der ersten Note. Eine Spalte
+        // braucht eine Beobachtung nicht (category_id bleibt NULL).
         <>
           <div style={{ marginBottom: 16 }}><Empty title={t("noten.noSections")} hint={t("noten.noSectionsHint")} /></div>
           {(summary || []).length > 0 && (
@@ -910,10 +890,9 @@ export default function Noten() {
 
       {beobFuer && (
         <Beobachtungen t={t} student={summary.find((s) => s.student_id === beobFuer)} cats={allCats}
-          onSpalteAnlegen={beobSpalteAnlegen}
           entries={entries.filter((e) => e.student_id === beobFuer && e.kind === "observation")}
           onClose={() => setBeobFuer(null)}
-          onSave={(b) => call(() => fetch(`${API}/entries`, alsJson("POST", b)))}
+          onSave={(b) => call(() => fetch(`${API}/entries`, alsJson("POST", { ...b, class_id: classId, kurs_id: kursId ?? null, term })))}
           onDelete={(id) => call(() => fetch(`${API}/entries/${id}`, { method: "DELETE" }))} />
       )}
 
@@ -1645,63 +1624,44 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
   );
 }
 
-function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete, onSpalteAnlegen }) {
-  const [catId, setCatId] = useState(cats[0]?.id ?? null);
-  const [legt, setLegt] = useState(false);
-  // Kommt die Spalte erst waehrend des Dialogs dazu, muss sie auch gewaehlt sein.
-  useEffect(() => { if (catId == null && cats[0]) setCatId(cats[0].id); }, [cats]); // eslint-disable-line
-  // Gibt es noch keine Spalte, entsteht sie beim Oeffnen von selbst statt als
-  // Sackgasse „Lege zuerst eine Spalte an": die Beobachtungsspalte hat Gewicht 0
-  // und ist keine Entscheidung, die jemand treffen muesste — sie ist die
-  // Voraussetzung dafuer, dass ein Eintrag ueberhaupt irgendwo haengen kann.
-  // Nur wenn das Anlegen scheitert, bleibt der Knopf als zweiter Versuch.
-  const angefragt = useRef(false);
-  useEffect(() => {
-    if (cats.length > 0 || angefragt.current) return;
-    angefragt.current = true;
-    setLegt(true);
-    Promise.resolve(onSpalteAnlegen()).catch(() => {}).finally(() => setLegt(false));
-  }, [cats.length]); // eslint-disable-line
+function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete }) {
+  // Beobachtungen haengen an KEINER Spalte (grade_entries.category_id ist bei
+  // ihnen NULL): sie zaehlen nie in einen Schnitt, brauchen also auch keine
+  // Zelle. Vorher war das eine Sackgasse — „hat heute geholfen" faellt am
+  // ersten Schultag an, lange bevor irgendeine Bewertungsstruktur steht.
+  // `cats` dient nur noch dazu, den Spaltennamen von BESTANDS-Beobachtungen
+  // anzuzeigen.
   const [tendency, setTendency] = useState(1);
   const [note, setNote] = useState("");
+  // Eine Beobachtung ohne Text sagt nichts: erst mit Text laesst sie sich
+  // speichern — sonst sammeln sich leere Zeilen, die niemand mehr zuordnet.
+  const speichern = () => {
+    if (!note.trim()) return;
+    onSave({ student_id: student.student_id, kind: "observation", tendency, note: note.trim() });
+    setNote("");
+  };
   return (
     <UiModal onClose={onClose} width={460} label={student?.name}>
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{student?.name}</h3>
         <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{t("noten.obsSub")}</p>
-        {cats.length === 0 ? (
-          legt ? <Skeleton rows={2} height={34} /> : (
-            <div>
-              <p style={{ fontSize: 14, color: "var(--text3)", marginBottom: 12 }}>{t("noten.needColumnFirst")}</p>
-              <button onClick={async () => { setLegt(true); await onSpalteAnlegen(); setLegt(false); }}
-                style={btnPrimary}>{t("noten.obsColumnAdd")}</button>
-            </div>
-          )
-        ) : (
-          <>
-            <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-              <select value={catId ?? ""} onChange={(e) => setCatId(Number(e.target.value))} style={{ ...inp, flex: 1, minWidth: 140 }}>
-                {cats.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-              </select>
-              {[[1, "+"], [0, "·"], [-1, "−"]].map(([v, label]) => (
-                <button key={v} onClick={() => setTendency(v)} style={{ width: 38, cursor: "pointer", fontSize: 16, borderRadius: CONTROL_R, fontWeight: 700, border: tendency === v ? "1px solid var(--accent)" : "1px solid var(--border2)", background: tendency === v ? "var(--accent-bg)" : "var(--card)", color: tendency === v ? "var(--accent)" : "var(--text2)" }}>{label}</button>
-              ))}
-            </div>
-            <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} placeholder={t("noten.obsPlaceholder")}
-              onKeyDown={(e) => { if (e.key === "Enter" && catId && note.trim()) { onSave({ category_id: catId, student_id: student.student_id, kind: "observation", tendency, note: note.trim() }); setNote(""); } }}
-              style={{ ...inp, marginBottom: 12 }} />
-            {/* Eine Beobachtung ohne Text sagt nichts: der Knopf bleibt aus,
-                bis wirklich etwas dasteht — sonst sammeln sich leere Zeilen,
-                die niemand mehr zuordnen kann. */}
-            <button onClick={() => { onSave({ category_id: catId, student_id: student.student_id, kind: "observation", tendency, note: note.trim() }); setNote(""); }} disabled={!catId || !note.trim()} style={{ ...btnPrimary, opacity: catId && note.trim() ? 1 : 0.4, marginBottom: 16 }}>{t("noten.note")}</button>
-          </>
-        )}
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          {[[1, "+"], [0, "·"], [-1, "−"]].map(([v, label]) => (
+            <button key={v} onClick={() => setTendency(v)} style={{ width: 38, cursor: "pointer", fontSize: 16, borderRadius: CONTROL_R, fontWeight: 700, border: tendency === v ? "1px solid var(--accent)" : "1px solid var(--border2)", background: tendency === v ? "var(--accent-bg)" : "var(--card)", color: tendency === v ? "var(--accent)" : "var(--text2)" }}>{label}</button>
+          ))}
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} placeholder={t("noten.obsPlaceholder")}
+            onKeyDown={(e) => { if (e.key === "Enter") speichern(); }}
+            style={{ ...inp, flex: 1, minWidth: 140 }} />
+        </div>
+        <button onClick={speichern} disabled={!note.trim()} style={{ ...btnPrimary, opacity: note.trim() ? 1 : 0.4, marginBottom: 16 }}>{t("noten.note")}</button>
         {entries.map((e) => {
           const k = cats.find((c) => c.id === e.category_id);
           return (
             <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13 }}>
               <span style={{ width: 62, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>
               <span style={{ width: 14, fontWeight: 700, color: e.tendency > 0 ? C.success : e.tendency < 0 ? C.danger : "var(--text3)" }}>{e.tendency > 0 ? "+" : e.tendency < 0 ? "−" : "·"}</span>
-              <span style={{ flex: 1, minWidth: 0 }}><span style={{ color: "var(--text3)" }}>{k?.name}: </span>{e.note}</span>
+              {/* Spaltenname nur bei Bestands-Beobachtungen, die noch an einer
+                  Spalte haengen. */}
+              <span style={{ flex: 1, minWidth: 0 }}>{k && <span style={{ color: "var(--text3)" }}>{k.name}: </span>}{e.note}</span>
               <button onClick={() => onDelete(e.id)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
             </div>
           );

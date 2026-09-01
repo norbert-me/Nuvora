@@ -17,6 +17,7 @@ Notiz zur größten Fassung die dünnste.
 **Module**
 
 - Das Modul „Unterrichtsplanung" heißt „Einstiege".
+- Das Modul „Auswertung" heißt „Noten".
 
 **Kalender**
 
@@ -29,7 +30,9 @@ Notiz zur größten Fassung die dünnste.
 
 - Die Übernahme eines CardVote-Tests bot Abschnitte fremder Fächer an; die
   Spalte landete im falschen Notenbuch.
-- Eine Beobachtung lässt sich anlegen, ohne vorher eine Spalte zu bauen.
+- Eine Beobachtung braucht keine Spalte mehr; ohne Bewertungsstruktur steht die
+  Namensliste mit dem Beobachtungs-Knopf da.
+- Der „Vergleich" steht bei den Klassenarbeiten statt neben dem Notenbuch.
 - Der Satz „Der Gesamtschnitt ist eine Rechenhilfe" unter der Tabelle ist weg.
 
 **CardVote**

@@ -730,8 +730,25 @@ class GradeEntry(Base):
     __tablename__ = "grade_entries"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    category_id: Mapped[int] = mapped_column(ForeignKey("grade_categories.id", ondelete="CASCADE"), index=True)
+    # Noten haengen IMMER an einer Spalte — sie sind der Inhalt einer Zelle.
+    # Beobachtungen haengen an NICHTS davon: sie zaehlen nie in einen Schnitt,
+    # also gibt es fuer sie auch keine Spalte, die man erst anlegen muesste
+    # (das war eine Sackgasse: "hat heute geholfen" fiel an, lange bevor
+    # irgendeine Bewertungsstruktur stand). Bei ihnen ist category_id NULL und
+    # class_id/kurs_id/term sagen, wohin der Eintrag gehoert.
+    category_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("grade_categories.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
+    # Nur bei spaltenlosen Beobachtungen gesetzt (sonst kommt beides ueber die
+    # Spalte und ihren Abschnitt).
+    class_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    kurs_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    term: Mapped[str] = mapped_column(String(10), default="", server_default="")
     # "grade" = zaehlt in den Schnitt, "observation" = zaehlt nie.
     kind: Mapped[str] = mapped_column(String(20), default="grade", server_default="grade")
     # Note als Zahl (1.0–6.0, Tendenzen als .3/.7). Bei Beobachtungen leer.

@@ -10,7 +10,7 @@ from datetime import datetime, date
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
-from sqlalchemy import inspect as sa_inspect, select
+from sqlalchemy import inspect as sa_inspect, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import models as m
@@ -104,7 +104,12 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
         "scans": await _rows(db, m.Scan, in_(m.Scan, "session_id", session_ids)),
         "noten_abschnitte": await _rows(db, m.GradeSection, m.GradeSection.owner_id == uid),
         "noten_spalten": await _rows(db, m.GradeCategory, m.GradeCategory.owner_id == uid),
-        "noten_eintraege": await _rows(db, m.GradeEntry, in_(m.GradeEntry, "category_id", cat_ids)),
+        # Beobachtungen haengen an keiner Spalte (category_id NULL), sondern an
+        # der Klasse — sonst fehlten sie in der Auskunft.
+        "noten_eintraege": await _rows(db, m.GradeEntry, or_(
+            in_(m.GradeEntry, "category_id", cat_ids),
+            in_(m.GradeEntry, "class_id", class_ids),
+        )),
         "noten_overrides": await _rows(db, m.GradeOverride, m.GradeOverride.owner_id == uid),
         "quartalsstriche": await _rows(db, m.QuartalDivider, m.QuartalDivider.owner_id == uid),
         "karten_decks": await _rows(db, m.CardDeck, m.CardDeck.owner_id == uid),
