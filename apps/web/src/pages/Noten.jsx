@@ -1650,6 +1650,18 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete, o
   const [legt, setLegt] = useState(false);
   // Kommt die Spalte erst waehrend des Dialogs dazu, muss sie auch gewaehlt sein.
   useEffect(() => { if (catId == null && cats[0]) setCatId(cats[0].id); }, [cats]); // eslint-disable-line
+  // Gibt es noch keine Spalte, entsteht sie beim Oeffnen von selbst statt als
+  // Sackgasse „Lege zuerst eine Spalte an": die Beobachtungsspalte hat Gewicht 0
+  // und ist keine Entscheidung, die jemand treffen muesste — sie ist die
+  // Voraussetzung dafuer, dass ein Eintrag ueberhaupt irgendwo haengen kann.
+  // Nur wenn das Anlegen scheitert, bleibt der Knopf als zweiter Versuch.
+  const angefragt = useRef(false);
+  useEffect(() => {
+    if (cats.length > 0 || angefragt.current) return;
+    angefragt.current = true;
+    setLegt(true);
+    Promise.resolve(onSpalteAnlegen()).catch(() => {}).finally(() => setLegt(false));
+  }, [cats.length]); // eslint-disable-line
   const [tendency, setTendency] = useState(1);
   const [note, setNote] = useState("");
   return (
@@ -1657,11 +1669,13 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete, o
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{student?.name}</h3>
         <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{t("noten.obsSub")}</p>
         {cats.length === 0 ? (
-          <div>
-            <p style={{ fontSize: 14, color: "var(--text3)", marginBottom: 12 }}>{t("noten.needColumnFirst")}</p>
-            <button onClick={async () => { setLegt(true); await onSpalteAnlegen(); setLegt(false); }} disabled={legt}
-              style={{ ...btnPrimary, opacity: legt ? 0.6 : 1 }}>{t("noten.obsColumnAdd")}</button>
-          </div>
+          legt ? <Skeleton rows={2} height={34} /> : (
+            <div>
+              <p style={{ fontSize: 14, color: "var(--text3)", marginBottom: 12 }}>{t("noten.needColumnFirst")}</p>
+              <button onClick={async () => { setLegt(true); await onSpalteAnlegen(); setLegt(false); }}
+                style={btnPrimary}>{t("noten.obsColumnAdd")}</button>
+            </div>
+          )
         ) : (
           <>
             <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
