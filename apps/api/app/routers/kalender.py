@@ -151,6 +151,97 @@ class EntryOut(EntryIn):
         return v or []
 
 
+class TrefferOut(BaseModel):
+    """Ein Suchtreffer im Kalender — genug, um ihn zu zeigen UND hinzuspringen."""
+    art: str            # "entry" | "exam" | "break"
+    id: int
+    date: str           # "YYYY-MM-DD" — der Tag, auf den gesprungen wird
+    title: str
+    sub: str = ""       # Kurs/Klasse oder Zeitraum, als zweite Zeile
+    serie: bool = False
+
+
+@router.get("/suche", response_model=List[TrefferOut])
+async def suche(q: str = "", limit: int = 30,
+                user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Den ganzen Kalender durchsuchen — nicht nur den sichtbaren Zeitraum.
+
+    Wer „Noteneingabe" sucht, weiss gerade NICHT, in welcher Woche das steht —
+    genau deshalb sucht er. Die Ansicht kann das nicht beantworten: sie laedt
+    ein Fenster. Also serverseitig ueber alles, was einen Tag hat: Eintraege
+    (Titel, Notiz, Ort), Klassenarbeitstermine (Titel, Notiz) und freie
+    Zeitraeume (Bezeichnung). Der Kursname zaehlt mit — „WP8" ist fuer viele
+    die naheliegende Suche.
+
+    Sortiert wird nach Naehe zu heute, Kommendes zuerst: uebersichtlich ist das
+    Ziel des Kalenders, und der naechste Termin ist fast immer der gemeinte.
+    Vergangenes faellt nicht weg, es steht nur dahinter.
+    """
+    text = (q or "").strip().lower()[:100]
+    if len(text) < 2:
+        return []          # ein Buchstabe trifft alles und sagt nichts
+    limit = max(1, min(int(limit or 30), 100))
+    heute = date.today()
+
+    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(Kurs.owner_id == user.id))).scalars().all()}
+    klassen = {c.id: c for c in (await db.execute(select(SchoolClass).where(SchoolClass.owner_id == user.id))).scalars().all()}
+
+    def bezug(class_id, kurs_id) -> str:
+        lab = _kurs_label(kurse.get(kurs_id)) if kurs_id else ""
+        if lab:
+            return lab
+        k = klassen.get(class_id) if class_id else None
+        return k.name if k else ""
+
+    def passt(*felder) -> bool:
+        return any(text in (f or "").lower() for f in felder)
+
+    treffer: list[TrefferOut] = []
+
+    for e in (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == user.id))).scalars().all():
+        b = bezug(e.class_id, e.kurs_id)
+        if not passt(e.title, e.notes, e.location, b):
+            continue
+        # Bei einer Serie ist der gespeicherte Tag der ERSTE — und damit fast
+        # immer Vergangenheit. Gesucht ist der naechste Termin, sonst springt
+        # die Suche einer laufenden AG in den September zurueck.
+        tag = _tag(e.date)
+        if e.rrule:
+            kommend = serien_tage(e, heute, heute + timedelta(days=730))
+            tag = kommend[0] if kommend else tag
+        treffer.append(TrefferOut(art="entry", id=e.id, date=tag.strftime("%Y-%m-%d"),
+                                  title=e.title or t_leer(e), sub=b, serie=bool(e.rrule)))
+
+    for x in (await db.execute(select(ExamDate).where(ExamDate.owner_id == user.id))).scalars().all():
+        b = bezug(x.class_id, x.kurs_id)
+        if not passt(x.title, x.notiz, b):
+            continue
+        treffer.append(TrefferOut(art="exam", id=x.id, date=_tag(x.date).strftime("%Y-%m-%d"),
+                                  title=x.title or "Klassenarbeit", sub=b))
+
+    for f in (await db.execute(select(CalendarBreak).where(CalendarBreak.owner_id == user.id))).scalars().all():
+        if not passt(f.label):
+            continue
+        von, bis = _tag(f.start_date), _tag(f.end_date)
+        treffer.append(TrefferOut(art="break", id=f.id, date=von.strftime("%Y-%m-%d"),
+                                  title=f.label or "Freier Zeitraum",
+                                  sub=f"{von.strftime('%d.%m.%Y')} – {bis.strftime('%d.%m.%Y')}"))
+
+    # Kommendes aufsteigend zuerst, Vergangenes danach absteigend (das zuletzt
+    # Gewesene oben) — beides in EINER Liste, damit niemand blaettern muss.
+    def rang(tr: TrefferOut):
+        d = date.fromisoformat(tr.date)
+        return (0, (d - heute).days) if d >= heute else (1, (heute - d).days)
+
+    treffer.sort(key=rang)
+    return treffer[:limit]
+
+
+def t_leer(e) -> str:
+    """Ein Eintrag ohne Titel heisst nach dem, was ihn ausmacht."""
+    return (e.notes or "").strip().splitlines()[0][:60] if (e.notes or "").strip() else "(ohne Titel)"
+
+
 @router.get("/entries", response_model=List[EntryOut])
 async def list_entries(frm: Optional[datetime] = None, to: Optional[datetime] = None,
                        user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):

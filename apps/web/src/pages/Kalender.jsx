@@ -219,6 +219,16 @@ export default function Kalender() {
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
   const [extInfo, setExtInfo] = useState(null); // angeklickter externer (abonnierter) Termin
   const [jumpOpen, setJumpOpen] = useState(false); // Datums-Sprung-Popover (Klick aufs Datum)
+  // Suche im ganzen Kalender (nicht nur im sichtbaren Zeitraum) — wer
+  // „Noteneingabe" sucht, weiss ja gerade nicht, in welcher Woche das steht.
+  const [sucheOffen, setSucheOffen] = useState(false);
+  const [suchText, setSuchText] = useState("");
+  const [treffer, setTreffer] = useState([]);
+  const [suchLaeuft, setSuchLaeuft] = useState(false);
+  // Nach dem Sprung soll der getroffene Eintrag aufgehen — er steckt aber im
+  // Zeitraum, der erst nachgeladen wird. Also merken und oeffnen, sobald er da
+  // ist.
+  const [springZu, setSpringZu] = useState(null); // { art, id } oder null
 
   useEffect(() => {
     swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
@@ -326,6 +336,39 @@ export default function Kalender() {
     } else setTodoEvents([]);
   }, [view, cursor, aktiv.notizbrett]); // eslint-disable-line
   useEffect(() => { load(); }, [load]);
+
+  // Suchen mit kurzer Verzoegerung: ein Aufruf je Tastendruck waere ein
+  // Serverlauf je Buchstabe, und die Antwort des vorletzten kaeme zuletzt.
+  useEffect(() => {
+    const q = suchText.trim();
+    if (!sucheOffen || q.length < 2) { setTreffer([]); setSuchLaeuft(false); return; }
+    setSuchLaeuft(true);
+    let gilt = true;
+    const timer = setTimeout(() => {
+      hol(`${API}/suche?q=${encodeURIComponent(q)}`).then((d) => {
+        if (!gilt) return;
+        setTreffer(Array.isArray(d) ? d : []);
+        setSuchLaeuft(false);
+      });
+    }, 250);
+    return () => { gilt = false; clearTimeout(timer); };
+  }, [suchText, sucheOffen]);
+
+  // Ist der Zeitraum des Treffers geladen, den Eintrag oeffnen. Nur Eintraege:
+  // ein Klassenarbeitstermin und ein freier Zeitraum haben im Tag keine eigene
+  // Maske, dort ist der Sprung selbst die Antwort.
+  useEffect(() => {
+    if (!springZu || springZu.art !== "entry") { if (springZu) setSpringZu(null); return; }
+    const treffer_ = entries.find((e) => e.id === springZu.id);
+    if (treffer_) { setEditing(treffer_); setSpringZu(null); }
+  }, [entries, springZu]);
+
+  const springeZuTreffer = (tr) => {
+    setSucheOffen(false);
+    setCursor(startOfDay(new Date(tr.date + "T00:00:00")));
+    setView("day");
+    setSpringZu({ art: tr.art, id: tr.id });
+  };
   const todoByDay = (d) => todoEvents.filter((e) => e.date === ymd(d));
 
   const topicName = (id) => {
@@ -563,7 +606,43 @@ export default function Kalender() {
                 options={[["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
             </span>
           )}
-          ansicht={(
+          ansicht={(<>
+            <div style={{ position: "relative" }}>
+            {/* Lupe = „wo steht das nochmal?": sucht im ganzen Kalender, nicht
+                im gezeigten Zeitraum — ein Klick auf einen Treffer springt zu
+                seinem Tag und oeffnet ihn. */}
+            <button onClick={() => setSucheOffen((v) => !v)} className="icon-btn" style={toolbarIconBtn}
+              title={t("kalender.search")} aria-label={t("kalender.search")}>
+              <Icon d={ICONS.search} size={18} />
+            </button>
+            {sucheOffen && (<>
+              <div onClick={() => setSucheOffen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <Popover align="right" style={{ width: 320, padding: 8 }}>
+                <input autoFocus value={suchText} onChange={(e) => setSuchText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Escape") setSucheOffen(false); if (e.key === "Enter" && treffer[0]) springeZuTreffer(treffer[0]); }}
+                  placeholder={t("kalender.searchPlaceholder")} style={{ ...inputStyle, width: "100%", marginBottom: 6 }} />
+                {suchText.trim().length < 2 ? null : suchLaeuft ? (
+                  <div style={{ padding: "8px 10px", fontSize: 13, color: "var(--text3)" }}>{t("common.loading")}</div>
+                ) : treffer.length === 0 ? (
+                  <div style={{ padding: "8px 10px", fontSize: 13, color: "var(--text3)" }}>{t("kalender.searchNone")}</div>
+                ) : (
+                  <div style={{ maxHeight: 300, overflow: "auto" }}>
+                    {treffer.map((tr) => (
+                      <button key={`${tr.art}-${tr.id}-${tr.date}`} onClick={() => springeZuTreffer(tr)}
+                        style={{ ...menuRow, boxSizing: "border-box", width: "100%", textAlign: "left", display: "block" }}>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>{tr.title}</span>
+                        <span style={{ display: "block", fontSize: 12, color: "var(--text3)" }}>
+                          {new Date(tr.date + "T00:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })}
+                          {tr.serie ? ` · ${t("kalender.searchSeries")}` : ""}
+                          {tr.sub ? ` · ${tr.sub}` : ""}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </Popover>
+            </>)}
+            </div>
             <div style={{ position: "relative" }}>
             {/* Auge = „was anzeigen?": Ganztägige/Externe ein-/ausblenden + Farbe. */}
             <button data-tour="kal-view-menu" onClick={() => setViewMenuOpen((v) => !v)} className="icon-btn" style={{ ...toolbarIconBtn, opacity: (showAllDay && showExt && extAus.size === 0) ? 1 : 0.55 }} title={t("kalender.viewMenu")} aria-label={t("kalender.viewMenu")}>
@@ -620,7 +699,7 @@ export default function Kalender() {
               </Popover>
             </>)}
             </div>
-          )}
+          </>)}
           mehr={[
             { key: "abo", label: t("kalender.subscribe"), icon: ICONS.share, onClick: openAbo },
             // WebUntis steht hier und nicht mehr am Stundenplan: es bringt

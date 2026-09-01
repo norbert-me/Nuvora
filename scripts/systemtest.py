@@ -791,6 +791,20 @@ def inhalt_kalender(api, u, spuren):
     if len(danach) != 2:
         raise AssertionError(f"ausgenommener Termin ist wieder da: {len(danach)} Vorkommen")
 
+    # Suche ueber den GANZEN Kalender: der Sinn ist, etwas zu finden, dessen
+    # Woche man nicht kennt — geprueft wird deshalb auch, dass eine Serie auf
+    # ein KOMMENDES Vorkommen zeigt und nicht auf ihren Kopf.
+    tr = api.call("GET", f"/api/kalender/suche?q={PRAEFIX}%20Stunde", erwartet=(200,))
+    if not any(x["id"] == eintrag["id"] and x["art"] == "entry" for x in tr):
+        raise AssertionError("Suche findet den eigenen Eintrag nicht")
+    if not any(x["id"] == eintrag["id"] for x in api.call("GET", "/api/kalender/suche?q=Merksatz", erwartet=(200,))):
+        raise AssertionError("Suche findet die Notiz nicht")
+    ser = [x for x in api.call("GET", f"/api/kalender/suche?q=Raum%2012", erwartet=(200,)) if x["id"] == serie["id"]]
+    if not ser or not ser[0]["serie"]:
+        raise AssertionError("Suche findet die Serie ueber ihren Ort nicht")
+    if api.call("GET", "/api/kalender/suche?q=x", erwartet=(200,)):
+        raise AssertionError("ein einzelner Buchstabe darf nichts liefern")
+
     slot = api.call("PUT", "/api/kalender/timetable/slot", {
         "weekday": 0, "period": 1, "class_id": u.class_id, "title": f"{PRAEFIX} Slot",
     }, erwartet=(200,))

@@ -21,6 +21,8 @@ Notiz zur größten Fassung die dünnste.
 
 **Kalender**
 
+- Der Kalender hat eine Suche (Lupe): Titel, Notiz, Ort und Kurs, über den
+  ganzen Zeitraum — ein Klick auf einen Treffer springt zum Tag und öffnet ihn.
 - Der Raum lässt sich im Stundenplan eintragen.
 - Klassenarbeiten haben ein Suchfeld und einen Kurs-Filter.
 - Ein Quiz aus einem Ordner ließ sich nicht an eine Stunde hängen („Verknüpfter
