@@ -59,3 +59,25 @@ export const hmToMin = (hhmm) => {
 
 /** Sekunden als "M:SS" (Fragen-Uhr in Session und Auswertung). */
 export const mmss = (sek) => `${Math.floor(sek / 60)}:${String(Math.floor(sek % 60)).padStart(2, "0")}`;
+
+/**
+ * Was in einem Datumsfeld steht, als Date (0:00 lokal) — oder null.
+ *
+ * Ein `<input type="date">` liefert nicht nur saubere Werte: tippt man im
+ * Jahresfeld weiter, steht dort in Chrome auch mal ein fuenf- oder
+ * sechsstelliges Jahr ("275760-09-13"). `new Date()` macht daraus **Invalid
+ * Date**, und die naechste `toISOString()` wirft — die Seite war weg, mitten
+ * im Tippen. Deshalb wird hier geprueft statt gehofft: vier Ziffern, ein
+ * plausibles Jahr, ein Datum, das es wirklich gibt (der 31.02. faellt heraus).
+ * Aufrufer behandeln `null` als „noch nichts Gueltiges eingegeben".
+ */
+export const parseYmd = (s) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || "").trim());
+  if (!m) return null;
+  const [j, mo, tg] = [+m[1], +m[2], +m[3]];
+  if (j < 1900 || j > 2200 || mo < 1 || mo > 12 || tg < 1 || tg > 31) return null;
+  const d = new Date(j, mo - 1, tg);
+  // Rueckprobe: der 31.02. wird sonst still zum 3.3.
+  if (d.getFullYear() !== j || d.getMonth() !== mo - 1 || d.getDate() !== tg) return null;
+  return d;
+};

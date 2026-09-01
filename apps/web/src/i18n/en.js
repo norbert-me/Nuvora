@@ -1014,6 +1014,8 @@ export default {
   "kalender.extColor": "External color",
   "kalender.viewMenu": "Show",
   "kalender.search": "Search",
+  "kalender.entryEndDate": "until (multi-day)",
+  "kalender.multiDayHint": "Multi-day — the entry is all-day on every day.",
   "kalender.searchPlaceholder": "Title, note, place or course",
   "kalender.searchNone": "Nothing found",
   "kalender.searchSeries": "Series",

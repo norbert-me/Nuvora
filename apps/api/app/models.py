@@ -807,6 +807,10 @@ class CalendarEntry(Base):
     # ohne diesen Hinweis riete die Auswahl beim Bearbeiten den falschen Kurs.
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    # Letzter Tag eines mehrtaegigen Termins (Schulfahrt, Projektwoche) —
+    # INKLUSIV und leer bei allem Eintaegigen. Ein mehrtaegiger Termin ist
+    # immer ganztaegig: eine Uhrzeit gilt fuer einen Tag, nicht fuer fuenf.
+    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(200), default="", server_default="")
     notes: Mapped[str] = mapped_column(Text, default="", server_default="")
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)

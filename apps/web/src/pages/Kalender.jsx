@@ -23,7 +23,7 @@ import ferienDE from "../data/ferien-de.json";
 import { feiertage } from "../data/feiertage.js";
 // ymd/isoDay/hmToMin/startOfDay/addDays/mondayOf/isoWeek standen hier eigens —
 // dieselben Zeilen lagen in Zufall, Sitzplan, Anwesenheit und feiertage.js.
-import { addDays, hmToMin, isoDay, isoWeek, mondayOf, startOfDay, wochentagMo0, ymd } from "../core/datum.js";
+import { addDays, hmToMin, isoDay, isoWeek, mondayOf, parseYmd, startOfDay, wochentagMo0, ymd } from "../core/datum.js";
 
 // Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
 const BUNDESLAENDER = [
@@ -96,7 +96,7 @@ export default function Kalender() {
   const view = (params.get("view") === "today" ? "day" : params.get("view")) || startAnsicht;
   const setView = (v) => setParams((p) => { const n = new URLSearchParams(p); if (v === startAnsicht) n.delete("view"); else n.set("view", v); return n; }, { replace: true });
   // Startdatum optional per ?date=YYYY-MM-DD (Deep-Link, z.B. aus den Einstiegen).
-  const [cursor, setCursor] = useState(() => { const p = params.get("date"); return p && /^\d{4}-\d{2}-\d{2}$/.test(p) ? startOfDay(new Date(p + "T00:00:00")) : startOfDay(new Date()); });
+  const [cursor, setCursor] = useState(() => parseYmd(params.get("date")) || startOfDay(new Date()));
   const [abo, setAbo] = useState(null); // Abo-URLs { url, webcal }
   const [viewMenuOpen, setViewMenuOpen] = useState(false); // „Auge"-Menü (was ein-/ausblenden)
   const [showAllDay, setShowAllDay] = useState(() => { try { return localStorage.getItem("kal_allday") !== "0"; } catch { return true; } });
@@ -358,16 +358,27 @@ export default function Kalender() {
   // ein Klassenarbeitstermin und ein freier Zeitraum haben im Tag keine eigene
   // Maske, dort ist der Sprung selbst die Antwort.
   useEffect(() => {
-    if (!springZu || springZu.art !== "entry") { if (springZu) setSpringZu(null); return; }
-    const treffer_ = entries.find((e) => e.id === springZu.id);
-    if (treffer_) { setEditing(treffer_); setSpringZu(null); }
-  }, [entries, springZu]);
+    if (!springZu) return;
+    if (springZu.art === "entry") {
+      const treffer_ = entries.find((e) => e.id === springZu.id);
+      if (treffer_) { setEditing(treffer_); setSpringZu(null); }
+      return;
+    }
+    if (springZu.art === "extern") {
+      // Externe Termine liegen nicht in `entries`, sondern in `extEvents` —
+      // ihr Schluessel ist uid|Datum.
+      const ev = extEvents.find((x) => x.key === springZu.key);
+      if (ev) { setExtInfo(ev); setSpringZu(null); }
+      return;
+    }
+    setSpringZu(null);
+  }, [entries, extEvents, springZu]);
 
   const springeZuTreffer = (tr) => {
     setSucheOffen(false);
-    setCursor(startOfDay(new Date(tr.date + "T00:00:00")));
+    setCursor(parseYmd(tr.date) || startOfDay(new Date()));
     setView("day");
-    setSpringZu({ art: tr.art, id: tr.id });
+    setSpringZu({ art: tr.art, id: tr.id, key: tr.key || "" });
   };
   const todoByDay = (d) => todoEvents.filter((e) => e.date === ymd(d));
 
@@ -377,7 +388,14 @@ export default function Kalender() {
     const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null;
     return p ? `${p.name} / ${tp.name}` : tp.name;
   };
-  const byDay = (d) => entries.filter((e) => ymd(new Date(e.date)) === ymd(d));
+  // Ein mehrtaegiger Eintrag gehoert an JEDEN Tag seines Zeitraums, nicht nur
+  // an den ersten — sonst waere die Klassenfahrt ab Dienstag unsichtbar.
+  const byDay = (d) => entries.filter((e) => {
+    const tag = ymd(d);
+    const von = ymd(new Date(e.date));
+    const bis = e.end_date ? ymd(new Date(e.end_date)) : von;
+    return tag >= von && tag <= bis;
+  });
   // Ganztägig ein/ausblenden: filtert ganztägige Einträge bzw. externe Termine
   // ohne Uhrzeit aus den Kalenderansichten (Stundenplan-Slots bleiben).
   const byDayV = (d) => showAllDay ? byDay(d) : byDay(d).filter((e) => !isAllDayEntry(e));
@@ -750,9 +768,13 @@ export default function Kalender() {
               {jumpOpen && (<>
                 <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                 <Popover align="center" style={{ padding: 8, display: "flex", gap: 8, alignItems: "center" }}>
+                  {/* parseYmd statt new Date(): ein Datumsfeld liefert beim
+                      Tippen im Jahr auch „275760-09-13" — daraus wurde ein
+                      Invalid Date, und die naechste toISOString() nahm die ganze
+                      Seite mit. Unfertiges wird ignoriert, nicht uebernommen. */}
                   {view === "day" && (
                     <input type="date" value={ymd(cursor)} autoFocus style={selectStyle}
-                      onChange={(e) => { if (e.target.value) { setCursor(startOfDay(new Date(e.target.value + "T00:00:00"))); setJumpOpen(false); } }} />
+                      onChange={(e) => { const d = parseYmd(e.target.value); if (d) { setCursor(d); setJumpOpen(false); } }} />
                   )}
                   {view === "month" && (
                     <select value={cursor.getMonth()} onChange={(e) => { setCursor(startOfDay(new Date(cursor.getFullYear(), Number(e.target.value), 1))); setJumpOpen(false); }} style={selectStyle}>
@@ -994,6 +1016,44 @@ function ExtCalEditor({ cals, mit, onChange, onMit, onSave, t }) {
 }
 
 const cell = { border: "1px solid var(--border)", minHeight: 84, padding: 8, verticalAlign: "top", background: "var(--card)" };
+
+// ── Mehrtaegige Termine: EIN Balken statt eines Chips je Tag ─────────────────
+//
+// Apple zeichnet eine Klassenfahrt als durchgehenden Streifen ueber die Woche;
+// sieben gleich aussehende Chips untereinander beantworten die Frage „wie lange
+// dauert das?" gar nicht. Umgesetzt ohne Umbau des Tabellenrasters: der Chip
+// verliert an der fortgesetzten Seite seine Rundung und ragt per negativem
+// Rand ueber die Zellgrenze, sodass er am Nachbartag anschliesst. Beschriftet
+// wird nur der Anfang — und der Wochenanfang, sonst laeuft ein Streifen ohne
+// Text durch die zweite Zeile.
+//
+// EINE Quelle fuer eigene Eintraege, externe Termine und Ferien: drei Kopien
+// waeren nach der ersten Aenderung drei verschiedene Streifen.
+const spanneVon = (start, ende, tag, { imRaster = true } = {}) => {
+  if (!ende || ende <= start) return null;          // eintaegig
+  const montag = wochentagMo0(new Date(tag + "T00:00:00")) === 0;
+  const istStart = tag === start;
+  const istEnde = tag === ende;
+  return {
+    istStart, istEnde,
+    zeigtText: istStart || montag || !imRaster,
+    stil: imRaster ? {
+      borderTopLeftRadius: istStart ? undefined : 0,
+      borderBottomLeftRadius: istStart ? undefined : 0,
+      borderTopRightRadius: istEnde ? undefined : 0,
+      borderBottomRightRadius: istEnde ? undefined : 0,
+      marginLeft: istStart ? undefined : -9,
+      marginRight: istEnde ? undefined : -9,
+      width: "auto",
+    } : {},
+  };
+};
+
+/** „‹" / „›" an einem Balken, der vor- oder nachher weitergeht. */
+const spannePfeile = (sp, titel) => {
+  if (!sp) return titel;
+  return `${sp.istStart ? "" : "‹ "}${titel}${sp.istEnde ? "" : " ›"}`;
+};
 const chip = { display: "block", width: "100%", textAlign: "left", fontSize: 12, padding: "2px 8px", borderRadius: CONTROL_R, background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)", border: "none", cursor: "pointer", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 // Vorlage aus dem Stundenplan: gestrichelt, gedaempft — anklicken macht daraus einen Termin.
 const ghost = { ...chip, background: "transparent", color: "var(--text3)", border: "1px dashed var(--border2)" };
@@ -1015,13 +1075,23 @@ function SlotGhosts({ list, entries, className, slotName, topicName, onSlot, day
 // Modul-Objekt (Deck/Quiz/Lernleiter) liegen dort — kein Inline-↗ mehr im
 // Kalenderraster (war Doppelung und Unruhe).
 // Externe (abonnierte) Termine — read-only, grau, nicht klickbar.
-function ExtChips({ list, onOpen, extColor }) {
+function ExtChips({ list, onOpen, extColor, tag = null, imRaster = true }) {
   const colOf = (ev) => ev.color || extColor;
   if (!list || !list.length) return null;
-  return list.map((ev, i) => (
-    <button key={`ext-${i}`} onClick={onOpen ? (e) => { e.stopPropagation(); onOpen(ev); } : undefined} title={ev.title}
-      style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: colOf(ev) || "var(--text3)", background: colOf(ev) ? colOf(ev) + "1e" : "var(--bg2)", border: `1px dashed ${colOf(ev) || "var(--border2)"}`, borderRadius: CONTROL_R, padding: "2px 8px", margin: "4px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default" }}>{(ev.time ? ev.time + " " : "")}<Icon d={ICONS.link} size={11} /> {ev.title || "—"}</button>
-  ));
+  return list.map((ev, i) => {
+    // Ein mehrtaegiger Termin aus dem Abo kommt je Tag einmal an, traegt aber
+    // seinen Zeitraum mit (start/end) — daraus wird derselbe Balken wie bei
+    // eigenen Eintraegen.
+    const sp = tag ? spanneVon(ev.start || tag, ev.end || null, tag, { imRaster }) : null;
+    const titel = ev.title || "—";
+    return (
+      <button key={`ext-${i}`} onClick={onOpen ? (e) => { e.stopPropagation(); onOpen(ev); } : undefined} title={titel}
+        style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: colOf(ev) || "var(--text3)", background: colOf(ev) ? colOf(ev) + "1e" : "var(--bg2)", border: `1px dashed ${colOf(ev) || "var(--border2)"}`, borderRadius: CONTROL_R, padding: "2px 8px", margin: "4px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default",
+          ...(sp ? { ...sp.stil, borderLeftStyle: sp.istStart ? "dashed" : "none", borderRightStyle: sp.istEnde ? "dashed" : "none" } : {}) }}>
+        {sp && !sp.zeigtText ? "\u00a0" : <>{(ev.time ? ev.time + " " : "")}<Icon d={ICONS.link} size={11} /> {sp ? spannePfeile(sp, titel) : titel}</>}
+      </button>
+    );
+  });
 }
 
 // Datierte To-dos als Chip (Modul To-do). Erledigte durchgestrichen. Klick führt
@@ -1036,7 +1106,7 @@ function TodoChips({ list, onOpen }) {
   ));
 }
 
-function EntryChips({ list, className, kursName = () => "", topicName, onOpen, classColor }) {
+function EntryChips({ list, className, kursName = () => "", topicName, onOpen, classColor, tag = null, imRaster = true }) {
   // Anzeige denkt in Kursen: liegt ein Kurs am Eintrag, dessen Namen (Fach) zeigen,
   // sonst die Fach-Klasse.
   const nameOf = (e) => (e.kurs_id && kursName(e.kurs_id)) || (className && className(e.class_id)) || "";
@@ -1045,12 +1115,16 @@ function EntryChips({ list, className, kursName = () => "", topicName, onOpen, c
     // Zweizeilig: Titel oben, darunter Uhrzeit + Kurs/Klasse gedaempft.
     const titel = e.title || topicName(e.topic_id) || nameOf(e) || "—";
     const meta = [e.start_time || null, nameOf(e) || null].filter(Boolean).join(" · ");
+    const sp = tag ? spanneVon(ymd(new Date(e.date)), e.end_date ? ymd(new Date(e.end_date)) : null, tag, { imRaster }) : null;
+    const text = sp ? (sp.zeigtText ? spannePfeile(sp, titel) : "\u00a0") : titel;
     return (
       <button key={e.id} onClick={(ev) => { ev.stopPropagation(); onOpen({ ...e, date: new Date(e.date) }); }}
-        style={{ ...chip, whiteSpace: "normal", marginTop: 4, width: "100%", lineHeight: 1.25, ...(col ? { background: col + "22", color: "var(--text)", borderLeft: `3px solid ${col}` } : {}) }}
+        style={{ ...chip, whiteSpace: "normal", marginTop: 4, width: "100%", lineHeight: 1.25, ...(col ? { background: col + "22", color: "var(--text)", borderLeft: `3px solid ${col}` } : {}), ...(sp ? { ...sp.stil, ...(sp.istStart ? {} : { borderLeft: "none" }) } : {}) }}
         title={[titel, meta].filter(Boolean).join(" — ")}>
-        <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: 600 }}>{titel}</span>
-        {meta && <span style={{ display: "block", fontSize: 11, opacity: 0.72, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meta}</span>}
+        <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: 600 }}>{text}</span>
+        {/* Bei einem Balken steht die Zeile nur am Anfang: sonst wiederholt sich
+            „Mathe · 7.5" fuenfmal quer durch die Woche. */}
+        {meta && (!sp || sp.zeigtText) && <span style={{ display: "block", fontSize: 11, opacity: 0.72, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meta}</span>}
       </button>
     );
   });
@@ -1113,8 +1187,8 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo
                     </div>
                     {/* Siehe WeekView: frei blendet nur den Stundenplan aus. */}
                     {f && <FreiMarker label={f.label} t={t} />}
-                    <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
-                    <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
+                    <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} tag={ymd(d)} />
+                    <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} tag={ymd(d)} />
                     {!f && slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
                     {/* To-dos zeigen auch an freien Tagen (Ferien/Feiertag). */}
                     <TodoChips list={todoByDay && todoByDay(d)} onOpen={onTodo} />
@@ -1152,8 +1226,12 @@ function WeekView({ extColor, range, byDay, extByDay, todoByDay, onTodo, slotsFo
               Abo. Ferien heissen „kein Unterricht", nicht „keine Termine". */}
           {f && <FreiMarker label={f.label} t={t} />}
           {!f && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
-          <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
-          <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
+          {/* In der Woche stehen die Tage als eigene Karten mit Abstand — ein
+              durchgehender Streifen ginge dort ins Leere. Also dieselbe
+              Information mit Pfeilen: „‹ Klassenfahrt ›" heisst, dass es davor
+              und danach weitergeht. */}
+          <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} tag={ymd(d)} imRaster={false} />
+          <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} tag={ymd(d)} imRaster={false} />
           {/* To-dos auch an freien Tagen. */}
           <TodoChips list={todoByDay && todoByDay(d)} onOpen={onTodo} />
         </div>
@@ -1990,6 +2068,12 @@ function EntryModal({ entry, zeiten = [], classes, topics, methods = [], quizze 
     ? `${startTime || "?"}–${endTime || "?"}`
     : ((stundeVon || stundeBis) ? `${stundeVon || "?"}–${stundeBis || "?"}` : null);
   const [dateVal, setDateVal] = useState(entry.date ? ymd(new Date(entry.date)) : ymd(new Date()));
+  // Letzter Tag eines mehrtaegigen Termins (Schulfahrt, Projektwoche). Leer =
+  // eintaegig. Mehrtaegig ist immer ganztaegig — eine Uhrzeit gilt fuer einen
+  // Tag, nicht fuer fuenf; deshalb blendet das gesetzte Enddatum die Zeitfelder
+  // aus (und der Server leert sie ohnehin).
+  const [endVal, setEndVal] = useState(entry.end_date ? ymd(new Date(entry.end_date)) : "");
+  const mehrtaegig = !!endVal && endVal > dateVal;
   const [decks, setDecks] = useState([]); // Karten-Decks der gewaehlten Klasse
   // Decks haengen an der Klasse: neu laden, wenn Klasse wechselt und Modul aktiv.
   useEffect(() => {
@@ -2165,7 +2249,15 @@ function EntryModal({ entry, zeiten = [], classes, topics, methods = [], quizze 
         {edit && (<>
         {entry.period == null && (<>
           <div style={lbl}>{t("kalender.extDate")}</div>
-          <input type="date" value={dateVal} onChange={(e) => e.target.value && setDateVal(e.target.value)} style={fld} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="date" value={dateVal} onChange={(e) => { const d = parseYmd(e.target.value); if (d) setDateVal(ymd(d)); }} style={{ ...fld, width: "auto" }} />
+            <span style={{ color: "var(--text3)" }}>–</span>
+            {/* „bis" leer heisst eintaegig — das ist der Normalfall und braucht
+                keinen zweiten Schalter „geht ueber mehrere Tage". */}
+            <input type="date" value={endVal} min={dateVal} onChange={(e) => { const d = parseYmd(e.target.value); setEndVal(d ? ymd(d) : ""); }}
+              style={{ ...fld, width: "auto" }} title={t("kalender.entryEndDate")} />
+            {endVal && <button onClick={() => setEndVal("")} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.close} size={15} /></button>}
+          </div>
         </>)}
         <div style={lbl}>{t("kalender.entryTitle")}</div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus placeholder={t("kalender.entryTitlePlaceholder")} style={fld} />
@@ -2173,6 +2265,9 @@ function EntryModal({ entry, zeiten = [], classes, topics, methods = [], quizze 
             einmalig frueher an, und dafuer den ganzen Stundenplan zu aendern
             waere die falsche Ebene. Leer heisst „die Zeit der Stunde"; der
             Knopf setzt genau darauf zurueck. */}
+        {mehrtaegig ? (
+          <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("kalender.multiDayHint")}</div>
+        ) : (<>
         <div style={lbl}>{t("kalender.entryTime")}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.start")} />
@@ -2186,6 +2281,7 @@ function EntryModal({ entry, zeiten = [], classes, topics, methods = [], quizze 
           </div>
         )}
         {timeInvalid && <div style={{ fontSize: 12, color: C.danger, marginTop: 5 }}>{t("kalender.timeInvalid")}</div>}
+        </>)}
         <div style={lbl}>{t("kalender.kursOrClass")}</div>
         <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={kursId} allowNone noneLabel={`– ${t("kalender.noClass")} –`}
           onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }} onKurs={setKursId} style={dialogSelect} />
@@ -2335,7 +2431,7 @@ function EntryModal({ entry, zeiten = [], classes, topics, methods = [], quizze 
         ))}
 
         </>)}
-        <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", location: ort, rrule: rruleBauen(), exdate: Array.isArray(entry.exdate) ? entry.exdate : [], verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>
+        <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, end_date: mehrtaegig ? (() => { const [y, m, d] = endVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : null, title, notes, start_time: mehrtaegig ? "" : (startTime || ""), end_time: mehrtaegig ? "" : (endTime || ""), location: ort, rrule: rruleBauen(), exdate: Array.isArray(entry.exdate) ? entry.exdate : [], verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>
           {entry.id && <button onClick={() => onDelete(entry.id, entry)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         </DialogFuss>
         </>)}

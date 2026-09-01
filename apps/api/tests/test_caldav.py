@@ -136,10 +136,30 @@ def test_aufgabe_wird_abgelehnt():
     assert e.value.status == 403
 
 
-def test_mehrtaegiger_termin_wird_abgelehnt():
+def test_mehrtaegiger_termin_kommt_mit_inklusivem_ende_an():
+    # DTEND ist bei Ganztags-Terminen EXKLUSIV: der 1.9. als DTEND heisst,
+    # dass der 31.8. der letzte Tag ist. Genau ein „-1" — keins verlaengert die
+    # Klassenfahrt um einen Tag, zwei schneiden einen ab.
     text = ("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\n"
             "DTSTART;VALUE=DATE:20260827\r\nDTEND;VALUE=DATE:20260901\r\n"
             "SUMMARY:Klassenfahrt\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
+    d = X.parse_vevent(text)
+    assert d["datum"] == date(2026, 8, 27)
+    assert d["ende_datum"] == date(2026, 8, 31)
+    # Und zurueck: derselbe Zeitraum, wieder mit exklusivem DTEND.
+    ics = X.baue_vevent(uid="x@n", tag=date(2026, 8, 27), ende_tag=date(2026, 8, 31), titel="Klassenfahrt")
+    assert "DTSTART;VALUE=DATE:20260827" in ics
+    assert "DTEND;VALUE=DATE:20260901" in ics
+    assert X.parse_vevent(ics)["ende_datum"] == date(2026, 8, 31)
+
+
+def test_termin_ueber_mitternacht_wird_abgelehnt():
+    # Getaktet ueber Mitternacht bleibt abgelehnt: Nuvora fuehrt Uhrzeiten je
+    # Tag, nicht als Zeitspanne — halb uebernommen waere er am Geraet richtig
+    # und hier falsch.
+    text = ("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\n"
+            "DTSTART:20260827T220000\r\nDTEND:20260828T010000\r\n"
+            "SUMMARY:Nachtwanderung\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
     with pytest.raises(CaldavFehler) as e:
         X.parse_vevent(text)
     assert e.value.status == 403

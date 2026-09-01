@@ -12,26 +12,33 @@ Zwischenfassung (x.y.0) hängt sie **alle Abschnitte der vorigen Reihe** an: wer
 von 4.1.0 auf 4.2.0 geht, hat 4.1.1 bis 4.1.9 nie gesehen — sonst wäre die
 Notiz zur größten Fassung die dünnste.
 
-## 4.1.5 — 31.08.2026
+## 4.1.6 — 01.09.2026
 
 **Module**
 
-- Das Modul „Unterrichtsplanung" heißt „Einstiege".
 - Das Modul „Auswertung" heißt „Noten".
-
-**Kalender**
-
-- Der Kalender hat eine Suche (Lupe): Titel, Notiz, Ort und Kurs, über den
-  ganzen Zeitraum — ein Klick auf einen Treffer springt zum Tag und öffnet ihn.
-- Der Raum lässt sich im Stundenplan eintragen.
-- Klassenarbeiten haben ein Suchfeld und einen Kurs-Filter.
-- Ein Quiz aus einem Ordner ließ sich nicht an eine Stunde hängen („Verknüpfter
-  Eintrag nicht gefunden").
 
 **Konto**
 
 - Die geführte Tour merkt sich am Konto, dass sie gelaufen ist — sie startete
   auf jedem Gerät neu, auf dem Handy immer wieder.
+
+**Kalender**
+
+- Der Kalender hat eine Suche (Lupe): Titel, Notiz, Ort und Kurs über den
+  ganzen Zeitraum, auch in abonnierten Kalendern — ein Klick auf einen Treffer
+  springt zum Tag und öffnet ihn.
+- Termine über mehrere Tage: ein Eintrag mit „bis"-Datum, im Monat als
+  durchgehender Balken, in der Woche mit Pfeilen an den Rändern. Aus Apple und
+  Outlook kommen mehrtägige Termine jetzt an, statt abgelehnt zu werden.
+- Die Datumseingabe in der Tagesansicht konnte die Seite beim Tippen im
+  Jahresfeld abstürzen lassen.
+
+**Noten**
+
+- Eine Beobachtung braucht keine Spalte mehr; ohne Bewertungsstruktur steht die
+  Namensliste mit dem Beobachtungs-Knopf da.
+- Der „Vergleich" steht bei den Klassenarbeiten statt neben dem Notenbuch.
 
 **Kurse**
 
@@ -44,13 +51,24 @@ Notiz zur größten Fassung die dünnste.
   neue Lernleiter erst nach dem Neuladen.
 - Die Unterthema-Auswahl im Generator war anders groß als die Felder daneben.
 
+## 4.1.5 — 31.08.2026
+
+**Module**
+
+- Das Modul „Unterrichtsplanung" heißt „Einstiege".
+
+**Kalender**
+
+- Der Raum lässt sich im Stundenplan eintragen.
+- Klassenarbeiten haben ein Suchfeld und einen Kurs-Filter.
+- Ein Quiz aus einem Ordner ließ sich nicht an eine Stunde hängen („Verknüpfter
+  Eintrag nicht gefunden").
+
 **Noten**
 
 - Die Übernahme eines CardVote-Tests bot Abschnitte fremder Fächer an; die
   Spalte landete im falschen Notenbuch.
-- Eine Beobachtung braucht keine Spalte mehr; ohne Bewertungsstruktur steht die
-  Namensliste mit dem Beobachtungs-Knopf da.
-- Der „Vergleich" steht bei den Klassenarbeiten statt neben dem Notenbuch.
+- Eine Beobachtung lässt sich anlegen, ohne vorher eine Spalte zu bauen.
 - Der Satz „Der Gesamtschnitt ist eine Rechenhilfe" unter der Tabelle ist weg.
 
 **CardVote**

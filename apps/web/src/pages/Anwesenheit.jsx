@@ -13,7 +13,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { swr , lastClass } from "../core/cache.js";
 import { useUrlClass } from "../core/klassenwahl.js";
-import { wochentagMo0, ymd } from "../core/datum.js";
+import { parseYmd, wochentagMo0, ymd } from "../core/datum.js";
 import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api/anwesenheit";
@@ -86,7 +86,9 @@ export default function Anwesenheit() {
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = cls?.students || [];
 
-  const isoOf = (d) => new Date(d + "T00:00:00").toISOString();
+  // parseYmd statt new Date(): aus einem Datumsfeld kommt beim Tippen auch
+  // Unfertiges, und toISOString() auf einem Invalid Date wirft.
+  const isoOf = (d) => (parseYmd(d) || new Date()).toISOString();
   // Frische Serverdaten (anderer Tag, andere Klasse, andere Stunde) beenden den
   // Entwurf — sonst zeigte die Liste die Status des vorigen Tages weiter.
   const frisch = useRef(false);
@@ -222,7 +224,7 @@ export default function Anwesenheit() {
             onZurueck={() => wechseln(() => shift(-1))} labelZurueck={t("kalender.prev")}
             onVor={() => wechseln(() => shift(1))} labelVor={t("kalender.next")}
             onHeute={() => wechseln(() => setDatum(ymd(new Date())))} labelHeute={t("anwesenheit.today")}
-            mitte={<input type="date" value={datum} onChange={(ev) => { const v = ev.target.value; wechseln(() => setDatum(v)); }} style={segmentInput} />} />
+            mitte={<input type="date" value={datum} onChange={(ev) => { const d = parseYmd(ev.target.value); if (d) wechseln(() => setDatum(ymd(d))); }} style={segmentInput} />} />
           {legende}
           {istFrei ? (
             <div style={{ ...panelStyle, padding: "12px 16px", background: C.warning + "1a", border: "none", color: C.warning, fontSize: 14, fontWeight: 600 }}>

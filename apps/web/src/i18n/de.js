@@ -999,6 +999,8 @@ export default {
   "kalender.extColor": "Farbe externer",
   "kalender.viewMenu": "Anzeigen",
   "kalender.search": "Suchen",
+  "kalender.entryEndDate": "bis (mehrtägig)",
+  "kalender.multiDayHint": "Mehrtägig — der Termin gilt an allen Tagen ganztägig.",
   "kalender.searchPlaceholder": "Titel, Notiz, Ort oder Kurs",
   "kalender.searchNone": "Nichts gefunden",
   "kalender.searchSeries": "Serie",

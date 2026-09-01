@@ -5,7 +5,7 @@
 // Deshalb prüft der erste Test genau diesen Abend.
 import { describe, expect, it } from "vitest";
 
-import { addDays, heuteYmd, hmToMin, isoDay, isoWeek, mmss, mondayOf, startOfDay, wochentagMo0, ymd } from "./datum.js";
+import { addDays, heuteYmd, hmToMin, isoDay, isoWeek, mmss, mondayOf, parseYmd, startOfDay, wochentagMo0, ymd } from "./datum.js";
 
 describe("ymd", () => {
   it("nullt Monat und Tag auf zwei Stellen", () => {
@@ -84,5 +84,30 @@ describe("Uhrzeit", () => {
     expect(mmss(0)).toBe("0:00");
     expect(mmss(65)).toBe("1:05");
     expect(mmss(600)).toBe("10:00");
+  });
+});
+
+describe("parseYmd", () => {
+  it("nimmt ein gültiges Datum als lokalen Tagesbeginn", () => {
+    const d = parseYmd("2026-09-01");
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(8);
+    expect(d.getDate()).toBe(1);
+    expect(d.getHours()).toBe(0);
+  });
+
+  it("weist ab, was ein Datumsfeld beim Tippen liefert", () => {
+    // Genau daran ist die Kalenderseite gestorben: sechsstelliges Jahr aus dem
+    // <input type="date">, daraus Invalid Date, und die nächste toISOString()
+    // warf mitten im Tippen.
+    expect(parseYmd("275760-09-13")).toBe(null);
+    expect(parseYmd("")).toBe(null);
+    expect(parseYmd("2026-09")).toBe(null);
+    expect(parseYmd("0002-09-01")).toBe(null);
+  });
+
+  it("weist einen Tag ab, den es nicht gibt", () => {
+    expect(parseYmd("2026-02-31")).toBe(null);
+    expect(parseYmd("2026-13-01")).toBe(null);
   });
 });

@@ -1015,6 +1015,8 @@ export default {
   "kalender.extColor": "Color externo",
   "kalender.viewMenu": "Mostrar",
   "kalender.search": "Buscar",
+  "kalender.entryEndDate": "hasta (varios días)",
+  "kalender.multiDayHint": "Varios días — la cita dura todo el día.",
   "kalender.searchPlaceholder": "Título, nota, lugar o curso",
   "kalender.searchNone": "Sin resultados",
   "kalender.searchSeries": "Serie",

@@ -305,8 +305,10 @@ def parse_vevent(text: str) -> dict:
 
     * **Aufgaben (VTODO) und alles andere ausser VEVENT.** Der Kalender sagt in
       seinen Eigenschaften, dass er nur VEVENT fuehrt.
-    * **Mehrtaegige Termine.** Auch die gibt es bei uns nicht; ein Eintrag
-      gehoert zu einem Tag.
+    Mehrtaegige GANZTAGS-Termine (Schulfahrt, Projektwoche) werden uebernommen
+    — sie kommen als `ende_datum` zurueck (INKLUSIV, waehrend DTEND im ICS
+    exklusiv ist). Weiter abgelehnt bleibt ein getakteter Termin ueber
+    Mitternacht: Nuvora fuehrt Uhrzeiten je Tag, nicht als Zeitspanne.
     """
     if len(text or "") > 200_000:
         raise CaldavFehler(413, "Termin zu gross")
@@ -348,14 +350,18 @@ def parse_vevent(text: str) -> dict:
     ende_name, ende = felder.get("DTEND", (None, ""))
     ende_tag = _ics_datum(ende)
     ganztags = "T" not in start
+    # DTEND ist bei Ganztags-Terminen EXKLUSIV: der letzte Tag ist DTEND - 1.
+    ende_datum = None
     if ganztags and ende_tag and ende_tag > tag + timedelta(days=1):
-        raise CaldavFehler(403, "Mehrtaegige Termine werden nicht unterstuetzt", "supported-calendar-data")
+        ende_datum = ende_tag - timedelta(days=1)
     if not ganztags and ende_tag and ende_tag != tag:
         raise CaldavFehler(403, "Termine ueber Mitternacht werden nicht unterstuetzt", "supported-calendar-data")
 
     return {
         "uid": _ics_unescape(felder.get("UID", (None, ""))[1])[:200],
         "datum": tag,
+        # Letzter Tag eines mehrtaegigen Termins, INKLUSIV — None bei eintaegigen.
+        "ende_datum": ende_datum,
         "start_time": _ics_zeit(start),
         "end_time": _ics_zeit(ende) if ende else "",
         "title": _ics_unescape(felder.get("SUMMARY", (None, ""))[1])[:200],
@@ -367,7 +373,7 @@ def parse_vevent(text: str) -> dict:
 
 
 def baue_vevent(*, uid: str, tag, titel: str, notiz: str = "", ort: str = "",
-                rrule: str = "", exdate=None,
+                rrule: str = "", exdate=None, ende_tag=None,
                 start_time: str = "", end_time: str = "", stand=None) -> str:
     """Einen Eintrag als vollstaendiges VCALENDAR ausgeben (eine Ressource)."""
     def d8(d):
@@ -387,8 +393,10 @@ def baue_vevent(*, uid: str, tag, titel: str, notiz: str = "", ort: str = "",
     else:
         # Ganztaegig: DTEND ist EXKLUSIV, also der Folgetag (RFC 5545). Genau
         # ein "+1" — keins macht den Termin null Tage lang, zwei ziehen ihn
-        # ueber zwei Tage.
-        zeit = [f"DTSTART;VALUE=DATE:{d8(tag)}", f"DTEND;VALUE=DATE:{d8(tag + timedelta(days=1))}"]
+        # ueber zwei Tage. Bei einem mehrtaegigen Termin ist es der letzte Tag
+        # + 1, mit derselben Rechnung.
+        letzter = ende_tag if (ende_tag and ende_tag > tag) else tag
+        zeit = [f"DTSTART;VALUE=DATE:{d8(tag)}", f"DTEND;VALUE=DATE:{d8(letzter + timedelta(days=1))}"]
 
     stempel = (stand or datetime.utcnow()).strftime("%Y%m%dT%H%M%SZ")
     zeilen = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Nuvora//Kalender//DE",

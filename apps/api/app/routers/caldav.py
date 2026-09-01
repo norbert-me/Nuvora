@@ -314,9 +314,10 @@ async def _texte(db: AsyncSession, user: User, eintraege) -> dict:
         notiz = "\n".join(x for x in ((e.title if e.title != titel else ""), e.notes or "") if x)
         tag = e.date.date() if hasattr(e.date, "date") else e.date
         von, bis = _stundenzeit(e)
+        ende = e.end_date.date() if hasattr(e.end_date, "date") else e.end_date
         out[e.id] = X.baue_vevent(uid=_uid(e), tag=tag, titel=titel, notiz=notiz,
                                   ort=e.location or "", rrule=e.rrule or "",
-                                  exdate=list(e.exdate or []),
+                                  exdate=list(e.exdate or []), ende_tag=ende,
                                   start_time=von, end_time=bis, stand=e.created_at)
     return out
 
@@ -847,6 +848,7 @@ async def ressource(request: Request, user_id: int, name: str,
         elif kopf and notiz.startswith(kopf + "\n"):
             notiz = notiz[len(kopf) + 1:]
         treffer.date = tagesbeginn(daten["datum"])
+        treffer.end_date = tagesbeginn(daten["ende_datum"]) if daten.get("ende_datum") else None
         treffer.title = titel
         treffer.notes = notiz
         treffer.location = daten["location"]
@@ -861,6 +863,7 @@ async def ressource(request: Request, user_id: int, name: str,
     else:
         rate_limit("caldav_neu", f"u{u.id}", 200, 3600, "Zu viele neue Termine.")
         e = CalendarEntry(owner_id=u.id, date=tagesbeginn(daten["datum"]),
+                          end_date=tagesbeginn(daten["ende_datum"]) if daten.get("ende_datum") else None,
                           title=daten["title"], notes=daten["notes"],
                           location=daten["location"], rrule=daten["rrule"], exdate=daten["exdate"],
                           start_time=daten["start_time"], end_time=daten["end_time"],

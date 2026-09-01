@@ -97,6 +97,8 @@ class PhaseItem(BaseModel):
 
 class EntryIn(BaseModel):
     date: datetime
+    # Letzter Tag, INKLUSIV — leer heisst eintaegig (siehe CalendarEntry).
+    end_date: Optional[datetime] = None
     title: str = ""
     notes: str = ""
     verlaufsplan: List[PhaseItem] = []
@@ -113,6 +115,21 @@ class EntryIn(BaseModel):
 
     @model_validator(mode="after")
     def _times_ok(self):
+        # Mehrtaegig ist eine eigene Bauform, keine Zusatzangabe:
+        #  * ein Enddatum, das nicht NACH dem Anfang liegt, ist keins (der
+        #    Termin waere sonst „null Tage lang" — dieselbe Falle wie beim
+        #    exklusiven DTEND);
+        #  * Uhrzeiten fallen weg: „9:00" gilt fuer einen Tag, nicht fuer fuenf
+        #    (Apple und Outlook zeigen mehrtaegige ebenfalls ganztaegig);
+        #  * eine Serie schliesst sich aus — „jeden Montag von Montag bis
+        #    Freitag" hat keine Bedeutung, die jemand aufzaehlen kann.
+        if self.end_date is not None and _tag(self.end_date) <= _tag(self.date):
+            self.end_date = None
+        if self.end_date is not None:
+            self.start_time = ""
+            self.end_time = ""
+            self.rrule = ""
+            self.exdate = []
         # Endzeit (falls beide gesetzt) muss nach der Startzeit liegen.
         if self.start_time and self.end_time and self.end_time <= self.start_time:
             raise ValueError("Die Endzeit muss nach der Startzeit liegen")
@@ -153,12 +170,13 @@ class EntryOut(EntryIn):
 
 class TrefferOut(BaseModel):
     """Ein Suchtreffer im Kalender — genug, um ihn zu zeigen UND hinzuspringen."""
-    art: str            # "entry" | "exam" | "break"
-    id: int
+    art: str            # "entry" | "exam" | "break" | "extern"
+    id: int             # 0 bei externen Terminen: sie haben keine eigene id
     date: str           # "YYYY-MM-DD" — der Tag, auf den gesprungen wird
     title: str
     sub: str = ""       # Kurs/Klasse oder Zeitraum, als zweite Zeile
     serie: bool = False
+    key: str = ""       # externer Termin: sein Schluessel (uid|Datum)
 
 
 @router.get("/suche", response_model=List[TrefferOut])
@@ -209,6 +227,11 @@ async def suche(q: str = "", limit: int = 30,
         if e.rrule:
             kommend = serien_tage(e, heute, heute + timedelta(days=730))
             tag = kommend[0] if kommend else tag
+        # Mehrtaegig: der Zeitraum gehoert in die Zeile — sonst steht dort nur
+        # der erste Tag und man haelt die Klassenfahrt fuer einen Tagestermin.
+        if e.end_date:
+            zeitraum = f"{tag.strftime('%d.%m.%Y')} – {_tag(e.end_date).strftime('%d.%m.%Y')}"
+            b = f"{b} · {zeitraum}" if b else zeitraum
         treffer.append(TrefferOut(art="entry", id=e.id, date=tag.strftime("%Y-%m-%d"),
                                   title=e.title or t_leer(e), sub=b, serie=bool(e.rrule)))
 
@@ -218,6 +241,38 @@ async def suche(q: str = "", limit: int = 30,
             continue
         treffer.append(TrefferOut(art="exam", id=x.id, date=_tag(x.date).strftime("%Y-%m-%d"),
                                   title=x.title or "Klassenarbeit", sub=b))
+
+    # Abonnierte Kalender zaehlen mit: fuer die Lehrkraft ist der iCloud-Termin
+    # im selben Kalender wie der eigene — eine Suche, die ihn auslaesst,
+    # antwortet „gibt es nicht", obwohl er auf dem Bildschirm steht.
+    # Ausgeblendetes bleibt draussen (`hidden`), und ein mehrtaegiger Termin
+    # steht als EIN Treffer da (er wird sonst je Tag einmal geliefert).
+    # Ein Termin, nicht seine Tage: mehrtaegige kommen je Tag aus dem Feed,
+    # Serien je Vorkommen. Je UID bleibt EINER stehen — der naechste kommende,
+    # sonst der zuletzt gewesene. Sonst fuellt eine woechentliche Chorprobe die
+    # ganze Liste.
+    je_uid: dict = {}
+    for ev in await externe_ereignisse(user):
+        if ev.get("hidden"):
+            continue
+        if not passt(ev.get("title"), ev.get("location"), ev.get("description")):
+            continue
+        uid = ev.get("uid") or ev.get("key") or ev.get("title") or ""
+        tag = ev.get("start") or ev.get("date")
+        try:
+            d = date.fromisoformat(tag)
+        except (TypeError, ValueError):
+            continue
+        alt = je_uid.get(uid)
+        if alt is None or _naeher(d, alt[0], heute):
+            je_uid[uid] = (d, ev)
+    for d, ev in je_uid.values():
+        tag = ev.get("start") or ev.get("date")
+        ende = ev.get("end") or tag
+        treffer.append(TrefferOut(art="extern", id=0, date=tag,
+                                  title=ev.get("title") or "(ohne Titel)",
+                                  sub=(ev.get("location") or "") if ende == tag else f"{tag} – {ende}",
+                                  key=ev.get("key") or ""))
 
     for f in (await db.execute(select(CalendarBreak).where(CalendarBreak.owner_id == user.id))).scalars().all():
         if not passt(f.label):
@@ -237,6 +292,13 @@ async def suche(q: str = "", limit: int = 30,
     return treffer[:limit]
 
 
+def _naeher(neu: date, alt: date, heute: date) -> bool:
+    """Liegt `neu` naeher an heute als `alt`? Kommendes schlaegt Vergangenes."""
+    def rang(d: date):
+        return (0, (d - heute).days) if d >= heute else (1, (heute - d).days)
+    return rang(neu) < rang(alt)
+
+
 def t_leer(e) -> str:
     """Ein Eintrag ohne Titel heisst nach dem, was ihn ausmacht."""
     return (e.notes or "").strip().splitlines()[0][:60] if (e.notes or "").strip() else "(ohne Titel)"
@@ -252,7 +314,9 @@ async def list_entries(frm: Optional[datetime] = None, to: Optional[datetime] = 
     # laufende AG im Maerz aus dem Kalender verschwunden.
     serie = CalendarEntry.rrule != ""
     if frm is not None:
-        q = q.where(or_(CalendarEntry.date >= frm, serie))
+        # Ein mehrtaegiger Termin faengt vor dem Fenster an und ragt hinein —
+        # ohne diesen Zweig fehlte die Schulfahrt ab ihrem zweiten Tag.
+        q = q.where(or_(CalendarEntry.date >= frm, serie, CalendarEntry.end_date >= frm))
     if to is not None:
         q = q.where(CalendarEntry.date <= to)
     rows = (await db.execute(q.order_by(CalendarEntry.date))).scalars().all()
@@ -1802,9 +1866,14 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
             dtend = f"DTEND:{d8(day)}T{b2}"
         else:
             # Ganztaegig: DTEND ist exklusiv, also der Folgetag. Ein einzelner
-            # Tag braucht genau EIN "+1" — nicht keins und nicht zwei.
+            # Tag braucht genau EIN "+1" — nicht keins und nicht zwei. Bei
+            # einem mehrtaegigen Termin ist es der letzte Tag + 1 (dieselbe
+            # Rechnung wie bei den Ferien darunter).
+            letzter = _tag(e.end_date) if getattr(e, "end_date", None) else day
+            if letzter < day:
+                letzter = day
             dtstart = f"DTSTART;VALUE=DATE:{d8(day)}"
-            dtend = f"DTEND;VALUE=DATE:{d8(day + timedelta(days=1))}"
+            dtend = f"DTEND;VALUE=DATE:{d8(letzter + timedelta(days=1))}"
         lines += [
             "BEGIN:VEVENT",
             f"UID:nuvora-entry-{e.id}-{FORM_MARKER}@nuvora",

@@ -805,6 +805,23 @@ def inhalt_kalender(api, u, spuren):
     if api.call("GET", "/api/kalender/suche?q=x", erwartet=(200,)):
         raise AssertionError("ein einzelner Buchstabe darf nichts liefern")
 
+    # Mehrtaegig: EIN Eintrag mit Enddatum, sichtbar an jedem Tag dazwischen.
+    mehr = api.call("POST", "/api/kalender/entries", {
+        "date": tag.isoformat(), "end_date": (tag + timedelta(days=3)).isoformat(),
+        "title": f"{PRAEFIX} Fahrt", "start_time": "09:00", "end_time": "10:00",
+    }, erwartet=(201,))
+    spuren.append(("Mehrtaegiger Eintrag", lambda: api.call(
+        "DELETE", f"/api/kalender/entries/{mehr['id']}", erwartet=(204, 404))))
+    if not mehr.get("end_date"):
+        raise AssertionError("Enddatum nicht gespeichert")
+    if mehr.get("start_time") or mehr.get("end_time"):
+        raise AssertionError("mehrtaegig muss ganztaegig sein — Uhrzeit blieb stehen")
+    # Fenster, das ERST NACH dem Anfang beginnt: der Termin muss trotzdem kommen.
+    spaet = (f"?frm={(tag + timedelta(days=2)).isoformat()}"
+             f"&to={(tag + timedelta(days=5)).isoformat()}")
+    if not any(e["id"] == mehr["id"] for e in api.call("GET", f"/api/kalender/entries{spaet}", erwartet=(200,))):
+        raise AssertionError("mehrtaegiger Termin faellt aus dem Fenster, sobald er davor beginnt")
+
     slot = api.call("PUT", "/api/kalender/timetable/slot", {
         "weekday": 0, "period": 1, "class_id": u.class_id, "title": f"{PRAEFIX} Slot",
     }, erwartet=(200,))
