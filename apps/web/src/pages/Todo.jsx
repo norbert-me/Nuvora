@@ -2,6 +2,7 @@
 // datierte Einträge erscheinen zusätzlich im Kalender (Regel 3: reine Zusatz-
 // Brücke, die Liste läuft eigenständig).
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { pageTitle, cardStyle, chipStyle, sectionLabel, toolbarBtn, toolbarBtnPrimary, toolbarInput, CONTROL_R, Icon, ICONS, iconBtn, toolbarIconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
@@ -21,6 +22,15 @@ const API = "/api/todo";
 
 export default function Todo({ embedded } = {}) {
   const { t } = useLanguage();
+  // Aus dem Kalender kommt man mit ?todo=<id> hierher: der Klick auf eine
+  // datierte Aufgabe im Kalender soll bei DIESER Aufgabe landen, nicht nur
+  // irgendwo in der Liste. Sie wird hervorgehoben und ins Bild gerollt; die
+  // Markierung verschwindet nach ein paar Sekunden von selbst — sie ist ein
+  // Wegweiser, kein Zustand.
+  const [params] = useSearchParams();
+  const zielId = Number(params.get("todo")) || null;
+  const [markiert, setMarkiert] = useState(zielId);
+  const zielRef = useRef(null);
   // Regel 3: die Kalender-Brücke ist Zusatz — ohne das Modul gibt es sie nicht,
   // also darf der Hinweis darauf auch nicht erscheinen.
   const aktiv = useAktiv();
@@ -37,6 +47,12 @@ export default function Todo({ embedded } = {}) {
   const naechsteStunde = () => { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); return `${String(d.getHours()).padStart(2, "0")}:00`; };
   const load = () => hol(API).then((d) => setItems(Array.isArray(d) ? d : []));
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!markiert || !zielRef.current) return;
+    try { zielRef.current.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* egal */ }
+    const timer = setTimeout(() => setMarkiert(null), 4000);
+    return () => clearTimeout(timer);
+  }, [markiert, items.length]);
 
   // ── Ein Entwurf für Haken und Reihenfolge ──
   // Nichts geht zum Server, bevor jemand speichert — auch das Häkchen nicht.
@@ -140,7 +156,9 @@ export default function Todo({ embedded } = {}) {
       );
     }
     return (
-      <div key={it.id} {...(dnd || {})} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", marginBottom: 8, cursor: dnd ? "grab" : "default" }}>
+      <div key={it.id} {...(dnd || {})} ref={markiert === it.id ? zielRef : undefined}
+        style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", marginBottom: 8, cursor: dnd ? "grab" : "default",
+          ...(markiert === it.id ? { border: "1px solid var(--accent)", boxShadow: "inset 3px 0 0 var(--accent)" } : {}) }}>
         {dnd && <span className="drag-handle" title={t("todo.reorderHint")} style={{ color: "var(--text3)", flexShrink: 0, display: "inline-flex", cursor: "grab" }}><Icon d={ICONS.grip} size={15} /></span>}
         <input type="checkbox" checked={istErledigt(it)} onChange={() => toggle(it)} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
         <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: istErledigt(it) ? "line-through" : "none", color: istErledigt(it) ? "var(--text3)" : "var(--text)" }}>{it.text}</span>

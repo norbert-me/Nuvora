@@ -12,13 +12,25 @@ Zwischenfassung (x.y.0) hängt sie **alle Abschnitte der vorigen Reihe** an: wer
 von 4.1.0 auf 4.2.0 geht, hat 4.1.1 bis 4.1.9 nie gesehen — sonst wäre die
 Notiz zur größten Fassung die dünnste.
 
-## 4.1.7 — unveröffentlicht
+## 4.1.7 — 01.09.2026
+
+**Noten**
+
+- Der Klick auf einen Namen zeigt E-/G-Kurs, Förderschwerpunkte, Maßnahmen und
+  Notiz — und lässt sie dort auch ändern. Vorher lag E/G im Kurs und der
+  Förderschwerpunkt in der Klasse, und im Notenbuch stand nichts davon.
 
 **Kurse**
 
 - Die E/G-Zuordnung stand am rechten Rand ihrer Spalte, also direkt vor dem
   nächsten Namen. Jetzt steht sie vor dem eigenen Namen, mit Trennlinie
   zwischen den Spalten.
+- Der Jahrgang wird ausgewählt statt getippt; „andere …" legt einen neuen an.
+
+**Kalender**
+
+- Der Klick auf eine Aufgabe führt zu genau dieser Aufgabe, nicht nur in die
+  Liste.
 
 ## 4.1.6 — 01.09.2026
 

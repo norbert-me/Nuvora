@@ -28,6 +28,9 @@ const FACH_VORSCHLAEGE = [
 export default function Kurse() {
   const { t } = useLanguage();
   const [kurse, setKurse] = useState([]);
+  // Welche Jahrgaenge es schon gibt — die Auswahl unten fuellt sich daraus.
+  const jahrgaenge = [...new Set(kurse.map((k) => k.jahrgang).filter(Boolean).map(String))]
+    .sort((a, b) => Number(a) - Number(b));
   const [allClasses, setAllClasses] = useState([]);
   // Gelöschte Kurse liegen im gemeinsamen Papierkorb des Kerns (/papierkorb).
   const [neu, setNeu] = useState("");
@@ -216,9 +219,24 @@ export default function Kurse() {
                     <datalist id="nuvora-faecher-kurs">
                       {FACH_VORSCHLAEGE.map((f) => <option key={f} value={f} />)}
                     </datalist>
-                    <input type="number" min="1" max="13" value={kurs.wert.jahrgang}
-                      onChange={(e) => kurs.setz({ jahrgang: e.target.value })} placeholder={t("topics.jahrgang")}
-                      style={{ ...inputStyle, width: 110 }} />
+                    {/* Auswahl statt Zahlenfeld: an einer Schule gibt es eine
+                        Handvoll Jahrgaenge, und man tippt sie nicht jedes Mal
+                        neu. Die Liste kommt aus dem, was schon da ist (eigene
+                        Kurse); „andere …" bleibt der Weg fuer den ersten und
+                        fuer einen, den es hier noch nicht gibt — ohne ihn waere
+                        die Auswahl eine Sackgasse. */}
+                    {kurs.wert.jahrgang && !jahrgaenge.includes(String(kurs.wert.jahrgang)) ? (
+                      <input type="number" min="1" max="13" autoFocus value={kurs.wert.jahrgang === "0" ? "" : kurs.wert.jahrgang}
+                        onChange={(e) => kurs.setz({ jahrgang: e.target.value })} placeholder={t("topics.jahrgang")}
+                        style={{ ...inputStyle, width: 110 }} />
+                    ) : (
+                      <select value={kurs.wert.jahrgang || ""} style={{ ...selectStyle, width: 130 }}
+                        onChange={(e) => kurs.setz({ jahrgang: e.target.value === "neu" ? "0" : e.target.value })}>
+                        <option value="">– {t("topics.jahrgang")} –</option>
+                        {jahrgaenge.map((j) => <option key={j} value={j}>{t("topics.jahrgangN", { n: j })}</option>)}
+                        <option value="neu">{t("kurse.jahrgangNeu")}</option>
+                      </select>
+                    )}
                     {/* Der Stammraum. Am Kurs und nicht je Stundenplan-Stunde:
                         derselbe Kurs hat vier Stunden in der Woche und meist
                         denselben Raum. Der Kalender setzt ihn als Ort ein. */}
