@@ -3,6 +3,7 @@
 // Kursen sein.
 import { useState, useEffect, useRef } from "react";
 import { liegtDavor, nachJahrAbsteigend } from "../core/schuljahr.js";
+import { MASSNAHMEN } from "../core/foerderung.js";
 import { useLanguage } from "../i18n/index.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
@@ -380,20 +381,6 @@ function StudentMembers({ kursId, allClasses, t }) {
 // hängen deshalb am Kurs; gespeichert werden sie an der Person, mit kurs_id.
 //
 // Vokabular wortgleich zum Backend (MASSNAHMEN_VALUES in classes.py).
-const MASSNAHMEN = [
-  ["Zeitzuschlag", "Mehr Bearbeitungszeit, z. B. +25 %"],
-  ["Abweichende Lernziele", "Wird an anderen Zielen gemessen als die Klasse"],
-  ["Weniger Aufgaben", "Reduzierter Umfang bei gleicher Anforderung"],
-  ["Vorlesen", "Aufgabenstellungen werden vorgelesen"],
-  ["Größere Schrift", "Arbeitsblatt in größerer Schrift / mehr Kontrast"],
-  ["Hilfsmittel", "Z. B. Taschenrechner, Wörterbuch, Formelsammlung"],
-  ["Eigener Raum", "Arbeitet getrennt oder in einer Kleingruppe"],
-  ["Zusätzliche Pausen", "Darf die Arbeit unterbrechen"],
-  ["Assistenz", "Begleitung durch eine weitere Person"],
-  ["Rechtschreibung nicht bewertet", "Rechtschreibleistung fließt nicht ein"],
-  ["Mündlich statt schriftlich", "Leistung wird mündlich erbracht"],
-  ["Sonstiges", "Freie Beschreibung im Feld daneben"],
-];
 
 function MassnahmenPanel({ kursId, t }) {
   const [studs, setStuds] = useState(null);

@@ -7,7 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..schueler import sortiert
+from ..schueler import sortiert, zeilen_der_person
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
 from ..besitz import eigenes
@@ -595,6 +595,84 @@ async def _owned_student(db: AsyncSession, user: User, student_id: int) -> Stude
     cls = await db.get(SchoolClass, st.class_id)
     if not cls or cls.owner_id != user.id:
         raise HTTPException(404, "Schüler nicht gefunden")
+    return st
+
+
+@router.get("/students/{student_id}", response_model=StudentOut)
+async def get_student(student_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Die Angaben zu EINER Person — fuer den Schuelerdialog (Notenbuch,
+    Sitzplan, Klassenarbeit). Einzeln statt in jeder Liste: eine Notentabelle
+    braucht keine Foerderangaben von dreissig Kindern, ein geoeffneter Dialog
+    genau die eines Kindes."""
+    return await _owned_student(db, user, student_id)
+
+
+class PersonIn(BaseModel):
+    """Was zur PERSON gehoert — nicht zur Fach-Klasse und nicht zum Modul.
+
+    Nur gesetzte Felder werden geschrieben (None = unveraendert), damit ein
+    Dialog, der nur das Niveau zeigt, nicht die Foerderschwerpunkte leert.
+    """
+    niveau: Optional[str] = None
+    foerder: Optional[List[str]] = None
+    notizen: Optional[str] = None
+    klassenlehrer: Optional[str] = None
+
+    @field_validator("niveau")
+    @classmethod
+    def valid_niveau(cls, v):
+        if v is not None and v not in ("", "E", "G"):
+            raise ValueError("Niveau muss E, G oder leer sein")
+        return v
+
+    @field_validator("foerder")
+    @classmethod
+    def valid_foerder(cls, v):
+        if v is None:
+            return v
+        unknown = set(v) - FOERDER_VALUES
+        if unknown:
+            raise ValueError(f"Unbekannter Foerderschwerpunkt: {', '.join(sorted(unknown))}")
+        return v
+
+    @field_validator("notizen")
+    @classmethod
+    def notizen_len(cls, v):
+        if v is not None and len(v) > 2000:
+            raise ValueError("Notiz zu lang (max. 2000 Zeichen)")
+        return v
+
+
+@router.patch("/students/{student_id}", response_model=StudentOut)
+async def update_student(student_id: int, body: PersonIn,
+                         user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Die Angaben zu EINER Person aendern — von ueberall her.
+
+    Bisher ging das nur ueber „ganze Klasse speichern" (Klassenmaske) oder ueber
+    den Kurs (E/G, Massnahmen). Wer im Notenbuch auf einen Namen klickte, sah
+    die Angaben bestenfalls und konnte nichts davon aendern: E/G lag im Kurs,
+    der Foerderschwerpunkt in der Klasse — zwei Orte fuer eine Person.
+
+    Geschrieben wird auf ALLE Zeilen der Person (Geschwisterklassen), wie es
+    der Kurs-Weg schon tut: sonst waere ein Kind in Mathe „E" und in Deutsch
+    ohne Niveau. Die Massnahmen bleiben bewusst draussen — die haengen am Kurs
+    (ein Zeitzuschlag in Mathe heisst nicht dasselbe wie in Sport) und laufen
+    weiter ueber `/api/kurse/{id}/massnahmen`.
+    """
+    st = await _owned_student(db, user, student_id)
+    rate_limit("student_patch", f"u{user.id}", 300, 60, "Zu viele Aenderungen. Bitte kurz warten.")
+    ziele = await zeilen_der_person(db, st.name, [st.class_id]) or [st]
+    for s in ziele:
+        if body.niveau is not None:
+            s.niveau = body.niveau
+        if body.foerder is not None:
+            s.foerder = list(body.foerder)
+        if body.notizen is not None:
+            s.notizen = body.notizen
+        if body.klassenlehrer is not None:
+            s.klassenlehrer = body.klassenlehrer.strip()[:120]
+    await db.commit()
+    await db.refresh(st)
     return st
 
 

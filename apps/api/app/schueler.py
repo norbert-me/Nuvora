@@ -79,3 +79,22 @@ async def roster_kurs(db, kurs_id) -> list[Student]:
     if not sids:
         return []
     return kanonisch(await sortiert(db, Student.id.in_(sids)))
+
+
+async def zeilen_der_person(db, name: str, class_ids) -> list[Student]:
+    """Alle Zeilen EINER Person — ueber die Geschwisterklassen hinweg.
+
+    Dieselbe Person steht in jeder ihrer Fach-Klassen als eigene Zeile. Was zur
+    Person gehoert (E/G, Foerderschwerpunkte, Notizen), gehoert deshalb auf
+    jede davon: sonst waere ein Kind in Mathe „E" und in Deutsch ohne Niveau,
+    und niemand wuesste, welche Zeile stimmt. `_rows_of_person` in kurse.py
+    macht dasselbe fuer die Kurs-Sicht; hier ist der Weg ueber die Klasse.
+    """
+    name = (name or "").strip()
+    if not name or not class_ids:
+        return []
+    alle: set = set()
+    for cid in class_ids:
+        alle |= await sibling_class_ids(db, cid)
+    rows = (await db.execute(select(Student).where(Student.class_id.in_(list(alle))))).scalars().all()
+    return [s for s in rows if s.name.strip() == name]

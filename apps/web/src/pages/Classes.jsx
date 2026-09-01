@@ -17,6 +17,7 @@ import { AddButton, COLORS as C, CONTROL_R, ICONS, Icon, Tabs, btnSecondary, btn
 import ImportMenu from "../components/ImportMenu.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import AuthImage from "../components/AuthImage.jsx";
+import { FOERDER } from "../core/foerderung.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { peek, put } from "../core/cache.js";
@@ -31,20 +32,6 @@ const API = "/api";
 //
 // Die Erklaerungen stammen ebenfalls von dort: sie sagen, was der Schwerpunkt
 // im Unterricht bedeutet, statt nur ein Etikett zu vergeben.
-const FOERDER = [
-  ["LRS", "Schwierigkeiten beim Lesen und Schreiben"],
-  ["Dyskalkulie", "Schwierigkeiten mit Zahlen, Mengen und Rechenoperationen"],
-  ["Lesen", "Schwierigkeiten beim Textverständnis"],
-  ["DaZ", "Deutsch als Zweitsprache – Fachsprache fällt schwer"],
-  ["Lernen", "Allgemeine Lernschwierigkeiten, braucht mehr Zeit und Struktur"],
-  ["Sozial-Emotional", "Schwierigkeiten in Gruppenarbeit oder bei Frustration"],
-  ["Auditive Wahrnehmung", "Schwierigkeiten bei der Verarbeitung gehörter Informationen"],
-  ["Motorik", "Schwierigkeiten bei feinmotorischen Aufgaben (Schreiben, Zeichnen)"],
-  ["Konzentration", "Kann sich nur kurz konzentrieren, leicht ablenkbar"],
-  ["Sehen", "Eingeschränktes Sehvermögen, braucht große Schrift/Kontrast"],
-  ["Hören", "Eingeschränktes Hörvermögen, braucht visuelle Anweisungen"],
-  ["Sprache", "Schwierigkeiten beim mündlichen Ausdruck"],
-];
 
 const EMPTY_STUDENT = { card_id: 1, name: "", niveau: "", foerder: null, massnahmen: null, notizen: "", klassenlehrer: "" };
 

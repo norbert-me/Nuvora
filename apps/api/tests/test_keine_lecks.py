@@ -69,6 +69,11 @@ ERLAUBT = {
         "hier werden die Angaben gepflegt.",
     "/api/classes/{class_id}":
         "dito, einzelne Klasse.",
+    "/api/classes/students/{student_id}":
+        "Der Schuelerdialog der Lehrkraft (Notenbuch, Sitzplan): genau die "
+        "Ansicht, in der die Angaben gezeigt UND gepflegt werden. Bewusst "
+        "einzeln statt in jeder Liste — eine Notentabelle bekommt die "
+        "Foerderangaben von dreissig Kindern nicht mehr mitgeliefert.",
     "/api/classes/{class_id}/massnahmen":
         "Zweck des Endpunkts: der Kalender zeigt am Klassenarbeitstermin die "
         "vereinbarten Nachteilsausgleiche. Angemeldet, eigene Klasse.",

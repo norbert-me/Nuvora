@@ -14,6 +14,7 @@ import { Link } from "react-router-dom";
 import { COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
 import { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
@@ -910,7 +911,7 @@ export default function Noten() {
       <SpeicherBalken entwurf={entwurf} />
 
       {infoFuer && (
-        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} className={cls?.name} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} />
+        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} className={cls?.name} kursId={kursId} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} />
       )}
     </div>
   );
@@ -1482,7 +1483,7 @@ function KommentarForm({ t, initial = "", onSave, onCancel }) {
   );
 }
 
-function StudentInfo({ t, student, summary, sections, entries = [], className, onZeugnis, onClose }) {
+function StudentInfo({ t, student, summary, sections, entries = [], className, kursId = null, onZeugnis, onClose }) {
   // Hook vor jedem fruehen Ausstieg: sonst haengt die Hook-Reihenfolge daran,
   // ob gerade ein Kind gewaehlt ist.
   const [bereich, setBereich] = useState("gesamt");
@@ -1552,20 +1553,12 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
           {onZeugnis && <button onClick={onZeugnis} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, whiteSpace: "nowrap" }} title={t("noten.zeugnisHint")}>{t("noten.zeugnis")}</button>}
         </div>
 
-        <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 14px", fontSize: 14, marginBottom: 16 }}>
-          {/* Nur zeigen, was es gibt: eine Zeile „Kurs —" behauptet eine
-              E/G-Einteilung, die in diesem Fach gar nicht gefuehrt wird. */}
-          {student.niveau && (<>
-            <dt style={dtS}>{t("noten.course")}</dt>
-            <dd style={ddS}>{student.niveau === "E" ? "E-Kurs" : "G-Kurs"}</dd>
-          </>)}
-          {student.foerder?.length > 0 && (<>
-            <dt style={dtS}>{t("noten.supportNeeds")}</dt>
-            <dd style={ddS}>{student.foerder.join(", ")}</dd>
-          </>)}
-          {student.klassenlehrer && (<><dt style={dtS}>{t("noten.classTeacher")}</dt><dd style={ddS}>{student.klassenlehrer}</dd></>)}
-          {student.notizen && (<><dt style={dtS}>{t("noten.notes")}</dt><dd style={ddS}>{student.notizen}</dd></>)}
-        </dl>
+        {/* Die Angaben zur Person stehen hier nicht nur, sie sind hier auch
+            aenderbar — vorher lag E/G im Kurs und der Foerderschwerpunkt in der
+            Klasse, und wer beim Eintragen der Noten etwas nachtragen wollte,
+            musste die Seite verlassen. Eine Komponente fuer alle Orte
+            (components/SchuelerAngaben.jsx). */}
+        <SchuelerAngaben studentId={student.id} kursId={kursId} t={t} />
 
         <GradeChart series={serie} t={t}
           titel={bereich === "gesamt" ? t("noten.verlauf") : t("noten.verlaufSection", { name: secName })}

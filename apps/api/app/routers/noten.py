@@ -178,11 +178,20 @@ class SectionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# Die Zeilen bleiben schlank: Name und Nummer. Was zur PERSON gehoert
+# (E/G, Foerderschwerpunkte, Notizen) holt der Schuelerdialog einzeln ueber
+# `GET /api/classes/students/{id}` — eine Liste, die bei jedem Aufruf die
+# Art-9-Angaben aller dreissig Kinder mitschickt, braucht niemand fuer eine
+# Notentabelle.
+def _person(s):
+    return {"id": s.id, "card_id": s.card_id, "name": s.name, "class_id": s.class_id}
+
+
 @router.get("/classes/{class_id}/students")
 async def kurs_students(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Noten-Zeilen: die kanonischen SuS des Kurses (dedupliziert)."""
     await _owned_class(db, user, class_id)
-    return [{"id": s.id, "card_id": s.card_id, "name": s.name} for s in await _kurs_roster(db, user, class_id)]
+    return [_person(s) for s in await _kurs_roster(db, user, class_id)]
 
 
 @router.get("/kurse/{kurs_id}/students")
@@ -191,7 +200,7 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
     (Kurse aus Teilen von Klassen). Deduplikat per Name wie beim Klassen-Roster."""
     await eigener_kurs(db, user, kurs_id)
     ordered = await _kanon_kurs(db, kurs_id)
-    return [{"id": s.id, "card_id": s.card_id, "name": s.name, "class_id": s.class_id} for s in ordered]
+    return [_person(s) for s in ordered]
 
 
 def _sec_kurs_where(user, class_id, kurs_id):
