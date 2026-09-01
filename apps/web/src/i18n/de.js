@@ -25,7 +25,7 @@ export default {
   "nav.tutorial": "Tutorial",
   "nav.start": "Start",
   "nav.grades": "Noten",
-  "auswertung.title": "Auswertung",
+  "auswertung.title": "Noten",
   "auswertung.tabGrades": "Notenbuch",
   "auswertung.tabWorks": "Klassenarbeiten",
   "cd.create": "Rätsel erstellen",

@@ -91,7 +91,10 @@ REGISTRY: List[ModuleDef] = [
     ModuleDef(
         key="auswertung",
         group="werkzeug",
-        name="Auswertung",
+        # Angezeigt heisst das Modul „Noten" — Schluessel und Pfad bleiben
+        # „auswertung" (sie stehen in user_modules, in Lesezeichen und in den
+        # Proben).
+        name="Noten",
         description=(
             "Leistung auswerten an einem Ort — zwei Reiter: Notenbuch (eigene "
             "Spalten mit Gewichten, gewichteter Schnitt und Trend je Schüler; die "

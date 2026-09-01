@@ -25,7 +25,7 @@ export default {
   "nav.tutorial": "Tutorial",
   "nav.start": "Start",
   "nav.grades": "Grades",
-  "auswertung.title": "Assessment",
+  "auswertung.title": "Grades",
   "auswertung.tabGrades": "Gradebook",
   "auswertung.tabWorks": "Exams",
   "cd.create": "Create puzzle",
