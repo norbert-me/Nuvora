@@ -12,6 +12,17 @@ Zwischenfassung (x.y.0) hängt sie **alle Abschnitte der vorigen Reihe** an: wer
 von 4.1.0 auf 4.2.0 geht, hat 4.1.1 bis 4.1.9 nie gesehen — sonst wäre die
 Notiz zur größten Fassung die dünnste.
 
+## 4.1.8 — unveröffentlicht
+
+**Kalender**
+
+- Wird eine Klassenarbeit umbenannt, heißt die Aufgabe „… korrigieren" mit.
+  Ein selbst umformulierter Text bleibt unberührt.
+
+**Module**
+
+- Das Notizbrett ist nicht mehr „beta".
+
 ## 4.1.7 — 01.09.2026
 
 **Noten**

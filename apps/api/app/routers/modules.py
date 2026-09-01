@@ -230,7 +230,7 @@ REGISTRY: List[ModuleDef] = [
             "(das sind die Beobachtungen)."
         ),
         path="/notizbrett",
-        stage="beta",
+        stage="stable",
     ),
     ModuleDef(
         key="tafel",

@@ -920,13 +920,21 @@ async def _korrektur_todo(db, user, e: ExamDate, verschieben: bool = False) -> N
     if not await is_active(db, user.id, "notizbrett") or not e.date:
         return
     marke = f"#ka{e.id}"
+    titel = (e.title or "").strip() or "Klassenarbeit"
     schon = (await db.execute(select(Todo).where(
         Todo.owner_id == user.id, Todo.text.like(f"%{marke}%")))).scalars().first()
     if schon:
         if verschieben and not schon.done:
             schon.due_date = (e.date + timedelta(days=7)).date()
+            # Der Name der Arbeit steht im Aufgabentext — wird die Arbeit
+            # umbenannt, hiesse die Aufgabe sonst weiter „Nr. 1 korrigieren",
+            # waehrend im Kalender „Bruchrechnung" steht. Angefasst wird nur,
+            # was noch unsere eigene Form hat: hat die Lehrkraft den Text selbst
+            # umformuliert, gehoert er ihr.
+            neu = f"{titel} korrigieren {marke}"
+            if schon.text.endswith(f" korrigieren {marke}") and schon.text != neu:
+                schon.text = neu
         return
-    titel = (e.title or "").strip() or "Klassenarbeit"
     db.add(Todo(owner_id=user.id, text=f"{titel} korrigieren {marke}",
                 due_date=(e.date + timedelta(days=7)).date()))
 
