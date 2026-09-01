@@ -512,15 +512,20 @@ function NiveauPanel({ kursId, niveauAktiv = false, t }) {
   if (studs.length === 0) return <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 8 }}>{t("kurse.niveauNoStudents")}</p>;
   return (
     <>
-      <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
+      {/* Spalten mit Trennlinie statt Raster: `columns` bringt die Linie von
+          selbst mit (column-rule) — im Raster stand das E/G-Kaestchen am
+          rechten Rand seiner Zelle, also direkt VOR dem naechsten Namen, und
+          las sich wie dessen Niveau. Das Kaestchen steht deshalb jetzt VOR dem
+          Namen: bündige Spalte, und die Zuordnung ist auf einen Blick klar. */}
+      <div style={{ marginTop: 12, columnWidth: 210, columnGap: 20, columnRule: "1px solid var(--border)" }}>
         {studs.map((s) => (
-          <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+          <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "3px 0", breakInside: "avoid" }}>
             {/* E/G-Selektor nur bei aktivem Regler; sonst nur der Name (Teilnehmer sichtbar). */}
             {niveauAktiv && (
               <NiveauToggle wert={e.wert[s.name] || ""} onChange={(v) => e.setz({ [s.name]: v })}
                 size={24} title={t("kurse.niveauToggle")} />
             )}
+            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
           </div>
         ))}
       </div>
