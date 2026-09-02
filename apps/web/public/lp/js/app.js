@@ -2930,28 +2930,38 @@
             if (task.section === 'Wiederholung' && !wdhHeadingDone) {
                 wdhHeadingDone = true;
                 y = pdfHinweis(doc, marginL, contentW, y, 'Du bist nicht fertig geworden?',
-                    ['Kein Problem – das ist eingeplant. In der naechsten Stunde arbeitest du im Wiederholungsteil an deinen offenen Aufgaben weiter. Nimm die Leiter mit.']);
+                    ['Kein Problem – das ist eingeplant. In der nächsten Stunde arbeitest du im Wiederholungsteil an deinen offenen Aufgaben weiter. Nimm die Leiter mit.']);
             }
 
             // „Wie geht es weiter?" + Smiley-Regeln, dann die Zusatzaufgaben-Überschrift.
             if (task.zusatz && !zusatzHeadingDone) {
                 zusatzHeadingDone = true;
-                if (y > unten(doc, 47)) { doc.addPage(); y = 15; }
-                // Kasten mit Titel und zwei Regeln, je mit gezeichnetem Smiley davor.
+                // Kasten mit Titel und zwei Regeln, je mit gezeichnetem Smiley
+                // davor. Die Zeilen werden UMGEBROCHEN und die Kastenhoehe
+                // daraus gerechnet: vorher standen beide Saetze in einer Zeile
+                // und liefen rechts aus dem Blatt — jsPDF schneidet nicht ab,
+                // es schreibt weiter. Auf A4 fiel es knapp nicht auf, auf jedem
+                // schmaleren Blatt sofort.
+                const regelBreite = contentW - 15;
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+                const kopfZeilen = doc.splitTextToSize('Wie geht es weiter? Schau auf deine Smileys bei den Pflichtaufgaben.', contentW - 8);
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+                const regel1 = doc.splitTextToSize('Höchstens einmal kein guter Smiley: Du darfst frei wählen – Zusatz- oder Knobelaufgaben.', regelBreite);
+                const regel2 = doc.splitTextToSize('Zweimal oder öfter kein guter Smiley: Mach die Zusatzaufgaben – sie üben, was noch wackelt.', regelBreite);
+                const kastenH = 6 + kopfZeilen.length * 5.5 + (regel1.length + regel2.length) * 4.6 + 3;
+                if (y > unten(doc, kastenH + 25)) { doc.addPage(); y = 15; }
                 doc.setDrawColor(180); doc.setLineWidth(0.3); doc.setFillColor(245, 247, 250);
-                doc.roundedRect(marginL, y, contentW, 22, 2, 2, 'FD'); doc.setDrawColor(0);
+                doc.roundedRect(marginL, y, contentW, kastenH, 2, 2, 'FD'); doc.setDrawColor(0);
                 let ty = y + 5;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30);
-                doc.text('Wie geht es weiter? Schau auf deine Smileys bei den Pflichtaufgaben.', marginL + 4, ty);
-                ty += 5.5;
+                kopfZeilen.forEach((z) => { doc.text(z, marginL + 4, ty); ty += 5.5; });
                 doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60);
                 drawSmiley(doc, marginL + 6, ty - 1, 2, true);
-                doc.text('Höchstens einmal kein guter Smiley: Du darfst frei wählen – Zusatz- oder Knobelaufgaben.', marginL + 11, ty);
-                ty += 5;
+                regel1.forEach((z) => { doc.text(z, marginL + 11, ty); ty += 4.6; });
                 drawSmiley(doc, marginL + 6, ty - 1, 2, false);
-                doc.text('Zweimal oder öfter kein guter Smiley: Mach die Zusatzaufgaben – sie üben, was noch wackelt.', marginL + 11, ty);
+                regel2.forEach((z) => { doc.text(z, marginL + 11, ty); ty += 4.6; });
                 doc.setTextColor(0);
-                y += 27;
+                y += kastenH + 5;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
                 doc.text('Zusatzaufgaben', marginL, y);
                 y += 3;
