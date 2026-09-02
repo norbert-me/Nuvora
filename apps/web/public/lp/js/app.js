@@ -2829,22 +2829,23 @@
     function renderStudentPage(doc, entry, marginL, contentW, lineH, checkboxSize, withQR) {
         const s = entry.student;
         const selectedTasks = entry.tasks.filter(t => t.selected);
-        let y = 15;
+        // Ein flaches Blatt (A5 quer: 148 mm hoch) hat gut die halbe Hoehe von
+        // A4. Mit den A4-Abstaenden rutschten die Zusatzaufgaben auf eine
+        // zweite Seite — und eine Lernleiter, die man wenden muss, ist genau
+        // das Gegenteil dessen, wofuer A5 gewaehlt wird. Also enger setzen:
+        // dieselben Angaben, weniger Luft.
+        const flach = doc.internal.pageSize.getHeight() < 200;
+        let y = flach ? 12 : 15;
         // QR unten rechts auf dem Blatt, falls vorhanden. Datum bleibt oben
         // rechts (keine Kollision mehr).
         const qrImg = withQR ? qrCache[s.id] : null;
-        const qrSize = 20;
+        const qrSize = flach ? 15 : 20;
         const dateRight = marginL + contentW;
-        if (qrImg) {
-            const pageH = doc.internal.pageSize.getHeight();
-            const qrY = pageH - qrSize - 12;
-            doc.addImage(qrImg, 'PNG', marginL + contentW - qrSize, qrY, qrSize, qrSize);
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(6);
-            doc.setTextColor(120);
-            doc.text('Karten-App', marginL + contentW - qrSize / 2, qrY + qrSize + 2.5, { align: 'center' });
-            doc.setTextColor(0);
-        }
+        // Der QR-Code wird ERST AM ENDE gezeichnet (siehe unten), nicht hier:
+        // klebte er fest am unteren Blattrand, musste jede Aufgabenzeile diesen
+        // Platz freihalten — auf dem flachen Blatt kostete das eine ganze Seite.
+        // Jetzt haengt er unter dem Inhalt und rutscht nur dann an den Rand,
+        // wenn darunter noch Platz ist.
         const cbSize = 5;
         // Alles in einer Zeile sitzt auf DERSELBEN Mitte `y`: Kaestchen und
         // Smileys werden um sie herum gezeichnet, Text braucht dafuer einen
@@ -2867,7 +2868,7 @@
         const korrX = marginL + contentW - spalte(24, 16);
         const pruefX = korrX - spalte(32, 20);
         const smileyX = pruefX - spalte(18, 13);   // Spalte für die Selbsteinschätzung (Smileys)
-        const rowH = 12;
+        const rowH = flach ? 9 : 12;
 
         const pdfTitle = entry.unterthema ? entry.thema + ' – ' + entry.unterthema : entry.thema;
         // Der Titel lief rechts aus dem Blatt: 18pt fett und ein langer
@@ -2876,7 +2877,7 @@
         // umbrechen — abschneiden waere der falsche Ausweg, der Titel sagt,
         // welche Leiter das Kind vor sich hat.
         doc.setFont('helvetica', 'bold');
-        let titelGroesse = 18;
+        let titelGroesse = flach ? 14 : 18;
         const titelText = 'Lernleiter: ' + pdfTitle;
         while (titelGroesse > 12) {
             doc.setFontSize(titelGroesse);
@@ -2886,7 +2887,7 @@
         doc.setFontSize(titelGroesse);
         const titelZeilen = doc.splitTextToSize(titelText, contentW);
         doc.text(titelZeilen, marginL, y);
-        y += 9 + (titelZeilen.length - 1) * (titelGroesse * 0.42);
+        y += (flach ? 7 : 9) + (titelZeilen.length - 1) * (titelGroesse * 0.42);
 
         // Name links, Datum rechts auf derselben Zeile - so kollidiert das
         // Datum nicht mehr mit langen Titeln.
@@ -2901,7 +2902,7 @@
         y += 3;
         doc.setLineWidth(0.6);
         doc.line(marginL, y, marginL + contentW, y);
-        y += 7;
+        y += flach ? 5 : 7;
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
@@ -2920,11 +2921,12 @@
         doc.setDrawColor(200);
         doc.line(marginL, y, marginL + contentW, y);
         doc.setDrawColor(0);
-        y += 5;
+        y += flach ? 4 : 5;
 
         let zusatzHeadingDone = false, wdhHeadingDone = false;
         selectedTasks.forEach((task, idx) => {
-            if (y > unten(doc, 25)) { doc.addPage(); y = 15; }
+            // Reserve unten: eine Zeile plus der QR-Block, falls einer da ist.
+            if (y > unten(doc, rowH + 8)) { doc.addPage(); y = flach ? 12 : 15; }
 
             // Hinweis über dem Wiederholungsteil.
             if (task.section === 'Wiederholung' && !wdhHeadingDone) {
@@ -2949,7 +2951,10 @@
                 const regel1 = doc.splitTextToSize('Höchstens einmal kein guter Smiley: Du darfst frei wählen – Zusatz- oder Knobelaufgaben.', regelBreite);
                 const regel2 = doc.splitTextToSize('Zweimal oder öfter kein guter Smiley: Mach die Zusatzaufgaben – sie üben, was noch wackelt.', regelBreite);
                 const kastenH = 6 + kopfZeilen.length * 5.5 + (regel1.length + regel2.length) * 4.6 + 3;
-                if (y > unten(doc, kastenH + 25)) { doc.addPage(); y = 15; }
+                // Platz fuer den Kasten UND die erste Zusatzaufgabe darunter —
+                // ein fester Puffer von 25 mm warf auf dem flachen Blatt eine
+                // halb leere Seite ab, obwohl alles noch gepasst haette.
+                if (y > unten(doc, kastenH + rowH + 12)) { doc.addPage(); y = flach ? 12 : 15; }
                 doc.setDrawColor(180); doc.setLineWidth(0.3); doc.setFillColor(245, 247, 250);
                 doc.roundedRect(marginL, y, contentW, kastenH, 2, 2, 'FD'); doc.setDrawColor(0);
                 let ty = y + 5;
@@ -3034,6 +3039,18 @@
         doc.setTextColor(22, 163, 74);
         doc.text('Ziel erreicht!', marginL + contentW / 2 - 15, y);
         doc.setTextColor(0);
+
+        if (qrImg) {
+            const pageH = doc.internal.pageSize.getHeight();
+            // Unter den Inhalt — hoechstens bis zum unteren Rand.
+            const qrY = Math.min(y + 6, pageH - qrSize - (flach ? 8 : 12));
+            doc.addImage(qrImg, 'PNG', marginL + contentW - qrSize, qrY, qrSize, qrSize);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(6);
+            doc.setTextColor(120);
+            doc.text('Karten-App', marginL + contentW - qrSize / 2, qrY + qrSize + 2.5, { align: 'center' });
+            doc.setTextColor(0);
+        }
     }
 
     function generateLoesungPdf(doc, marginL, contentW, lineH) {

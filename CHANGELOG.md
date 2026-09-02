@@ -93,7 +93,8 @@ Notiz zur größten Fassung die dünnste.
 
 - Die Lernleiter lässt sich als A5 quer ausdrucken (A4 war für eine kurze Leiter
   halb leer; zwei A5 passen auf ein Blatt). Das Format steht neben den
-  PDF-Knöpfen und wird gemerkt.
+  PDF-Knöpfen und wird gemerkt. Auf dem flachen Blatt sitzen die Zeilen enger,
+  damit die Leiter auf eine Seite passt.
 - Ein offener Lernpfad zeigte nach dem Anlegen einer Lernleiter im Generator die
   neue Lernleiter erst nach dem Neuladen.
 - Die Unterthema-Auswahl im Generator war anders groß als die Felder daneben.
