@@ -2826,6 +2826,22 @@
         return y + boxH + 5;
     }
 
+    // Abschnittsueberschrift auf dem Blatt („Wiederholung", „Zusatzaufgaben"):
+    // fett, duenne Linie darunter. EINE Form fuer beide — vorher hatte der
+    // Wiederholungsteil einen Erklaerkasten und der Zusatzteil eine
+    // Ueberschrift, und man sah den beiden nicht an, dass sie dasselbe sind.
+    function abschnittTitel(doc, marginL, contentW, y, text, flach) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(flach ? 10 : 11);
+        doc.setTextColor(0);
+        doc.text(text, marginL, y);
+        y += 2.5;
+        doc.setDrawColor(200); doc.setLineWidth(0.2);
+        doc.line(marginL, y, marginL + contentW, y);
+        doc.setDrawColor(0);
+        return y + (flach ? 4 : 5);
+    }
+
     function renderStudentPage(doc, entry, marginL, contentW, lineH, checkboxSize, withQR) {
         const s = entry.student;
         const selectedTasks = entry.tasks.filter(t => t.selected);
@@ -2839,8 +2855,20 @@
         // QR unten rechts auf dem Blatt, falls vorhanden. Datum bleibt oben
         // rechts (keine Kollision mehr).
         const qrImg = withQR ? qrCache[s.id] : null;
-        const qrSize = flach ? 15 : 20;
-        const dateRight = marginL + contentW;
+        const qrSize = flach ? 14 : 20;
+        // Auf dem flachen Blatt sitzt der QR-Code OBEN RECHTS: unten stossen die
+        // Aufgabenzeilen bis an den Rand, dort waere er entweder im Weg oder er
+        // schoebe die letzte Aufgabe auf ein zweites Blatt. Der Kopf ist die
+        // einzige Flaeche, die ohnehin frei bleibt.
+        const qrOben = flach && !!qrImg;
+        const kopfBreite = qrOben ? contentW - qrSize - 4 : contentW;
+        const dateRight = marginL + kopfBreite;
+        if (qrOben) {
+            // Ohne Beschriftung: im Kopf ist die Zeile darunter der Trennstrich,
+            // und „Karten-App" haette ihn geschnitten. Wofuer der Code ist,
+            // wissen die Kinder — sie scannen ihn jede Woche.
+            doc.addImage(qrImg, 'PNG', marginL + contentW - qrSize, y - 5, qrSize, qrSize);
+        }
         // Der QR-Code wird ERST AM ENDE gezeichnet (siehe unten), nicht hier:
         // klebte er fest am unteren Blattrand, musste jede Aufgabenzeile diesen
         // Platz freihalten — auf dem flachen Blatt kostete das eine ganze Seite.
@@ -2868,7 +2896,7 @@
         const korrX = marginL + contentW - spalte(24, 16);
         const pruefX = korrX - spalte(32, 20);
         const smileyX = pruefX - spalte(18, 13);   // Spalte für die Selbsteinschätzung (Smileys)
-        const rowH = flach ? 9 : 12;
+        const rowH = flach ? 8 : 12;
 
         const pdfTitle = entry.unterthema ? entry.thema + ' – ' + entry.unterthema : entry.thema;
         // Der Titel lief rechts aus dem Blatt: 18pt fett und ein langer
@@ -2881,11 +2909,11 @@
         const titelText = 'Lernleiter: ' + pdfTitle;
         while (titelGroesse > 12) {
             doc.setFontSize(titelGroesse);
-            if (doc.getTextWidth(titelText) <= contentW) break;
+            if (doc.getTextWidth(titelText) <= kopfBreite) break;
             titelGroesse -= 1;
         }
         doc.setFontSize(titelGroesse);
-        const titelZeilen = doc.splitTextToSize(titelText, contentW);
+        const titelZeilen = doc.splitTextToSize(titelText, kopfBreite);
         doc.text(titelZeilen, marginL, y);
         y += (flach ? 7 : 9) + (titelZeilen.length - 1) * (titelGroesse * 0.42);
 
@@ -2928,11 +2956,14 @@
             // Reserve unten: eine Zeile plus der QR-Block, falls einer da ist.
             if (y > unten(doc, rowH + 8)) { doc.addPage(); y = flach ? 12 : 15; }
 
-            // Hinweis über dem Wiederholungsteil.
+            // Wiederholungsteil: eine Ueberschrift wie bei den Zusatzaufgaben —
+            // vorher stand hier ein Erklaerkasten ("Du bist nicht fertig
+            // geworden?"), der ein Drittel des flachen Blattes fuellte und
+            // dabei NICHT sagte, welche Aufgaben zur Wiederholung gehoeren.
+            // Genau das ist die Frage am Blatt; erklaert wird sie im Unterricht.
             if (task.section === 'Wiederholung' && !wdhHeadingDone) {
                 wdhHeadingDone = true;
-                y = pdfHinweis(doc, marginL, contentW, y, 'Du bist nicht fertig geworden?',
-                    ['Kein Problem – das ist eingeplant. In der nächsten Stunde arbeitest du im Wiederholungsteil an deinen offenen Aufgaben weiter. Nimm die Leiter mit.']);
+                y = abschnittTitel(doc, marginL, contentW, y, 'Wiederholung', flach);
             }
 
             // „Wie geht es weiter?" + Smiley-Regeln, dann die Zusatzaufgaben-Überschrift.
@@ -2944,20 +2975,27 @@
                 // und liefen rechts aus dem Blatt — jsPDF schneidet nicht ab,
                 // es schreibt weiter. Auf A4 fiel es knapp nicht auf, auf jedem
                 // schmaleren Blatt sofort.
+                // Knapp halten: auf dem flachen Blatt kostet jede Zeile hier
+                // eine Aufgabe weiter unten. Die Regel steht in drei Zeilen
+                // statt in vier Saetzen — was sie bedeutet, ist im Unterricht
+                // besprochen, das Blatt erinnert nur daran.
                 const regelBreite = contentW - 15;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-                const kopfZeilen = doc.splitTextToSize('Wie geht es weiter? Schau auf deine Smileys bei den Pflichtaufgaben.', contentW - 8);
+                // Auf dem flachen Blatt faellt die Titelzeile weg: sie kostet
+                // dort eine ganze Aufgabe weiter unten, und die beiden Regeln
+                // darunter sagen dasselbe.
+                const kopfZeilen = flach ? [] : doc.splitTextToSize('Wie geht es weiter? Schau auf deine Smileys.', contentW - 8);
                 doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-                const regel1 = doc.splitTextToSize('Höchstens einmal kein guter Smiley: Du darfst frei wählen – Zusatz- oder Knobelaufgaben.', regelBreite);
-                const regel2 = doc.splitTextToSize('Zweimal oder öfter kein guter Smiley: Mach die Zusatzaufgaben – sie üben, was noch wackelt.', regelBreite);
-                const kastenH = 6 + kopfZeilen.length * 5.5 + (regel1.length + regel2.length) * 4.6 + 3;
+                const regel1 = doc.splitTextToSize('Höchstens einmal traurig: frei wählen – Zusatz oder Knobeln.', regelBreite);
+                const regel2 = doc.splitTextToSize('Zweimal oder öfter traurig: Zusatzaufgaben machen.', regelBreite);
+                const kastenH = (flach ? 4 : 6) + kopfZeilen.length * 5.5 + (regel1.length + regel2.length) * 4.6 + (flach ? 1.5 : 3);
                 // Platz fuer den Kasten UND die erste Zusatzaufgabe darunter —
                 // ein fester Puffer von 25 mm warf auf dem flachen Blatt eine
                 // halb leere Seite ab, obwohl alles noch gepasst haette.
                 if (y > unten(doc, kastenH + rowH + 12)) { doc.addPage(); y = flach ? 12 : 15; }
                 doc.setDrawColor(180); doc.setLineWidth(0.3); doc.setFillColor(245, 247, 250);
                 doc.roundedRect(marginL, y, contentW, kastenH, 2, 2, 'FD'); doc.setDrawColor(0);
-                let ty = y + 5;
+                let ty = y + (flach ? 4 : 5);
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30);
                 kopfZeilen.forEach((z) => { doc.text(z, marginL + 4, ty); ty += 5.5; });
                 doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60);
@@ -2966,14 +3004,8 @@
                 drawSmiley(doc, marginL + 6, ty - 1, 2, false);
                 regel2.forEach((z) => { doc.text(z, marginL + 11, ty); ty += 4.6; });
                 doc.setTextColor(0);
-                y += kastenH + 5;
-                doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-                doc.text('Zusatzaufgaben', marginL, y);
-                y += 3;
-                doc.setDrawColor(200); doc.setLineWidth(0.2);
-                doc.line(marginL, y, marginL + contentW, y);
-                doc.setDrawColor(0);
-                y += 6;
+                y += kastenH + (flach ? 4 : 5);
+                y = abschnittTitel(doc, marginL, contentW, y, 'Zusatzaufgaben', flach);
             }
 
             doc.setDrawColor(0);
@@ -3040,10 +3072,10 @@
         doc.text('Ziel erreicht!', marginL + contentW / 2 - 15, y);
         doc.setTextColor(0);
 
-        if (qrImg) {
+        if (qrImg && !qrOben) {
             const pageH = doc.internal.pageSize.getHeight();
             // Unter den Inhalt — hoechstens bis zum unteren Rand.
-            const qrY = Math.min(y + 6, pageH - qrSize - (flach ? 8 : 12));
+            const qrY = Math.min(y + 6, pageH - qrSize - 12);
             doc.addImage(qrImg, 'PNG', marginL + contentW - qrSize, qrY, qrSize, qrSize);
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(6);
