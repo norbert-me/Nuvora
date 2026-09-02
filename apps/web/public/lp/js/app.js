@@ -2727,7 +2727,13 @@
     // Papierformat des Ausdrucks. A4 ist fuer eine kurze Lernleiter halb leer —
     // A5 passt zweimal auf ein Blatt und spart die Haelfte Papier. Gemerkt wird
     // die Wahl im Browser: es ist eine Ansichtssache, kein Inhalt.
-    const FORMATE = { a4: { breite: 210, rand: 15 }, a5: { breite: 148, rand: 10 } };
+    // A5 liegt QUER: zwei davon passen uebereinander auf ein A4-Blatt, und die
+    // Breite bleibt die von A4 (210 mm) — die Lernleiter braucht die Breite fuer
+    // ihre drei Spalten am rechten Rand, nicht die Hoehe.
+    const FORMATE = {
+        a4: { breite: 210, rand: 15, lage: 'portrait' },
+        a5: { breite: 210, rand: 15, lage: 'landscape' },
+    };
     function gewaehltesFormat() {
         const v = (document.getElementById('gen-format') || {}).value;
         return FORMATE[v] ? v : 'a4';
@@ -2747,7 +2753,7 @@
         const { jsPDF } = window.jspdf;
         const format = gewaehltesFormat();
         try { localStorage.setItem('lp_pdf_format', format); } catch (e) { /* egal */ }
-        const doc = new jsPDF({ unit: 'mm', format });
+        const doc = new jsPDF({ unit: 'mm', format, orientation: FORMATE[format].lage });
         const marginL = FORMATE[format].rand;
         const contentW = FORMATE[format].breite - marginL * 2;
         const lineH = 6;

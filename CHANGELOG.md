@@ -91,8 +91,9 @@ Notiz zur größten Fassung die dünnste.
 
 **Lernpfad**
 
-- Die Lernleiter lässt sich als A5 ausdrucken (A4 war für eine kurze Leiter halb
-  leer). Das Format steht neben den PDF-Knöpfen und wird gemerkt.
+- Die Lernleiter lässt sich als A5 quer ausdrucken (A4 war für eine kurze Leiter
+  halb leer; zwei A5 passen auf ein Blatt). Das Format steht neben den
+  PDF-Knöpfen und wird gemerkt.
 - Ein offener Lernpfad zeigte nach dem Anlegen einer Lernleiter im Generator die
   neue Lernleiter erst nach dem Neuladen.
 - Die Unterthema-Auswahl im Generator war anders groß als die Felder daneben.
