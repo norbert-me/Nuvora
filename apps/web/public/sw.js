@@ -5,8 +5,8 @@
 // die Rückfallebene, wenn kein Netz da ist. SCHREIBEN geht offline NICHT
 // (Nicht-GET-Anfragen laufen netzwerk-only) — dafür bräuchte es eine Sync-/
 // Konflikt-Schicht, die es (noch) nicht gibt.
-const CACHE_NAME = "nuvora-v3";
-const API_CACHE = "nuvora-api-v3";
+const CACHE_NAME = "nuvora-v4";
+const API_CACHE = "nuvora-api-v4";
 const STATIC_ASSETS = ["/", "/index.html", "/manifest.json", "/favicon.svg", "/icon-192.png", "/icon-512.png"];
 
 // Die Lernpfad-App liegt als Statik daneben und wird von LernpfadModule.jsx
@@ -184,6 +184,26 @@ self.addEventListener("fetch", (event) => {
         // eine SPA: index.html kann jede Route rendern, das Routing macht der
         // Client. Cache-Schluessel der Shell ist "/index.html" (STATIC_ASSETS).
         .catch(() => caches.match(event.request).then((r) => r || caches.match("/index.html")))
+    );
+    return;
+  }
+
+  // Die Lernpfad-Statik traegt KEINEN Hash im Namen (/lp/js/app.js,
+  // /lp/style.scoped.css) — cache-first hiess dort: nach einem Deploy bleibt
+  // die alte Fassung liegen, bis der Cache-Name wechselt. Genau daran sah eine
+  // frisch ausgelieferte Aenderung im Lernpfad "gleich aus". Also
+  // netzwerk-first mit Cache als Offline-Rueckfall, wie bei der Navigation.
+  if (url.pathname.startsWith("/lp/")) {
+    event.respondWith(
+      fetch(event.request)
+        .then((res) => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
+          }
+          return res;
+        })
+        .catch(() => caches.match(event.request).then((c) => c || Response.error()))
     );
     return;
   }

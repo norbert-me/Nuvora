@@ -108,6 +108,21 @@ def teste_system(api, b):
     b.pruefe("System", "Lernpfad /lp/css/style.scoped.css",
              statik("/lp/css/style.scoped.css", "#lp-app"))
 
+    def lp_nicht_gecacht():
+        """Die Lernpfad-Statik traegt keinen Hash im Dateinamen.
+
+        Ohne no-cache laeuft nach einem Deploy die alte app.js weiter — die
+        Aenderung ist ausgeliefert und sieht trotzdem 'gleich aus'. Genau das
+        ist einmal passiert; deshalb steht es hier.
+        """
+        api.call("GET", "/lp/js/app.js", erwartet=(200,), roh=True)
+        cc = (api.letzte_kopfe.get("cache-control") or "").lower()
+        if "no-cache" not in cc and "no-store" not in cc:
+            raise AssertionError(f"Cache-Control: {cc or '(fehlt)'} — alte app.js bleibt nach dem Deploy liegen")
+        return f"Cache-Control: {cc}"
+
+    b.pruefe("System", "Lernpfad wird nicht gecacht", lp_nicht_gecacht)
+
 
 # ───────────────── 1b. Erreichbarkeit, Sicherheit, Web-Dateien ─────────────────
 
