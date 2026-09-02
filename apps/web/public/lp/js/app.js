@@ -2724,14 +2724,32 @@
         for (const c of codes) await latexToImage(c);
     }
 
+    // Papierformat des Ausdrucks. A4 ist fuer eine kurze Lernleiter halb leer —
+    // A5 passt zweimal auf ein Blatt und spart die Haelfte Papier. Gemerkt wird
+    // die Wahl im Browser: es ist eine Ansichtssache, kein Inhalt.
+    const FORMATE = { a4: { breite: 210, rand: 15 }, a5: { breite: 148, rand: 10 } };
+    function gewaehltesFormat() {
+        const v = (document.getElementById('gen-format') || {}).value;
+        return FORMATE[v] ? v : 'a4';
+    }
+    // Wie weit darf y laufen, bevor umgebrochen wird? Frueher standen hier feste
+    // Zahlen (272, 250, …), die stillschweigend A4 voraussetzten — auf A5 haette
+    // das erst nach dem Blattende umgebrochen. Der Abstand ZUM UNTEREN RAND ist
+    // dagegen in jedem Format derselbe.
+    function unten(doc, abstand) {
+        return doc.internal.pageSize.getHeight() - abstand;
+    }
+
     async function generatePDF(mode) {
         if (!previewData || !previewData.length) { toast('Erst Vorschau generieren'); return; }
         if (window.katex) await prerenderLatex();
 
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-        const marginL = 15;
-        const contentW = 210 - marginL - 15;
+        const format = gewaehltesFormat();
+        try { localStorage.setItem('lp_pdf_format', format); } catch (e) { /* egal */ }
+        const doc = new jsPDF({ unit: 'mm', format });
+        const marginL = FORMATE[format].rand;
+        const contentW = FORMATE[format].breite - marginL * 2;
         const lineH = 6;
         const checkboxSize = 4;
 
@@ -2834,9 +2852,15 @@
         // Die Selbsteinschätzung per Smiley ist entfallen: sie wurde nie
         // ausgewertet (Papier), und was die Lernenden können, zeigt der Test.
         // Die beiden Ankreuzspalten ruecken dafuer an den rechten Rand.
-        const korrX = marginL + contentW - 24;
-        const pruefX = korrX - 32;
-        const smileyX = pruefX - 18;   // Spalte für die Selbsteinschätzung (Smileys)
+        // Die drei Spalten am rechten Rand (Selbsteinschaetzung, Geprueft,
+        // Korrektur) sind fuer A4 gemasst. Auf A5 ist das Blatt 52 mm schmaler —
+        // stur uebernommen blieben fuer den Aufgabentext gut 50 mm uebrig. Also
+        // im Verhaeltnis zur Textbreite (A4 = 180 mm), mit Untergrenze, damit
+        // ein Haken noch hinpasst.
+        const spalte = (a4Wert, minWert) => Math.max(minWert, a4Wert * (contentW / 180));
+        const korrX = marginL + contentW - spalte(24, 16);
+        const pruefX = korrX - spalte(32, 20);
+        const smileyX = pruefX - spalte(18, 13);   // Spalte für die Selbsteinschätzung (Smileys)
         const rowH = 12;
 
         const pdfTitle = entry.unterthema ? entry.thema + ' – ' + entry.unterthema : entry.thema;
@@ -2876,10 +2900,14 @@
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
         doc.setTextColor(120);
+        // Auf dem schmalen Blatt liefen die Spaltenkoepfe ineinander — jsPDF
+        // schneidet nicht ab, es schreibt weiter. Also kuerzere Woerter, sobald
+        // der Platz knapp wird.
+        const eng = contentW < 150;
         doc.text('erledigt', cbX, y);
-        doc.text('wie lief\'s?', smileyX, y);
-        doc.text('Lösung geprüft', pruefX, y);
-        doc.text('korrigiert', korrX, y);
+        doc.text(eng ? 'wie war\'s?' : 'wie lief\'s?', smileyX, y);
+        doc.text(eng ? 'geprüft' : 'Lösung geprüft', pruefX, y);
+        doc.text(eng ? 'korr.' : 'korrigiert', korrX, y);
         doc.setTextColor(0);
         y += 2;
         doc.setLineWidth(0.2);
@@ -2890,7 +2918,7 @@
 
         let zusatzHeadingDone = false, wdhHeadingDone = false;
         selectedTasks.forEach((task, idx) => {
-            if (y > 272) { doc.addPage(); y = 15; }
+            if (y > unten(doc, 25)) { doc.addPage(); y = 15; }
 
             // Hinweis über dem Wiederholungsteil.
             if (task.section === 'Wiederholung' && !wdhHeadingDone) {
@@ -2902,7 +2930,7 @@
             // „Wie geht es weiter?" + Smiley-Regeln, dann die Zusatzaufgaben-Überschrift.
             if (task.zusatz && !zusatzHeadingDone) {
                 zusatzHeadingDone = true;
-                if (y > 250) { doc.addPage(); y = 15; }
+                if (y > unten(doc, 47)) { doc.addPage(); y = 15; }
                 // Kasten mit Titel und zwei Regeln, je mit gezeichnetem Smiley davor.
                 doc.setDrawColor(180); doc.setLineWidth(0.3); doc.setFillColor(245, 247, 250);
                 doc.roundedRect(marginL, y, contentW, 22, 2, 2, 'FD'); doc.setDrawColor(0);
@@ -3021,7 +3049,7 @@
 
         sections.forEach(sec => {
             if (!sec.tasks.length) return;
-            if (y > 260) { doc.addPage(); y = 15; }
+            if (y > unten(doc, 37)) { doc.addPage(); y = 15; }
 
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(10);
@@ -3034,7 +3062,7 @@
             doc.setTextColor(0);
 
             sec.tasks.forEach(task => {
-                if (y > 270) { doc.addPage(); y = 15; }
+                if (y > unten(doc, 27)) { doc.addPage(); y = 15; }
 
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(10);
@@ -3051,7 +3079,7 @@
                 doc.setFontSize(9);
                 const lines = doc.splitTextToSize(task.loesung, contentW - 5);
                 lines.forEach(line => {
-                    if (y > 275) { doc.addPage(); y = 15; }
+                    if (y > unten(doc, 22)) { doc.addPage(); y = 15; }
                     doc.text(line, marginL + 5, y);
                     y += lineH - 1;
                 });
@@ -3079,7 +3107,7 @@
 
         lrsStudents.forEach((entry, idx) => {
             if (idx > 0) { y += 6; }
-            if (y > 260) { doc.addPage(); y = 15; }
+            if (y > unten(doc, 37)) { doc.addPage(); y = 15; }
 
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
@@ -3087,7 +3115,7 @@
             y += 6;
 
             lrsTasks.forEach(task => {
-                if (y > 270) { doc.addPage(); y = 15; }
+                if (y > unten(doc, 27)) { doc.addPage(); y = 15; }
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(10);
                 doc.text(task.id + ':', marginL + 3, y);
@@ -3099,7 +3127,7 @@
                 if (text) {
                     const lines = doc.splitTextToSize(text, contentW - 6);
                     lines.forEach(line => {
-                        if (y > 275) { doc.addPage(); y = 15; }
+                        if (y > unten(doc, 22)) { doc.addPage(); y = 15; }
                         doc.text(line, marginL + 6, y);
                         y += lineH - 1;
                     });
@@ -4165,6 +4193,12 @@
     // target=_top) — damit sie ueberall gleich sind. Keine eigenen Seiten mehr.
 
     // ─── Init ───
+    // Gemerktes Papierformat wiederherstellen (Ansichtssache, deshalb Browser).
+    try {
+        const f = localStorage.getItem('lp_pdf_format');
+        const sel = document.getElementById('gen-format');
+        if (sel && FORMATE[f]) sel.value = f;
+    } catch (e) { /* egal */ }
     setNextId();
     renderKlassen();
     renderAufgaben();
