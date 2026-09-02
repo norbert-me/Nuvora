@@ -33,7 +33,13 @@ export default defineConfig({
   // das neue `app.js` (das traegt einen Zeitstempel), behielt aber das alte
   // CSS — sichtbar wurde das an zwei Aufklapp-Pfeilen nebeneinander: der neue
   // aus dem frischen Skript, der alte aus der gecachten `::after`-Regel.
-  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  //
+  // Die Marke traegt deshalb einen BUILD-Stempel, nicht die Paketversion:
+  // `apps/web/package.json` wurde jahrelang nicht mitgezogen (sie stand auf
+  // 4.1.5, waehrend 4.1.7 lief), und eine Frischemarke, die sich nicht
+  // aendert, ist keine. Genau daran lief eine geaenderte `app.js` nach dem
+  // Deploy weiter mit dem alten Stand: gleiche Adresse, gleicher Cache.
+  define: { __APP_VERSION__: JSON.stringify(`${pkg.version}+${Date.now().toString(36)}`) },
   build: {
     rollupOptions: {
       output: {
