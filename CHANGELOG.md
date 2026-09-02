@@ -23,6 +23,11 @@ Notiz zur größten Fassung die dünnste.
 - Ein Fälligkeitsdatum aus einem anderen Jahr trägt die Jahreszahl.
 - Eine neue Aufgabe steht oben in der Liste, nicht unten.
 
+**Fehlermeldung**
+
+- An eine Meldung lässt sich eine Datei anhängen (Screenshot, Export, PDF) —
+  selbst ausgewählt, bis 3 MB. Protokoll und Umgebung bleiben inhaltsfrei.
+
 **Startseite**
 
 - Die Kachel „Heute" zeigte entfallene Stunden weiter an und ließ bei Terminen
@@ -32,6 +37,8 @@ Notiz zur größten Fassung die dünnste.
 
 - Der Klick auf eine Aufgabe führt zu genau dieser Aufgabe, nicht nur in die
   Liste.
+- Die gewählte Startansicht (Monat/Woche/Tag) wirkt wieder: sie galt nur ohne
+  Ansichts-Parameter in der Adresse, und der blieb nach jedem Reiterklick stehen.
 - Die Aufgabe „… korrigieren" heißt nach der Notiz der Klassenarbeit (sonst
   nach ihrem Titel) und zieht bei Änderungen mit. Ein selbst umformulierter
   Text bleibt unberührt.

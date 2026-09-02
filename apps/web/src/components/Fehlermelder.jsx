@@ -13,7 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
-  btnPrimary, btnSecondary, cardStyle, COLORS as C, CONTROL_R, DialogKopf, Icon, ICONS,
+  btnPrimary, btnSecondary, cardStyle, COLORS as C, CONTROL_R, dateiWaehlen, DialogKopf, Icon, iconBtn, ICONS,
   inputStyle, Modal, SHADOW,
 } from "./Icons.jsx";
 import { alsText, beobachte, leeren, protokoll, umgebung } from "../core/protokoll.js";
@@ -31,6 +31,14 @@ export default function Fehlermelder() {
   const [fertig, setFertig] = useState(false);
   const [fehler, setFehler] = useState("");
   const [anzahl, setAnzahl] = useState(0);
+  // Ein Anhang, den die Lehrkraft SELBST aussucht (Screenshot, Export, PDF).
+  // Er darf Inhalte tragen — anders als Protokoll und Umgebung, die
+  // inhaltsfrei bleiben: hier hat jemand hingesehen und sich entschieden.
+  // Die Grenze richtet sich nach dem, was eine Mail traegt (der Server nimmt
+  // 3 MB Rohdaten); zu gross wird hier abgefangen, damit niemand erst
+  // hochlaedt und dann eine Absage bekommt.
+  const ANHANG_MAX = 3 * 1024 * 1024;
+  const [datei, setDatei] = useState(null); // { name, typ, groesse, daten(base64) }
   // Der Knopf soll auf sich aufmerksam machen, wenn wirklich etwas schiefging —
   // aber nur dann. Ein Dauerpunkt wäre nach zwei Tagen unsichtbar.
   const [problem, setProblem] = useState(false);
@@ -51,6 +59,7 @@ export default function Fehlermelder() {
       log: mitLog ? alsText() : "",
       umgebung: mitUmg ? umgebung() : "",
       seite: window.location.pathname + window.location.search,
+      ...(datei ? { anhang_name: datei.name, anhang_typ: datei.typ, anhang_daten: datei.daten } : {}),
     })).catch(() => null);
     setBusy(false);
     if (!res || !res.ok) {
@@ -65,7 +74,7 @@ export default function Fehlermelder() {
 
   const schliessen = () => {
     setOffen(false);
-    setText(""); setFertig(false); setFehler(""); setLogOffen(false);
+    setText(""); setFertig(false); setFehler(""); setLogOffen(false); setDatei(null);
   };
 
   return (
@@ -127,6 +136,35 @@ export default function Fehlermelder() {
                     .filter(Boolean).join("\n\n") || t("melder.logLeer")}
                 </pre>
               )}
+
+              {/* Anhang: bewusst KEIN automatisches Einsammeln — die Datei
+                  waehlt die Lehrkraft. */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "4px 0 12px", flexWrap: "wrap" }}>
+                <button onClick={() => dateiWaehlen(async (f) => {
+                  if (!f) return;
+                  if (f.size > ANHANG_MAX) { setFehler(t("melder.anhangZuGross", { n: Math.round(ANHANG_MAX / 1024 / 1024) })); return; }
+                  const daten = await new Promise((res) => {
+                    const r = new FileReader();
+                    r.onload = () => res(String(r.result || "").split(",")[1] || "");
+                    r.onerror = () => res("");
+                    r.readAsDataURL(f);
+                  });
+                  if (!daten) { setFehler(t("melder.anhangFehler")); return; }
+                  setFehler("");
+                  setDatei({ name: f.name, typ: f.type || "application/octet-stream", groesse: f.size, daten });
+                }, "*/*")} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13 }}>
+                  {t("melder.anhang")}
+                </button>
+                {datei && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
+                    {datei.name} ({Math.max(1, Math.round(datei.groesse / 1024))} KB)
+                    <button onClick={() => setDatei(null)} className="icon-btn" style={{ ...iconBtn, padding: 2 }}
+                      title={t("common.delete")} aria-label={t("common.delete")}>
+                      <Icon d={ICONS.close} size={14} />
+                    </button>
+                  </span>
+                )}
+              </div>
 
               {fehler && <div style={{ color: C.danger, fontSize: 13, marginBottom: 8 }}>{fehler}</div>}
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>

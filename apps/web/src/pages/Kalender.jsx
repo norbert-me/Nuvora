@@ -92,7 +92,16 @@ export default function Kalender() {
   const [startAnsicht, setStartAnsicht] = useState(() => {
     try { const v = localStorage.getItem("kal_view_start"); return ["month", "week", "day"].includes(v) ? v : "month"; } catch { return "month"; }
   });
-  const setzeStartAnsicht = (v) => { setStartAnsicht(v); try { localStorage.setItem("kal_view_start", v); } catch { /* egal */ } };
+  // Die Startansicht wirkt nur, solange KEIN ?view in der Adresse steht — und
+  // dort landet es bei jedem Reiterklick. Nach einem Neuladen gewann deshalb
+  // immer der alte Parameter, und die Einstellung sah kaputt aus. Wer sie hier
+  // waehlt, meint „so soll der Kalender aussehen": also gleich anwenden, indem
+  // der Parameter verschwindet.
+  const setzeStartAnsicht = (v) => {
+    setStartAnsicht(v);
+    try { localStorage.setItem("kal_view_start", v); } catch { /* egal */ }
+    setParams((p) => { const n = new URLSearchParams(p); n.delete("view"); return n; }, { replace: true });
+  };
   const view = (params.get("view") === "today" ? "day" : params.get("view")) || startAnsicht;
   const setView = (v) => setParams((p) => { const n = new URLSearchParams(p); if (v === startAnsicht) n.delete("view"); else n.set("view", v); return n; }, { replace: true });
   // Startdatum optional per ?date=YYYY-MM-DD (Deep-Link, z.B. aus den Einstiegen).

@@ -33,7 +33,16 @@ def email_configured() -> bool:
     return bool(os.environ.get("SMTP_HOST") and os.environ.get("SMTP_FROM"))
 
 
-def _send_sync(to: str, subject: str, body: str, reply_to: str = "") -> bool:
+# Wie gross eine Mail werden darf, die wir selbst verschicken. Viele Postfaecher
+# nehmen 10–25 MB, manche Weiterleitung deutlich weniger — und eine Mail, die
+# der Server annimmt und der naechste verwirft, kommt nirgends an und meldet es
+# niemandem. 4 MB ist die Groesse, die praktisch ueberall durchgeht; base64
+# blaeht einen Anhang um ein Drittel auf, die Grenze gilt fuer die ROHDATEN.
+ANHANG_MAX = 3 * 1024 * 1024
+
+
+def _send_sync(to: str, subject: str, body: str, reply_to: str = "",
+               anhang: tuple | None = None) -> bool:
     host = os.environ.get("SMTP_HOST")
     port = int(os.environ.get("SMTP_PORT", "465"))
     user = os.environ.get("SMTP_USER")
@@ -50,6 +59,13 @@ def _send_sync(to: str, subject: str, body: str, reply_to: str = "") -> bool:
         msg["Reply-To"] = reply_to
     msg["Subject"] = subject
     msg.set_content(body)
+    # Anhang: (Dateiname, MIME-Typ, Bytes). Der Typ kommt vom Aufrufer geprueft;
+    # hier wird nur noch angehaengt.
+    if anhang:
+        name, typ, daten = anhang
+        haupt, _, unter = (typ or "application/octet-stream").partition("/")
+        msg.add_attachment(daten, maintype=haupt or "application", subtype=unter or "octet-stream",
+                           filename=name or "anhang")
 
     ctx = ssl.create_default_context()
     if port == 465:
@@ -67,13 +83,14 @@ def _send_sync(to: str, subject: str, body: str, reply_to: str = "") -> bool:
     return True
 
 
-async def send_email(to: str, subject: str, body: str, reply_to: str = "") -> bool:
+async def send_email(to: str, subject: str, body: str, reply_to: str = "",
+                     anhang: tuple | None = None) -> bool:
     """Versendet best-effort — wirft nie, blockiert nie den Request (läuft im Threadpool)."""
     if not email_configured():
         logger.info("SMTP nicht konfiguriert — E-Mail an %s übersprungen", _fuer_log(to))
         return False
     try:
-        return await asyncio.to_thread(_send_sync, to, subject, body, reply_to)
+        return await asyncio.to_thread(_send_sync, to, subject, body, reply_to, anhang)
     except Exception as e:
         logger.warning("E-Mail-Versand an %s fehlgeschlagen: %s", _fuer_log(to), _fuer_log(str(e), 300))
         return False

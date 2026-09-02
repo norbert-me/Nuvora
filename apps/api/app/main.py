@@ -1295,6 +1295,13 @@ class BugBody(_BaseModel):
     # im Klartext gezeigt. Inhaltsfrei wie das Protokoll; siehe
     # apps/web/src/core/protokoll.js (umgebung()).
     umgebung: str = ""
+    # Ein selbst gewaehlter Anhang (Screenshot, Export, PDF). Nichts wird
+    # automatisch eingesammelt — was mitgeht, hat die Lehrkraft ausgesucht;
+    # deshalb darf er auch Inhalte tragen, waehrend Protokoll und Umgebung
+    # inhaltsfrei bleiben.
+    anhang_name: str = ""
+    anhang_typ: str = ""
+    anhang_daten: str = ""   # base64, ohne data:-Praefix
 
 
 @app.post("/api/bugreport")
@@ -1350,8 +1357,31 @@ async def bugreport(body: BugBody, request: Request, user=Depends(get_current_us
     if log:
         rumpf += f"\n--- Protokoll (vom Melder freigegeben) ---\n{log}\n"
 
+    # Anhang: die Groesse entscheidet sich an dem, was eine Mail traegt — nicht
+    # an dem, was der Browser hochladen kann. Zu gross wird ABGELEHNT statt
+    # abgeschnitten: ein halber Screenshot ist kein Screenshot, und eine Mail,
+    # die der naechste Server verwirft, kommt nirgends an.
+    anhang = None
+    if body.anhang_daten:
+        import base64
+        import binascii
+        try:
+            daten = base64.b64decode(body.anhang_daten, validate=True)
+        except (binascii.Error, ValueError):
+            raise HTTPException(400, "Anhang konnte nicht gelesen werden")
+        if len(daten) > mailer.ANHANG_MAX:
+            raise HTTPException(413, f"Anhang zu groß (max. {mailer.ANHANG_MAX // (1024 * 1024)} MB)")
+        name = _hdr(body.anhang_name)[:120] or "anhang"
+        # Nur Dateiname, kein Pfad — und keine Kopfzeilen-Tricks im Namen.
+        name = name.replace("/", "_").replace("\\", "_").replace('"', "_")
+        typ = _hdr(body.anhang_typ)[:100] or "application/octet-stream"
+        if typ.count("/") != 1 or any(c in typ for c in ";, "):
+            typ = "application/octet-stream"
+        anhang = (name, typ, daten)
+        rumpf += f"\n--- Anhang: {name} ({len(daten) // 1024} KB) ---\n"
+
     ok = await mailer.send_email(to, f"Nuvora Fehlermeldung von {user.email}", rumpf,
-                                 reply_to=_hdr(user.email))
+                                 reply_to=_hdr(user.email), anhang=anhang)
     if not ok:
         raise HTTPException(503, "Meldung konnte nicht gesendet werden")
     return {"ok": True}
