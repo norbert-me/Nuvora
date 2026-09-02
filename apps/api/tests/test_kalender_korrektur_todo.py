@@ -33,6 +33,21 @@ async def _todo(s):
 
 
 @pytest.mark.asyncio
+async def test_notiz_stellt_den_namen(s):
+    # Der Titel ist meist die Nummer, die Notiz sagt, worum es geht — in der
+    # Aufgabenliste liest man das Zweite.
+    u, cls = await _welt(s)
+    tag = datetime(2026, 9, 10, 8)
+    e = await KAL.create_exam(KAL.ExamIn(class_id=cls.id, date=tag, title="Nr. 1", notiz="Bruchrechnung"), user=u, db=s)
+    td = await _todo(s)
+    assert td.text == f"Bruchrechnung korrigieren #ka{e.id}"
+    # Aendert sich die Notiz, heisst die Aufgabe mit.
+    await KAL.update_exam(e.id, KAL.ExamIn(class_id=cls.id, date=tag, title="Nr. 1", notiz="Dezimalzahlen"), user=u, db=s)
+    td = await _todo(s)
+    assert td.text == f"Dezimalzahlen korrigieren #ka{e.id}"
+
+
+@pytest.mark.asyncio
 async def test_umbenennen_zieht_die_aufgabe_mit(s):
     u, cls = await _welt(s)
     tag = datetime(2026, 9, 10, 8)

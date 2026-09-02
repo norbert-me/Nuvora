@@ -20,16 +20,21 @@ Notiz zur größten Fassung die dünnste.
 
 **Notizbrett**
 
-- Stehen Aufgaben aus mehreren Jahren in der Liste, bekommt jedes Jahr eine
-  Farbe (Punkt am Datum) und darüber eine Legende. Bei nur einem Jahr erscheint
-  nichts.
+- Ein Fälligkeitsdatum aus einem anderen Jahr trägt die Jahreszahl.
+- Eine neue Aufgabe steht oben in der Liste, nicht unten.
+
+**Startseite**
+
+- Die Kachel „Heute" zeigte entfallene Stunden weiter an und ließ bei Terminen
+  ohne Stundenplan-Stunde die Uhrzeit weg. Auch die Zeiten der Stunden fehlten.
 
 **Kalender**
 
 - Der Klick auf eine Aufgabe führt zu genau dieser Aufgabe, nicht nur in die
   Liste.
-- Wird eine Klassenarbeit umbenannt, heißt die Aufgabe „… korrigieren" mit.
-  Ein selbst umformulierter Text bleibt unberührt.
+- Die Aufgabe „… korrigieren" heißt nach der Notiz der Klassenarbeit (sonst
+  nach ihrem Titel) und zieht bei Änderungen mit. Ein selbst umformulierter
+  Text bleibt unberührt.
 
 **Noten**
 

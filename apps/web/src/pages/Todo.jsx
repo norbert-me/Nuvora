@@ -83,7 +83,11 @@ export default function Todo({ embedded } = {}) {
 
   const istErledigt = (it) => (e.wert.erledigt.includes(it.id) ? true
     : e.wert.reihenfolge.includes(it.id) ? false : !!it.done);
-  const platz = (it) => { const i = e.wert.reihenfolge.indexOf(it.id); return i < 0 ? Number.MAX_SAFE_INTEGER : i; };
+  // Was der Entwurf noch nicht kennt, ist gerade erst entstanden — und eine
+  // frisch angelegte Aufgabe gehoert nach OBEN, nicht ans Ende einer langen
+  // Liste (der Server legt sie ebenfalls oben an, position = kleinste - 1).
+  // Vorher landete sie unten und sah aus wie verschluckt.
+  const platz = (it) => { const i = e.wert.reihenfolge.indexOf(it.id); return i < 0 ? -1 : i; };
 
   const add = async () => {
     const v = text.trim();
@@ -118,7 +122,15 @@ export default function Todo({ embedded } = {}) {
     setEditId(null); load();
   };
 
-  const fmtDate = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "short" }); } catch { return iso; } };
+  // Im laufenden Jahr reicht „14. Jan"; alles andere traegt die Jahreszahl —
+  // sonst sieht ein Termin im naechsten Januar aus wie einer in vier Wochen.
+  const fmtDate = (iso) => {
+    try {
+      const opt = { day: "2-digit", month: "short" };
+      if (fremdesJahr(iso)) opt.year = "numeric";
+      return new Date(iso + "T00:00:00").toLocaleDateString(undefined, opt);
+    } catch { return iso; }
+  };
   // Die Farbe des Datums-Etiketts sagt, wie dringend es ist: vorbei = rot, in
   // den naechsten sieben Tagen = gelb, alles Weitere = blau wie bisher. Ohne
   // das stand jedes Datum gleich da, und ein ueberfaelliger Punkt sah aus wie
@@ -133,23 +145,13 @@ export default function Todo({ embedded } = {}) {
     grenze.setDate(grenze.getDate() + 7);
     return iso <= ymd(grenze) ? C.warning : null;   // null = die blaue Vorgabe
   };
-  // Liegen Faelligkeiten in mehreren Kalenderjahren, bekommt jedes Jahr eine
-  // Farbe — sonst sieht „14.01." aus wie „14.01." und man merkt nicht, dass
-  // eine der beiden Aufgaben ins naechste Jahr gehoert. Bei EINEM Jahr
-  // erscheint nichts: eine Legende, in der genau eine Zeile steht, erklaert
-  // eine Unterscheidung, die es nicht gibt.
-  //
-  // Die Farbe laeuft neben der Ampel, nicht statt ihr: die Ampel (rot =
-  // vorbei, gelb = diese Woche) beantwortet „wie dringend?", der Jahrespunkt
-  // „welches Jahr?". Zwei Fragen, zwei Kanaele — im Chip vermischt waeren
-  // beide unlesbar.
-  const jahre = [...new Set(items.map((i) => (i.due_date || "").slice(0, 4)).filter(Boolean))].sort();
-  const JAHRFARBEN = [C.info, C.success, C.warning, C.danger, "#8e44ad", "#16a085"];
-  const jahrFarbe = (iso) => {
-    if (jahre.length < 2 || !iso) return null;
-    const i = jahre.indexOf(iso.slice(0, 4));
-    return i < 0 ? null : JAHRFARBEN[i % JAHRFARBEN.length];
-  };
+  // Faellt eine Aufgabe in ein anderes Jahr, steht die Jahreszahl AM DATUM.
+  // Der erste Anlauf war ein Farbpunkt je Jahr samt Legende — er beantwortete
+  // die Frage nur ueber einen Umweg („welche Farbe war noch 2027?"), waehrend
+  // die Zahl sie direkt beantwortet. Die Ampel (rot = vorbei, gelb = diese
+  // Woche) bleibt davon unberuehrt: sie sagt, wie dringend es ist.
+  const diesesJahr = String(new Date().getFullYear());
+  const fremdesJahr = (iso) => !!iso && iso.slice(0, 4) !== diesesJahr;
   // Angezeigt wird der ENTWURF, nicht der Serverstand.
   const offen = items.filter((i) => !istErledigt(i)).sort((a, b) => platz(a) - platz(b));
   const erledigt = items.filter((i) => istErledigt(i));
@@ -183,12 +185,11 @@ export default function Todo({ embedded } = {}) {
           // Erledigtes bleibt neutral: eine abgehakte Aufgabe ist nicht mehr
           // ueberfaellig, ein rotes Etikett daneben waere nur Laerm.
           const f = istErledigt(it) ? null : faelligFarbe(it.due_date);
-          const jf = jahrFarbe(it.due_date);
+
           return (
             <span style={{ ...chipStyle, flexShrink: 0, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6,
               background: f ? f + "1f" : "var(--accent-bg, rgba(10,132,255,0.12))",
               color: f || "var(--accent)" }}>
-              {jf && <span title={it.due_date.slice(0, 4)} style={{ width: 8, height: 8, borderRadius: "50%", background: jf, flexShrink: 0 }} />}
               {fmtDate(it.due_date)}{it.due_time ? ` · ${it.due_time}` : ""}
             </span>
           );
@@ -235,17 +236,6 @@ export default function Todo({ embedded } = {}) {
       {/* Legende — nur wenn wirklich mehrere Jahre in der Liste stehen. Sie
           sagt, wofuer der Punkt am Datum steht; ohne sie waeren es bunte
           Punkte ohne Bedeutung. */}
-      {jahre.length > 1 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 12, fontSize: 12, color: "var(--text3)" }}>
-          {jahre.map((j) => (
-            <span key={j} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: jahrFarbe(`${j}-01-01`) }} />
-              {j}
-            </span>
-          ))}
-        </div>
-      )}
-
       {items.length === 0 ? (
         <Empty title={t("todo.empty")} hint={t("todo.emptyHint")} />
       ) : (

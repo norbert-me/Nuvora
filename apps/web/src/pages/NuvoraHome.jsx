@@ -139,16 +139,22 @@ function HeutePanel({ t, orgaAktiv }) {
     (async () => {
       const heute = new Date();
       const j = (r) => (r.ok ? r.json() : null);
-      const [tt, classes, breaks] = await Promise.all([
+      const [tt, classes, breaks, cancels] = await Promise.all([
         fetch("/api/kalender/timetable").then(j).catch(() => null),
         fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).catch(() => []),
         fetch("/api/kalender/breaks").then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        // Entfallene Stunden: im Kalender sind sie weggewischt, auf der
+        // Startseite standen sie trotzdem — dieselbe Frage, zwei Antworten.
+        fetch("/api/kalender/slot-cancellations").then((r) => (r.ok ? r.json() : [])).catch(() => []),
       ]);
       const frm = new Date(heute); frm.setHours(0, 0, 0, 0);
       const to = new Date(heute); to.setHours(23, 59, 59, 0);
       const entries = await fetch(`/api/kalender/entries?frm=${frm.toISOString()}&to=${to.toISOString()}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
       const freiHeute = (Array.isArray(breaks) ? breaks : []).find((b) => ymd(heute) >= b.start_date.slice(0, 10) && ymd(heute) <= b.end_date.slice(0, 10));
-      if (!ab) setData({ slots: (tt?.slots || []), times: (tt?.times || []), entries: Array.isArray(entries) ? entries : [], classes, frei: freiHeute });
+      if (!ab) setData({ slots: (tt?.slots || []), times: (tt?.times || []), entries: Array.isArray(entries) ? entries : [],
+                        classes, frei: freiHeute,
+                        entfallen: (Array.isArray(cancels) ? cancels : [])
+                          .filter((c) => (c.date || "").slice(0, 10) === ymd(heute)).map((c) => c.period) });
     })();
     return () => { ab = true; };
   }, []);
@@ -157,12 +163,17 @@ function HeutePanel({ t, orgaAktiv }) {
   // Nur heute gültige Stundenplan-Versionen (valid_from/valid_to grenzen ein).
   // heuteYmd ist oben schon definiert (YYYY-MM-DD).
   const activeToday = (s) => (!s.valid_from || heuteYmd >= s.valid_from) && (!s.valid_to || heuteYmd <= s.valid_to);
-  const slots = data.slots.filter((s) => s.weekday === wochentag() && activeToday(s)).sort((a, b) => a.period - b.period);
+  const slots = data.slots
+    .filter((s) => s.weekday === wochentag() && activeToday(s) && !(data.entfallen || []).includes(s.period))
+    .sort((a, b) => a.period - b.period);
   const extras = data.entries.filter((e) => e.period == null || !slots.some((s) => s.period === e.period));
   if (slots.length === 0 && extras.length === 0 && !data.frei) return null;
   const cname = (id) => data.classes.find((c) => c.id === id)?.name || "";
   const ccolor = (id) => data.classes.find((c) => c.id === id)?.color || "var(--border2)";
-  const zeit = (p) => { const w = data.times[p - 1]; return w && (w.from || w.to) ? `${w.from || ""}–${w.to || ""}` : ""; };
+  // Die Stundenzeiten heissen {start, end} (so liefert sie /api/kalender/
+  // timetable). Hier stand `from`/`to` — beides undefined, und deshalb blieb
+  // die Zeile unter der Stundennummer immer leer.
+  const zeit = (p) => { const w = data.times[p - 1]; return w && (w.start || w.end) ? `${w.start || ""}–${w.end || ""}` : ""; };
   const eintrag = (p) => data.entries.find((e) => e.period === p);
   const dateStr = new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" });
 
@@ -198,12 +209,20 @@ function HeutePanel({ t, orgaAktiv }) {
               </Link>
             );
           })}
-          {extras.map((e) => (
-            <Link key={e.id} to="/kalender?view=day" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
-              <div style={{ minWidth: 42, textAlign: "center", color: "var(--text3)", fontSize: 12 }}>—</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{e.title || (e.class_id && cname(e.class_id)) || t("kalender.planned")}</div>
-            </Link>
-          ))}
+          {/* Termine ohne Stundenplan-Stunde: die eigene Uhrzeit gehoert
+              dazu. Sie stand am Eintrag und wurde hier verschwiegen — dann
+              sieht ein Termin um 8 Uhr aus wie einer um 18 Uhr. */}
+          {extras.map((e) => {
+            const von = e.start_time || "";
+            const bis = e.end_time || "";
+            const zeitTxt = von ? (bis ? `${von}–${bis}` : von) : "";
+            return (
+              <Link key={e.id} to="/kalender?view=day" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
+                <div style={{ minWidth: 42, textAlign: "center", color: "var(--text3)", fontSize: 12, whiteSpace: "nowrap" }}>{zeitTxt || "—"}</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{e.title || (e.class_id && cname(e.class_id)) || t("kalender.planned")}</div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

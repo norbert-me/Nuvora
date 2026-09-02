@@ -920,7 +920,12 @@ async def _korrektur_todo(db, user, e: ExamDate, verschieben: bool = False) -> N
     if not await is_active(db, user.id, "notizbrett") or not e.date:
         return
     marke = f"#ka{e.id}"
-    titel = (e.title or "").strip() or "Klassenarbeit"
+    # Der Name der Aufgabe kommt aus der NOTIZ des Termins, wenn es eine gibt:
+    # der Titel ist meist die Nummer („Nr. 1"), die Notiz sagt, worum es geht
+    # („Bruchrechnung, Kapitel 3") — und genau das will man in der Aufgabenliste
+    # lesen. Ohne Notiz bleibt der Titel, ohne beides „Klassenarbeit".
+    notiz = (e.notiz or "").strip().splitlines()[0][:80] if (e.notiz or "").strip() else ""
+    titel = notiz or (e.title or "").strip() or "Klassenarbeit"
     schon = (await db.execute(select(Todo).where(
         Todo.owner_id == user.id, Todo.text.like(f"%{marke}%")))).scalars().first()
     if schon:
