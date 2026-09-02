@@ -2946,10 +2946,10 @@
                 ty += 5.5;
                 doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60);
                 drawSmiley(doc, marginL + 6, ty - 1, 2, true);
-                doc.text('Hoechstens einmal kein guter Smiley: Du darfst frei waehlen – Zusatz- oder Knobelaufgaben.', marginL + 11, ty);
+                doc.text('Höchstens einmal kein guter Smiley: Du darfst frei wählen – Zusatz- oder Knobelaufgaben.', marginL + 11, ty);
                 ty += 5;
                 drawSmiley(doc, marginL + 6, ty - 1, 2, false);
-                doc.text('Zweimal oder oefter kein guter Smiley: Mach die Zusatzaufgaben – sie ueben, was noch wackelt.', marginL + 11, ty);
+                doc.text('Zweimal oder öfter kein guter Smiley: Mach die Zusatzaufgaben – sie üben, was noch wackelt.', marginL + 11, ty);
                 doc.setTextColor(0);
                 y += 27;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
