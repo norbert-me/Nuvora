@@ -329,6 +329,13 @@ SICHERHEITS_KOPFE = [
      "sonst duerfte eine crossdomain.xml fremden Clients Zugriff erlauben"),
     ("cross-origin-resource-policy", "same-origin",
      "sonst duerfen fremde Seiten unsere Antworten einbetten"),
+]
+
+# Diese beiden gelten nur in einem "secure context": ueber http ignoriert der
+# Browser sie und schreibt bei jedem Aufruf eine Warnung in die Konsole. Der
+# Proxy schickt sie deshalb nur ueber https — und hier werden sie auch nur dann
+# verlangt.
+SICHERHEITS_KOPFE_HTTPS = [
     ("cross-origin-opener-policy", "same-origin",
      "sonst behaelt ein geoeffnetes Fenster Zugriff auf unseres"),
     ("cross-origin-embedder-policy", "",
@@ -352,13 +359,13 @@ def teste_sicherheit(api, b):
             api.call("GET", pfad, roh=True)
             kopfe = api.letzte_kopfe
             fehlt = []
-            for name, erwartet, warum in SICHERHEITS_KOPFE:
+            for name, erwartet, warum in SICHERHEITS_KOPFE + (SICHERHEITS_KOPFE_HTTPS if https else []):
                 wert = kopfe.get(name, "")
                 if not wert or (erwartet and erwartet not in wert.lower()):
                     fehlt.append(f"{name} ({warum})")
             if fehlt:
                 raise AssertionError("fehlt: " + "; ".join(fehlt))
-            return ", ".join(n for n, _e, _w in SICHERHEITS_KOPFE)
+            return ", ".join(n for n, _e, _w in SICHERHEITS_KOPFE + (SICHERHEITS_KOPFE_HTTPS if https else []))
         return fn
 
     # Auf mehreren Pfaden, nicht nur auf der Startseite: nginx vererbt

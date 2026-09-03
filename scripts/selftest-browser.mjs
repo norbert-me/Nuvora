@@ -216,6 +216,7 @@ async function lauf(motor) {
 
     // ── Reihenfolge der Schueler im Formular ──
     await reihenfolgeProbe(kontext, api);
+    await sitzplanProbe(kontext, api);
 
     // ── Lernpfad wirklich bedienen ──
     // Das Modul ist die einzige Nicht-React-Seite; „rendert" sagt hier am
@@ -504,6 +505,58 @@ async function reihenfolgeProbe(kontext, api) {
     }
   } catch (e) {
     notiere("Bedienung", "Reihenfolge im Klassenformular", false, kurzfehler(e));
+  } finally {
+    if (klasse?.id) {
+      await api(`/api/classes/${klasse.id}`, "delete").catch(() => {});
+      await api(`/api/classes/${klasse.id}/purge`, "delete").catch(() => {});
+    }
+  }
+}
+
+/**
+ * Der Sitzplan MIT Plaetzen — nicht nur die leere Seite.
+ *
+ * Warum das eigens dasteht: der Rundgang oeffnete /orga?tab=sitzplan und fand
+ * die Seite in Ordnung — beim Testkonto war schlicht kein Platz gesetzt, und
+ * genau die Schleife ueber die Plaetze war die kaputte. Ein Rest der
+ * entfernten Aufruf-Ansicht (die Variable `abs`) liess die Seite im Betrieb
+ * abstuerzen, waehrend hier alles gruen blieb. Eine Seite gilt erst als
+ * geprueft, wenn ihr HAUPTINHALT gerendert hat, nicht nur ihr Rahmen.
+ *
+ * Dieselbe Frage stellt sich bei jeder Seite, die eine Liste zeichnet — wer
+ * eine neue Probe schreibt, legt darum vorher Daten an.
+ */
+async function sitzplanProbe(kontext, api) {
+  const name = `${MARKE} Sitzplan`;
+  let klasse = null;
+  try {
+    const angelegt = await api("/api/classes", "post", {
+      name,
+      students: [{ card_id: 1, name: `${MARKE} Ida` }, { card_id: 2, name: `${MARKE} Jon` }],
+    });
+    if (!angelegt.ok()) throw new Error(`Klasse anlegen: HTTP ${angelegt.status()}`);
+    klasse = await angelegt.json();
+    const plaetze = klasse.students.map((s, i) => ({ sid: s.id, x: 40 + i * 220, y: 60, rot: 0 }));
+    const put = await api(`/api/sitzplan/${klasse.id}`, "put", { seats: plaetze });
+    if (!put.ok()) throw new Error(`Sitzplan setzen: HTTP ${put.status()}`);
+
+    const { seite } = await neueSeite(kontext);
+    try {
+      await seite.goto(`/orga?tab=sitzplan&class=${klasse.id}`, { waitUntil: "networkidle", timeout: 30000 });
+      await tourWegklicken(seite);
+      // Auf den Namen warten: er steht auf dem Platz. Rendert die Seite mit
+      // einem Fehler durch, bleibt er aus — und genau das ist der Befund.
+      await seite.getByText(`${MARKE} Ida`, { exact: false }).first()
+        .waitFor({ state: "visible", timeout: 15000 });
+      const sichtbar = await seite.getByText(new RegExp(`${MARKE} (Ida|Jon)`)).count();
+      notiere("Bedienung", "Sitzplan zeigt belegte Plätze", sichtbar >= 2,
+        sichtbar >= 2 ? `${sichtbar} Plätze gerendert (nicht nur der leere Rahmen)`
+                      : `nur ${sichtbar} von 2 Plätzen gerendert — Render-Fehler?`);
+    } finally {
+      await seite.close().catch(() => {});
+    }
+  } catch (e) {
+    notiere("Bedienung", "Sitzplan zeigt belegte Plätze", false, kurzfehler(e));
   } finally {
     if (klasse?.id) {
       await api(`/api/classes/${klasse.id}`, "delete").catch(() => {});

@@ -665,8 +665,15 @@ export async function rundgang(seite, pfad, probleme, {
     hinweis = ` → ${jetzt}`;
   }
   // Gerenderter Inhalt statt leerer Shell.
-  const textLaenge = (await seite.locator("body").innerText()).trim().length;
+  const text = (await seite.locator("body").innerText()).trim();
+  const textLaenge = text.length;
   if (textLaenge < 20) probleme.push("Seite bleibt leer (Render-Fehler?)");
+  // Die Auffangseite (LadeFehler in main.jsx) IST Inhalt — nach Zeichenzahl
+  // sah eine abgestuerzte Seite deshalb gesund aus. Genau so blieb der
+  // Sitzplan-Absturz („Can't find variable: abs") im Rundgang unbemerkt: die
+  // Auffangseite rendert 150 Zeichen und faellt durch keine der Pruefungen.
+  if (/Diese Seite konnte nicht geladen werden/i.test(text))
+    probleme.push("zeigt die Auffangseite (die Seite ist beim Rendern gestorben)");
 
   if (pruefeUeberlauf) {
     // Waagerechtes Scrollen heisst auf dem Telefon: etwas ragt aus dem Bild,
