@@ -324,6 +324,15 @@ SICHERHEITS_KOPFE = [
     ("x-frame-options", "", "sonst laesst sich Nuvora in fremde Seiten einbetten (Clickjacking)"),
     ("referrer-policy", "", "sonst wandern vollstaendige Adressen an fremde Server"),
     ("content-security-policy", "", "die wichtigste Bremse gegen eingeschleustes Javascript"),
+    # Aus einem Pentest nachgezogen: fehlten alle vier.
+    ("x-permitted-cross-domain-policies", "none",
+     "sonst duerfte eine crossdomain.xml fremden Clients Zugriff erlauben"),
+    ("cross-origin-resource-policy", "same-origin",
+     "sonst duerfen fremde Seiten unsere Antworten einbetten"),
+    ("cross-origin-opener-policy", "same-origin",
+     "sonst behaelt ein geoeffnetes Fenster Zugriff auf unseres"),
+    ("cross-origin-embedder-policy", "",
+     "sagt, was eingebettet werden darf"),
 ]
 
 # Pfade, die es im Netz nie geben darf.
@@ -358,6 +367,27 @@ def teste_sicherheit(api, b):
     for pfad, name in (("/", "Startseite"), ("/api/health", "API"),
                        ("/site.json", "Betreiberdaten"), ("/lp/index.html", "Lernpfad-Statik")):
         b.pruefe("Sicherheit", f"Schutz-Kopfzeilen: {name}", kopfe_auf(pfad))
+
+    def csp_ohne_inline_javascript():
+        """`script-src 'unsafe-inline'` hebt die CSP dort auf, wo sie am
+        meisten traegt. Sie stand jahrelang drin — wegen EINES Inline-Scripts
+        (Dark-Mode), das jetzt als Datei ausgeliefert wird. Der Test haelt es
+        fest, damit es nicht mit dem naechsten Schnipsel zurueckkommt."""
+        api.call("GET", "/", roh=True)
+        csp = (api.letzte_kopfe.get("content-security-policy") or "")
+        if not csp:
+            raise AssertionError("keine Content-Security-Policy")
+        teile = {t.strip().split(" ")[0]: t.strip() for t in csp.split(";") if t.strip()}
+        script = teile.get("script-src", "")
+        if "unsafe-inline" in script or "unsafe-eval" in script:
+            raise AssertionError(f"script-src erlaubt Inline-Javascript: {script}")
+        if "object-src 'none'" not in csp:
+            raise AssertionError("object-src 'none' fehlt")
+        if not csp.startswith("default-src 'none'"):
+            raise AssertionError("default-src ist nicht 'none' — nicht Erlaubtes laedt trotzdem")
+        return "script-src ohne unsafe-inline, default-src/object-src 'none'"
+
+    b.pruefe("Sicherheit", "CSP verbietet Inline-Javascript", csp_ohne_inline_javascript)
 
     if https:
         def hsts():

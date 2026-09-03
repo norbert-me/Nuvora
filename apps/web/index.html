@@ -149,7 +149,9 @@
          Flaeche kurz auf. try/catch, weil Safari im privaten Modus schon beim
          blossen Zugriff auf localStorage eine Ausnahme wirft — die letzte
          ungeschuetzte Speicherabfrage der Shell. -->
-    <script>try{if(localStorage.getItem('darkMode')==='true')document.documentElement.classList.add('dark');}catch(e){}</script>
+    <!-- Eigene Datei statt Inline-Script: nur so kommt die CSP ohne
+         script-src 'unsafe-inline' aus (siehe public/theme.js). -->
+    <script src="/theme.js"></script>
   </head>
   <body>
     <noscript>

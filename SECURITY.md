@@ -38,8 +38,13 @@ Proxy-Konfiguration, Deploy-Skripte.
 
 **Nicht** im Rahmen, weil es Sache der Betreiberin oder des Betreibers ist:
 
-- fehlendes TLS oder fehlendes HSTS — Nuvora lauscht auf Port 80, die
-  Verschlüsselung terminiert ein vorgelagerter Proxy
+- **die TLS-Konfiguration selbst** — Nuvora lauscht auf Port 80, die
+  Verschlüsselung terminiert ein vorgelagerter Proxy. Protokollversionen,
+  Cipher-Suiten und Zertifikate gehören dorthin. Meldet ein Scanner CBC-Suiten
+  (`TLS_ECDHE_*_CBC_*`) oder TLS 1.0/1.1, ist das dort abzustellen: nur
+  TLS 1.2+ anbieten und die Cipher-Liste auf AEAD beschränken (TLS 1.3 plus
+  `ECDHE-…-GCM`/`CHACHA20-POLY1305`). Den HSTS-Header setzt Nuvora selbst,
+  aber nur auf https-Antworten (`X-Forwarded-Proto`)
 - Konfigurationsfehler einer einzelnen Instanz (offene Datenbank, schwache
   Passwörter, fehlende Backups)
 - Angriffe, die einen bereits übernommenen Server oder Zugang voraussetzen
@@ -53,6 +58,11 @@ Bekanntem verliert:
   Bewusst, weil die eingebettete Lernpfad-App denselben Token braucht. Folge: ein
   XSS wäre gleichbedeutend mit Kontoübernahme. Gegenmaßnahmen: strenge CSP am
   Proxy, konsequentes Escaping, 30-Tage-Ablauf, Widerruf über `token_version`.
+- **`style-src 'unsafe-inline'` in der CSP.** Die Oberfläche setzt ihre Maße als
+  React-`style`-Attribute (`Icons.jsx` ist die Design-Quelle, kein
+  CSS-Framework), die eingebettete Lernpfad-App ebenso. Ohne die Erlaubnis
+  stünde Nuvora ohne Layout da. `script-src` kommt seit 4.1.7 ohne
+  `unsafe-inline` aus, und ein Test hält das fest.
 - **Passwörter mit PBKDF2-HMAC-SHA256, 100 000 Iterationen.** Unter der aktuellen
   OWASP-Empfehlung; die Umstellung auf Argon2id mit Migration beim nächsten
   Login ist vorgemerkt.

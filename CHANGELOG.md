@@ -14,6 +14,14 @@ Notiz zur größten Fassung die dünnste.
 
 ## 4.1.7 — 01.09.2026
 
+**Sicherheit**
+
+- Die Content-Security-Policy verbietet Inline-Javascript (`script-src` ohne
+  `unsafe-inline`) und erlaubt nur noch, was ausdrücklich dasteht
+  (`default-src 'none'`, `object-src 'none'`).
+- Neue Schutz-Kopfzeilen: HSTS (nur über https), X-Permitted-Cross-Domain-
+  Policies, Cross-Origin-Resource-/Opener-/Embedder-Policy.
+
 **Module**
 
 - Das Notizbrett ist nicht mehr „beta".
