@@ -14,6 +14,11 @@ Notiz zur größten Fassung die dünnste.
 
 ## 4.1.7 — 01.09.2026
 
+**Orga**
+
+- Der Sitzplan stürzte beim Öffnen ab („Can't find variable: abs") — ein Rest
+  der entfernten Aufruf-Ansicht.
+
 **Sicherheit**
 
 - Die Content-Security-Policy verbietet Inline-Javascript (`script-src` ohne

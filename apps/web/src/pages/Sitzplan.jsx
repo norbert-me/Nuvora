@@ -628,10 +628,9 @@ export default function Sitzplan() {
                     // drei Metern Abstand; nur die Toenung reicht bei
                     // Sonnenlicht auf der Leinwand nicht.
                     border: `1px solid ${hf || "var(--border2)"}`,
-                    background: hf ? `${hf}1f` : (abs ? "var(--bg2)" : "var(--bg)"), color: "var(--text)", fontSize: 13, fontWeight: 600,
+                    background: hf ? `${hf}1f` : "var(--bg)", color: "var(--text)", fontSize: 13, fontWeight: 600,
                     cursor: hervor === "mark" && !seat.empty ? "pointer" : "grab",
-                    boxShadow: SHADOW.ruhig, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none",
-                    opacity: abs ? 0.5 : 1, textDecoration: abs ? "line-through" : "none" }}>
+                    boxShadow: SHADOW.ruhig, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none" }}>
                   {hf && (
                     // Der Balken traegt die Farbe da, wo sie auch bei
                     // uebereinanderliegenden Tischen sichtbar bleibt: an der

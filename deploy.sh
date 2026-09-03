@@ -210,6 +210,20 @@ if ! python3 scripts/pruefe_namen.py apps/api/app; then
   echo "  ✗ Abbruch vor dem Hochladen — der Server bleibt unangetastet."
   exit 1
 fi
+# Dasselbe fuer die Oberflaeche: eine Variable, die es nicht gibt, baut sauber
+# durch und stirbt erst beim Rendern („Can't find variable: abs" im Sitzplan).
+# Nur die Regel no-undef, siehe apps/web/eslint.config.js. Fehlt eslint (frisch
+# geklont, kein npm install), wird uebersprungen statt abgebrochen — eine
+# fehlende Werkbank ist kein Befund ueber den Code.
+if [ -x apps/web/node_modules/.bin/eslint ]; then
+  if ! (cd apps/web && node_modules/.bin/eslint . --quiet); then
+    echo
+    echo "  ✗ Abbruch vor dem Hochladen — der Server bleibt unangetastet."
+    exit 1
+  fi
+else
+  echo "  · eslint nicht installiert — Frontend-Namensprüfung übersprungen"
+fi
 
 schritt "Server erreichbar machen (rsync)"
 ssh "$SERVER" "command -v rsync >/dev/null 2>&1 || { echo 'installiere rsync...'; (apt-get update -qq && apt-get install -y -qq rsync) || apk add --no-cache rsync; }"
