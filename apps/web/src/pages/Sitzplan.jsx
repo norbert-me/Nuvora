@@ -319,7 +319,12 @@ export default function Sitzplan() {
   //
   // Der Ausschnitt zieht mit (scrollLeft/scrollTop), sonst springt der Plan
   // beim Loslassen unter der Hand weg.
-  const RAND_ZUG = 600;     // so weit darf man über den Rand hinausziehen
+  // So weit darf man über den Rand hinausziehen — in JEDE Richtung. Nach
+  // rechts und unten hing der Tisch sonst „wie an einer Wand": die Grenze war
+  // die aktuelle Flaechenbreite, und die waechst erst mit dem Inhalt, der dort
+  // gar nicht erst hinkam. Nach links/oben folgt danach das Zurueckschieben
+  // ins Positive (normalisieren), nach rechts/unten waechst schlicht das Blatt.
+  const RAND_ZUG = 600;
   const RAND_INNEN = 20;    // dort liegt danach das linke/obere Element
   const normalisieren = (liste, tf) => {
     const xs = [...liste.map((s) => s.x), tf ? tf.x : Infinity];
@@ -356,8 +361,8 @@ export default function Sitzplan() {
   const onTafelMove = (e) => {
     const d = tafelRef.current; if (!d) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - TAFEL_W));
-    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - TAFEL_H));
+    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - TAFEL_W + RAND_ZUG));
+    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - TAFEL_H + RAND_ZUG));
     // rot beibehalten — sonst verliert die Tafel beim Verschieben ihre Drehung.
     setTafel((tf) => ({ ...tf, x, y }));
   };
@@ -402,8 +407,8 @@ export default function Sitzplan() {
       snapshot();
     }
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - SEAT_W));
-    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - SEAT_H));
+    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - SEAT_W + RAND_ZUG));
+    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - SEAT_H + RAND_ZUG));
     // rot ausdrücklich beibehalten (Drag darf die Drehung nie verwerfen).
     setSeats((prev) => prev.map((s) => (s.sid === d.sid ? { ...s, x, y, rot: s.rot ?? d.rot } : s)));
   };
@@ -489,8 +494,8 @@ export default function Sitzplan() {
     if (!sid || platziert.has(sid)) return;
     snapshot();
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - SEAT_W / 2, rect.width / zoom - SEAT_W));
-    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - SEAT_H / 2, rect.height / zoom - SEAT_H));
+    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - SEAT_W / 2, rect.width / zoom - SEAT_W + RAND_ZUG));
+    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - SEAT_H / 2, rect.height / zoom - SEAT_H + RAND_ZUG));
     const norm = normalisieren([...seats, { sid, x, y, rot: 0 }], tafel);
     persist(norm.liste, norm.tafel);
     if (norm.dx || norm.dy) ausschnittNachziehen(norm.dx, norm.dy);

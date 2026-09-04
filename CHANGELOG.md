@@ -21,8 +21,8 @@ Notiz zur größten Fassung die dünnste.
 
 **Sitzplan**
 
-- Der Plan lässt sich auch nach links (und oben) erweitern; die Fläche wächst
-  mit dem, was darauf steht.
+- Der Plan lässt sich in jede Richtung erweitern; die Fläche wächst mit dem,
+  was darauf steht. Vorher hingen die Tische am Rand „wie an einer Wand".
 - Ein Tisch ließ sich am Foto nicht ziehen — der Browser nahm stattdessen das
   Bild mit.
 
