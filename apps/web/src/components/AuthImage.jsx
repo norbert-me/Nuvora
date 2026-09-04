@@ -19,7 +19,11 @@ export default function AuthImage({ src, alt = "", style, zoomable = true, reloa
   if (!url) return null;
   return (
     <>
-      <img src={url} alt={alt} onClick={zoomable ? () => setZoom(true) : undefined}
+      {/* draggable={false}: der Browser zieht ein Bild sonst von sich aus als
+          Datei mit sich — im Sitzplan hing dann das Foto am Zeiger, waehrend
+          der Tisch stehen blieb. Bilder in Nuvora sind Anzeige, kein Ziehgut. */}
+      <img src={url} alt={alt} draggable={false} onDragStart={(e) => e.preventDefault()}
+        onClick={zoomable ? () => setZoom(true) : undefined}
         style={{ cursor: zoomable ? "zoom-in" : undefined, ...style }} />
       {zoom && (
         // Dunkler als modalOverlay: vor einem Bild soll die Seite ganz zuruecktreten.

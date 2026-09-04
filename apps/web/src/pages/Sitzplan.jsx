@@ -308,6 +308,41 @@ export default function Sitzplan() {
   // Leerer Platz (kein Schüler): eigener String-sid + empty-Flag, versetzt abgelegt.
   const addEmpty = () => { snapshot(); const n = seats.filter((s) => s.empty).length; persist([...seats, { sid: "e" + Date.now(), x: 40 + (n % 8) * 18, y: 60 + (n % 8) * 18, rot: 0, empty: true }]); };
 
+  // ── Nach LINKS (und oben) erweitern ──
+  //
+  // Die Flaeche fing bei 0 an, und jeder Zug wurde dort abgefangen: wer den
+  // Raum spiegelverkehrt aufbaut, konnte links nichts mehr anlegen — er haette
+  // erst alles andere nach rechts schieben muessen. Jetzt darf ein Zug ueber
+  // den Rand hinaus (RAND_ZUG), und danach wird die ganze Anordnung so
+  // verschoben, dass wieder alles bei >= RAND_INNEN liegt. Gespeichert werden
+  // weiterhin nur positive Zahlen; das Blatt ist einfach groesser geworden.
+  //
+  // Der Ausschnitt zieht mit (scrollLeft/scrollTop), sonst springt der Plan
+  // beim Loslassen unter der Hand weg.
+  const RAND_ZUG = 600;     // so weit darf man über den Rand hinausziehen
+  const RAND_INNEN = 20;    // dort liegt danach das linke/obere Element
+  const normalisieren = (liste, tf) => {
+    const xs = [...liste.map((s) => s.x), tf ? tf.x : Infinity];
+    const ys = [...liste.map((s) => s.y), tf ? tf.y : Infinity];
+    const minX = Math.min(...xs, Infinity);
+    const minY = Math.min(...ys, Infinity);
+    const dx = minX < 0 ? RAND_INNEN - minX : 0;
+    const dy = minY < 0 ? RAND_INNEN - minY : 0;
+    if (!dx && !dy) return { liste, tafel: tf, dx: 0, dy: 0 };
+    return {
+      liste: liste.map((s) => ({ ...s, x: s.x + dx, y: s.y + dy })),
+      tafel: tf ? { ...tf, x: tf.x + dx, y: tf.y + dy } : tf,
+      dx, dy,
+    };
+  };
+  // Nach dem Verschieben denselben Bildausschnitt behalten.
+  const ausschnittNachziehen = (dx, dy) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (dx) el.scrollLeft += dx * zoom;
+    if (dy) el.scrollTop += dy * zoom;
+  };
+
   // Tafel ziehen (Pointer). Breite/Höhe der Tafel-Fläche.
   const TAFEL_W = 200, TAFEL_H = 30;
   const onTafelDown = (e) => {
@@ -321,14 +356,19 @@ export default function Sitzplan() {
   const onTafelMove = (e) => {
     const d = tafelRef.current; if (!d) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - TAFEL_W));
-    const y = Math.max(0, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - TAFEL_H));
+    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - TAFEL_W));
+    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - TAFEL_H));
     // rot beibehalten — sonst verliert die Tafel beim Verschieben ihre Drehung.
     setTafel((tf) => ({ ...tf, x, y }));
   };
   const onTafelUp = () => {
     window.removeEventListener("pointermove", onTafelMove);
     window.removeEventListener("pointerup", onTafelUp);
+    const norm = normalisieren(seats, tafel);
+    if (norm.dx || norm.dy) {
+      persist(norm.liste, norm.tafel);
+      ausschnittNachziehen(norm.dx, norm.dy);
+    }
     // Kein Schreiben mehr beim Loslassen: der Zug steht längst im Entwurf.
     tafelRef.current = null;
   };
@@ -362,8 +402,8 @@ export default function Sitzplan() {
       snapshot();
     }
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - SEAT_W));
-    const y = Math.max(0, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - SEAT_H));
+    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - SEAT_W));
+    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - SEAT_H));
     // rot ausdrücklich beibehalten (Drag darf die Drehung nie verwerfen).
     setSeats((prev) => prev.map((s) => (s.sid === d.sid ? { ...s, x, y, rot: s.rot ?? d.rot } : s)));
   };
@@ -372,6 +412,18 @@ export default function Sitzplan() {
     window.removeEventListener("pointerup", onUp);
     const d = dragRef.current;
     dragRef.current = null;
+    // Wurde ueber den linken/oberen Rand hinaus gezogen, wandert die ganze
+    // Anordnung zurueck ins Positive — die Flaeche ist damit nach links
+    // gewachsen, ohne dass jemand Koordinaten von Hand aufraeumen muss.
+    if (d?.gezogen) {
+      const norm = normalisieren(seats, tafel);
+      // `persist` schreibt Plaetze UND Tafel in den Entwurf — ein zweiter
+      // Aufruf ueber setSeats/setTafel waere derselbe Zug zweimal.
+      if (norm.dx || norm.dy) {
+        persist(norm.liste, norm.tafel);
+        ausschnittNachziehen(norm.dx, norm.dy);
+      }
+    }
     // Im Markier-Modus ist der Klick auf den Platz der Handgriff: eine Ecke
     // mehr waere die fuenfte an einem Tisch von 108 px Breite.
     if (d && !d.gezogen && !d.empty && hervor === "mark") markSchalten(d.sid);
@@ -437,9 +489,11 @@ export default function Sitzplan() {
     if (!sid || platziert.has(sid)) return;
     snapshot();
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min((e.clientX - rect.left) / zoom - SEAT_W / 2, rect.width / zoom - SEAT_W));
-    const y = Math.max(0, Math.min((e.clientY - rect.top) / zoom - SEAT_H / 2, rect.height / zoom - SEAT_H));
-    persist([...seats, { sid, x, y, rot: 0 }]);
+    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - SEAT_W / 2, rect.width / zoom - SEAT_W));
+    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - SEAT_H / 2, rect.height / zoom - SEAT_H));
+    const norm = normalisieren([...seats, { sid, x, y, rot: 0 }], tafel);
+    persist(norm.liste, norm.tafel);
+    if (norm.dx || norm.dy) ausschnittNachziehen(norm.dx, norm.dy);
   };
 
   // Leeren setzt auch die Tafel zurueck — sonst blieb sie an ihrer verschobenen
@@ -590,7 +644,13 @@ export default function Sitzplan() {
           </div>
           <div ref={scrollRef} style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: cardStyle.borderRadius, background: "var(--card)", marginBottom: 16 }}>
           <div ref={canvasRef} onPointerDown={onCanvasDown} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}
-            style={{ position: "relative", height: 760, width: "calc(100% - 40px)", minWidth: 720, margin: "0 20px", transform: `scale(${zoom})`, transformOrigin: "0 0",
+            style={{ position: "relative",
+              // Die Flaeche waechst mit dem, was darauf steht — sonst endet der
+              // Raum am Rand des Fensters, und ein Tisch weiter rechts liesse
+              // sich gar nicht erst ablegen.
+              height: Math.max(760, ...seats.map((s) => s.y + SEAT_H + 60), (tafel?.y ?? 0) + TAFEL_H + 60),
+              width: Math.max(720, ...seats.map((s) => s.x + SEAT_W + 60), (tafel?.x ?? 0) + TAFEL_W + 60),
+              minWidth: "calc(100% - 40px)", margin: "0 20px", transform: `scale(${zoom})`, transformOrigin: "0 0",
               cursor: "grab",
               backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
             {/* Bewegliche Tafel */}
@@ -643,7 +703,13 @@ export default function Sitzplan() {
                     // Gesichts, ob man jemanden erkennt — ein Kreis mit 26 px
                     // war aus drei Metern ein Punkt. 32 passt in die Zeilenhoehe
                     // des Platzes (SEAT_H 46 minus Innenabstand).
-                    <Portrait student={s} size={32} form="eckig" style={{ marginRight: 8 }} />
+                    // `pointerEvents: none`: sonst faengt das Bild den Zug ab
+                    // und der Browser startet sein eigenes Bild-Ziehen — der
+                    // Platz blieb stehen, das Foto hing am Zeiger. Gezogen wird
+                    // der Platz, nicht sein Inhalt (beim Namen war es nie
+                    // anders, der ist kein Drag-Ziel).
+                    <Portrait student={s} size={32} form="eckig"
+                      style={{ marginRight: 8, pointerEvents: "none", userSelect: "none" }} />
                   )}
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: seat.empty ? "var(--text3)" : undefined }}>{seat.empty ? t("sitzplan.emptySeat") : s.name}</span>
                   {!seat.empty && segelTeil && segelOn && (() => {

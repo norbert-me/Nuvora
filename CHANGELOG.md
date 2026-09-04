@@ -19,6 +19,13 @@ Notiz zur größten Fassung die dünnste.
 - Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
   Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
 
+**Sitzplan**
+
+- Der Plan lässt sich auch nach links (und oben) erweitern; die Fläche wächst
+  mit dem, was darauf steht.
+- Ein Tisch ließ sich am Foto nicht ziehen — der Browser nahm stattdessen das
+  Bild mit.
+
 **Klassen**
 
 - Ein Klassenfoto wird beim Hinzufügen quadratisch zugeschnitten; verschieben
