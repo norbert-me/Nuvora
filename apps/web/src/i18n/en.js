@@ -1047,6 +1047,7 @@ export default {
   "kalender.more": "Advanced",
   "kalender.place": "Location",
   "kalender.placePlaceholder": "e.g. Room 12, hall",
+  "kalender.raumFuerAlle": "For every lesson of this course",
   "kalender.repeat": "Repeat",
   "kalender.repeatNone": "– once –",
   "kalender.repeatDaily": "daily",

@@ -1134,6 +1134,12 @@ class TimetableSlot(Base):
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(200), default="", server_default="")
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Raum NUR fuer diese eine Stunde. Leer heisst „der Raum des Kurses"
+    # (kurse.raum) — der Normalfall ist ein Stammraum, die Ausnahme die eine
+    # Doppelstunde im Computerraum. Beides nebeneinander, weil sonst entweder
+    # jede Stunde einzeln gepflegt werden muesste oder die Ausnahme gar nicht
+    # eintragbar waere.
+    raum: Mapped[str] = mapped_column(String(60), default="", server_default="")
     # Gültigkeitszeitraum: Änderungen am Stundenplan wirken ab HEUTE, die
     # Vergangenheit bleibt unverändert. Beim Ändern wird die alte Version bis
     # gestern begrenzt (valid_to) und eine neue ab heute angelegt (valid_from).

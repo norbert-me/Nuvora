@@ -21,6 +21,8 @@ Notiz zur größten Fassung die dünnste.
 
 **Kalender**
 
+- Der Raum lässt sich für eine einzelne Stundenplan-Stunde setzen oder mit
+  einem Häkchen für alle Stunden des Kurses.
 - Der Eintrag-Dialog nennt im Kopf die Uhrzeit der Stunde — „2. Stunde" allein
   sagt nicht, wann sie ist. Der Hinweis unter den Zeitfeldern ist dafür weg.
 - Neuer Reiter „Zeitleiste": der Kurs von oben nach unten — Unterrichtsstunden,

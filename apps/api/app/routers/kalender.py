@@ -1149,7 +1149,9 @@ async def stundenplan_vorkommen(db: AsyncSession, user: User, start: date, ende:
                 z = zeiten[s.period - 1] if 0 < s.period <= len(zeiten) else None
                 out.append({
                     "slot": s, "tag": tag, "titel": titel,
-                    "raum": getattr(kurs, "raum", "") or "",
+                    # Die Stunde schlaegt den Kurs: ein Stammraum gilt fuer
+                    # alle, die eine Ausnahme fuer sich.
+                    "raum": (getattr(s, "raum", "") or "") or (getattr(kurs, "raum", "") or ""),
                     "start": (z or {}).get("start", "") if isinstance(z, dict) else "",
                     "ende": (z or {}).get("end", "") if isinstance(z, dict) else "",
                 })
@@ -1372,6 +1374,8 @@ class SlotIn(BaseModel):
     kurs_id: Optional[int] = None   # gewaehlter Kurs (Fach) — Anzeige daraus
     title: str = ""
     topic_id: Optional[int] = None
+    # Raum nur fuer diese Stunde; leer = der Raum des Kurses (siehe Modell).
+    raum: str = ""
     # Fuer welchen Zeitraum die Stunde gilt: "1", "2", "jahr" oder leer
     # (laufendes Halbjahr). Der Begriff statt zweier Datumsfelder — das
     # Schuljahr steht am Konto, und zwei Stellen mit Datumsangaben liefen
@@ -1517,6 +1521,7 @@ async def upsert_slot(body: SlotIn, user: User = Depends(require_module), db: As
     same = active is not None and (
         active.class_id == body.class_id and active.kurs_id == body.kurs_id
         and (active.title or "") == (body.title or "") and active.topic_id == body.topic_id
+        and (active.raum or "") == (body.raum or "")
         and _tag(active.valid_to) == bis
     )
     if active is None:

@@ -584,7 +584,7 @@ export default function Kalender() {
   };
 
   const saveSlot = async (s) => {
-    const body = { weekday: s.weekday, period: s.period, title: s.title || "", class_id: s.class_id || null, kurs_id: s.kurs_id ?? null, topic_id: s.topic_id || null, term };
+    const body = { weekday: s.weekday, period: s.period, title: s.title || "", class_id: s.class_id || null, kurs_id: s.kurs_id ?? null, topic_id: s.topic_id || null, raum: s.raum || "", term };
     const res = await fetch(`${API}/timetable/slot`, alsJson("PUT", body)).catch(() => null);
     // Bisher blieb die Maske bei Ablehnung einfach offen stehen — nicht von
     // „ich habe den Knopf verfehlt" zu unterscheiden.
@@ -1967,9 +1967,14 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onRau
   // derselbe Kurs hat vier Stunden in der Woche und meist denselben Raum. Er
   // steht trotzdem hier, weil man ihn beim Eintragen des Stundenplans zur Hand
   // hat — gespeichert wird er am Kurs, wie die Farbe auch.
+  // Zwei Ebenen, ein Feld: der Stammraum liegt am KURS (er gilt fuer alle
+  // Stunden), die Ausnahme an DIESER Stunde. Der Schalter sagt, welche von
+  // beiden gerade gemeint ist — vorher ging jede Eingabe an den Kurs, und die
+  // eine Doppelstunde im Computerraum liess sich gar nicht eintragen.
   const raumOf = (kid) => (kurse.find((k) => k.id === kid) || {}).raum || "";
-  const [raum, setRaum] = useState(raumOf(kursId));
-  useEffect(() => { setRaum(raumOf(kursId)); }, [kursId]); // eslint-disable-line
+  const [fuerAlle, setFuerAlle] = useState(!(slot.raum || ""));
+  const [raum, setRaum] = useState(slot.raum || raumOf(kursId));
+  useEffect(() => { setRaum((slot.raum || "") || raumOf(kursId)); setFuerAlle(!(slot.raum || "")); }, [kursId]); // eslint-disable-line
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
   const lbl = { fontSize: 12, color: "var(--text2)", margin: "12px 0 4px" };
   return (
@@ -1996,13 +2001,20 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onRau
           <div style={lbl}>{t("kurse.raum")}</div>
           <input value={raum} maxLength={60} onChange={(e) => setRaum(e.target.value)}
             placeholder={t("kalender.placePlaceholder")} style={{ ...inputStyle, width: "100%" }} />
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)", marginTop: 6 }}>
+            <input type="checkbox" checked={fuerAlle} onChange={(e) => setFuerAlle(e.target.checked)} style={{ margin: 0 }} />
+            {t("kalender.raumFuerAlle")}
+          </label>
         </>)}
         <DialogFuss onAbbrechen={onClose} onSpeichern={() => {
             // Farbe erst beim Speichern anwenden — und nur, wenn sie sich geändert hat.
             if ((kursId || classId) && color && color !== clsColorOf(kursId, classId)) onColor && onColor(kursId, classId ? Number(classId) : null, color);
-            // Der Raum geht an den Kurs — und nur, wenn er sich geaendert hat.
-            if (kursId && raum !== raumOf(kursId)) onRaum && onRaum(kursId, raum.trim());
-            onSave({ weekday: slot.weekday, period: slot.period, title: "", class_id: classId ? Number(classId) : null, kurs_id: classId ? kursId : null, topic_id: null });
+            // „Fuer alle" schreibt an den Kurs und raeumt die Ausnahme dieser
+            // Stunde weg — sonst uebertoente sie den neuen Stammraum. Sonst
+            // bleibt der Kurs unberuehrt und nur diese Stunde bekommt ihn.
+            const nurHier = !fuerAlle ? raum.trim() : "";
+            if (kursId && fuerAlle && raum.trim() !== raumOf(kursId)) onRaum && onRaum(kursId, raum.trim());
+            onSave({ weekday: slot.weekday, period: slot.period, title: "", class_id: classId ? Number(classId) : null, kurs_id: classId ? kursId : null, topic_id: null, raum: nurHier });
           }}>
           {slot.id && <button onClick={() => onDelete(slot.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </DialogFuss>

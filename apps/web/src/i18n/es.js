@@ -1048,6 +1048,7 @@ export default {
   "kalender.more": "Avanzado",
   "kalender.place": "Lugar",
   "kalender.placePlaceholder": "p. ej. Aula 12, salón",
+  "kalender.raumFuerAlle": "Para todas las clases de este curso",
   "kalender.repeat": "Repetición",
   "kalender.repeatNone": "– una vez –",
   "kalender.repeatDaily": "diaria",

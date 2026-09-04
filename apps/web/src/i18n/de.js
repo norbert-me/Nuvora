@@ -1032,6 +1032,7 @@ export default {
   "kalender.more": "Erweitert",
   "kalender.place": "Ort",
   "kalender.placePlaceholder": "z. B. Raum 12, Aula",
+  "kalender.raumFuerAlle": "Für alle Stunden dieses Kurses",
   "kalender.repeat": "Wiederholung",
   "kalender.repeatNone": "– einmalig –",
   "kalender.repeatDaily": "täglich",
