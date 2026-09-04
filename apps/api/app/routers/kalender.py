@@ -18,7 +18,7 @@ from ..zeit import tagesbeginn
 # RRULE ist ICS-Grammatik; die Uebersetzung liegt in app/caldav.py (ohne
 # FastAPI, ohne Datenbank, testbar ohne Server). Eine zweite Fassung hier waere
 # die, in der eine Pruefung fehlt.
-from ..caldav import rrule_pruefen
+from ..caldav import rrule_pruefen, stundenzeit
 from ..felder import ohne_leer, ohne_none
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
@@ -544,6 +544,7 @@ async def export_kalender(user: User = Depends(require_module), db: AsyncSession
         "timetable": {
             "periods": user.timetable_periods or 6,
             "times": user.timetable_times or [],
+            "zero": user.timetable_zero,
             "slots": [{"weekday": s.weekday, "period": s.period, "class": id2name.get(s.class_id), "title": s.title} for s in slots],
         },
         "breaks": [{"start_date": b.start_date.isoformat(), "end_date": b.end_date.isoformat(), "label": b.label} for b in breaks],
@@ -582,6 +583,7 @@ class ImportSlot(BaseModel):
 class ImportTimetable(BaseModel):
     periods: Optional[int] = None
     times: Optional[list] = None
+    zero: Optional[dict] = None  # 0. Stunde (fehlt in aelteren Dateien)
     slots: Optional[List[ImportSlot]] = None
 
     # Hier zaehlt auch die 0 als „nichts angegeben" — deshalb ohne_leer mit
@@ -650,6 +652,9 @@ async def import_kalender(body: dict, user: User = Depends(require_module), db: 
         user.timetable_periods = tt.periods
     if tt.times is not None:
         user.timetable_times = tt.times
+        # Nur zusammen mit den Zeiten: eine aeltere Datei kennt das Feld nicht,
+        # und dann soll die eingerichtete 0. Stunde nicht verschwinden.
+        user.timetable_zero = tt.zero if isinstance(tt.zero, dict) else None
     # Stundenplan-Slots ersetzen (Wochentag+Stunde eindeutig).
     if tt.slots is not None:
         for s in (await db.execute(select(TimetableSlot).where(TimetableSlot.owner_id == user.id))).scalars().all():
@@ -1146,14 +1151,14 @@ async def stundenplan_vorkommen(db: AsyncSession, user: User, start: date, ende:
                     getattr(klassen.get(s.class_id), "kurs_id", None))
                 titel = (_kurs_label(kurs) or getattr(klassen.get(s.class_id), "name", "")
                          or s.title or "Unterricht")
-                z = zeiten[s.period - 1] if 0 < s.period <= len(zeiten) else None
+                zs, ze = stundenzeit(zeiten, user.timetable_zero, s.period)
                 out.append({
                     "slot": s, "tag": tag, "titel": titel,
                     # Die Stunde schlaegt den Kurs: ein Stammraum gilt fuer
                     # alle, die eine Ausnahme fuer sich.
                     "raum": (getattr(s, "raum", "") or "") or (getattr(kurs, "raum", "") or ""),
-                    "start": (z or {}).get("start", "") if isinstance(z, dict) else "",
-                    "ende": (z or {}).get("end", "") if isinstance(z, dict) else "",
+                    "start": zs,
+                    "ende": ze,
                 })
         tag += timedelta(days=1)
     return out
@@ -1419,6 +1424,9 @@ class Timetable(BaseModel):
     periods: int
     slots: List[SlotOut]
     times: list = []
+    # Die 0. Stunde: {start,end} wenn es sie gibt, sonst None. Ein eigener Platz
+    # statt einer verschobenen Liste — siehe stundenzeit().
+    zero: Optional[dict] = None
     # Das Schuljahr aus dem Profil (Halbjahre + Ende). Die Auswahl „1. HJ /
     # 2. HJ / Jahr" braucht es, und ist es nicht eingetragen, sagt die
     # Oberflaeche das, statt einen Zeitraum zu erfinden.
@@ -1431,6 +1439,7 @@ class PeriodsIn(BaseModel):
 
 class TimesIn(BaseModel):
     times: list  # [{start, end}] je Stunde
+    zero: Optional[dict] = None  # 0. Stunde; None = es gibt keine
 
 
 @router.get("/timetable", response_model=Timetable)
@@ -1442,7 +1451,7 @@ async def get_timetable(user: User = Depends(require_module), db: AsyncSession =
     def _iso(d):
         return d.isoformat() if d else ""
     return {"periods": user.timetable_periods or 6, "slots": rows,
-            "times": user.timetable_times or [],
+            "times": user.timetable_times or [], "zero": user.timetable_zero,
             "schuljahr": {"hj1": _iso(user.hj1_start), "hj2": _iso(user.hj2_start),
                           "ende": _iso(user.jahr_ende)}}
 
@@ -1483,6 +1492,7 @@ async def del_slot_cancellation(body: SlotCancelIn, user: User = Depends(require
 async def set_times(body: TimesIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Uhrzeiten je Stunde setzen: Liste [{start,end}]."""
     user.timetable_times = body.times
+    user.timetable_zero = body.zero if isinstance(body.zero, dict) else None
     await db.commit()
     return await get_timetable(user, db)
 
@@ -1499,7 +1509,7 @@ async def set_periods(body: PeriodsIn, user: User = Depends(require_module), db:
 @router.put("/timetable/slot", response_model=SlotOut)
 async def upsert_slot(body: SlotIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Setzt die Stunde an (weekday, period) — legt an oder aktualisiert."""
-    if not 0 <= body.weekday <= 6 or body.period < 1:
+    if not 0 <= body.weekday <= 6 or body.period < 0:
         raise HTTPException(400, "Ungueltige Stunde")
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
@@ -1779,9 +1789,9 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
             a = _hm(e.start_time)
             b2 = _hm(e.end_time)
         else:
-            tm = ttimes[e.period - 1] if (e.period and isinstance(ttimes, list) and 0 < e.period <= len(ttimes)) else None
-            a = _hm(tm.get("start")) if isinstance(tm, dict) else None
-            b2 = _hm(tm.get("end")) if isinstance(tm, dict) else None
+            zs, ze = stundenzeit(ttimes, u.timetable_zero, e.period) if e.period is not None else ("", "")
+            a = _hm(zs)
+            b2 = _hm(ze)
         if a and b2:
             # Getaktet: DTEND ist der echte Endzeitpunkt AM SELBEN TAG — hier
             # waere ein "+1 Tag" der Fehler, der den Termin ueber Nacht zoege.
@@ -2455,7 +2465,7 @@ async def untis_uebernehmen(body: UntisUebernahmeIn, user: User = Depends(requir
     """
     gesetzt = 0
     for s in body.slots[:200]:
-        if not 0 <= s.weekday <= 6 or s.period < 1:
+        if not 0 <= s.weekday <= 6 or s.period < 0:
             continue
         await upsert_slot(SlotIn(weekday=s.weekday, period=s.period, title=(s.title or "")[:200],
                                  kurs_id=s.kurs_id, class_id=s.class_id, topic_id=None), user, db)

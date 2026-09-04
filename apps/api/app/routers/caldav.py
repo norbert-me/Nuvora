@@ -300,10 +300,8 @@ async def _texte(db: AsyncSession, user: User, eintraege) -> dict:
     def _stundenzeit(e):
         if e.start_time and e.end_time:
             return e.start_time, e.end_time
-        if e.period and 0 < e.period <= len(zeiten):
-            z = zeiten[e.period - 1]
-            if isinstance(z, dict):
-                return (z.get("start") or ""), (z.get("end") or "")
+        if e.period is not None:
+            return X.stundenzeit(zeiten, user.timetable_zero, e.period)
         return "", ""
 
     out = {}

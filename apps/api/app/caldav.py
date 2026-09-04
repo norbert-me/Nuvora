@@ -248,6 +248,24 @@ def _ics_zeit(wert):
     return f"{hh}:{mm}"
 
 
+def stundenzeit(times, zero, period):
+    """(start, ende) einer Stundennummer als "HH:MM" — oder ("", "").
+
+    Die Stunden 1..n stehen in `times` (Index = Nummer - 1). Die **0. Stunde**
+    ist der Vorspann davor und hat einen eigenen Platz (`users.timetable_zero`),
+    statt die Liste zu verschieben: eine verschobene Liste haette jede
+    gespeicherte Stundennummer um eins verrueckt.
+
+    Blatt, damit die drei Leser (Kalender, ICS-Feed, CalDAV) dieselbe Regel
+    benutzen — als Kopie liefe die dritte nach der ersten Aenderung anders.
+    """
+    z = zero if period == 0 else (
+        times[period - 1] if isinstance(times, list) and 0 < period <= len(times) else None)
+    if not isinstance(z, dict):
+        return "", ""
+    return (z.get("start") or ""), (z.get("end") or "")
+
+
 _RRULE_FREQ = ("DAILY", "WEEKLY", "MONTHLY", "YEARLY")
 _RRULE_TAGE = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
 

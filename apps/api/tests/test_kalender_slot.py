@@ -374,3 +374,33 @@ async def test_stundenplan_gilt_je_halbjahr(s):
     zweite = [x for x in tt["slots"] if KAL._slot_active_on(x, _date(2027, 3, 1))]
     assert [x.class_id for x in erste] == [a.id]
     assert [x.class_id for x in zweite] == [b.id]
+
+
+@pytest.mark.asyncio
+async def test_nullte_stunde_hat_eigene_zeit(s):
+    """Die 0. Stunde ist der Vorspann vor der ersten — mit eigener Uhrzeit.
+
+    Sie darf die Liste der Stunden 1..n NICHT verschieben: sonst haette jede
+    schon gespeicherte Stundennummer nachtraeglich eine andere Zeit.
+    """
+    from app.caldav import stundenzeit
+    u = User(email="null@b.de", password_hash="x", name="L"); s.add(u); await s.commit()
+
+    tt = await KAL.set_times(KAL.TimesIn(
+        times=[{"start": "08:00", "end": "08:45"}, {"start": "08:50", "end": "09:35"}],
+        zero={"start": "07:10", "end": "07:55"}), user=u, db=s)
+    assert tt["zero"] == {"start": "07:10", "end": "07:55"}
+    assert tt["times"][0]["start"] == "08:00"
+
+    # Eine Stunde als 0. anlegen geht jetzt (vorher: period >= 1).
+    out = await KAL.upsert_slot(KAL.SlotIn(weekday=0, period=0, title="Frueh"), user=u, db=s)
+    assert out.period == 0
+
+    times = [{"start": "08:00", "end": "08:45"}]
+    assert stundenzeit(times, {"start": "07:10", "end": "07:55"}, 0) == ("07:10", "07:55")
+    assert stundenzeit(times, None, 0) == ("", "")       # keine 0. Stunde eingerichtet
+    assert stundenzeit(times, None, 1) == ("08:00", "08:45")
+
+    # Abschalten heisst: die Zeit ist weg, die uebrigen bleiben.
+    tt = await KAL.set_times(KAL.TimesIn(times=times, zero=None), user=u, db=s)
+    assert tt["zero"] is None and tt["times"] == times

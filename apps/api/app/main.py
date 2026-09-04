@@ -383,6 +383,7 @@ def _ensure_columns(sync_conn):
         ("topics", "voraussetzungen", "TEXT DEFAULT '' NOT NULL"),
         ("users", "timetable_periods", "INTEGER DEFAULT 6 NOT NULL"),
         ("users", "timetable_times", "JSON"),
+        ("users", "timetable_zero", "JSON"),
         ("notepad_notes", "width", "INTEGER DEFAULT 0 NOT NULL"),
         ("notepad_notes", "height", "INTEGER DEFAULT 0 NOT NULL"),
     ]

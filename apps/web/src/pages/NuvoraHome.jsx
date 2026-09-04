@@ -12,6 +12,7 @@ import { alsJson, hol } from "../core/melden.js";
 import { WIDGETS } from "../components/Widgets.jsx";
 import { ZIELE } from "../core/ziele.js";
 import { ymd } from "../core/datum.js";
+import { stundenZeit } from "../core/stunden";
 
 // Modul-Kachel: dieselbe Karte wie überall, nur als Link (kein eigener Kasten).
 // Die frühere Eigenbau-Fassung stand auf `var(--surface)` — die Variable gibt es
@@ -152,7 +153,7 @@ function HeutePanel({ t, orgaAktiv }) {
       const to = new Date(heute); to.setHours(23, 59, 59, 0);
       const entries = await fetch(`/api/kalender/entries?frm=${frm.toISOString()}&to=${to.toISOString()}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
       const freiHeute = (Array.isArray(breaks) ? breaks : []).find((b) => ymd(heute) >= b.start_date.slice(0, 10) && ymd(heute) <= b.end_date.slice(0, 10));
-      if (!ab) setData({ slots: (tt?.slots || []), times: (tt?.times || []), entries: Array.isArray(entries) ? entries : [],
+      if (!ab) setData({ slots: (tt?.slots || []), times: (tt?.times || []), zero: (tt?.zero || null), entries: Array.isArray(entries) ? entries : [],
                         classes, frei: freiHeute,
                         entfallen: (Array.isArray(cancels) ? cancels : [])
                           .filter((c) => (c.date || "").slice(0, 10) === ymd(heute)).map((c) => c.period) });
@@ -174,7 +175,7 @@ function HeutePanel({ t, orgaAktiv }) {
   // Die Stundenzeiten heissen {start, end} (so liefert sie /api/kalender/
   // timetable). Hier stand `from`/`to` — beides undefined, und deshalb blieb
   // die Zeile unter der Stundennummer immer leer.
-  const zeit = (p) => { const w = data.times[p - 1]; return w && (w.start || w.end) ? `${w.start || ""}–${w.end || ""}` : ""; };
+  const zeit = (p) => { const w = stundenZeit(data.times, data.zero, p); return w && (w.start || w.end) ? `${w.start || ""}–${w.end || ""}` : ""; };
   const eintrag = (p) => data.entries.find((e) => e.period === p);
   const dateStr = new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" });
 

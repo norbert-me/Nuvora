@@ -143,6 +143,10 @@ class User(Base):
     timetable_periods: Mapped[int] = mapped_column(Integer, default=6, server_default="6")
     # Uhrzeiten je Stunde: Liste [{start,end}] (Index = Stunde-1). Optional.
     timetable_times: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Die 0. Stunde ({start,end}) — der Vorspann vor der ersten. Eigener Platz
+    # statt Index 0 in timetable_times: das haette jede gespeicherte
+    # Stundennummer um eins verschoben.
+    timetable_zero: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     folders: Mapped[list["Folder"]] = relationship(back_populates="owner", cascade="all, delete-orphan")

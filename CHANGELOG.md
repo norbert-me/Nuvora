@@ -21,6 +21,8 @@ Notiz zur größten Fassung die dünnste.
 
 **Kalender**
 
+- Der Stundenplan kennt eine 0. Stunde — eine Zeile vor der ersten, mit
+  eigener Uhrzeit. Die Nummern der übrigen Stunden bleiben, wie sie waren.
 - Der Raum lässt sich für eine einzelne Stundenplan-Stunde setzen oder mit
   einem Häkchen für alle Stunden des Kurses.
 - Der Eintrag-Dialog nennt im Kopf die Uhrzeit der Stunde — „2. Stunde" allein

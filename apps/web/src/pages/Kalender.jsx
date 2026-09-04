@@ -25,6 +25,7 @@ import { feiertage } from "../data/feiertage.js";
 // ymd/isoDay/hmToMin/startOfDay/addDays/mondayOf/isoWeek standen hier eigens —
 // dieselben Zeilen lagen in Zufall, Sitzplan, Anwesenheit und feiertage.js.
 import { addDays, hmToMin, isoDay, isoWeek, mondayOf, parseYmd, startOfDay, wochentagMo0, ymd } from "../core/datum.js";
+import { stundenZeit, stundenListe } from "../core/stunden";
 
 // Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
 const BUNDESLAENDER = [
@@ -596,8 +597,8 @@ export default function Kalender() {
     const res = await fetch(`${API}/timetable/periods`, alsJson("PUT", { periods: n })).catch(() => null);
     if (res && res.ok) setTt(await res.json());
   };
-  const setTimes = async (times) => {
-    const res = await fetch(`${API}/timetable/times`, alsJson("PUT", { times })).catch(() => null);
+  const setTimes = async (times, zero = null) => {
+    const res = await fetch(`${API}/timetable/times`, alsJson("PUT", { times, zero })).catch(() => null);
     if (res && res.ok) setTt(await res.json());
   };
 
@@ -817,7 +818,7 @@ export default function Kalender() {
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
       {view === "zeitleiste" && <Zeitleiste />}
-      {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} aktiv={aktiv} topics={topics} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
+      {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} hatNull={!!tt.zero} aktiv={aktiv} topics={topics} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
 
       {/* Was im ANGEZEIGTEN Zeitraum ausgeblendet ist — eine Fläche über dem
           Kalender, kein eigener Reiter: die Frage „was sehe ich hier gerade
@@ -864,7 +865,7 @@ export default function Kalender() {
       )}
       {view === "timetable" && <TimetableView tt={tt} showTimes={showTimes} stichtag={stichtag} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
-      {editing && <EntryModal entry={editing} zeiten={tt.times || []} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
+      {editing && <EntryModal entry={editing} zeiten={tt.times || []} zeroZeit={tt.zero || null} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
         <Modal onClose={() => setAbo(null)} width={500} label={t("kalender.subscribeTitle")}>
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>{t("kalender.subscribeTitle")}</h3>
@@ -1283,7 +1284,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   const slots = f ? [] : slotsFor(day);
   const ext = extByDay ? extByDay(day) : [];
   const linked = (e) => e.cardvote_set_id || e.karten_deck_id || e.lernpfad_ladder_id || e.method_id || e.codedetektiv_puzzle;
-  const pTime = (p) => { const w = (tt.times || [])[p - 1]; return w ? { s: hmToMin(w.start), e: hmToMin(w.end) } : { s: null, e: null }; };
+  const pTime = (p) => { const w = stundenZeit(tt.times, tt.zero, p); return w ? { s: hmToMin(w.start), e: hmToMin(w.end) } : { s: null, e: null }; };
   // Zeitleiste 0–24 Uhr, aber scrollbar. Der Blick soll da anfangen, wo der Tag
   // anfaengt — nicht um Mitternacht.
   //
@@ -1453,7 +1454,7 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
   // (`periods`, `t<i>start`, `t<i>end` — Zeichenketten und Zahlen, damit ein
   // Neuladen die Arbeitskopie wieder einholt) und schreibt auf „Speichern".
   const basis = useMemo(() => {
-    const o = { periods: tt.periods };
+    const o = { periods: tt.periods, null: !!tt.zero, tZstart: (tt.zero && tt.zero.start) || "", tZend: (tt.zero && tt.zero.end) || "" };
     for (let i = 0; i < tt.periods; i++) {
       o[`t${i}start`] = (tt.times && tt.times[i] && tt.times[i].start) || "";
       o[`t${i}end`] = (tt.times && tt.times[i] && tt.times[i].end) || "";
@@ -1464,17 +1465,23 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
   const entwurf = useEntwurf(basis, async (wert) => {
     if (wert.periods !== tt.periods) await onPeriods(wert.periods);
     const arr = Array.from({ length: wert.periods }, (_, i) => ({ start: wert[`t${i}start`] || "", end: wert[`t${i}end`] || "" }));
-    await onTimes(arr);
+    await onTimes(arr, wert.null ? { start: wert.tZstart || "", end: wert.tZend || "" } : null);
     frisch.current = true;
   });
   useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
   const anzahl = entwurf.wert.periods;
-  const periods = Array.from({ length: anzahl }, (_, i) => i + 1);
+  // Die 0. Stunde ist der Vorspann vor der ersten — angehaengt, nicht
+  // eingeschoben: sonst hiesse die bisherige erste Stunde ploetzlich anders.
+  const hatNull = !!entwurf.wert.null;
+  const periods = stundenListe(anzahl, hatNull);
   // Der Editor zeigt den Plan des GEWÄHLTEN Zeitraums — nicht stur die
   // aktuellste Fassung. Sonst zeigte die Wahl „1. Halbjahr" den Plan des
   // zweiten und man überschriebe beim Tippen den falschen.
   const slot = (wd, p) => tt.slots.find((s) => s.weekday === wd && s.period === p
     && slotActiveOn(s, stichtag || new Date()));
+  // Schluessel der Zeitfelder: „t<Index>" fuer die Stunden 1..n, „tZ" fuer die
+  // 0. — die Liste bleibt damit bei Index = Nummer − 1.
+  const idx = (p) => (p === 0 ? "Z" : p - 1);
   const timeVal = (i, f) => entwurf.wert[`t${i}${f}`] || "";
   const commitTime = (i, f, val) => entwurf.setz({ [`t${i}${f}`]: val });
   const timeInput = { width: "100%", boxSizing: "border-box", border: "1px solid var(--border2)", borderRadius: CONTROL_R, fontSize: 12, padding: 4, background: "var(--bg)", color: "var(--text)", marginTop: 4 };
@@ -1484,8 +1491,8 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
   // Vertikal konstant: Zeilenhoehe = Dauer * px/min. Pausen zwischen den Stunden
   // erscheinen als leere Zwischenzeile derselben Skalierung.
   const PXMIN = 1.3;
-  const rowH = (p) => { const a = hmToMin(timeVal(p - 1, "start")), b = hmToMin(timeVal(p - 1, "end")); return a != null && b != null && b > a ? Math.max(52, (b - a) * PXMIN) : 72; };
-  const gapH = (p) => { const a = hmToMin(timeVal(p - 1, "end")), b = hmToMin(timeVal(p, "start")); return a != null && b != null && b > a ? (b - a) * PXMIN : 0; };
+  const rowH = (p) => { const a = hmToMin(timeVal(idx(p), "start")), b = hmToMin(timeVal(idx(p), "end")); return a != null && b != null && b > a ? Math.max(52, (b - a) * PXMIN) : 72; };
+  const gapH = (p) => { const a = hmToMin(timeVal(idx(p), "end")), b = hmToMin(timeVal(idx(p + 1), "start")); return a != null && b != null && b > a ? (b - a) * PXMIN : 0; };
   return (
     <div>
       <SpeicherBalken entwurf={entwurf} />
@@ -1508,8 +1515,8 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
                     <td style={{ ...tdBase, textAlign: "center", verticalAlign: "middle", padding: showTimes ? 4 : "4px 0", background: "transparent", border: "none", width: showTimes ? 96 : 26 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{p}.</div>
                       {showTimes && (<>
-                        <input type="time" value={timeVal(p - 1, "start")} onChange={(e) => commitTime(p - 1, "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
-                        <input type="time" value={timeVal(p - 1, "end")} onChange={(e) => commitTime(p - 1, "end", e.target.value)} style={timeInput} title={t("kalender.end")} />
+                        <input type="time" value={timeVal(idx(p), "start")} onChange={(e) => commitTime(idx(p), "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
+                        <input type="time" value={timeVal(idx(p), "end")} onChange={(e) => commitTime(idx(p), "end", e.target.value)} style={timeInput} title={t("kalender.end")} />
                       </>)}
                     </td>
                     {wdays.map((_, wd) => {
@@ -1543,6 +1550,7 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
                 <div style={{ display: "inline-flex", gap: 4 }}>
                   {anzahl > 1 && <button onClick={() => entwurf.setz({ periods: anzahl - 1 })} title={t("kalender.removePeriod")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>−</button>}
                   <button onClick={() => entwurf.setz({ periods: anzahl + 1 })} title={t("kalender.addPeriod")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>+</button>
+                  <button onClick={() => entwurf.setz({ null: !hatNull })} title={t("kalender.zeroPeriodHint")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>{hatNull ? t("kalender.zeroPeriodOff") : t("kalender.zeroPeriodOn")}</button>
                 </div>
               </td>
               {wdays.map((_, wd) => <td key={wd} style={{ border: "none" }} />)}
@@ -1625,7 +1633,7 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
 
 // Klassenarbeiten planen + Übersicht: je kommender Klassenarbeit die bis dahin
 // verbleibenden Stundenplan-Stunden (freie Tage/Ausfälle bereits abgezogen).
-function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUpd, onDel, t }) {
+function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics = [], onAdd, onUpd, onDel, t }) {
   const [classId, setClassId] = useState("");
   const [kursId, setKursId] = useState(null);
   const [date, setDate] = useState("");
@@ -1641,7 +1649,7 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUp
   const [eClassId, setEClassId] = useState("");
   const [eKursId, setEKursId] = useState(null);
   const [ePeriod, setEPeriod] = useState("");
-  const pOpts = Array.from({ length: Math.max(1, periods) }, (_, i) => i + 1);
+  const pOpts = stundenListe(Math.max(1, periods), hatNull);
   // Wonach die Liste sortiert ist. Vorgabe bleibt das Datum — das ist die
   // Frage „was kommt als Naechstes?". Wer mehrere Faecher unterrichtet, plant
   // die Arbeiten dagegen fachweise; innerhalb eines Fachs zaehlt wieder das
@@ -2022,7 +2030,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onRau
   );
 }
 
-function EntryModal({ entry, zeiten = [], classes, topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, topicName = () => "", kursName = () => "", onSave, onDelete, onClose, t }) {
+function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, topicName = () => "", kursName = () => "", onSave, onDelete, onClose, t }) {
   const navigate = useNavigate();
   // "Ergebnis als Note": die gelaufene Session zum verknüpften Quiz suchen und
   // deren Auswertung mit direkt geöffnetem Noten-Import ansteuern.
@@ -2068,7 +2076,7 @@ function EntryModal({ entry, zeiten = [], classes, topics, methods = [], quizze 
   // rechnet es auch der Tagesplan und der ICS-Feed); leer heisst „die der
   // Stunde" — genau so laesst sich eine einzelne Stunde verlegen, ohne den
   // Stundenplan anzufassen.
-  const stunde = entry.period != null ? (zeiten[entry.period - 1] || null) : null;
+  const stunde = entry.period != null ? stundenZeit(zeiten, zeroZeit, entry.period) : null;
   const stundeVon = (stunde && stunde.start) || "";
   const stundeBis = (stunde && stunde.end) || "";
   // Die Regel im Klartext. „wiederholt sich" stand da und beantwortete die
