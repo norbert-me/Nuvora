@@ -1041,7 +1041,6 @@ export default {
   "kalender.extRefreshing": "Actualizando …",
   "kalender.extRefreshHint": "Descarga el calendario externo al momento — muestra los eventos borrados sin espera.",
   "kalender.toggleAllDay": "Mostrar/ocultar eventos de todo el día",
-  "kalender.timeFromPeriod": "Vacío = la hora de la clase ({{von}}–{{bis}}).",
   "kalender.timeInvalid": "La hora de fin debe ser posterior a la de inicio.",
   "kalender.entryTime": "Hora (opcional)",
   "kalender.entryTitle": "Título",

@@ -2305,11 +2305,6 @@ function EntryModal({ entry, zeiten = [], classes, topics, methods = [], quizze 
           <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.end")} />
           {(startTime || endTime) && <button onClick={() => { setStartTime(""); setEndTime(""); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.close} size={15} /></button>}
         </div>
-        {entry.period != null && !startTime && !endTime && (stundeVon || stundeBis) && (
-          <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>
-            {t("kalender.timeFromPeriod", { von: stundeVon || "?", bis: stundeBis || "?" })}
-          </div>
-        )}
         {timeInvalid && <div style={{ fontSize: 12, color: C.danger, marginTop: 5 }}>{t("kalender.timeInvalid")}</div>}
         </>)}
         <div style={lbl}>{t("kalender.kursOrClass")}</div>
