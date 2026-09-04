@@ -2174,6 +2174,18 @@ function EntryModal({ entry, zeiten = [], classes, topics, methods = [], quizze 
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 5 }}>{!edit ? (title || clsName || t("kalender.entry")) : ((entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry"))}</h3>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {entry.period != null && <span style={{ ...chipStyle, fontWeight: 700, background: "var(--accent)", color: C.aufAkzent }}>{entry.period}. {t("kalender.period")}</span>}
+              {/* Die UHRZEIT gehoert in den Kopf, nicht nur als Hinweis unter
+                  leere Felder: „2. Stunde" beantwortet nicht, wann die Stunde
+                  ist — und genau danach schaut man, wenn man einen Termin
+                  oeffnet. Eigene Zeit am Eintrag schlaegt die der Stunde
+                  (dieselbe Rangfolge wie im Tagesplan und im ICS-Feed). */}
+              {(startTime || stundeVon || stundeBis) && (
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>
+                  {startTime
+                    ? `${startTime}${endTime ? `–${endTime}` : ""}`
+                    : `${stundeVon || "?"}–${stundeBis || "?"}`}
+                </span>
+              )}
               <span style={{ fontSize: 12, color: "var(--text3)" }}>{new Date(entry.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
             </div>
           </div>

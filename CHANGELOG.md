@@ -21,6 +21,8 @@ Notiz zur größten Fassung die dünnste.
 
 **Kalender**
 
+- Der Eintrag-Dialog nennt im Kopf die Uhrzeit der Stunde — „2. Stunde" allein
+  sagt nicht, wann sie ist.
 - Neuer Reiter „Zeitleiste": der Kurs von oben nach unten — Unterrichtsstunden,
   Themen, Freischaltungen (Quiz, Karten, Lernleiter, Rätsel) und
   Klassenarbeiten auf einer Achse.
