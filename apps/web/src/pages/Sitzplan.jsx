@@ -1,7 +1,7 @@
 // Modul Sitzplan — freie Fläche statt Raster. Tische frei platzieren und
 // drehen (z.B. schräge Tische). Gespeichert wird { seats: [{sid,x,y,rot}] }.
 // Schüler bleiben im Kern; hier nur ihre Positionen (Regel 3).
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import { cardStyle, chipStyle, panelStyle, sectionLabel, Segment, segmentBtn, toolbarBtn, Icon, ICONS, toolbarIconBtn, CONTROL_R, SHADOW, dateiWaehlen, COLORS as C, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
@@ -326,6 +326,32 @@ export default function Sitzplan() {
   // ins Positive (normalisieren), nach rechts/unten waechst schlicht das Blatt.
   const RAND_ZUG = 600;
   const RAND_INNEN = 20;    // dort liegt danach das linke/obere Element
+
+  // WAEHREND des Zugs liegt der Tisch links vom Ursprung — und damit ausserhalb
+  // der Flaeche: er verschwand unter dem Rand, und erst beim Loslassen sprang
+  // alles an seinen Platz. Nach rechts fiel das nie auf (dort waechst die
+  // Flaeche einfach), nach links und oben war es der eigentliche Fehler.
+  //
+  // Also zeichnet die Flaeche mit einem VERSATZ: liegt etwas im Negativen,
+  // ruecken alle Elemente um genau diesen Betrag nach rechts/unten und das
+  // Blatt wird vorne laenger. Man sieht den Tisch sofort dort, wo er hingehoert.
+  // Beim Loslassen normalisiert `normalisieren` die Daten wieder ins Positive;
+  // weil die Anzeige den Versatz schon hatte, aendert sich dabei optisch nichts.
+  const versatzX = Math.max(0, -Math.min(0, ...seats.map((s) => s.x), tafel?.x ?? 0));
+  const versatzY = Math.max(0, -Math.min(0, ...seats.map((s) => s.y), tafel?.y ?? 0));
+  // Der Ausschnitt zieht mit, sonst wandert der Plan beim Wachsen unter der
+  // Hand weg: waechst das Blatt links um 40 px, muss auch 40 px weiter rechts
+  // gescrollt werden, damit dasselbe im Bild bleibt.
+  const versatzVorher = useRef({ x: 0, y: 0 });
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const dx = versatzX - versatzVorher.current.x;
+    const dy = versatzY - versatzVorher.current.y;
+    versatzVorher.current = { x: versatzX, y: versatzY };
+    if (!el) return;
+    if (dx) el.scrollLeft += dx * zoom;
+    if (dy) el.scrollTop += dy * zoom;
+  }, [versatzX, versatzY]);   // eslint-disable-line
   const normalisieren = (liste, tf) => {
     const xs = [...liste.map((s) => s.x), tf ? tf.x : Infinity];
     const ys = [...liste.map((s) => s.y), tf ? tf.y : Infinity];
@@ -340,12 +366,13 @@ export default function Sitzplan() {
       dx, dy,
     };
   };
-  // Nach dem Verschieben denselben Bildausschnitt behalten.
-  const ausschnittNachziehen = (dx, dy) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (dx) el.scrollLeft += dx * zoom;
-    if (dy) el.scrollTop += dy * zoom;
+  // Das Normalisieren verschiebt nur die DATEN (Werte + dx, Versatz - dx) —
+  // auf dem Schirm bleibt alles, wo es ist. Ohne diesen Vermerk haette der
+  // Effekt oben den Versatz-Sprung als echte Verschiebung gelesen und den
+  // Ausschnitt ein zweites Mal nachgezogen: der Plan waere beim Loslassen
+  // weggerutscht.
+  const versatzNeutral = (dx, dy) => {
+    versatzVorher.current = { x: versatzX - dx, y: versatzY - dy };
   };
 
   // Tafel ziehen (Pointer). Breite/Höhe der Tafel-Fläche.
@@ -354,15 +381,15 @@ export default function Sitzplan() {
     snapshot();
     e.preventDefault();
     const rect = canvasRef.current.getBoundingClientRect();
-    tafelRef.current = { dx: (e.clientX - rect.left) / zoom - tafel.x, dy: (e.clientY - rect.top) / zoom - tafel.y };
+    tafelRef.current = { dx: (e.clientX - rect.left) / zoom - (tafel.x + versatzX), dy: (e.clientY - rect.top) / zoom - (tafel.y + versatzY) };
     window.addEventListener("pointermove", onTafelMove);
     window.addEventListener("pointerup", onTafelUp);
   };
   const onTafelMove = (e) => {
     const d = tafelRef.current; if (!d) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - TAFEL_W + RAND_ZUG));
-    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - TAFEL_H + RAND_ZUG));
+    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx - versatzX, rect.width / zoom - TAFEL_W + RAND_ZUG));
+    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy - versatzY, rect.height / zoom - TAFEL_H + RAND_ZUG));
     // rot beibehalten — sonst verliert die Tafel beim Verschieben ihre Drehung.
     setTafel((tf) => ({ ...tf, x, y }));
   };
@@ -371,8 +398,8 @@ export default function Sitzplan() {
     window.removeEventListener("pointerup", onTafelUp);
     const norm = normalisieren(seats, tafel);
     if (norm.dx || norm.dy) {
+      versatzNeutral(norm.dx, norm.dy);
       persist(norm.liste, norm.tafel);
-      ausschnittNachziehen(norm.dx, norm.dy);
     }
     // Kein Schreiben mehr beim Loslassen: der Zug steht längst im Entwurf.
     tafelRef.current = null;
@@ -392,7 +419,7 @@ export default function Sitzplan() {
     // herausgefallen.
     dragRef.current = {
       sid: seat.sid, empty: !!seat.empty,
-      dx: (e.clientX - rect.left) / zoom - seat.x, dy: (e.clientY - rect.top) / zoom - seat.y,
+      dx: (e.clientX - rect.left) / zoom - (seat.x + versatzX), dy: (e.clientY - rect.top) / zoom - (seat.y + versatzY),
       rot: seat.rot || 0, sx: e.clientX, sy: e.clientY, gezogen: false,
     };
     window.addEventListener("pointermove", onMove);
@@ -407,8 +434,8 @@ export default function Sitzplan() {
       snapshot();
     }
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - SEAT_W + RAND_ZUG));
-    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - SEAT_H + RAND_ZUG));
+    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx - versatzX, rect.width / zoom - SEAT_W + RAND_ZUG));
+    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy - versatzY, rect.height / zoom - SEAT_H + RAND_ZUG));
     // rot ausdrücklich beibehalten (Drag darf die Drehung nie verwerfen).
     setSeats((prev) => prev.map((s) => (s.sid === d.sid ? { ...s, x, y, rot: s.rot ?? d.rot } : s)));
   };
@@ -425,8 +452,8 @@ export default function Sitzplan() {
       // `persist` schreibt Plaetze UND Tafel in den Entwurf — ein zweiter
       // Aufruf ueber setSeats/setTafel waere derselbe Zug zweimal.
       if (norm.dx || norm.dy) {
+        versatzNeutral(norm.dx, norm.dy);
         persist(norm.liste, norm.tafel);
-        ausschnittNachziehen(norm.dx, norm.dy);
       }
     }
     // Im Markier-Modus ist der Klick auf den Platz der Handgriff: eine Ecke
@@ -446,7 +473,7 @@ export default function Sitzplan() {
   const onRotDown = (e, seat) => {
     snapshot();
     e.preventDefault(); e.stopPropagation();
-    const cx = seat.x + SEAT_W / 2, cy = seat.y + SEAT_H / 2;
+    const cx = seat.x + versatzX + SEAT_W / 2, cy = seat.y + versatzY + SEAT_H / 2;
     // Relativ drehen: Start-Zeigerwinkel und Start-Drehung merken, damit das
     // Greifen des Griffs nicht sofort auf einen absoluten Winkel springt.
     rotRef.current = { sid: seat.sid, cx, cy, startAngle: _angle(e, cx, cy), startRot: seat.rot || 0 };
@@ -470,7 +497,7 @@ export default function Sitzplan() {
   const onTafelRotDown = (e) => {
     snapshot();
     e.preventDefault(); e.stopPropagation();
-    const cx = tafel.x + TAFEL_W / 2, cy = tafel.y + TAFEL_H / 2;
+    const cx = tafel.x + versatzX + TAFEL_W / 2, cy = tafel.y + versatzY + TAFEL_H / 2;
     tafelRotRef.current = { cx, cy, startAngle: _angle(e, cx, cy), startRot: tafel.rot || 0 };
     window.addEventListener("pointermove", onTafelRotMove);
     window.addEventListener("pointerup", onTafelRotUp);
@@ -494,11 +521,11 @@ export default function Sitzplan() {
     if (!sid || platziert.has(sid)) return;
     snapshot();
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - SEAT_W / 2, rect.width / zoom - SEAT_W + RAND_ZUG));
-    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - SEAT_H / 2, rect.height / zoom - SEAT_H + RAND_ZUG));
+    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - SEAT_W / 2 - versatzX, rect.width / zoom - SEAT_W + RAND_ZUG));
+    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - SEAT_H / 2 - versatzY, rect.height / zoom - SEAT_H + RAND_ZUG));
     const norm = normalisieren([...seats, { sid, x, y, rot: 0 }], tafel);
+    if (norm.dx || norm.dy) versatzNeutral(norm.dx, norm.dy);
     persist(norm.liste, norm.tafel);
-    if (norm.dx || norm.dy) ausschnittNachziehen(norm.dx, norm.dy);
   };
 
   // Leeren setzt auch die Tafel zurueck — sonst blieb sie an ihrer verschobenen
@@ -653,14 +680,14 @@ export default function Sitzplan() {
               // Die Flaeche waechst mit dem, was darauf steht — sonst endet der
               // Raum am Rand des Fensters, und ein Tisch weiter rechts liesse
               // sich gar nicht erst ablegen.
-              height: Math.max(760, ...seats.map((s) => s.y + SEAT_H + 60), (tafel?.y ?? 0) + TAFEL_H + 60),
-              width: Math.max(720, ...seats.map((s) => s.x + SEAT_W + 60), (tafel?.x ?? 0) + TAFEL_W + 60),
+              height: Math.max(760, ...seats.map((s) => s.y + versatzY + SEAT_H + 60), (tafel?.y ?? 0) + versatzY + TAFEL_H + 60),
+              width: Math.max(720, ...seats.map((s) => s.x + versatzX + SEAT_W + 60), (tafel?.x ?? 0) + versatzX + TAFEL_W + 60),
               minWidth: "calc(100% - 40px)", margin: "0 20px", transform: `scale(${zoom})`, transformOrigin: "0 0",
               cursor: "grab",
               backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
             {/* Bewegliche Tafel */}
             <div onPointerDown={onTafelDown}
-              style={{ position: "absolute", left: tafel.x, top: tafel.y, width: TAFEL_W, height: TAFEL_H,
+              style={{ position: "absolute", left: tafel.x + versatzX, top: tafel.y + versatzY, width: TAFEL_W, height: TAFEL_H,
                 transform: `rotate(${tafel.rot || 0}deg)`, transformOrigin: "center",
                 display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
                 fontSize: 12, letterSpacing: "0.1em", color: "var(--text2)", textTransform: "uppercase", fontWeight: 700,
@@ -684,7 +711,7 @@ export default function Sitzplan() {
                 <div key={seat.sid} draggable={false}
                   onPointerDown={(e) => onSeatDown(e, seat)}
                   onDragStart={(e) => e.preventDefault()}
-                  style={{ position: "absolute", left: seat.x, top: seat.y, width: SEAT_W, minHeight: SEAT_H,
+                  style={{ position: "absolute", left: seat.x + versatzX, top: seat.y + versatzY, width: SEAT_W, minHeight: SEAT_H,
                     transform: `rotate(${seat.rot || 0}deg)`, transformOrigin: "center",
                     display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
                     padding: "6px 22px 6px 8px", borderRadius: CONTROL_R,
