@@ -15,7 +15,10 @@ import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwa
 import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api/sitzplan";
-const SEAT_W = 108, SEAT_H = 46;
+// Der Platz traegt zwei Zeilen: oben Bild und Knoepfe, darunter den Namen.
+// BILD ist die Kante des quadratischen Fotos und zugleich die Hoehe der oberen
+// Zeile — ohne Foto bleibt sie so hoch wie die Knoepfe.
+const SEAT_W = 108, SEAT_H = 46, BILD = 44;
 // SEGEL-Stufen (Helios-Konzept): Boot vom Hafen bis in die Welt, zunehmende
 // Selbststeuerung. Reihenfolge = Klick-Kreislauf am Platz (leer → … → leer).
 const SEGEL = [
@@ -707,79 +710,75 @@ export default function Sitzplan() {
               const s = byId(seat.sid);
               if (!seat.empty && !s) return null;   // verwaister Platz (Schüler gelöscht) bleibt versteckt
               const hf = seat.empty ? null : farbeFuer(s);
+              const mitFoto = !seat.empty && fotosOn && !!s?.has_photo;
               return (
                 <div key={seat.sid} draggable={false}
                   onPointerDown={(e) => onSeatDown(e, seat)}
                   onDragStart={(e) => e.preventDefault()}
                   style={{ position: "absolute", left: seat.x + versatzX, top: seat.y + versatzY, width: SEAT_W, minHeight: SEAT_H,
                     transform: `rotate(${seat.rot || 0}deg)`, transformOrigin: "center",
-                    display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
-                    // Mit Foto faellt der linke Innenabstand weg: das Bild soll
-                    // die volle Hoehe des Platzes fuellen und buendig an der
-                    // Kante sitzen — so ist es am Beamer so gross wie moeglich.
-                    padding: (!seat.empty && fotosOn && s?.has_photo) ? "0 22px 0 0" : "6px 22px 6px 8px",
-                    overflow: "hidden", borderRadius: CONTROL_R,
-                    // Hervorgehoben: farbiger Rahmen UND getoenter Grund. Nur
-                    // der Rahmen reicht am Beamer nicht — 1 px verschwindet aus
-                    // drei Metern Abstand; nur die Toenung reicht bei
-                    // Sonnenlicht auf der Leinwand nicht.
+                    // Zwei Zeilen: oben Bild und Knoepfe nebeneinander, darunter
+                    // der Name ueber die GANZE Breite. Vorher stand der Name
+                    // neben dem Bild und teilte sich 108 px mit ihm — aus
+                    // „Elias S." wurde „Eli…", und die Knoepfe an den Ecken
+                    // wurden vom Bild aus dem Kasten geschoben.
+                    display: "flex", flexDirection: "column", overflow: "hidden",
+                    borderRadius: CONTROL_R,
                     border: `1px solid ${hf || "var(--border2)"}`,
                     background: hf ? `${hf}1f` : "var(--bg)", color: "var(--text)", fontSize: 13, fontWeight: 600,
                     cursor: hervor === "mark" && !seat.empty ? "pointer" : "grab",
                     boxShadow: SHADOW.ruhig, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none" }}>
-                  {hf && (
-                    // Der Balken traegt die Farbe da, wo sie auch bei
-                    // uebereinanderliegenden Tischen sichtbar bleibt: an der
-                    // Kante. Radius links = Radius des Platzes.
-                    <span aria-hidden style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 5,
-                      background: hf, borderTopLeftRadius: CONTROL_R, borderBottomLeftRadius: CONTROL_R }} />
-                  )}
-                  {!seat.empty && fotosOn && (
-                    // Groesser und eckig: am Beamer entscheidet die Flaeche des
-                    // Gesichts, ob man jemanden erkennt — ein Kreis mit 26 px
-                    // war aus drei Metern ein Punkt. 32 passt in die Zeilenhoehe
-                    // des Platzes (SEAT_H 46 minus Innenabstand).
-                    // `pointerEvents: none`: sonst faengt das Bild den Zug ab
-                    // und der Browser startet sein eigenes Bild-Ziehen — der
-                    // Platz blieb stehen, das Foto hing am Zeiger. Gezogen wird
-                    // der Platz, nicht sein Inhalt (beim Namen war es nie
-                    // anders, der ist kein Drag-Ziel).
-                    //
-                    // So hoch wie der Platz (SEAT_H minus die beiden Rahmen),
-                    // quadratisch, buendig an der linken Kante. Der Radius folgt
-                    // links dem Platz und ist rechts eckig — sonst klafft
-                    // zwischen Bild und Name eine runde Luecke. Liegt ein
-                    // Farbbalken an der Kante, ruecken beide um seine Breite.
-                    <Portrait student={s} size={SEAT_H - 2} form="eckig"
-                      style={{ marginLeft: hf ? 5 : 0, marginRight: 8, pointerEvents: "none", userSelect: "none",
-                        border: "none",
-                        borderTopLeftRadius: hf ? 0 : CONTROL_R - 1, borderBottomLeftRadius: hf ? 0 : CONTROL_R - 1,
-                        borderTopRightRadius: 0, borderBottomRightRadius: 0 }} />
-                  )}
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: seat.empty ? "var(--text3)" : undefined }}>{seat.empty ? t("sitzplan.emptySeat") : s.name}</span>
-                  {!seat.empty && segelTeil && segelOn && (() => {
-                    const st = SEGEL.find((x) => x.key === segel[String(seat.sid)]);
-                    return (
-                      <button onPointerDown={(e) => e.stopPropagation()} onClick={() => cycleStage(seat.sid)}
-                        title={st ? `SEGEL: ${st.label}` : t("sitzplan.segelSet")}
-                        style={{ position: "absolute", left: -9, bottom: -9, width: 20, height: 20, borderRadius: 10, cursor: "pointer", fontSize: 11, fontWeight: 700, lineHeight: 1,
-                          display: "flex", alignItems: "center", justifyContent: "center", boxShadow: SHADOW.ruhig,
-                          background: st ? st.color : "var(--card)", color: st ? C.aufAkzent : "var(--text3)",
-                          border: st ? "none" : "1px dashed var(--border2)" }}>
-                        {st ? st.ab : "+"}
-                      </button>
-                    );
-                  })()}
-                  {(
-                    <>
-                      {/* Dreh-Griff (Icon) an der oberen rechten Ecke: ziehen = frei drehen. */}
+                  <div style={{ display: "flex", alignItems: "stretch", minHeight: mitFoto ? BILD : 0 }}>
+                    {hf && (
+                      // Der Balken traegt die Farbe da, wo sie auch bei
+                      // uebereinanderliegenden Tischen sichtbar bleibt: an der
+                      // Kante.
+                      <span aria-hidden style={{ width: 5, flexShrink: 0, background: hf }} />
+                    )}
+                    {mitFoto && (
+                      // `pointerEvents: none`: sonst faengt das Bild den Zug ab
+                      // und der Browser startet sein eigenes Bild-Ziehen — der
+                      // Platz blieb stehen, das Foto hing am Zeiger. Gezogen
+                      // wird der Platz, nicht sein Inhalt.
+                      <Portrait student={s} size={BILD} form="eckig"
+                        style={{ flexShrink: 0, borderRadius: 0, border: "none",
+                          pointerEvents: "none", userSelect: "none" }} />
+                    )}
+                    {/* Die Knoepfe sitzen NEBEN dem Bild in einer Reihe, nicht
+                        mehr an den Ecken: mit einem randlosen Bild lagen sie
+                        halb ausserhalb des Platzes. */}
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "flex-end",
+                      gap: 3, padding: "3px 4px" }}>
+                      {!seat.empty && segelTeil && segelOn && (() => {
+                        const st = SEGEL.find((x) => x.key === segel[String(seat.sid)]);
+                        return (
+                          <button onPointerDown={(e) => e.stopPropagation()} onClick={() => cycleStage(seat.sid)}
+                            title={st ? `SEGEL: ${st.label}` : t("sitzplan.segelSet")}
+                            style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 9, cursor: "pointer", fontSize: 10, fontWeight: 700, lineHeight: 1,
+                              display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                              background: st ? st.color : "var(--card)", color: st ? C.aufAkzent : "var(--text3)",
+                              border: st ? "none" : "1px dashed var(--border2)" }}>
+                            {st ? st.ab : "+"}
+                          </button>
+                        );
+                      })()}
+                      {/* Dreh-Griff: ziehen = frei drehen. */}
                       <span onPointerDown={(e) => onRotDown(e, seat)} title={t("sitzplan.rotate")}
-                        style={{ position: "absolute", right: -9, top: -9, width: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center",
-                          background: "var(--card)", border: "1px solid var(--border2)", color: "var(--text2)", fontSize: 12, lineHeight: 1, cursor: "grab", touchAction: "none", boxShadow: SHADOW.ruhig }}><Icon d={ICONS.rotate} size={11} /></span>
+                        style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center",
+                          background: "var(--card)", border: "1px solid var(--border2)", color: "var(--text2)", cursor: "grab", touchAction: "none" }}>
+                        <Icon d={ICONS.rotate} size={11} />
+                      </span>
                       <button onPointerDown={(e) => e.stopPropagation()} onClick={() => entfernen(seat.sid)} title={t("sitzplan.removeSeat")}
-                        style={{ position: "absolute", right: -9, bottom: -9, width: 20, height: 20, borderRadius: 10, border: "1px solid var(--border2)", background: "var(--card)", cursor: "pointer", color: C.danger, fontSize: 13, fontWeight: 700, padding: 0, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
-                    </>
-                  )}
+                        style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 9, border: "1px solid var(--border2)", background: "var(--card)", cursor: "pointer", color: C.danger, fontSize: 12, fontWeight: 700, padding: 0, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+                    </div>
+                  </div>
+                  {/* Der Name ueber die ganze Breite — er ist die Angabe, auf
+                      die es ankommt, und bekommt deshalb die breiteste Zeile.
+                      Lange Namen brechen um, statt abgeschnitten zu werden. */}
+                  <span style={{ padding: "3px 6px 4px", textAlign: "center", lineHeight: 1.25,
+                    overflowWrap: "anywhere", color: seat.empty ? "var(--text3)" : undefined }}>
+                    {seat.empty ? t("sitzplan.emptySeat") : s.name}
+                  </span>
                 </div>
               );
             })}
