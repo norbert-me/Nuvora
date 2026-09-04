@@ -11,7 +11,7 @@
 // das spart Übertragung und der Server bekommt genau das, was auch angezeigt
 // wird — kein zweiter Zuschnitt an anderer Stelle mit anderem Ergebnis.
 import { useEffect, useRef, useState } from "react";
-import { btnPrimary, btnSecondary, DialogKopf, Modal } from "./Icons.jsx";
+import { btnPrimary, btnSecondary, DialogKopf, Modal, panelStyle } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const KANTE = 512;   // Kantenlänge des Ergebnisses in Pixeln
@@ -76,7 +76,7 @@ export default function BildZuschnitt({ datei, onFertig, onAbbruch }) {
       <DialogKopf titel={t("classes.cropTitle")} onClose={onAbbruch} schliessenLabel={t("common.close")} />
       <div onPointerDown={start} onPointerMove={ziehen} onPointerUp={ende} onPointerCancel={ende}
         style={{ width: flaeche, height: flaeche, maxWidth: "100%", margin: "0 auto 12px", position: "relative",
-          overflow: "hidden", borderRadius: 12, background: "var(--bg2)", cursor: "grab", touchAction: "none" }}>
+          overflow: "hidden", borderRadius: panelStyle.borderRadius, background: "var(--bg2)", cursor: "grab", touchAction: "none" }}>
         {bild && (
           <img src={bild.src} alt="" draggable={false}
             style={{ position: "absolute", left: pos.x, top: pos.y, width: bw, height: bh, userSelect: "none" }} />

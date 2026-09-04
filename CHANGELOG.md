@@ -25,7 +25,8 @@ Notiz zur größten Fassung die dünnste.
   was darauf steht. Vorher hingen die Tische am Rand „wie an einer Wand".
   Nach links und oben sieht man den Tisch jetzt schon beim Ziehen an seinem
   Platz, statt erst beim Loslassen.
-- Das Foto füllt die Höhe des Platzes und sitzt bündig an der linken Kante.
+- Das Foto füllt die Höhe des Platzes; der Name steht darunter über die ganze
+  Breite und die Knöpfe sitzen neben dem Bild statt an den Ecken.
 - Ein Tisch ließ sich am Foto nicht ziehen — der Browser nahm stattdessen das
   Bild mit.
 

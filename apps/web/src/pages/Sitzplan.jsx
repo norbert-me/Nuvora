@@ -754,7 +754,7 @@ export default function Sitzplan() {
                         return (
                           <button onPointerDown={(e) => e.stopPropagation()} onClick={() => cycleStage(seat.sid)}
                             title={st ? `SEGEL: ${st.label}` : t("sitzplan.segelSet")}
-                            style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 9, cursor: "pointer", fontSize: 10, fontWeight: 700, lineHeight: 1,
+                            style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, lineHeight: 1,
                               display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
                               background: st ? st.color : "var(--card)", color: st ? C.aufAkzent : "var(--text3)",
                               border: st ? "none" : "1px dashed var(--border2)" }}>
