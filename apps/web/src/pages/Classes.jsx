@@ -19,6 +19,9 @@ import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { FOERDER } from "../core/foerderung.js";
 import { useLanguage } from "../i18n/index.jsx";
+import { hochladen } from "../core/upload.js";
+import Fortschrittsbalken from "../components/Fortschrittsbalken.jsx";
+import BildZuschnitt from "../components/BildZuschnitt.jsx";
 import { useAktiv } from "../core/modules.js";
 import { peek, put } from "../core/cache.js";
 import { alsJson } from "../core/melden.js";
@@ -232,11 +235,20 @@ export default function Classes() {
   // nach einem Bild „nicht gespeichert" da, obwohl das Bild längst liegt).
   const [fotoDa, setFotoDa] = useState({});   // student_id -> hat Foto?
   const hatFoto = (s) => (s.id != null && s.id in fotoDa ? fotoDa[s.id] : !!s.has_photo);
+  // Ein Foto geht nie ungeschnitten hinaus: die Anzeige ist quadratisch
+  // (Sitzplan, Listen), und `object-fit: cover` schneidet mittig ab — bei
+  // einem Hochformat also am Gesicht vorbei. Der Dialog schlaegt den groessten
+  // mittigen Ausschnitt vor; wer nachhelfen will, schiebt und zoomt.
+  const [zuschnitt, setZuschnitt] = useState(null);   // { sid, datei }
+  const [fotoLaeuft, setFotoLaeuft] = useState(null); // sid des laufenden Uploads
+  const [fotoProzent, setFotoProzent] = useState(null);
   const uploadPhoto = async (sid, file) => {
     if (!file || !sid) return;
     const fd = new FormData(); fd.append("file", file);
-    const r = await fetch(`/api/classes/students/${sid}/photo`, { method: "POST", body: fd }).catch(() => null);
-    if (r && r.ok) { setFotoDa((m) => ({ ...m, [sid]: true })); setPhotoVer((v) => v + 1); }
+    setFotoLaeuft(sid); setFotoProzent(0);
+    const r = await hochladen(`/api/classes/students/${sid}/photo`, fd, { onFortschritt: setFotoProzent });
+    setFotoLaeuft(null); setFotoProzent(null);
+    if (r.ok) { setFotoDa((m) => ({ ...m, [sid]: true })); setPhotoVer((v) => v + 1); }
   };
   const removePhoto = async (sid) => {
     if (!sid) return;
@@ -301,7 +313,19 @@ export default function Classes() {
       // Schmaler als eine Modulseite (die Zeilen sind 620 breit) und trotzdem
       // mittig: mit der vollen pageApp-Breite klebte das Formular am linken Rand.
       <div style={{ ...pageApp, maxWidth: 620 }}>
-        <h2 style={pageTitle}>{editing.id ? t("classes.editTitle") : t("classes.newTitle")}</h2>
+        {/* Die Ueberschrift ist der Weg zurueck. „Abbrechen" steht unten in
+            der Werkzeugleiste — wer oben am Titel steht, sucht dort und nicht
+            am anderen Ende der Maske. Dieselbe Nachfrage wie beim Abbrechen:
+            ein offener Entwurf geht nicht still verloren. */}
+        <button onClick={() => {
+          if (entwurf.geaendert && !window.confirm(t("speichern.verlassen"))) return;
+          uebernehmen(LEERE_KLASSE); setEditing(null);
+        }} title={t("classes.backToList")}
+          style={{ ...pageTitle, display: "inline-flex", alignItems: "center", gap: 6, border: "none",
+            background: "none", padding: 0, cursor: "pointer", color: "var(--text)" }}>
+          <Icon d={ICONS.chevronLeft} size={18} color="var(--text3)" />
+          {editing.id ? t("classes.editTitle") : t("classes.newTitle")}
+        </button>
         <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
           {/* Klassen tragen keine Farbe — die Farbe hängt am Kurs (Fach). */}
           <input placeholder={t("classes.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)}
@@ -369,9 +393,10 @@ export default function Classes() {
                     <>
                       <label style={{ ...btnSecondary, ...btnSmall, cursor: "pointer" }}>
                         {hatFoto(s) ? t("classes.photoChange") : t("classes.photoAdd")}
-                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; uploadPhoto(s.id, f); }} />
+                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; if (f) setZuschnitt({ sid: s.id, datei: f }); }} />
                       </label>
                       {hatFoto(s) && <button type="button" onClick={() => removePhoto(s.id)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>}
+                      {fotoLaeuft === s.id && <Fortschrittsbalken wert={fotoProzent} style={{ flex: 1, minWidth: 80, margin: 0 }} />}
                     </>
                   ) : <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("classes.photoSaveFirst")}</span>}
                 </div>
@@ -483,6 +508,11 @@ export default function Classes() {
           <p style={{ fontSize: 12, color: students.length >= MAX_CARDS ? C.danger : "var(--text3)", margin: 0 }}>
             {t("classes.limit", { max: MAX_CARDS, count: students.length })}
           </p>
+        )}
+        {zuschnitt && (
+          <BildZuschnitt datei={zuschnitt.datei}
+            onAbbruch={() => setZuschnitt(null)}
+            onFertig={(quadrat) => { const sid = zuschnitt.sid; setZuschnitt(null); uploadPhoto(sid, quadrat); }} />
         )}
       </div>
     );

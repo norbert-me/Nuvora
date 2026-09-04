@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useModules, useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
+import { lokal, sichern } from "../core/ansichten.js";
 import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLORS as C, pageApp, pageTitle, cardStyle, chipStyle, badge, btnSmall, CONTROL_H, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson, hol } from "../core/melden.js";
@@ -251,6 +252,13 @@ export default function NuvoraHome({ user }) {
   const dashKey = `nuvora_dash_${user?.id ?? "x"}`;
   const orderKey = `nuvora_modorder_${user?.id ?? "x"}`;
   const [dash, setDash] = useState(() => {
+    // Reihenfolge der Quellen: was das Konto sagt (core/ansichten.js), sonst
+    // der alte Browser-Eintrag, sonst die Voreinstellung. Die beiden alten
+    // Schluessel werden weiter gelesen, damit niemandes Anordnung verloren
+    // geht — geschrieben wird nur noch ans Konto.
+    const vomKonto = lokal("dash");
+    if (vomKonto && Array.isArray(vomKonto.order))
+      return { order: vomKonto.order, hidden: vomKonto.hidden || [], widgets: vomKonto.widgets ?? null };
     try {
       const roh = JSON.parse(localStorage.getItem(dashKey));
       if (roh && Array.isArray(roh.order)) return { order: roh.order, hidden: roh.hidden || [], widgets: roh.widgets || null };
@@ -261,6 +269,13 @@ export default function NuvoraHome({ user }) {
     } catch { /* egal */ }
     return { order: [], hidden: [], widgets: null };
   });
+  // Kommt der Kontostand erst nach dem ersten Zeichnen an (frisch angemeldet,
+  // anderes Geraet), zieht die Seite nach.
+  useEffect(() => {
+    const vomKonto = user?.ansichten?.dash;
+    if (vomKonto && Array.isArray(vomKonto.order))
+      setDash({ order: vomKonto.order, hidden: vomKonto.hidden || [], widgets: vomKonto.widgets ?? null });
+  }, [user?.ansichten]); // eslint-disable-line
   // widgets === null heisst „nie etwas eingestellt": dann gelten die
   // Voreinstellungen aus dem Register, damit sich fuer niemanden ueber Nacht
   // die Startseite leert.
@@ -299,7 +314,9 @@ export default function NuvoraHome({ user }) {
 
   const persist = (naechster) => {
     setDash(naechster);
-    try { localStorage.setItem(dashKey, JSON.stringify(naechster)); } catch { /* egal */ }
+    // Ans Konto (mit lokalem Sofort-Eintrag als Rueckfall) — die Einrichtung
+    // gehoert zur Person, nicht zum Geraet.
+    sichern("dash", naechster);
   };
 
   // Auch das Anordnen der Kacheln ist eine Änderung und wartet auf „Speichern".

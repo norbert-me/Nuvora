@@ -36,6 +36,13 @@ class User(Base):
     # Geraet neu — auf dem Handy bei jedem Aufruf, weil Safari den Speicher der
     # Seite nach ein paar Tagen raeumt.
     tours_done: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Ansichts-Einstellungen, die frueher nur im Browser lagen: die Einrichtung
+    # der Startseite (Reihenfolge, ausgeblendete Kacheln, Widgets) und die
+    # Start-Ansicht des Kalenders. Sie sind kein Inhalt — aber sie gehoeren zur
+    # Person, nicht zum Geraet: wer am Rechner aufraeumt und abends am Tablet
+    # weiterarbeitet, will dieselbe Startseite sehen. Form: {"dash": {...},
+    # "kalender": {"start": "month"}} — je Bereich ein Schluessel.
+    ansichten: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     # Noten mit Tendenz (2+/2-) statt ganzer Note (2). Default an — Module (Klassen-
     # arbeit, CardVote) übernehmen das als Voreinstellung.
     grade_tendency: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")

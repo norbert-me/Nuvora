@@ -15,6 +15,7 @@ import { kursLabel } from "../core/kurslabel.js";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { lokal, sichern } from "../core/ansichten.js";
 import { swr, put } from "../core/cache.js";
 import { undoDelete } from "../core/undo.jsx";
 import { alsJson, hol, pruefeAntwort, sende } from "../core/melden.js";
@@ -89,7 +90,12 @@ export default function Kalender() {
   // Kalender taeglich zum Planen der naechsten Stunde aufmacht, will nicht
   // jedes Mal erst vom Monat auf den Tag klicken. Im Browser gemerkt und nicht
   // am Konto — es ist eine Ansicht, kein Inhalt.
+  // Die Start-Ansicht gehoert zur Person, nicht zum Geraet (core/ansichten.js):
+  // wer sie am Rechner setzt, will sie am Tablet wiederfinden. Der alte
+  // Browser-Eintrag wird weiter gelesen, damit niemand seine Wahl verliert.
   const [startAnsicht, setStartAnsicht] = useState(() => {
+    const vomKonto = lokal("kalender")?.start;
+    if (["month", "week", "day"].includes(vomKonto)) return vomKonto;
     try { const v = localStorage.getItem("kal_view_start"); return ["month", "week", "day"].includes(v) ? v : "month"; } catch { return "month"; }
   });
   // Die Startansicht wirkt nur, solange KEIN ?view in der Adresse steht — und
@@ -99,7 +105,7 @@ export default function Kalender() {
   // der Parameter verschwindet.
   const setzeStartAnsicht = (v) => {
     setStartAnsicht(v);
-    try { localStorage.setItem("kal_view_start", v); } catch { /* egal */ }
+    sichern("kalender", { start: v });
     setParams((p) => { const n = new URLSearchParams(p); n.delete("view"); return n; }, { replace: true });
   };
   const view = (params.get("view") === "today" ? "day" : params.get("view")) || startAnsicht;

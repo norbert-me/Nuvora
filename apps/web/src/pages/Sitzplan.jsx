@@ -639,7 +639,11 @@ export default function Sitzplan() {
                       background: hf, borderTopLeftRadius: CONTROL_R, borderBottomLeftRadius: CONTROL_R }} />
                   )}
                   {!seat.empty && fotosOn && (
-                    <Portrait student={s} size={26} style={{ marginRight: 8 }} />
+                    // Groesser und eckig: am Beamer entscheidet die Flaeche des
+                    // Gesichts, ob man jemanden erkennt — ein Kreis mit 26 px
+                    // war aus drei Metern ein Punkt. 32 passt in die Zeilenhoehe
+                    // des Platzes (SEAT_H 46 minus Innenabstand).
+                    <Portrait student={s} size={32} form="eckig" style={{ marginRight: 8 }} />
                   )}
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: seat.empty ? "var(--text3)" : undefined }}>{seat.empty ? t("sitzplan.emptySeat") : s.name}</span>
                   {!seat.empty && segelTeil && segelOn && (() => {

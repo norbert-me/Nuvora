@@ -7,6 +7,8 @@
 import { useState, useEffect } from "react";
 import { Icon, ICONS, btnSecondary, btnSmall, iconBtn, chipStyle, cardStyle, COLORS as C, CONTROL_R, Modal } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { hochladen } from "../core/upload.js";
+import Fortschrittsbalken from "./Fortschrittsbalken.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { askConfirm } from "../core/dialog.jsx";
 import { hol } from "../core/melden.js";
@@ -28,6 +30,7 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
   const { t } = useLanguage();
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [fortschritt, setFortschritt] = useState(null);   // 0..100, null = kein Upload
   const [err, setErr] = useState("");
   const [vorschau, setVorschau] = useState(null);   // { url, name, mime }
 
@@ -43,7 +46,7 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
 
   const upload = async (file) => {
     if (!file) return;
-    setErr(""); setBusy(true);
+    setErr(""); setBusy(true); setFortschritt(0);
     const fd = new FormData();
     fd.append("file", file);
     if (topicId != null) fd.append("topic_id", String(topicId));
@@ -51,10 +54,12 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
     if (methodId != null) fd.append("method_id", String(methodId));
     if (workId != null) fd.append("work_id", String(workId));
     if (rolle) fd.append("rolle", rolle);
-    const res = await fetch(API, { method: "POST", body: fd }).catch(() => null);
-    setBusy(false);
-    if (res && res.ok) load();
-    else { const b = res ? await res.json().catch(() => ({})) : {}; setErr(typeof b.detail === "string" ? b.detail : t("common.notWork")); }
+    // Mit Fortschritt: eine Klassenarbeit als Scan hat schnell 20 MB, und ohne
+    // Balken ist der Unterschied zwischen „laedt" und „haengt" nicht zu sehen.
+    const res = await hochladen(API, fd, { onFortschritt: setFortschritt });
+    setBusy(false); setFortschritt(null);
+    if (res.ok) load();
+    else setErr(typeof res.daten?.detail === "string" ? res.daten.detail : t("common.notWork"));
   };
 
   // Was der Browser selbst zeigen kann, wird gezeigt. Office-Dateien kann er
@@ -115,12 +120,16 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
         <span style={chipStyle}>{items.length}</span>
         {!nurLesen && (
           <label style={{ ...btnSecondary, ...btnSmall, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, marginLeft: "auto" }}>
-            {busy ? t("material.uploading") : t("material.upload")}
+            {busy ? (fortschritt == null ? t("material.uploading") : `${t("material.uploading")} ${fortschritt} %`) : t("material.upload")}
             <input type="file" style={{ display: "none" }} disabled={busy}
               onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; upload(f); }} />
           </label>
         )}
       </div>
+      {/* Der Balken sagt, was die Prozentzahl allein nicht sagt: dass es
+          weitergeht. Bei unbekannter Gesamtgroesse (selten) bleibt er auf
+          voller Breite gedaempft — „laeuft, Dauer unbekannt". */}
+      <Fortschrittsbalken wert={busy ? fortschritt : undefined} />
       {err && <p style={{ color: C.danger, fontSize: 13, margin: "0 0 8px" }}>{err}</p>}
       {items.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("material.empty")}</p>

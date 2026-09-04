@@ -150,6 +150,7 @@ import Login from "./pages/Login.jsx";
 import Landing from "./pages/Landing.jsx";
 import NuvoraHome from "./pages/NuvoraHome.jsx";
 import GuidedTour, { PATH_TOUR, tourFor } from "./components/GuidedTour.jsx";
+import { uebernehmen as ansichtenUebernehmen, vergessen as ansichtenVergessen } from "./core/ansichten.js";
 import Suche from "./components/Suche.jsx";
 import { useModules } from "./core/modules.js";
 import { istAdmin } from "./core/admin.js";
@@ -1136,7 +1137,12 @@ function App() {
       .then((r) => (r.ok ? r.json() : null))
       .then((u) => {
         if (!alive) return;
-        if (u) { setUser(u); schreibJson("user", u); }
+        if (u) {
+          setUser(u); schreibJson("user", u);
+          // Ansichts-Einstellungen (Startseite, Kalender) kommen mit dem Konto
+          // herein und gelten ab sofort auf DIESEM Geraet.
+          ansichtenUebernehmen(u.ansichten);
+        }
         else { loesche("token"); loesche("user"); setUser(null); }
       })
       .catch(() => { /* offline: Interceptor kickt bei 401, sonst optimistisch */ })
@@ -1160,6 +1166,9 @@ function App() {
     // Zwischengespeicherte Kerndaten des Nutzers loeschen (kein Rest fuer den
     // naechsten Login am selben Browser).
     schluessel("nuvora_cache_").forEach(loesche);
+    // Auch die Ansichts-Einstellungen: der naechste Nutzer an diesem Browser
+    // soll nicht die Startseite des vorigen sehen.
+    ansichtenVergessen();
     setUser(null);
   };
 

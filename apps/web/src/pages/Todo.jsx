@@ -44,6 +44,17 @@ export default function Todo({ embedded } = {}) {
   const [eDate, setEDate] = useState("");
   const [eTime, setETime] = useState("");
 
+  // Der Datumswaehler soll aufgehen, sobald das Feld ueberhaupt erscheint —
+  // `showPicker()` geht nur nach einer echten Geste, also im selben Zug wie
+  // der Klick. Browser ohne die Methode zeigen einfach das Feld (Safari <16).
+  const datumRef = useRef(null);
+  const [datumAuf, setDatumAuf] = useState(false);
+  useEffect(() => {
+    if (!datumAuf) return;
+    setDatumAuf(false);
+    try { datumRef.current?.showPicker?.(); } catch { /* Browser ohne showPicker */ }
+  }, [datumAuf]);
+
   const naechsteStunde = () => { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); return `${String(d.getHours()).padStart(2, "0")}:00`; };
   const load = () => hol(API).then((d) => setItems(Array.isArray(d) ? d : []));
   useEffect(() => { load(); }, []);
@@ -131,16 +142,16 @@ export default function Todo({ embedded } = {}) {
       return new Date(iso + "T00:00:00").toLocaleDateString(undefined, opt);
     } catch { return iso; }
   };
-  // Die Farbe des Datums-Etiketts sagt, wie dringend es ist: vorbei = rot, in
-  // den naechsten sieben Tagen = gelb, alles Weitere = blau wie bisher. Ohne
-  // das stand jedes Datum gleich da, und ein ueberfaelliger Punkt sah aus wie
-  // einer im naechsten Monat. Sieben Tage, weil eine Schulwoche der Takt ist,
-  // in dem geplant wird.
+  // Die Farbe des Datums-Etiketts sagt, wie dringend es ist: HEUTE und alles
+  // Vergangene = rot, die naechsten sieben Tage = gelb, alles Weitere = blau.
+  // Heute stand vorher auf gelb — das ist die Farbe fuer „demnaechst", und
+  // genau so wurde sie gelesen: was heute faellig ist, ging unter. Sieben
+  // Tage, weil eine Schulwoche der Takt ist, in dem geplant wird.
   const heuteVergleich = heuteYmd();
   const faelligFarbe = (iso) => {
     const heute = heuteVergleich;
     if (!iso) return null;
-    if (iso < heute) return C.danger;
+    if (iso <= heute) return C.danger;
     const grenze = new Date();
     grenze.setDate(grenze.getDate() + 7);
     return iso <= ymd(grenze) ? C.warning : null;   // null = die blaue Vorgabe
@@ -213,11 +224,15 @@ export default function Todo({ embedded } = {}) {
         {/* Datum/Uhrzeit erst per Icon dazuschalten (Default heute bzw. nächste
             volle Stunde) — kein leeres Feld, das nach nichts aussieht. */}
         {!date ? (
-          <button onClick={() => setDate(heuteYmd())} className="icon-btn" title={t("todo.addDate")} aria-label={t("todo.addDate")} style={toolbarIconBtn}>
+          // Ein Klick, zwei Schritte: das Feld traegt sofort HEUTE (der
+          // haeufigste Fall) und der Waehler geht auf, falls jemand einen
+          // anderen Tag meint. Vorher erschien nur ein leeres Feld, das man
+          // noch einmal antippen musste.
+          <button onClick={() => { setDate(heuteYmd()); setDatumAuf(true); }} className="icon-btn" title={t("todo.addDate")} aria-label={t("todo.addDate")} style={toolbarIconBtn}>
             <Icon d={ICONS.calendar} size={18} color="var(--text2)" />
           </button>
         ) : (<>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} title={t("todo.dateHint")} style={toolbarInput} />
+          <input type="date" ref={datumRef} value={date} onChange={(e) => setDate(e.target.value)} title={t("todo.dateHint")} style={toolbarInput} />
           {!time ? (
             <button onClick={() => setTime(naechsteStunde())} className="icon-btn" title={t("todo.addTime")} aria-label={t("todo.addTime")} style={toolbarIconBtn}>
               <Icon d={ICONS.clock} size={18} color="var(--text2)" />

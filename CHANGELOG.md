@@ -12,6 +12,29 @@ Zwischenfassung (x.y.0) hängt sie **alle Abschnitte der vorigen Reihe** an: wer
 von 4.1.0 auf 4.2.0 geht, hat 4.1.1 bis 4.1.9 nie gesehen — sonst wäre die
 Notiz zur größten Fassung die dünnste.
 
+## 4.1.8 — 04.09.2026
+
+**Startseite und Kalender**
+
+- Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
+  Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
+
+**Klassen**
+
+- Ein Klassenfoto wird beim Hinzufügen quadratisch zugeschnitten; verschieben
+  und zoomen geht im Dialog.
+- Im Sitzplan sind die Fotos größer und eckig.
+- Ein Klick auf die Überschrift führt zurück zur Klassenliste.
+
+**Dateien**
+
+- Hochladen zeigt einen Fortschrittsbalken (Material, Klassenfotos).
+
+**Notizbrett**
+
+- Was heute fällig ist, steht rot (vorher gelb wie „demnächst").
+- Der Kalender-Knopf trägt sofort das heutige Datum ein und öffnet die Auswahl.
+
 ## 4.1.7 — 01.09.2026
 
 **Orga**

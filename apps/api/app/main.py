@@ -232,6 +232,7 @@ def _ensure_columns(sync_conn):
         ("grade_entries", "kurs_id", "INTEGER"),
         ("grade_entries", "term", "VARCHAR(10) DEFAULT '' NOT NULL"),
         ("users", "tours_done", "JSON"),
+        ("users", "ansichten", "JSON"),
         ("calendar_entries", "end_date", "TIMESTAMP"),   # mehrtaegige Termine
         ("question_sets", "owner_id", "INTEGER"),
         ("card_decks", "folder_id", "INTEGER"),

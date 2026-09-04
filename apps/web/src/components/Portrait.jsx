@@ -9,6 +9,7 @@
 // Bei 30 Kindern sind das 600 KB statt womöglich 100 MB Handyfotos — in einem
 // Schulnetz der Unterschied zwischen „ist da" und „lädt".
 import AuthImage from "./AuthImage.jsx";
+import { CONTROL_R } from "./Icons.jsx";
 
 /** Initialen aus „Mia O." → „MO", aus „Timur" → „T". */
 export function initialen(name) {
@@ -24,11 +25,15 @@ export function initialen(name) {
  * @param size     Kantenlänge in Pixeln
  * @param zoomable Klick vergrößert (in Listen meist unerwünscht)
  */
-export default function Portrait({ student, size = 32, zoomable = false, style }) {
+// `form`: "rund" (Standard, Listen und Chips) oder "eckig". Eckig ist für den
+// Sitzplan da — dort sitzen die Bilder auf einem rechteckigen Platz, und ein
+// Kreis darin verschenkt genau die Fläche, auf die es am Beamer ankommt: das
+// Gesicht. Der Radius folgt dann den Tokens (CONTROL_R) wie alles Eckige.
+export default function Portrait({ student, size = 32, zoomable = false, form = "rund", style }) {
   const rund = {
-    // Ausnahme von den Radius-Tokens: der Radius IST die halbe Kante — nur so
-    // wird aus dem Quadrat ein Kreis (Porträt).
-    width: size, height: size, borderRadius: size / 2, flexShrink: 0,
+    // Ausnahme von den Radius-Tokens NUR beim Kreis: dort IST der Radius die
+    // halbe Kante — anders wird aus dem Quadrat kein Kreis.
+    width: size, height: size, borderRadius: form === "eckig" ? CONTROL_R : size / 2, flexShrink: 0,
     objectFit: "cover", border: "1px solid var(--border2)", ...style,
   };
 

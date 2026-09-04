@@ -493,6 +493,8 @@ def _user_dict(user):
         "display_name": display or user.email, "grade_scale": user.grade_scale, "grade_tendency": user.grade_tendency,
         # Gesehene Touren: am Konto, damit sie nicht auf jedem Geraet neu laufen.
         "tours_done": list(getattr(user, "tours_done", None) or []),
+        # Ansichts-Einstellungen (Startseite, Kalender) — siehe models.User.
+        "ansichten": dict(getattr(user, "ansichten", None) or {}),
         "marketplace_name": getattr(user, "marketplace_name", "") or "",
         "pending_email": getattr(user, "pending_email", None),
         # Schuljahr — die Shell braucht es fuer alles, was „dieses Halbjahr" sagt.
@@ -754,6 +756,40 @@ async def tour_done(body: TourBody, user: User = Depends(get_current_user), db: 
         user.tours_done = [*done, key][:100]
         await db.commit()
     return {"ok": True, "tours_done": list(user.tours_done or [])}
+
+
+class AnsichtenBody(BaseModel):
+    """Ein Bereich mit seinen Einstellungen: {"bereich": "dash", "wert": {...}}."""
+    bereich: str
+    wert: dict
+
+
+@router.put("/ansichten")
+async def set_ansichten(body: AnsichtenBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Eine Ansichts-Einstellung am KONTO ablegen (Startseite, Kalender).
+
+    Frueher lag beides im localStorage — „es ist eine Ansicht, kein Inhalt".
+    Im Gebrauch war das falsch: wer die Startseite am Rechner einrichtet und
+    abends am Tablet weiterarbeitet, fand dort die alte Anordnung vor und hielt
+    sie fuer nicht gespeichert.
+
+    Je Bereich EIN Schluessel; andere Bereiche bleiben unberuehrt. Groesse
+    begrenzt, damit hier keine Inhalte landen: das ist eine Einstellung, kein
+    Ablageplatz.
+    """
+    bereich = (body.bereich or "").strip()[:40]
+    if not bereich or not bereich.isidentifier():
+        raise HTTPException(400, "Unbekannter Bereich")
+    import json as _json
+    if len(_json.dumps(body.wert)) > 8000:
+        raise HTTPException(413, "Einstellung zu groß")
+    alle = dict(getattr(user, "ansichten", None) or {})
+    alle[bereich] = body.wert
+    # Neues dict statt Mutieren: eine JSON-Spalte merkt sich eine Aenderung am
+    # Objekt sonst nicht (kein Mutable-Tracking) und schriebe nichts.
+    user.ansichten = alle
+    await db.commit()
+    return {"ok": True, "ansichten": alle}
 
 
 @router.put("/profile")

@@ -265,3 +265,34 @@ async def test_tour_ohne_namen_wird_abgewiesen(s):
     u = await _konto(s)
     with pytest.raises(HTTPException):
         await A.tour_done(A.TourBody(tour="  "), user=u, db=s)
+
+
+# ─────────────── Ansichts-Einstellungen am Konto ───────────────
+#
+# Startseite und Kalender-Startansicht lagen im localStorage („eine Ansicht,
+# kein Inhalt"). Im Gebrauch war das falsch: wer am Rechner einrichtet und
+# abends am Tablet weiterarbeitet, fand die alte Anordnung vor.
+
+@pytest.mark.asyncio
+async def test_ansichten_je_bereich(s):
+    u = await _konto(s)
+    r = await A.set_ansichten(A.AnsichtenBody(bereich="dash", wert={"order": ["kalender"]}), user=u, db=s)
+    assert r["ansichten"] == {"dash": {"order": ["kalender"]}}
+    # Ein zweiter Bereich laesst den ersten stehen.
+    r = await A.set_ansichten(A.AnsichtenBody(bereich="kalender", wert={"start": "week"}), user=u, db=s)
+    assert r["ansichten"]["dash"] == {"order": ["kalender"]}
+    assert r["ansichten"]["kalender"] == {"start": "week"}
+    # Und die Anmeldeantwort traegt sie, sonst wuesste die Oberflaeche nichts davon.
+    assert A._user_dict(u)["ansichten"]["kalender"] == {"start": "week"}
+
+
+@pytest.mark.asyncio
+async def test_ansichten_grenzen(s):
+    u = await _konto(s)
+    with pytest.raises(HTTPException) as e:
+        await A.set_ansichten(A.AnsichtenBody(bereich="", wert={}), user=u, db=s)
+    assert e.value.status_code == 400
+    # Das ist eine Einstellung, kein Ablageplatz.
+    with pytest.raises(HTTPException) as gross:
+        await A.set_ansichten(A.AnsichtenBody(bereich="dash", wert={"x": "y" * 9000}), user=u, db=s)
+    assert gross.value.status_code == 413
