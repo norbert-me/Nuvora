@@ -714,7 +714,11 @@ export default function Sitzplan() {
                   style={{ position: "absolute", left: seat.x + versatzX, top: seat.y + versatzY, width: SEAT_W, minHeight: SEAT_H,
                     transform: `rotate(${seat.rot || 0}deg)`, transformOrigin: "center",
                     display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
-                    padding: "6px 22px 6px 8px", borderRadius: CONTROL_R,
+                    // Mit Foto faellt der linke Innenabstand weg: das Bild soll
+                    // die volle Hoehe des Platzes fuellen und buendig an der
+                    // Kante sitzen — so ist es am Beamer so gross wie moeglich.
+                    padding: (!seat.empty && fotosOn && s?.has_photo) ? "0 22px 0 0" : "6px 22px 6px 8px",
+                    overflow: "hidden", borderRadius: CONTROL_R,
                     // Hervorgehoben: farbiger Rahmen UND getoenter Grund. Nur
                     // der Rahmen reicht am Beamer nicht — 1 px verschwindet aus
                     // drei Metern Abstand; nur die Toenung reicht bei
@@ -740,8 +744,17 @@ export default function Sitzplan() {
                     // Platz blieb stehen, das Foto hing am Zeiger. Gezogen wird
                     // der Platz, nicht sein Inhalt (beim Namen war es nie
                     // anders, der ist kein Drag-Ziel).
-                    <Portrait student={s} size={32} form="eckig"
-                      style={{ marginRight: 8, pointerEvents: "none", userSelect: "none" }} />
+                    //
+                    // So hoch wie der Platz (SEAT_H minus die beiden Rahmen),
+                    // quadratisch, buendig an der linken Kante. Der Radius folgt
+                    // links dem Platz und ist rechts eckig — sonst klafft
+                    // zwischen Bild und Name eine runde Luecke. Liegt ein
+                    // Farbbalken an der Kante, ruecken beide um seine Breite.
+                    <Portrait student={s} size={SEAT_H - 2} form="eckig"
+                      style={{ marginLeft: hf ? 5 : 0, marginRight: 8, pointerEvents: "none", userSelect: "none",
+                        border: "none",
+                        borderTopLeftRadius: hf ? 0 : CONTROL_R - 1, borderBottomLeftRadius: hf ? 0 : CONTROL_R - 1,
+                        borderTopRightRadius: 0, borderBottomRightRadius: 0 }} />
                   )}
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: seat.empty ? "var(--text3)" : undefined }}>{seat.empty ? t("sitzplan.emptySeat") : s.name}</span>
                   {!seat.empty && segelTeil && segelOn && (() => {
