@@ -62,6 +62,20 @@ async def test_arbeiten_und_themen_auf_der_achse(s):
 
 
 @pytest.mark.asyncio
+async def test_arbeit_ueber_die_klasse_zaehlt_mit(s):
+    """Eine Arbeit ohne Kurs, nur an der Klasse — der Normalfall, wenn ein Kurs
+    genau eine Klasse hat. Sie gehoert auf die Leiste; ein Filter allein auf
+    `kurs_id` liess sie verschwinden."""
+    u, cls, k = await _welt(s)
+    s.add(ExamDate(owner_id=u.id, class_id=cls.id, kurs_id=None,
+                   date=datetime.combine(datetime.now().date() + timedelta(days=5), datetime.min.time()),
+                   title="Ohne Kurs"))
+    await s.commit()
+    aus = await KAL.zeitleiste(kurs_id=k.id, user=u, db=s)
+    assert [p["titel"] for p in aus["punkte"] if p["art"] == "arbeit"] == ["Ohne Kurs"]
+
+
+@pytest.mark.asyncio
 async def test_freischaltung_nur_mit_modul(s):
     u, cls, k = await _welt(s)          # nur Kalender aktiv
     from app.models import CardDeck

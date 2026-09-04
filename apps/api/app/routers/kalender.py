@@ -1313,10 +1313,14 @@ async def zeitleiste(kurs_id: int, term: str = "", user: User = Depends(require_
             breaks_days=_freie_tage(breaks), cancel_set={(_tag(c.date), c.period) for c in cancels}):
         punkte.append({"art": "stunde", "date": tag.isoformat(), "period": period, "titel": "", "sub": ""})
 
+    # Dieselbe Zuordnung wie bei den Eintraegen: der Kurs zaehlt, und eine
+    # kurslose Arbeit der Klasse zaehlt mit. Nur auf `kurs_id` zu filtern liess
+    # genau die Termine verschwinden, die ueber die Klasse eingetragen sind —
+    # und das ist der Normalfall, wenn ein Kurs nur eine Klasse hat.
     for ex in (await db.execute(select(ExamDate).where(
-            ExamDate.owner_id == user.id, ExamDate.kurs_id == kurs_id))).scalars().all():
+            ExamDate.owner_id == user.id))).scalars().all():
         d = _tag(ex.date)
-        if start <= d < ende:
+        if start <= d < ende and zum_kurs(ex):
             punkte.append({"art": "arbeit", "date": d.isoformat(), "period": ex.period,
                            "titel": ex.title or "Klassenarbeit", "sub": ex.notiz or "", "id": ex.id})
 

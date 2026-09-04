@@ -852,6 +852,28 @@ def inhalt_kalender(api, u, spuren):
         "PUT", "/api/kalender/untis", {k: vorher.get(k) or "" for k in
                                        ("server", "schule", "benutzer", "ics_url")},
         erwartet=(200, 404))))
+    arbeit = api.call("POST", "/api/kalender/klassenarbeiten", {
+        "date": (tag + timedelta(days=7)).isoformat(), "title": f"{PRAEFIX} KA",
+        "class_id": u.class_id, "kurs_id": u.kurs_id,
+        # Themen der Arbeit: eins eigenes und eine erfundene Nummer. Die eigene
+        # muss bleiben, die fremde still herausfallen — ein Thema, das jemand
+        # zwischendurch geloescht hat, darf keinen Termin blockieren.
+        "topic_ids": [u.topic_id, 999999999],
+    }, erwartet=(201,))
+    spuren.append(("Klassenarbeitstermin", lambda: api.call(
+        "DELETE", f"/api/kalender/klassenarbeiten/{arbeit['id']}", erwartet=(204, 404))))
+    if arbeit.get("topic_ids") != [u.topic_id]:
+        raise AssertionError(f"Themen der Arbeit falsch gefiltert: {arbeit.get('topic_ids')}")
+    if not _finde(api.call("GET", "/api/kalender/klassenarbeiten", erwartet=(200,)),
+                  id=arbeit["id"]):
+        raise AssertionError("Klassenarbeitstermin nicht in der Liste")
+    # Die Uebersicht loest die Themen mit Namen auf — sonst stuende dort eine
+    # Nummer, mit der niemand etwas anfangen kann.
+    ueb = _finde(api.call("GET", "/api/kalender/klassenarbeiten/uebersicht", erwartet=(200,)),
+                 id=arbeit["id"])
+    if not ueb or not [x for x in (ueb.get("topics") or []) if x.get("label")]:
+        raise AssertionError(f"Themen fehlen in der Uebersicht: {ueb}")
+
     # Zeitleiste: die vier Quellen auf einer Achse. Geprueft wird, dass der
     # eigene Eintrag (Thema) und die Klassenarbeit darin auftauchen — und dass
     # die Stunden aus dem Stundenplan mitgezaehlt werden.
