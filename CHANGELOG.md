@@ -26,11 +26,18 @@ Notiz zur größten Fassung die dünnste.
   Nach links und oben sieht man den Tisch jetzt schon beim Ziehen an seinem
   Platz, statt erst beim Loslassen.
 - Das Foto füllt die Höhe des Platzes; der Name steht darunter über die ganze
-  Breite und die Knöpfe sitzen neben dem Bild statt an den Ecken.
+  Breite. Alle Plätze sind gleich groß, egal ob mit Foto oder ohne.
+- Der Dreh-Griff sitzt wieder in der Ecke oben rechts.
+- „Einpassen" rechnet mit einem festen Rand statt mit 30 % Zuschlag — der Plan
+  stand sonst winzig in der Mitte.
 - Ein Tisch ließ sich am Foto nicht ziehen — der Browser nahm stattdessen das
   Bild mit.
 
 **Klassen**
+
+- Ein vorhandenes Foto lässt sich neu zuschneiden, ohne die Datei erneut zu
+  suchen.
+- Ein Klick auf „Klassen" in der Navigation schließt die Bearbeiten-Maske.
 
 - Ein Klassenfoto wird beim Hinzufügen quadratisch zugeschnitten; verschieben
   und zoomen geht im Dialog.

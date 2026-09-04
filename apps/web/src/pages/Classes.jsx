@@ -112,13 +112,28 @@ export default function Classes() {
   // der nächsten weiter.
   const uebernehmen = (stand) => { setBasis(stand); entwurf.setz(stand); };
 
+  // Die geoeffnete Maske steht in der ADRESSE (?open=<id> bzw. ?open=neu).
+  // Erst dadurch schliesst ein Klick auf „Klassen" in der Navigation sie: der
+  // Reiter fuehrt auf /classes ohne Parameter, und die Maske folgt der Adresse.
+  // Vorher war sie reiner Zustand — der Klick fuehrte auf dieselbe Seite und
+  // nichts geschah.
+  const schliessen = ({ fragen = true } = {}) => {
+    if (fragen && entwurf.geaendert && !window.confirm(t("speichern.verlassen"))) return false;
+    uebernehmen(LEERE_KLASSE);
+    setEditing(null);
+    if (params.get("open")) setParams({}, { replace: true });
+    return true;
+  };
+
   const startNew = () => {
     setEditing({ id: null });
     uebernehmen({ ...LEERE_KLASSE, students: [{ ...EMPTY_STUDENT, card_id: 1 }] });
+    setParams({ open: "neu" }, { replace: true });
   };
 
   const startEdit = (cls) => {
     setEditing(cls);
+    if (params.get("open") !== String(cls.id)) setParams({ open: String(cls.id) }, { replace: true });
     // Reihenfolge kommt vom Server (position, dann card_id) und wird NICHT
     // ueberschrieben: sie ist genau das, was hier per Ziehen gesetzt wurde.
     // Fruehere Fassung sortierte nach card_id und nummerierte durch — damit war
@@ -132,12 +147,20 @@ export default function Classes() {
     uebernehmen({ name: cls.name, color: cls.color || C.info, students: rows, archiviert: archiv });
   };
 
-  // Direktlink ?open=<id> (z.B. aus dem Stundenplan): diese Klasse aufklappen.
+  // Die Adresse ist die Wahrheit: ?open=<id> oeffnet (auch als Direktlink aus
+  // dem Stundenplan), kein Parameter schliesst. Ein offener Entwurf geht dabei
+  // nicht still verloren — wer die Nachfrage abbricht, bekommt die Adresse
+  // zurueck.
   useEffect(() => {
-    const oid = Number(params.get("open"));
-    if (!oid || editing) return;
-    const cls = classes.find((c) => c.id === oid);
-    if (cls) { startEdit(cls); setParams({}, { replace: true }); }
+    const roh = params.get("open");
+    if (!roh) {
+      if (editing && !schliessen()) setParams({ open: editing.id ? String(editing.id) : "neu" }, { replace: true });
+      return;
+    }
+    if (editing) return;
+    if (roh === "neu") { startNew(); return; }
+    const cls = classes.find((c) => c.id === Number(roh));
+    if (cls) startEdit(cls);
   }, [classes, params]); // eslint-disable-line
 
   const save = async (wert) => {
@@ -178,8 +201,8 @@ export default function Classes() {
       const id = editing.id || angelegt?.id;
       if (id) await fetch(`${API}/classes/${id}/archive`, { method: "POST" }).catch(() => {});
     }
-    uebernehmen(LEERE_KLASSE);
-    setEditing(null);
+    // Nach dem Speichern ist nichts mehr offen — deshalb ohne Nachfrage.
+    schliessen({ fragen: false });
     load();
   };
 
@@ -250,6 +273,16 @@ export default function Classes() {
     setFotoLaeuft(null); setFotoProzent(null);
     if (r.ok) { setFotoDa((m) => ({ ...m, [sid]: true })); setPhotoVer((v) => v + 1); }
   };
+  // Das gespeicherte Foto als Datei holen und in den Zuschnitt-Dialog geben.
+  // Ueber `hol` laeuft der Token mit (das Bild haengt an einer geschuetzten
+  // Adresse), deshalb der Umweg ueber fetch statt eines <img src>.
+  const neuZuschneiden = async (sid) => {
+    const r = await fetch(`/api/classes/students/${sid}/photo`).catch(() => null);
+    if (!r || !r.ok) return;
+    const blob = await r.blob();
+    setZuschnitt({ sid, datei: new File([blob], "foto.jpg", { type: blob.type || "image/jpeg" }) });
+  };
+
   const removePhoto = async (sid) => {
     if (!sid) return;
     await fetch(`/api/classes/students/${sid}/photo`, { method: "DELETE" }).catch(() => {});
@@ -317,10 +350,7 @@ export default function Classes() {
             der Werkzeugleiste — wer oben am Titel steht, sucht dort und nicht
             am anderen Ende der Maske. Dieselbe Nachfrage wie beim Abbrechen:
             ein offener Entwurf geht nicht still verloren. */}
-        <button onClick={() => {
-          if (entwurf.geaendert && !window.confirm(t("speichern.verlassen"))) return;
-          uebernehmen(LEERE_KLASSE); setEditing(null);
-        }} title={t("classes.backToList")}
+        <button onClick={() => schliessen()} title={t("classes.backToList")}
           style={{ ...pageTitle, display: "inline-flex", alignItems: "center", gap: 6, border: "none",
             background: "none", padding: 0, cursor: "pointer", color: "var(--text)" }}>
           <Icon d={ICONS.chevronLeft} size={18} color="var(--text3)" />
@@ -395,6 +425,16 @@ export default function Classes() {
                         {hatFoto(s) ? t("classes.photoChange") : t("classes.photoAdd")}
                         <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; if (f) setZuschnitt({ sid: s.id, datei: f }); }} />
                       </label>
+                      {/* Neu zuschneiden, ohne die Datei noch einmal zu suchen:
+                          das gespeicherte Bild wird geholt und geht durch
+                          denselben Dialog. Was beim ersten Zuschnitt
+                          weggefallen ist, bleibt weg — hier laesst sich der
+                          Ausschnitt verschieben und (herauszoomen geht nicht
+                          ueber das vorhandene Bild hinaus). */}
+                      {hatFoto(s) && (
+                        <button type="button" onClick={() => neuZuschneiden(s.id)}
+                          style={{ ...btnSecondary, ...btnSmall }}>{t("classes.photoCrop")}</button>
+                      )}
                       {hatFoto(s) && <button type="button" onClick={() => removePhoto(s.id)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>}
                       {fotoLaeuft === s.id && <Fortschrittsbalken wert={fotoProzent} style={{ flex: 1, minWidth: 80, margin: 0 }} />}
                     </>
@@ -488,14 +528,11 @@ export default function Classes() {
             { key: "archiv", label: entwurf.wert.archiviert ? t("classes.unarchive") : t("classes.archive"), icon: ICONS.archive,
               onClick: () => entwurf.setz((w) => ({ archiviert: !w.archiviert })) },
             { key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true,
-              onClick: () => { remove(editing.id); uebernehmen(LEERE_KLASSE); setEditing(null); } },
+              onClick: () => { remove(editing.id); schliessen({ fragen: false }); } },
           ] : []}>
           <button onClick={addRow} disabled={students.length >= MAX_CARDS}
             style={{ ...toolbarBtn, opacity: students.length >= MAX_CARDS ? 0.4 : 1 }}>{t("classes.addRow")}</button>
-          <button onClick={() => {
-            if (entwurf.geaendert && !window.confirm(t("speichern.verlassen"))) return;
-            uebernehmen(LEERE_KLASSE); setEditing(null);
-          }} style={toolbarBtn}>{t("common.cancel")}</button>
+          <button onClick={() => schliessen()} style={toolbarBtn}>{t("common.cancel")}</button>
         </Werkzeugleiste>
         {/* Was das Speichern zusätzlich tun wird — sonst wäre ein
             umgeschaltetes Archiv im Menü verborgen. */}

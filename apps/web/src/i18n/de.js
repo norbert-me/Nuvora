@@ -653,6 +653,7 @@ export default {
   "classes.cropZoom": "Größe",
   "classes.cropUse": "Übernehmen",
   "classes.photoChange": "Foto ändern",
+  "classes.photoCrop": "Zuschneiden",
   "classes.photoSaveFirst": "Erst die Klasse speichern, dann Foto hochladen.",
   "classes.classTeacher": "Klassenleitung",
   "classes.classTeacherPlaceholder": "z. B. Frau Meyer (7a)",

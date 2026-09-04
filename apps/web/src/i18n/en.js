@@ -651,6 +651,7 @@ export default {
   "classes.cropZoom": "Size",
   "classes.cropUse": "Use",
   "classes.photoChange": "Change photo",
+  "classes.photoCrop": "Crop",
   "classes.photoSaveFirst": "Save the class first, then upload a photo.",
   "classes.classTeacher": "Class teacher",
   "classes.classTeacherPlaceholder": "e.g. Ms Meyer (7a)",
