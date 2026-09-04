@@ -1423,6 +1423,8 @@ export default {
   "todo.emptyHint": "Añade una tarea arriba — opcionalmente con fecha y hora.",
   "todo.calHint": "Con fecha la tarea también aparece en el calendario.",
   "todo.dateHint": "Fecha (opcional)",
+  "todo.notePlaceholder": "Nota (texto largo, opcional)",
+  "todo.noteShow": "Mostrar nota",
   "todo.addDate": "Añadir fecha",
   "todo.addTime": "Añadir hora",
   "todo.timeHint": "Hora (opcional)",

@@ -1422,6 +1422,8 @@ export default {
   "todo.emptyHint": "Add a task above — optionally with date and time.",
   "todo.calHint": "With a date the task also shows in the calendar.",
   "todo.dateHint": "Date (optional)",
+  "todo.notePlaceholder": "Note (longer text, optional)",
+  "todo.noteShow": "Show note",
   "todo.addDate": "Add date",
   "todo.addTime": "Add time",
   "todo.timeHint": "Time (optional)",

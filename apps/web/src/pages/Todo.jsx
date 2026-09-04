@@ -43,6 +43,10 @@ export default function Todo({ embedded } = {}) {
   const [eText, setEText] = useState("");
   const [eDate, setEDate] = useState("");
   const [eTime, setETime] = useState("");
+  // Laengerer Text zur Aufgabe. Die Zeile bleibt die Zeile — was mehr ist als
+  // eine Zeile, steht in der Notiz und klappt bei Bedarf auf.
+  const [eNotiz, setENotiz] = useState("");
+  const [notizAuf, setNotizAuf] = useState(null);   // id der aufgeklappten Notiz
 
   // Der Datumswaehler soll aufgehen, sobald das Feld ueberhaupt erscheint —
   // `showPicker()` geht nur nach einer echten Geste, also im selben Zug wie
@@ -124,12 +128,12 @@ export default function Todo({ embedded } = {}) {
     });
   };
   const del = async (id) => { await sende(`${API}/${id}`, { method: "DELETE" }, t("common.delete")); load(); };
-  const startEdit = (it) => { setEditId(it.id); setEText(it.text); setEDate(it.due_date || ""); setETime(it.due_time || ""); };
+  const startEdit = (it) => { setEditId(it.id); setEText(it.text); setENotiz(it.notiz || ""); setEDate(it.due_date || ""); setETime(it.due_time || ""); };
   const saveEdit = async () => {
     if (!eText.trim()) return;
     // Bei Ablehnung bleibt die Bearbeitung offen: die getippte Fassung steht
     // noch da, statt beim naechsten load() durch die alte ersetzt zu werden.
-    if (!(await sende(`${API}/${editId}`, alsJson("PUT", { text: eText.trim(), due_date: eDate || "", due_time: eDate ? (eTime || "") : "" }), t("common.save")))) return;
+    if (!(await sende(`${API}/${editId}`, alsJson("PUT", { text: eText.trim(), notiz: eNotiz, due_date: eDate || "", due_time: eDate ? (eTime || "") : "" }), t("common.save")))) return;
     setEditId(null); load();
   };
 
@@ -182,12 +186,16 @@ export default function Todo({ embedded } = {}) {
           {eDate && <input type="time" value={eTime} onChange={(e) => setETime(e.target.value)} style={toolbarInput} />}
           <button onClick={saveEdit} style={toolbarBtnPrimary}>{t("common.save")}</button>
           <button onClick={() => setEditId(null)} style={toolbarBtn}>{t("common.abort")}</button>
+          <textarea value={eNotiz} onChange={(e) => setENotiz(e.target.value.slice(0, 5000))}
+            rows={3} placeholder={t("todo.notePlaceholder")}
+            style={{ ...toolbarInput, width: "100%", flexBasis: "100%", resize: "vertical", lineHeight: 1.5,
+              overflowX: "hidden", overflowWrap: "anywhere", whiteSpace: "pre-wrap" }} />
         </div>
       );
     }
     return (
       <div key={it.id} {...(dnd || {})} ref={markiert === it.id ? zielRef : undefined}
-        style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", marginBottom: 8, cursor: dnd ? "grab" : "default",
+        style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", marginBottom: 8, cursor: dnd ? "grab" : "default",
           ...(markiert === it.id ? { border: "1px solid var(--accent)", boxShadow: "inset 3px 0 0 var(--accent)" } : {}) }}>
         {dnd && <span className="drag-handle" title={t("todo.reorderHint")} style={{ color: "var(--text3)", flexShrink: 0, display: "inline-flex", cursor: "grab" }}><Icon d={ICONS.grip} size={15} /></span>}
         <input type="checkbox" checked={istErledigt(it)} onChange={() => toggle(it)} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
@@ -205,8 +213,24 @@ export default function Todo({ embedded } = {}) {
             </span>
           );
         })()}
+        {/* Der Knopf erscheint NUR, wenn es eine Notiz gibt: ein leeres
+            Zeichen an jeder Zeile waere Rauschen. Geschrieben wird sie beim
+            Bearbeiten. */}
+        {it.notiz && (
+          <button onClick={() => setNotizAuf((v) => (v === it.id ? null : it.id))}
+            className="icon-btn" style={{ ...iconBtn, padding: 4, color: notizAuf === it.id ? "var(--accent)" : undefined }}
+            title={t("todo.noteShow")} aria-label={t("todo.noteShow")} aria-expanded={notizAuf === it.id}>
+            <Icon d={ICONS.note} size={15} />
+          </button>
+        )}
         <button onClick={() => startEdit(it)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
         <button onClick={() => del(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+        {notizAuf === it.id && (
+          <div style={{ flexBasis: "100%", fontSize: 13, color: "var(--text2)", lineHeight: 1.55,
+            whiteSpace: "pre-wrap", overflowWrap: "anywhere", borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 2 }}>
+            {it.notiz}
+          </div>
+        )}
       </div>
     );
   };

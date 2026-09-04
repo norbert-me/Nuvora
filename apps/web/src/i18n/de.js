@@ -1401,6 +1401,8 @@ export default {
   "todo.emptyHint": "Trag oben eine Aufgabe ein — optional mit Datum und Uhrzeit.",
   "todo.calHint": "Mit Datum erscheint die Aufgabe auch im Kalender.",
   "todo.dateHint": "Datum (optional)",
+  "todo.notePlaceholder": "Notiz (längerer Text, optional)",
+  "todo.noteShow": "Notiz anzeigen",
   "todo.addDate": "Datum hinzufügen",
   "todo.addTime": "Uhrzeit hinzufügen",
   "todo.timeHint": "Uhrzeit (optional)",

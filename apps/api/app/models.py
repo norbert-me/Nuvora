@@ -1509,6 +1509,11 @@ class Todo(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     text: Mapped[str] = mapped_column(String(500), default="", server_default="")
+    # Laengerer Text zur Aufgabe. Der `text` ist die Zeile in der Liste und
+    # bleibt kurz — was man sich zur Sache merkt („Frau X anrufen, Nummer …",
+    # drei Stichpunkte zur Konferenz), passt dort nicht hinein und landete
+    # sonst gar nicht erst in Nuvora.
+    notiz: Mapped[str] = mapped_column(Text, default="", server_default="")
     done: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Optional: Faelligkeitsdatum + Uhrzeit ("HH:MM", "" = ganztaegig/ohne Zeit).
     due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)

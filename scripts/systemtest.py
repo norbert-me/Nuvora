@@ -1087,12 +1087,18 @@ def inhalt_notizbrett(api, u, spuren):
     morgen = (datetime.now() + timedelta(days=1)).date().isoformat()
     aufgabe = api.call("POST", "/api/todo",
                        {"text": f"{PRAEFIX} Kopien machen", "due_date": morgen,
-                        "due_time": "07:30"}, erwartet=(201,))
+                        "due_time": "07:30", "notiz": "Zeile 1\nZeile 2"}, erwartet=(201,))
     spuren.append(("To-do", lambda: api.call(
         "DELETE", f"/api/todo/{aufgabe['id']}", erwartet=(204, 404))))
     t = _finde(api.call("GET", "/api/todo", erwartet=(200,)), id=aufgabe["id"])
     if not t or t.get("due_date") != morgen or t.get("due_time") != "07:30" or t.get("done"):
         raise AssertionError(f"To-do kam anders zurueck: {t}")
+    if t.get("notiz") != "Zeile 1\nZeile 2":
+        raise AssertionError(f"Notiz der Aufgabe kam anders zurueck: {t.get('notiz')!r}")
+    # Leeren muss gehen: die Notiz ist ein Zusatz, kein Pflichtfeld.
+    api.call("PUT", f"/api/todo/{aufgabe['id']}", {"notiz": ""}, erwartet=(200,))
+    if _finde(api.call("GET", "/api/todo", erwartet=(200,)), id=aufgabe["id"]).get("notiz") != "":
+        raise AssertionError("Notiz liess sich nicht leeren")
     api.call("PUT", f"/api/todo/{aufgabe['id']}", {"done": True}, erwartet=(200,))
     t = _finde(api.call("GET", "/api/todo", erwartet=(200,)), id=aufgabe["id"])
     if not t.get("done"):
@@ -1100,7 +1106,8 @@ def inhalt_notizbrett(api, u, spuren):
     # Datierte Aufgaben erscheinen im Kalender-Auszug des Moduls.
     if not _finde(api.call("GET", "/api/todo/calendar", erwartet=(200,)), id=aufgabe["id"]):
         raise AssertionError("datiertes To-do fehlt im Kalender-Auszug")
-    return "Notiz mit Zeilenumbruch, To-do mit Datum/Uhrzeit, Haken und Kalender-Auszug"
+    return ("Notiz mit Zeilenumbruch, To-do mit Datum/Uhrzeit und eigener Notiz "
+            "(gesetzt und geleert), Haken und Kalender-Auszug")
 
 
 

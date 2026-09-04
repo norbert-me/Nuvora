@@ -39,6 +39,8 @@ Notiz zur größten Fassung die dünnste.
 
 **Notizbrett**
 
+- Eine Aufgabe kann eine Notiz für längeren Text tragen; in der Liste klappt
+  sie auf Klick auf.
 - Was heute fällig ist, steht rot (vorher gelb wie „demnächst").
 - Der Kalender-Knopf trägt sofort das heutige Datum ein und öffnet die Auswahl.
 

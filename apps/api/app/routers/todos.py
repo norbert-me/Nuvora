@@ -30,12 +30,14 @@ require_module = modul_pflicht(MODULE_KEY)
 
 class TodoIn(BaseModel):
     text: str = ""
+    notiz: str = ""
     due_date: Optional[str] = None   # "YYYY-MM-DD" oder "" / None
     due_time: Optional[str] = None   # "HH:MM" oder "" / None
 
 
 class TodoPatch(BaseModel):
     text: Optional[str] = None
+    notiz: Optional[str] = None
     done: Optional[bool] = None
     due_date: Optional[str] = None   # "" leert das Datum; None = unveraendert
     due_time: Optional[str] = None
@@ -44,6 +46,7 @@ class TodoPatch(BaseModel):
 class TodoOut(BaseModel):
     id: int
     text: str
+    notiz: str = ""
     done: bool
     due_date: Optional[str] = None
     due_time: str = ""
@@ -70,7 +73,7 @@ def _clean_time(v):
 
 
 def _out(t: Todo) -> dict:
-    return {"id": t.id, "text": t.text, "done": t.done,
+    return {"id": t.id, "text": t.text, "notiz": t.notiz or "", "done": t.done,
             "due_date": t.due_date.isoformat() if t.due_date else None,
             "due_time": t.due_time or "", "position": t.position}
 
@@ -93,7 +96,8 @@ async def create_todo(body: TodoIn, user: User = Depends(require_module), db: As
     # Neue Eintraege oben (kleinste Position).
     mn = (await db.execute(select(Todo.position).where(Todo.owner_id == user.id).order_by(Todo.position).limit(1))).scalar_one_or_none()
     pos = (mn - 1) if mn is not None else 0
-    t = Todo(owner_id=user.id, text=text, due_date=d, due_time=tm, position=pos)
+    t = Todo(owner_id=user.id, text=text, notiz=(body.notiz or "").strip()[:5000],
+             due_date=d, due_time=tm, position=pos)
     db.add(t)
     await db.commit()
     await db.refresh(t)
@@ -122,6 +126,10 @@ async def update_todo(todo_id: int, body: TodoPatch, user: User = Depends(requir
     t = await eigenes(db, Todo, todo_id, user, "To-do nicht gefunden")
     if body.text is not None:
         t.text = body.text.strip()[:500] or t.text
+    if body.notiz is not None:
+        # Anders als beim Text darf die Notiz GELEERT werden: sie ist ein
+        # Zusatz, kein Pflichtfeld — „weg" ist eine gueltige Aenderung.
+        t.notiz = body.notiz.strip()[:5000]
     if body.done is not None:
         t.done = body.done
     if body.due_date is not None:
