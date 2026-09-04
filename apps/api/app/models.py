@@ -1040,63 +1040,6 @@ class ExamDate(Base):
     work_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
 
 
-class Stoffplan(Base):
-    """Stoffverteilungsplan: welches Thema wann und wie lange, je Kurs.
-
-    Die eine Zeile ist „Thema X, Y Stunden, an Stelle Z". Alles andere rechnet
-    sich daraus: WANN ein Thema drankommt, ergibt sich aus der Reihenfolge, den
-    Soll-Stunden und dem Stundenplan (freie Tage abgezogen) — deshalb steht hier
-    kein Datum. Ein eingetragenes Datum waere nach der ersten ausgefallenen
-    Stunde falsch und muesste von Hand nachgezogen werden; genau das ist die
-    Arbeit, die der Plan abnehmen soll.
-
-    Fach und Jahrgang am Thema (topics.fach/jahrgang) schlagen VOR, welche
-    Themen zu einem Kurs passen. Diese Tabelle haelt die ENTSCHEIDUNG — was
-    wirklich geplant ist, in welcher Reihenfolge und mit wie vielen Stunden.
-
-    Haengt am Modul Kalender (dort steht der Stundenplan, ohne den es keine
-    Wochen gibt). Regel 3: reiner Zusatz — Themen und Kurse gehoeren dem Kern
-    und wissen nichts davon. Thema geloescht -> Zeile faellt mit (CASCADE), der
-    Plan ist ohne sein Thema sinnlos.
-    """
-    __tablename__ = "stoffplan"
-    __table_args__ = (UniqueConstraint("kurs_id", "topic_id", name="uq_stoffplan_kurs_topic"),)
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    kurs_id: Mapped[int] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), index=True)
-    topic_id: Mapped[int] = mapped_column(ForeignKey("topics.id", ondelete="CASCADE"), index=True)
-    # Geplante Unterrichtsstunden fuer dieses Thema.
-    stunden: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
-    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    # Welches Halbjahr: "1" | "2" | "" (= durchgehend/ohne Zuordnung).
-    term: Mapped[str] = mapped_column(String(8), default="", server_default="")
-    notiz: Mapped[str] = mapped_column(Text, default="", server_default="")
-    # Fester Zeitraum statt gerechnetem.
-    #
-    # Gerechnet ist die Voreinstellung und bleibt es: aus Reihenfolge,
-    # Soll-Stunden und Stundenplan ergibt sich, wann ein Thema dran ist, und das
-    # zieht sich bei jedem Ausfall von selbst nach. Manche Themen liegen aber
-    # fest — die Projektwoche, das Thema vor der Arbeit, der Termin mit der
-    # Partnerklasse. Steht hier ein Datum, gilt es; sonst rechnet der Server.
-    # Ausdruecklich beides, nicht das eine ODER das andere: ein Plan, in dem
-    # jede Zeile ein Datum braucht, ist wieder die Handarbeit von vorher.
-    start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    # Schliesst dieses Thema mit einer Klassenarbeit ab? Dann zeigt die Zeile
-    # auf den TERMIN (exam_dates) — der Termin bleibt der Ort, an dem Datum und
-    # Klasse stehen. SET NULL: wird der Termin geloescht, verliert die Zeile nur
-    # ihre Verknuepfung, nicht ihr Thema.
-    exam_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("exam_dates.id", ondelete="SET NULL"), nullable=True, index=True)
-    # Auf welchem Anspruch wird dieses Thema geplant: "" (alle), "G" oder "E".
-    # Dieselben Buchstaben wie ueberall sonst (students.niveau, cards.niveau).
-    # Am PLAN und nicht am Thema: dasselbe Thema kann im E-Kurs vier Stunden
-    # dauern und im G-Kurs sechs — das ist eine Planungsentscheidung, keine
-    # Eigenschaft des Themas.
-    niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")
-
-
 class CaldavToken(Base):
     """Ein Geraete-Passwort fuer den CalDAV-Zugang.
 

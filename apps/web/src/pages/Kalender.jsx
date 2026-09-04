@@ -6,7 +6,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, Segment, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, pageApp, Popover } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import ThemenWahl from "../components/ThemenWahl.jsx";
-import Stoffplan from "../components/Stoffplan.jsx";
+import Zeitleiste from "../components/Zeitleiste.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import UntisImport from "../components/UntisImport.jsx";
@@ -429,7 +429,7 @@ export default function Kalender() {
   // Pfeiltasten ←/→ blättern (nur in Monat/Woche/Tag, nicht beim Tippen).
   useEffect(() => {
     const onKey = (e) => {
-      if (["timetable", "breaks", "klassenarbeit", "stoffplan", "today"].includes(view)) return;
+      if (["timetable", "breaks", "klassenarbeit", "zeitleiste", "today"].includes(view)) return;
       const el = document.activeElement;
       if (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
       if (e.key === "ArrowLeft") move(-1);
@@ -610,7 +610,7 @@ export default function Kalender() {
   // Stundenplan UND Freie Tage sind in die Navbar ausgelagert (?view=…) — beides
   // Konfiguration. Werkzeugleiste und Datums-Navigator gehören nur zu den
   // eigentlichen Kalenderansichten.
-  const kalAnsicht = view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && view !== "stoffplan";
+  const kalAnsicht = !["timetable", "breaks", "klassenarbeit", "zeitleiste"].includes(view);
 
   // Der Plus-Knopf legt im SICHTBAREN Zeitraum an, nicht immer heute: wer im
   // März blättert und etwas einträgt, meint den März. Tag = der gezeigte Tag,
@@ -816,7 +816,7 @@ export default function Kalender() {
           )} />
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
-      {view === "stoffplan" && <Stoffplan />}
+      {view === "zeitleiste" && <Zeitleiste />}
       {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} aktiv={aktiv} topics={topics} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
 
       {/* Was im ANGEZEIGTEN Zeitraum ausgeblendet ist — eine Fläche über dem

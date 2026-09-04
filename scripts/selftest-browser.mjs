@@ -133,7 +133,7 @@ async function lauf(motor) {
     // samt Navigation einfror. Ein eingefrorener Reiter faellt nur auf, wenn
     // ihn jemand aufruft; also ruft ihn der Rundgang auf.
     const UNTERANSICHTEN = [
-      "/kalender?view=timetable", "/kalender?view=stoffplan",
+      "/kalender?view=timetable", "/kalender?view=zeitleiste",
       "/kalender?view=breaks", "/kalender?view=klassenarbeit",
       "/auswertung?tab=klassenarbeit", "/orga?tab=sitzplan", "/orga?tab=anwesenheit",
     ];

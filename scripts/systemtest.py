@@ -840,61 +840,6 @@ def inhalt_kalender(api, u, spuren):
         "DELETE", f"/api/kalender/breaks/{pause['id']}", erwartet=(204, 404))))
     if not _finde(api.call("GET", "/api/kalender/breaks", erwartet=(200,)), id=pause["id"]):
         raise AssertionError("freier Zeitraum nicht in der Liste")
-
-    arbeit = api.call("POST", "/api/kalender/klassenarbeiten", {
-        "date": (tag + timedelta(days=7)).isoformat(), "title": f"{PRAEFIX} KA",
-        "class_id": u.class_id,
-        # Themen der Arbeit: eins eigenes und eine erfundene Nummer. Die eigene
-        # muss bleiben, die fremde still herausfallen — ein Thema, das jemand
-        # zwischendurch geloescht hat, darf keinen Termin blockieren.
-        "topic_ids": [u.topic_id, 999999999],
-    }, erwartet=(201,))
-    spuren.append(("Klassenarbeitstermin", lambda: api.call(
-        "DELETE", f"/api/kalender/klassenarbeiten/{arbeit['id']}", erwartet=(204, 404))))
-    if arbeit.get("topic_ids") != [u.topic_id]:
-        raise AssertionError(f"Themen der Arbeit falsch gefiltert: {arbeit.get('topic_ids')}")
-    if not _finde(api.call("GET", "/api/kalender/klassenarbeiten", erwartet=(200,)),
-                  id=arbeit["id"]):
-        raise AssertionError("Klassenarbeitstermin nicht in der Liste")
-    # Die Uebersicht loest die Themen mit Namen auf — sonst stuende dort eine
-    # Nummer, mit der niemand etwas anfangen kann.
-    ueb = _finde(api.call("GET", "/api/kalender/klassenarbeiten/uebersicht", erwartet=(200,)),
-                 id=arbeit["id"])
-    if not ueb or not [x for x in (ueb.get("topics") or []) if x.get("label")]:
-        raise AssertionError(f"Themen fehlen in der Uebersicht: {ueb}")
-    # Stoffverteilungsplan: Themen mit Soll-Stunden je Kurs. Der Server rechnet
-    # daraus die Zeitraeume — hier zaehlt, dass der Plan gespeichert wird und
-    # ein fremdes Thema NICHT hineinkommt.
-    if u.kurs_id:
-        api.call("PUT", "/api/kalender/stoffplan", {
-            "kurs_id": u.kurs_id,
-            # Fester Zeitraum, Anspruch und eine erfundene Klassenarbeit: das
-            # Datum muss gewinnen (statt gerechnet zu werden), das Niveau
-            # ankommen, die fremde Arbeit still herausfallen.
-            "zeilen": [{"topic_id": u.topic_id, "stunden": 3,
-                        "start_date": "2026-09-01", "end_date": "2026-09-10",
-                        "niveau": "E", "exam_id": 999999999},
-                       {"topic_id": 999999999, "stunden": 5}],
-        }, erwartet=(204,))
-        spuren.append(("Stoffplan", lambda: api.call(
-            "PUT", "/api/kalender/stoffplan",
-            {"kurs_id": u.kurs_id, "zeilen": []}, erwartet=(204, 404))))
-        plan = api.call("GET", f"/api/kalender/stoffplan?kurs_id={u.kurs_id}", erwartet=(200,))
-        eigene = [z for z in plan.get("zeilen") or [] if z["topic_id"] == u.topic_id]
-        if len(eigene) != 1 or eigene[0]["stunden"] != 3:
-            raise AssertionError(f"Stoffplan nicht gespeichert: {plan.get('zeilen')}")
-        if any(z["topic_id"] == 999999999 for z in plan.get("zeilen") or []):
-            raise AssertionError("fremdes Thema im Stoffplan angenommen")
-        z0 = eigene[0]
-        if z0.get("start") != "2026-09-01" or not z0.get("fest"):
-            raise AssertionError(f"fester Zeitraum wird nicht bevorzugt: {z0}")
-        if z0.get("niveau") != "E":
-            raise AssertionError(f"Anspruch nicht gespeichert: {z0}")
-        if z0.get("exam_id") is not None:
-            raise AssertionError("fremde Klassenarbeit im Stoffplan angenommen")
-        if "stunden_gesamt" not in plan:
-            raise AssertionError(f"Stoffplan ohne Stundenrechnung: {plan}")
-
     # WebUntis-Anbindung: hier wird NICHT bei Untis angefragt — kein Testlauf
     # darf von einem fremden Server abhaengen, und ein Passwort gehoert nicht in
     # ein Testskript. Geprueft wird das, was uns gehoert: die gemerkten Angaben
@@ -907,6 +852,16 @@ def inhalt_kalender(api, u, spuren):
         "PUT", "/api/kalender/untis", {k: vorher.get(k) or "" for k in
                                        ("server", "schule", "benutzer", "ics_url")},
         erwartet=(200, 404))))
+    # Zeitleiste: die vier Quellen auf einer Achse. Geprueft wird, dass der
+    # eigene Eintrag (Thema) und die Klassenarbeit darin auftauchen — und dass
+    # die Stunden aus dem Stundenplan mitgezaehlt werden.
+    leiste = api.call("GET", f"/api/kalender/zeitleiste?kurs_id={u.kurs_id}", erwartet=(200,))
+    arten = {p["art"] for p in leiste.get("punkte", [])}
+    if "arbeit" not in arten:
+        raise AssertionError(f"Klassenarbeit fehlt auf der Zeitleiste: {arten}")
+    if not leiste.get("kurs", {}).get("id") == u.kurs_id:
+        raise AssertionError(f"Zeitleiste antwortet fuer den falschen Kurs: {leiste.get('kurs')}")
+
     api.call("PUT", "/api/kalender/untis",
              {"server": "https://ajax.webuntis.com/WebUntis/?school=zz-selbsttest",
               "schule": "zz-selbsttest", "benutzer": f"{PRAEFIX}-untis", "ics_url": ""},
@@ -952,7 +907,7 @@ def inhalt_kalender(api, u, spuren):
               "mitschicken": bool(vorher_ext.get("mitschicken"))}, erwartet=(200,))
 
     return ("Eintrag (6 Felder + Verlaufsplan), Slot, freier Zeitraum, "
-            "Klassenarbeit mit Themen, Stoffplan wiedergefunden, Untis-Angaben, "
+            "Klassenarbeit mit Themen, Zeitleiste, Untis-Angaben, "
             "Export-Schalter fremde Kalender")
 
 

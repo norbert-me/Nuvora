@@ -1226,37 +1226,6 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
     return out
 
 
-# ─── Stoffverteilungsplan ───
-#
-# „Ich kann Arbeiten planen und sehe die Stunden bis dahin — dasselbe brauche
-# ich fuer Themen." Genau das: je Kurs eine Liste von Themen mit Soll-Stunden,
-# und daraus rechnet der Server, WANN jedes Thema dran ist.
-#
-# Der Kern der Sache ist, was NICHT gespeichert wird: kein Datum je Thema. Ein
-# eingetragenes Datum ist nach der ersten ausgefallenen Stunde falsch, und es
-# von Hand nachzuziehen ist die Arbeit, die der Plan gerade abnehmen soll.
-# Gespeichert wird die Reihenfolge und die Stundenzahl; das Datum ergibt sich
-# aus dem Stundenplan (freie Tage und Ausfaelle abgezogen) — dieselbe Rechnung,
-# die auch die Klassenarbeits-Uebersicht benutzt (_unterrichtsstunden).
-
-class StoffplanZeile(BaseModel):
-    topic_id: int
-    stunden: int = 1
-    term: str = ""       # "1" | "2" | "" (durchgehend)
-    notiz: str = ""
-    # Fester Zeitraum ("JJJJ-MM-TT" oder ""); leer heisst „rechne es aus".
-    start_date: str = ""
-    end_date: str = ""
-    # Schliesst mit dieser Klassenarbeit ab (Termin-ID) — 0/None = keine.
-    exam_id: Optional[int] = None
-    niveau: str = ""     # "" | "G" | "E"
-
-
-class StoffplanIn(BaseModel):
-    kurs_id: int
-    zeilen: List[StoffplanZeile]
-
-
 def _datum(wert):
     """"JJJJ-MM-TT" -> date, alles andere -> None.
 
@@ -1291,30 +1260,31 @@ def _halbjahr(user: User, term: str):
     return (hj1, hj2 or ende)
 
 
-@router.get("/stoffplan")
-async def stoffplan(kurs_id: int, term: str = "", user: User = Depends(require_module),
-                    db: AsyncSession = Depends(get_db)):
-    """Der Plan eines Kurses samt errechneter Zeitraeume je Thema."""
-    from ..models import KursTag, Stoffplan, Topic
+@router.get("/zeitleiste")
+async def zeitleiste(kurs_id: int, term: str = "", user: User = Depends(require_module),
+                     db: AsyncSession = Depends(get_db)):
+    """Der Kurs als SENKRECHTE Leiste: was wann ansteht — von oben nach unten.
+
+    Drei Quellen, die es schon gibt, auf einer Achse: die Unterrichtsstunden
+    (dieselbe Rechnung wie ueberall, `_unterrichtsstunden`), die
+    Klassenarbeiten und die geplanten Freischaltungen (Quiz, Karten-Stapel,
+    Lernleiter, Raetsel am Kalendertag). Dazu die Themen — aus den EINTRAEGEN,
+    nicht aus einer eigenen Planungstabelle: was an einem Tag unterrichtet
+    wird, steht am Eintrag.
+
+    Warum zusammen und nicht vier Abfragen: die Frage ist EINE — „wie sieht
+    mein Halbjahr aus?". Getrennt muesste die Oberflaeche vier Antworten auf
+    einer Achse zusammenlegen und dabei dieselbe Zuordnung noch einmal treffen
+    (welche Stunde gehoert zu welchem Kurs, was faellt in den Zeitraum). Die
+    steht hier schon.
+
+    Regel 3: die Freischaltungen nennen fremde Module. Ist eines nicht aktiv,
+    faellt sein Punkt heraus — nicht die ganze Leiste, und kein 403: der
+    Kalender arbeitet ohne sie vollstaendig.
+    """
+    from ..models import KursTag, Topic
 
     k = await eigener_kurs(db, user, kurs_id)
-    zeilen = (await db.execute(select(Stoffplan).where(
-        Stoffplan.owner_id == user.id, Stoffplan.kurs_id == kurs_id
-    ).order_by(Stoffplan.position, Stoffplan.id))).scalars().all()
-
-    themen = {t.id: t for t in (await db.execute(select(Topic).where(
-        Topic.owner_id == user.id, Topic.deleted_at.is_(None)))).scalars().all()}
-
-    def label(tid):
-        t = themen.get(tid)
-        if not t:
-            return None
-        p = themen.get(t.parent_id) if t.parent_id else None
-        return f"{p.name} / {t.name}" if p else t.name
-
-    # Die Klasse des Kurses: ohne sie zaehlen nur Stunden, an denen der Kurs
-    # ausdruecklich steht — wer den Stundenplan nur ueber die Klasse gepflegt
-    # hat, saehe sonst null Stunden.
     klassen = (await db.execute(select(KursTag.class_id).where(KursTag.kurs_id == kurs_id))).scalars().all()
     class_id = klassen[0] if len(klassen) == 1 else None
 
@@ -1326,136 +1296,67 @@ async def stoffplan(kurs_id: int, term: str = "", user: User = Depends(require_m
     slots = (await db.execute(select(TimetableSlot).where(TimetableSlot.owner_id == user.id))).scalars().all()
     breaks = (await db.execute(select(CalendarBreak).where(CalendarBreak.owner_id == user.id))).scalars().all()
     cancels = (await db.execute(select(SlotCancellation).where(SlotCancellation.owner_id == user.id))).scalars().all()
-    planned = (await db.execute(select(CalendarEntry).where(
-        CalendarEntry.owner_id == user.id, CalendarEntry.period.is_not(None)))).scalars().all()
+    eintraege = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == user.id))).scalars().all()
+    planned = [e for e in eintraege if e.period is not None]
 
-    stunden_termine = _unterrichtsstunden(
-        kurs_id=kurs_id, class_id=class_id, start=start, ende=ende,
-        slots=slots, planned=planned,
-        breaks_days=_freie_tage(breaks), cancel_set={(_tag(c.date), c.period) for c in cancels})
+    # Gehoert dieser Eintrag zum Kurs? Kurs gesetzt: derselbe Kurs. Sonst zaehlt
+    # ein kursloser Eintrag der Klasse mit — wer den Stundenplan nur ueber die
+    # Klasse pflegt, saehe sonst eine leere Leiste.
+    def zum_kurs(e):
+        return e.kurs_id == kurs_id or (e.kurs_id is None and class_id is not None and e.class_id == class_id)
 
-    # IST-Stunden: konkret geplante Eintraege, die auf das Thema zeigen. Nur
-    # Eintraege, keine Stundenplan-Vorlagen — die Vorlage sagt „hier ist Mathe",
-    # nicht „hier wurde dieses Thema unterrichtet".
-    ist = {}
-    for e in planned:
-        ed = _tag(e.date)
-        if not e.topic_id or not (start <= ed < ende):
-            continue
-        if e.kurs_id == kurs_id or (e.kurs_id is None and class_id is not None and e.class_id == class_id):
-            ist[e.topic_id] = ist.get(e.topic_id, 0) + 1
+    punkte = []
 
-    # Klassenarbeiten des Kurses im Zeitraum. Sie stehen NICHT nur daneben:
-    # eine Planzeile kann auf eine zeigen („dieses Thema schliesst damit ab"),
-    # und die Termine, auf die keine zeigt, sortiert die Oberflaeche nach Datum
-    # zwischen die Zeilen. Sie sind schon eingetragen — der Plan soll sie
-    # benutzen, nicht ein zweites Mal abfragen.
-    exams = (await db.execute(select(ExamDate).where(
-        ExamDate.owner_id == user.id, ExamDate.kurs_id == kurs_id).order_by(ExamDate.date))).scalars().all()
-    arbeiten = [
-        {"id": ex.id, "date": _tag(ex.date).isoformat(), "title": ex.title,
-         "topics": [label(t) for t in (ex.topic_ids or []) if label(t)]}
-        for ex in exams if start <= _tag(ex.date) < ende
-    ]
+    for tag, period in _unterrichtsstunden(
+            kurs_id=kurs_id, class_id=class_id, start=start, ende=ende,
+            slots=slots, planned=planned,
+            breaks_days=_freie_tage(breaks), cancel_set={(_tag(c.date), c.period) for c in cancels}):
+        punkte.append({"art": "stunde", "date": tag.isoformat(), "period": period, "titel": "", "sub": ""})
 
-    # Soll-Stunden der Reihe nach auf die Termine legen. Reicht der Zeitraum
-    # nicht, bleibt `bis` leer — das ist der eigentliche Befund des Plans
-    # („dafuer reicht das Halbjahr nicht"), keine Panne.
-    i = 0
-    out = []
-    for z in zeilen:
-        lab = label(z.topic_id)
-        if not lab:
-            continue                 # Thema im Papierkorb: Zeile still ueberspringen
-        n = max(0, int(z.stunden or 0))
-        eigene = stunden_termine[i:i + n]
-        i += n
-        # Fester Zeitraum gewinnt gegen den gerechneten. Beides steht in der
-        # Antwort: die Oberflaeche zeigt das eingetragene Datum an und kann
-        # trotzdem sagen, was die Rechnung ergaebe.
-        gerechnet_von = eigene[0][0].isoformat() if eigene else None
-        gerechnet_bis = eigene[-1][0].isoformat() if eigene else None
-        out.append({
-            "topic_id": z.topic_id, "label": lab, "stunden": n, "term": z.term or "",
-            "notiz": z.notiz or "", "ist": ist.get(z.topic_id, 0),
-            "niveau": z.niveau or "",
-            "start_date": z.start_date.isoformat() if z.start_date else "",
-            "end_date": z.end_date.isoformat() if z.end_date else "",
-            "start": (z.start_date.isoformat() if z.start_date else gerechnet_von),
-            "ende": (z.end_date.isoformat() if z.end_date else gerechnet_bis),
-            "fest": bool(z.start_date or z.end_date),
-            # Weniger Termine als Soll-Stunden: das Halbjahr ist zu kurz.
-            "passt": len(eigene) == n,
-            "exam_id": z.exam_id,
-        })
+    for ex in (await db.execute(select(ExamDate).where(
+            ExamDate.owner_id == user.id, ExamDate.kurs_id == kurs_id))).scalars().all():
+        d = _tag(ex.date)
+        if start <= d < ende:
+            punkte.append({"art": "arbeit", "date": d.isoformat(), "period": ex.period,
+                           "titel": ex.title or "Klassenarbeit", "sub": ex.notiz or "", "id": ex.id})
 
-    # Was noch fehlt: Themen desselben Fachs und Jahrgangs, die nicht im Plan
-    # stehen. Fach/Jahrgang schlagen VOR, dieser Plan ist die Entscheidung.
-    drin = {z.topic_id for z in zeilen}
-    vorschlaege = []
-    if k.fach or k.jahrgang:
-        for t in themen.values():
-            if t.id in drin or t.parent_id is None:
-                continue          # geplant wird auf Ebene der Unterthemen
-            wurzel = themen.get(t.parent_id)
-            if not wurzel:
-                continue
-            if k.fach and (wurzel.fach or "") != k.fach:
-                continue
-            if k.jahrgang and wurzel.jahrgang != k.jahrgang:
-                continue
-            vorschlaege.append({"topic_id": t.id, "label": label(t.id)})
-    vorschlaege.sort(key=lambda x: x["label"] or "")
+    arten = (("cardvote_set_id", "cardvote", "Quiz"),
+             ("karten_deck_id", "karten", "Karten"),
+             ("lernpfad_ladder_id", "lernpfad", "Lernleiter"),
+             ("codedetektiv_puzzle", "code-detektiv", "Rätsel"))
+    aktiv = {modul: await is_active(db, user.id, modul) for _f, modul, _w in arten}
 
-    return {
-        "kurs_id": kurs_id, "kurs": k.name, "fach": k.fach or "", "jahrgang": k.jahrgang,
-        "von": start.isoformat(), "bis": ende.isoformat(),
-        "halbjahr_gesetzt": bool(von),
-        "stunden_gesamt": len(stunden_termine),
-        "stunden_verplant": min(i, len(stunden_termine)),
-        "zeilen": out, "arbeiten": arbeiten, "vorschlaege": vorschlaege,
-    }
+    themen = {t.id: t for t in (await db.execute(select(Topic).where(
+        Topic.owner_id == user.id, Topic.deleted_at.is_(None)))).scalars().all()}
 
+    def thema_label(tid):
+        t = themen.get(tid)
+        if not t:
+            return None
+        p = themen.get(t.parent_id) if t.parent_id else None
+        return f"{p.name} / {t.name}" if p else t.name
 
-@router.put("/stoffplan", status_code=204)
-async def set_stoffplan(body: StoffplanIn, user: User = Depends(require_module),
-                        db: AsyncSession = Depends(get_db)):
-    """Den ganzen Plan eines Kurses setzen — Reihenfolge ist die Listenreihenfolge.
-
-    Ganz statt zeilenweise, weil Reihenfolge und Stundenzahl zusammen EINE
-    Entscheidung sind: wer ein Thema verschiebt, verschiebt alle danach. Ein
-    PUT je Zeile hiesse zwanzig Aufrufe fuer einen Zug.
-    """
-    from sqlalchemy import delete as sa_delete
-    from ..models import Stoffplan, Topic
-
-    await eigener_kurs(db, user, body.kurs_id)
-    eigene = {t for (t,) in (await db.execute(select(Topic.id).where(
-        Topic.owner_id == user.id, Topic.deleted_at.is_(None)))).all()}
-
-    exam_ids = {e for (e,) in (await db.execute(select(ExamDate.id).where(
-        ExamDate.owner_id == user.id, ExamDate.kurs_id == body.kurs_id))).all()}
-
-    await db.execute(sa_delete(Stoffplan).where(
-        Stoffplan.owner_id == user.id, Stoffplan.kurs_id == body.kurs_id))
     gesehen = set()
-    for pos, z in enumerate(body.zeilen[:200]):
-        # Fremde und doppelte Themen still ueberspringen: die Liste kommt aus
-        # einer Oberflaeche, in der man zieht und ablegt — ein 422 mitten im
-        # Umsortieren waere die schlechteste Antwort darauf.
-        if z.topic_id not in eigene or z.topic_id in gesehen:
+    for e in eintraege:
+        d = _tag(e.date)
+        if not (start <= d < ende) or not zum_kurs(e):
             continue
-        gesehen.add(z.topic_id)
-        db.add(Stoffplan(owner_id=user.id, kurs_id=body.kurs_id, topic_id=z.topic_id,
-                         stunden=max(0, min(int(z.stunden or 0), 200)), position=pos,
-                         term=(z.term or "")[:8], notiz=(z.notiz or "")[:500],
-                         start_date=_datum(z.start_date), end_date=_datum(z.end_date),
-                         # Nur Termine DIESES Kurses: eine Zeile, die auf die
-                         # Arbeit einer fremden Lerngruppe zeigt, waere ein Plan,
-                         # der beim Verschieben dort mitwandert.
-                         exam_id=z.exam_id if z.exam_id in exam_ids else None,
-                         niveau=z.niveau if z.niveau in ("G", "E") else ""))
-    await db.commit()
+        for feld, modul, wort in arten:
+            if getattr(e, feld, None) and aktiv.get(modul):
+                punkte.append({"art": "freischaltung", "date": d.isoformat(), "period": e.period,
+                               "titel": e.title or wort, "sub": wort, "modul": modul, "id": e.id})
+        # Ein Thema erscheint einmal je Tag: mehrere Stunden am selben Tag sind
+        # dasselbe Thema, keine zwei Punkte.
+        lab = thema_label(e.topic_id) if e.topic_id else None
+        if lab and (d, e.topic_id) not in gesehen:
+            gesehen.add((d, e.topic_id))
+            punkte.append({"art": "thema", "date": d.isoformat(), "period": e.period,
+                           "titel": lab, "sub": ""})
+
+    # Nach Tag, dann nach Stunde: an einem Tag steht die 1. Stunde ueber der 5.
+    punkte.sort(key=lambda p: (p["date"], p.get("period") if p.get("period") is not None else 99))
+    return {"kurs": {"id": k.id, "name": k.name, "fach": k.fach or ""},
+            "von": start.isoformat(), "bis": ende.isoformat(), "punkte": punkte}
 
 
 # ─── Stundenplan (wiederkehrendes Wochenraster, Vorlage fuer Termine) ───
