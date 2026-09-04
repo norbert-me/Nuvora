@@ -31,6 +31,18 @@ export default function Fehlermelder() {
   const [fertig, setFertig] = useState(false);
   const [fehler, setFehler] = useState("");
   const [anzahl, setAnzahl] = useState(0);
+  // „Grosser Bildschirm" statt „Desktop": entscheidend ist der Platz, nicht das
+  // Geraet. Ein Tablet im Querformat bekommt denselben Knopf wie der Rechner.
+  const [gross, setGross] = useState(() => {
+    try { return window.matchMedia("(min-width: 900px)").matches; } catch { return false; }
+  });
+  useEffect(() => {
+    let mq;
+    try { mq = window.matchMedia("(min-width: 900px)"); } catch { return; }
+    const h = (e) => setGross(e.matches);
+    mq.addEventListener("change", h);
+    return () => mq.removeEventListener("change", h);
+  }, []);
   // Ein Anhang, den die Lehrkraft SELBST aussucht (Screenshot, Export, PDF).
   // Er darf Inhalte tragen — anders als Protokoll und Umgebung, die
   // inhaltsfrei bleiben: hier hat jemand hingesehen und sich entschieden.
@@ -83,13 +95,17 @@ export default function Fehlermelder() {
         title={t("melder.titel")} aria-label={t("melder.titel")}
         style={{
           position: "fixed", right: 16, bottom: 16, zIndex: 300,
-          width: 40, height: 40, borderRadius: CONTROL_R,
+          // Am Rechner ein Viertel groesser: dort ist der Knopf eine kleine
+          // Marke am Bildrand und wurde uebersehen. Auf dem Handy bleibt er,
+          // wie er war — 40 px sind dort schon eine Daumenflaeche, und der
+          // Platz ist knapper.
+          width: gross ? 50 : 40, height: gross ? 50 : 40, borderRadius: CONTROL_R,
           display: "flex", alignItems: "center", justifyContent: "center",
           background: "var(--card)", border: "1px solid var(--border2)",
           color: problem ? C.danger : "var(--text3)", cursor: "pointer",
           boxShadow: SHADOW.schwebend,
         }}>
-        <Icon d={ICONS.bug} size={18} color="currentColor" />
+        <Icon d={ICONS.bug} size={gross ? 22 : 18} color="currentColor" />
         {/* Punkt statt Zahl: wie viele Fehler es waren, hilft niemandem —
             dass überhaupt einer war, schon. Radius = halbe Kante (Grafik). */}
         {problem && (

@@ -58,6 +58,7 @@ Notiz zur größten Fassung die dünnste.
 
 **Notizbrett**
 
+- Die Aufgabenliste steht mittig, auch im Notizbrett.
 - Eine Aufgabe kann eine Notiz für längeren Text tragen; in der Liste klappt
   sie auf Klick auf.
 - Was heute fällig ist, steht rot (vorher gelb wie „demnächst").
@@ -88,6 +89,8 @@ Notiz zur größten Fassung die dünnste.
 - Eine neue Aufgabe steht oben in der Liste, nicht unten.
 
 **Fehlermeldung**
+
+- Der Melde-Knopf ist auf großen Bildschirmen ein Viertel größer.
 
 - An eine Meldung lässt sich eine Datei anhängen (Screenshot, Export, PDF) —
   selbst ausgewählt, bis 3 MB. Protokoll und Umgebung bleiben inhaltsfrei.

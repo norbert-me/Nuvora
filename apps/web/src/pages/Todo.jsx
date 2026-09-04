@@ -236,7 +236,10 @@ export default function Todo({ embedded } = {}) {
   };
 
   return (
-    <div style={{ maxWidth: 640, margin: embedded ? 0 : "0 auto" }}>
+    // Auch eingebettet mittig: im Notizbrett sass die Liste in einer 960 px
+    // breiten Seite und klebte am linken Rand — die Umgebung ist zentriert,
+    // die Liste war es nicht.
+    <div style={{ maxWidth: 640, margin: "0 auto" }}>
       {!embedded && <h1 style={pageTitle}>{t("todo.title")}</h1>}
 
       {/* Auch die Eingabezeile ist eine Werkzeugleiste — dieselbe Komponente,
