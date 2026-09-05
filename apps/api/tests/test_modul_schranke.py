@@ -39,6 +39,8 @@ KERN = (
     # Die ladbaren Apps: eine Eigenschaft der Installation, kein Modulinhalt —
     # dieselbe Antwort fuer jede Lehrkraft.
     "/api/apps",
+    # Die Aenderungsliste: gehoert der Installation, nicht einem Modul.
+    "/api/changelog",
     # Dateiablage der Lehrkraft: haengt an Themen (Kern), gehoert keinem Modul.
     "/api/material",
     # Klassen-Export/-Import gehoeren dem Kern. Die Fragen-, Ordner- und

@@ -158,6 +158,7 @@ import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";
 import Fehlermelder from "./components/Fehlermelder.jsx";
+import WasIstNeu from "./components/WasIstNeu.jsx";
 import { notiereAufruf, notiereSeite, protokollStarten } from "./core/protokoll.js";
 import { btnPrimary, btnSecondary, btnSmall, Skeleton, Modal, pageForm, pageTitle, pageIntro,
   COLORS as C, Icon, ICONS, iconBtn, cardStyle, chipStyle, menuRow, popoverPanel, SHADOW, CONTROL_R } from "./components/Icons.jsx";
@@ -1223,6 +1224,8 @@ function Wurzel() {
             Spam-Schutz, und die Schuelerseiten hinter dem QR-Code sollen
             keinen Melde-Knopf tragen. */}
         {user && <Fehlermelder />}
+        {/* Nach einem Update: die Aenderungsliste beim ersten Anmelden danach. */}
+        {user && <WasIstNeu />}
         <UpdateBanner />
         <SpeicherHinweis />
         {/* Die beiden oeffentlichen Seiten liegen ausserhalb des Rahmens und

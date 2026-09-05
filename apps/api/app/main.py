@@ -384,6 +384,7 @@ def _ensure_columns(sync_conn):
         ("users", "timetable_periods", "INTEGER DEFAULT 6 NOT NULL"),
         ("users", "timetable_times", "JSON"),
         ("users", "timetable_zero", "JSON"),
+        ("users", "changelog_seen", "VARCHAR(20) DEFAULT '' NOT NULL"),
         ("notepad_notes", "width", "INTEGER DEFAULT 0 NOT NULL"),
         ("notepad_notes", "height", "INTEGER DEFAULT 0 NOT NULL"),
     ]
@@ -1275,6 +1276,53 @@ async def apps(user=Depends(get_current_user)):
         "plattformen": [{"key": k, "label": label, "datei": d["dateien"].get(k)}
                         for k, label, _ in APP_PLATTFORMEN],
     }
+
+
+# ─── Was ist neu? ───
+#
+# Nach einem Update sieht die Lehrkraft beim naechsten Anmelden, was sich
+# geaendert hat. Quelle ist CHANGELOG.md — dieselbe Datei, aus der die
+# Release-Notiz entsteht.
+#
+# Zwei Entscheidungen: der Stand haengt am KONTO (`users.changelog_seen`), nicht
+# im Browser — sonst kaeme dieselbe Liste am Rechner und am Tablet noch einmal.
+# Und wer sich zum ERSTEN Mal anmeldet, bekommt nichts: die Historie von zwanzig
+# Fassungen ist fuer ein neues Konto keine Neuigkeit, sondern eine Wand aus Text.
+# Deshalb setzt schon die Registrierung den Stand auf die laufende Fassung.
+@app.get("/api/changelog")
+async def changelog_neu(user=Depends(get_current_user)):
+    """Die Fassungen, die seit dem letzten Blick dieser Lehrkraft dazukamen."""
+    from . import changelog as _cl
+    pfad = _cl.datei()
+    text = pfad.read_text(encoding="utf-8") if pfad else ""
+    gesehen = (getattr(user, "changelog_seen", "") or "").strip()
+    return {
+        "version": APP_VERSION,
+        "gesehen": gesehen,
+        # Ohne einen gemerkten Stand (Bestandskonto von vor dieser Funktion)
+        # zeigen wir NUR die laufende Fassung: sie ist das, was sich fuer diese
+        # Person zuletzt geaendert hat — nicht die ganze Geschichte.
+        "abschnitte": _cl.seit(text, gesehen or APP_VERSION, bis=APP_VERSION) if gesehen
+                      else _cl.seit(text, _vorige_fassung(text, APP_VERSION), bis=APP_VERSION),
+    }
+
+
+def _vorige_fassung(text: str, aktuell: str) -> str:
+    """Die Fassung direkt vor `aktuell` — Startpunkt fuer Konten ohne Stand."""
+    from . import changelog as _cl
+    kleiner = [a["version"] for a in _cl.abschnitte(text)
+               if _cl.version_tupel(a["version"]) < _cl.version_tupel(aktuell)]
+    return kleiner[0] if kleiner else aktuell
+
+
+@app.post("/api/changelog/seen")
+async def changelog_gesehen(user=Depends(get_current_user), db=Depends(get_db)):
+    """Merkt: bis hierher gesehen. Ohne Rumpf — es gibt nur einen Stand."""
+    u = await db.get(User, user.id)
+    if u:
+        u.changelog_seen = APP_VERSION
+        await db.commit()
+    return {"gesehen": APP_VERSION}
 
 
 @app.post("/api/mail-test")

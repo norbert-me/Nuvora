@@ -541,7 +541,12 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
     result = await db.execute(select(User).where(User.email == email))
     if result.scalar_one_or_none():
         raise HTTPException(400, "E-Mail bereits registriert")
-    user = User(email=email, password_hash=_hash_pw(body.password), name=body.name, salutation=body.salutation, email_verified=False)
+    # changelog_seen von Anfang an auf die laufende Fassung: ein neues Konto
+    # soll beim ersten Anmelden nicht die Aenderungsliste der letzten zwanzig
+    # Fassungen sehen — fuer diese Person ist daran nichts neu.
+    from ..admin import APP_VERSION as _fassung
+    user = User(email=email, password_hash=_hash_pw(body.password), name=body.name,
+                salutation=body.salutation, email_verified=False, changelog_seen=_fassung)
     db.add(user)
     await db.commit()
     await db.refresh(user)

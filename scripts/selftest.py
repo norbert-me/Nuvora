@@ -905,6 +905,19 @@ def teste_kern(api, b, u):
         mit = [p["key"] for p in out["plattformen"] if p.get("datei")]
         return f"{len(keys)} Plattformen, {len(mit)} mit Datei (Stand {out.get('version') or '—'})"
 
+    def was_ist_neu():
+        # Die Aenderungsliste kommt aus CHANGELOG.md. Im Container ist sie ein
+        # Mount — fehlt er, antwortet der Endpunkt mit einer leeren Liste, und
+        # niemand saehe je, was sich geaendert hat.
+        out = api.call("GET", "/api/changelog", erwartet=(200,))
+        if not out.get("version"):
+            raise AssertionError("keine Fassung gemeldet")
+        api.call("POST", "/api/changelog/seen", {}, erwartet=(200,))
+        danach = api.call("GET", "/api/changelog", erwartet=(200,))
+        if danach.get("abschnitte"):
+            raise AssertionError("nach dem Bestaetigen steht die Liste immer noch offen")
+        return f"Fassung {out['version']}, {len(out.get('abschnitte') or [])} Abschnitt(e), Bestaetigen wirkt"
+
     b.pruefe("Kern", "Klassen und Schueler", klassen)
     b.pruefe("Kern", "Reihenfolge", reihenfolge)
     b.pruefe("Kern", "Kurse", kurse)
@@ -918,6 +931,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Modulregister", modulregister)
     b.pruefe("Kern", "Sicherung", sicherung)
     b.pruefe("Kern", "App-Downloads", apps, schwere="warnung")
+    b.pruefe("Kern", "Was ist neu?", was_ist_neu)
 
 
 # ── je Modul eine Probe: anlegen, lesen, aendern, loeschen ──

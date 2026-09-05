@@ -147,6 +147,10 @@ class User(Base):
     # statt Index 0 in timetable_times: das haette jede gespeicherte
     # Stundennummer um eins verschoben.
     timetable_zero: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Welche Fassung der Aenderungsliste diese Lehrkraft schon gesehen hat.
+    # Am Konto und nicht im Browser — dieselbe Regel wie bei tours_done: sonst
+    # bekaeme man dieselbe Liste am Rechner und am Tablet erneut.
+    changelog_seen: Mapped[str] = mapped_column(String(20), default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     folders: Mapped[list["Folder"]] = relationship(back_populates="owner", cascade="all, delete-orphan")

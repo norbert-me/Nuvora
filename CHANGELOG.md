@@ -21,6 +21,8 @@ Notiz zur größten Fassung die dünnste.
 
 **Konto und Zugänge**
 
+- Nach einem Update zeigt Nuvora beim nächsten Anmelden, was neu ist.
+
 - Im Profil steht „App laden": die Desktop-App für macOS lässt sich direkt
   herunterladen. Windows, Linux, Android und iPhone stehen schon in der Liste
   und sagen, dass sie in Vorbereitung sind.

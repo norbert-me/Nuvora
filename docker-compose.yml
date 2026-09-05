@@ -80,6 +80,11 @@ services:
       # /app/config/site.json. Ohne diesen Mount galt das Impressum immer als
       # fehlend, obwohl nginx dieselbe Datei unter /site.json ausliefert.
       - ./config:/app/config:ro
+      # Die Aenderungsliste: "Was ist neu?" zeigt sie nach einem Update. Als
+      # Mount und nicht ins Image kopiert, weil der Build-Kontext apps/api ist
+      # und die Datei im Wurzelverzeichnis liegt — eine zweite Fassung darin
+      # waere nach der naechsten Version falsch.
+      - ./CHANGELOG.md:/app/CHANGELOG.md:ro
     depends_on:
       db:
         condition: service_healthy
