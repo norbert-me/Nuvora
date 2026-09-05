@@ -19,6 +19,11 @@ Notiz zur größten Fassung die dünnste.
 - Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
   Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
 
+**Notizbrett**
+
+- Eine Aufgabe am unteren Rand rutscht beim Bearbeiten oder Aufklappen der
+  Notiz ins Bild — vorher tippte man in ein Feld, das man nicht sah.
+
 **Konto und Zugänge**
 
 - Nach einem Update zeigt Nuvora beim nächsten Anmelden, was neu ist.

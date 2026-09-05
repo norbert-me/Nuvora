@@ -59,6 +59,24 @@ export default function Todo({ embedded } = {}) {
     try { datumRef.current?.showPicker?.(); } catch { /* Browser ohne showPicker */ }
   }, [datumAuf]);
 
+  // Aufklappen macht eine Zeile hoeher — steht sie unten am Rand, waechst sie
+  // aus dem Bild heraus, und man tippt in ein Feld, das man nicht sieht. Die
+  // Seite scrollt deshalb nach, sobald eine Zeile in die Bearbeitung geht oder
+  // ihre Notiz zeigt. `block: "nearest"` schiebt nur so weit wie noetig — eine
+  // Zeile, die ohnehin sichtbar ist, bleibt, wo sie ist.
+  const zeilenRefs = useRef({});
+  useEffect(() => {
+    const id = editId ?? notizAuf;
+    if (id == null) return;
+    const el = zeilenRefs.current[id];
+    if (!el) return;
+    // Erst nach dem Zeichnen: vorher hat die Zeile noch ihre alte Hoehe.
+    const timer = setTimeout(() => {
+      try { el.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch { /* egal */ }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [editId, notizAuf]);
+
   const naechsteStunde = () => { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); return `${String(d.getHours()).padStart(2, "0")}:00`; };
   const load = () => hol(API).then((d) => setItems(Array.isArray(d) ? d : []));
   useEffect(() => { load(); }, []);
@@ -180,7 +198,8 @@ export default function Todo({ embedded } = {}) {
   const Row = (it, dnd) => {
     if (editId === it.id) {
       return (
-        <div key={it.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", border: "1px solid var(--accent)", borderRadius: CONTROL_R, marginBottom: 8 }}>
+        <div key={it.id} ref={(el) => { zeilenRefs.current[it.id] = el; }}
+          style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", border: "1px solid var(--accent)", borderRadius: CONTROL_R, marginBottom: 8 }}>
           <input value={eText} onChange={(e) => setEText(e.target.value)} autoFocus onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditId(null); }} style={{ ...toolbarInput, flex: 1, minWidth: 140 }} />
           <input type="date" value={eDate} onChange={(e) => setEDate(e.target.value)} style={toolbarInput} />
           {eDate && <input type="time" value={eTime} onChange={(e) => setETime(e.target.value)} style={toolbarInput} />}
@@ -194,7 +213,8 @@ export default function Todo({ embedded } = {}) {
       );
     }
     return (
-      <div key={it.id} {...(dnd || {})} ref={markiert === it.id ? zielRef : undefined}
+      <div key={it.id} {...(dnd || {})}
+        ref={(el) => { zeilenRefs.current[it.id] = el; if (markiert === it.id) zielRef.current = el; }}
         style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", marginBottom: 8, cursor: dnd ? "grab" : "default",
           ...(markiert === it.id ? { border: "1px solid var(--accent)", boxShadow: "inset 3px 0 0 var(--accent)" } : {}) }}>
         {dnd && <span className="drag-handle" title={t("todo.reorderHint")} style={{ color: "var(--text3)", flexShrink: 0, display: "inline-flex", cursor: "grab" }}><Icon d={ICONS.grip} size={15} /></span>}
