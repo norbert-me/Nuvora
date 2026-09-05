@@ -22,12 +22,14 @@ import {
 } from "./Icons.jsx";
 import { hol, alsJson } from "../core/melden.js";
 import { useLanguage } from "../i18n/index.jsx";
+import KalenderAdresseHilfe from "./KalenderAdresseHilfe.jsx";
 
 // Die Gruende, die der Server nennen kann (app/untis.py, GRUENDE). Beide Seiten
 // muessen dieselbe Liste kennen — ein Grund ohne Text waere eine leere Meldung.
 const GRUENDE = ["zugangsdaten", "schule", "server", "gesperrt", "kein_zugriff", "sso", "unbekannt"];
 
 export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [], periods = 6 }) {
+  const [hilfe, setHilfe] = useState(false);
   const { t } = useLanguage();
   const [quelle, setQuelle] = useState("api");
   const [konto, setKonto] = useState({ server: "", schule: "", benutzer: "", ics_url: "" });
@@ -159,6 +161,12 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
                   style={{ ...inputStyle, width: "100%" }} />
               </label>
               <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>{t("untis.icsHinweis")}</p>
+              {/* Der Abo-Link liegt in WebUntis drei Klicks tief; ohne den Weg
+                  dorthin scheitert der ICS-Import an der Adresse, nicht an uns. */}
+              <button type="button" onClick={() => setHilfe(true)} style={{ ...btnSecondary, ...btnSmall, alignSelf: "flex-start" }}>
+                {t("kalhilfe.titel")}
+              </button>
+              <KalenderAdresseHilfe offen={hilfe} onClose={() => setHilfe(false)} />
               <p style={{ fontSize: 12, color: C.warning, margin: 0 }}>{t("untis.icsGrenze")}</p>
             </div>
           )}

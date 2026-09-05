@@ -2172,11 +2172,15 @@ _EXT_TTL = 600  # 10 Minuten
 
 def _fetch_ics(url: str) -> str:
     """Einen externen ICS-Feed holen. Der SSRF-Schutz (keine privaten IPs,
-    DNS-Rebinding-Pin, keine Weiterleitungen) steht in app/netz.py — an EINER
-    Stelle, weil ihn auch die Untis-Anbindung braucht und zwei Fassungen davon
-    genau eine zu viel waeren."""
-    from ..netz import hole
-    return hole(url, timeout=6, max_bytes=2_000_000)
+    DNS-Rebinding-Pin, jede Weiterleitung neu geprueft) steht in app/netz.py —
+    an EINER Stelle, weil ihn auch die Untis-Anbindung braucht und zwei
+    Fassungen davon genau eine zu viel waeren.
+
+    Mit Weiterleitungen, weil iCloud und Google auf ihre Freigabe-Adressen
+    regelmaessig mit 302 antworten: ohne das starb der Abruf mit "HTTP Error
+    302: Found", und in der Oberflaeche sah es aus, als sei der Link falsch."""
+    from ..netz import hole_mit_umleitung
+    return hole_mit_umleitung(url, timeout=6, max_bytes=2_000_000)
 
 
 async def externe_ereignisse(user: User, refresh: bool = False) -> list:

@@ -19,6 +19,10 @@ const BEREICHE = [
   { key: "module", ziel: "/modules" },
   // Beides gehoert in die Tour, weil es die Fragen sind, die nach ein paar
   // Wochen kommen: „Was sagen mir die Zahlen?" und „Wohin mit dem alten Jahr?"
+  // Der Kalender in beide Richtungen: fremde Termine herein, Nuvora hinaus.
+  // Es ist die haeufigste Rueckfrage — beide Wege liegen hinter Menues, und wer
+  // sie nicht kennt, tippt seinen Stundenplan ab.
+  { key: "kalender", ziel: "/kalender" },
   { key: "auswerten", ziel: "/auswertung?tab=klassenarbeit" },
   { key: "jahresende", ziel: "/classes" },
   { key: "loslegen", ziel: "/modules" },

@@ -151,3 +151,16 @@ def test_fehler_behaelt_originaltext():
     # Eine uebersetzte Meldung ohne das Original ist nicht nachpruefbar.
     e = UntisFehler("kein_zugriff", "no right for getTimetable()")
     assert e.grund == "kein_zugriff" and "getTimetable" in e.text
+
+
+def test_ics_zeit_in_utc_wird_umgerechnet():
+    """WebUntis schreibt seine ICS-Zeiten oft in UTC ("…T060000Z").
+
+    Roh gelesen waere das 06:00, und die Zuordnung zur Stundennummer traefe die
+    falsche Stunde oder gar keine — der Import blieb dann leer, ohne Fehler.
+    """
+    from app.untis import _zeitpunkt
+    assert _zeitpunkt("20260907T060000Z") == ("20260907", "08:00")   # Sommerzeit
+    assert _zeitpunkt("20261207T070000Z") == ("20261207", "08:00")   # Winterzeit
+    assert _zeitpunkt("20260907T080000") == ("20260907", "08:00")    # Ortszeit bleibt
+    assert _zeitpunkt("20260907") == ("20260907", "")                # ganztaegig

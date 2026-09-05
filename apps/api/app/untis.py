@@ -31,10 +31,11 @@ In allen diesen Faellen bleibt der ICS-Weg.
 """
 import json
 import logging
+import os
 import re
 from datetime import date
 
-from .netz import NetzFehler, hole
+from .netz import NetzFehler, hole, hole_mit_umleitung
 
 _log = logging.getLogger("nuvora.untis")
 
@@ -263,6 +264,37 @@ def _stunde_aus_api(z: dict, stamm: dict) -> dict:
 
 # ─── Der andere Weg: ICS-Abo-Link ───
 
+# Untis schreibt seine ICS-Zeiten haeufig in UTC ("20260907T060000Z"). Roh
+# gelesen wird daraus 06:00, und die Zuordnung zur Stundennummer trifft die
+# falsche Stunde oder gar keine — der Import blieb dann leer, ohne Fehler.
+# Umgerechnet wird nach der Schulzeitzone; sie steht nirgends in Nuvora, deshalb
+# Europe/Berlin als Vorgabe und `SCHOOL_TZ` fuer alle anderen.
+SCHUL_ZEITZONE = os.environ.get("SCHOOL_TZ", "Europe/Berlin")
+
+
+def _zeitpunkt(roh: str):
+    """Ein ICS-DTSTART/DTEND zerlegen: ("YYYYMMDD", "HH:MM").
+
+    Ohne Uhrzeit (reines Datum) ist der zweite Teil leer. Ein "Z" am Ende heisst
+    UTC und wird umgerechnet; alles andere gilt als Ortszeit — genau wie im
+    uebrigen Nuvora, das Tag und "HH:MM" ohne Zeitzone speichert.
+    """
+    roh = (roh or "").strip()
+    if "T" not in roh or len(roh) < 15:
+        return roh[:8], ""
+    tag, zeit = roh[:8], roh[9:15]
+    if not roh.endswith("Z"):
+        return tag, zeit[:2] + ":" + zeit[2:4]
+    try:
+        from datetime import datetime as _dt, timezone as _tz
+        from zoneinfo import ZoneInfo
+        p = _dt.strptime(tag + zeit, "%Y%m%d%H%M%S").replace(tzinfo=_tz.utc)
+        lokal = p.astimezone(ZoneInfo(SCHUL_ZEITZONE))
+        return lokal.strftime("%Y%m%d"), lokal.strftime("%H:%M")
+    except Exception:
+        return tag, zeit[:2] + ":" + zeit[2:4]
+
+
 def stunden_aus_ics(url: str, von: date, bis: date) -> list:
     """Denselben Stundenplan aus einem WebUntis-ICS-Abo lesen.
 
@@ -275,7 +307,10 @@ def stunden_aus_ics(url: str, von: date, bis: date) -> list:
     Uebernahme von Ausfaellen bleibt dem API-Weg vorbehalten.
     """
     try:
-        text = hole(url.replace("webcal://", "https://", 1), timeout=10, max_bytes=4_000_000)
+        # Mit Weiterleitungen: der persoenliche Untis-Abo-Link antwortet je nach
+        # Installation mit 302 auf die eigentliche Datei.
+        text = hole_mit_umleitung(url.replace("webcal://", "https://", 1),
+                                  timeout=10, max_bytes=4_000_000)
     except NetzFehler as e:
         raise UntisFehler("server", str(e))
     except Exception as e:
@@ -303,11 +338,14 @@ def stunden_aus_ics(url: str, von: date, bis: date) -> list:
             k = schluessel.split(";", 1)[0].upper()
             roh = wert.strip()
             if k == "DTSTART":
-                cur["datum"] = roh[:8]
-                if "T" in roh and len(roh) >= 13:
-                    cur["start"] = roh[9:11] + ":" + roh[11:13]
-            elif k == "DTEND" and "T" in roh and len(roh) >= 13:
-                cur["ende"] = roh[9:11] + ":" + roh[11:13]
+                d0, t0 = _zeitpunkt(roh)
+                cur["datum"] = d0 or roh[:8]
+                if t0:
+                    cur["start"] = t0
+            elif k == "DTEND":
+                _, t1 = _zeitpunkt(roh)
+                if t1:
+                    cur["ende"] = t1
             elif k == "SUMMARY":
                 cur["titel"] = roh.replace("\\,", ",").replace(r"\;", ";").replace("\\n", " ")
             elif k == "LOCATION":

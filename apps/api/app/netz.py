@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -61,6 +62,15 @@ def _pruefe_ziel(url: str):
 
 
 class _KeineWeiterleitung(urllib.request.HTTPRedirectHandler):
+    """Weiterleitungen fangen wir SELBST — siehe `hole()`.
+
+    urllib wuerde ihnen folgen, ohne das neue Ziel noch einmal zu pruefen; genau
+    darueber laeuft der Umweg auf eine interne Adresse (SSRF). Sie hier komplett
+    zu verbieten war der erste Anlauf und ging in die andere Richtung schief:
+    WebUntis, iCloud und Google antworten auf ihre Kalender-Adressen regelmaessig
+    mit 301/302, und der Abruf starb dann mit "HTTP Error 302: Found".
+    """
+
     def redirect_request(self, *a, **k):
         return None
 
@@ -96,3 +106,31 @@ def hole(url: str, *, daten: bytes = None, kopfzeilen: dict = None,
             return r.read(max_bytes).decode("utf-8", "replace")
     finally:
         socket.getaddrinfo = _echtes_gai
+
+
+# Wie viele Weiterleitungen wir mitgehen. Drei reichen fuer jeden echten Fall
+# (http->https, Host->CDN, Freigabe-Adresse->Datei); mehr ist eine Schleife.
+_MAX_UMLEITUNGEN = 3
+
+
+def hole_mit_umleitung(url: str, *, kopfzeilen: dict = None, timeout: int = 8,
+                       max_bytes: int = 2_000_000) -> str:
+    """Wie `hole()`, folgt aber bis zu drei Weiterleitungen — jede geprueft.
+
+    Der Unterschied zu urllibs eigenem Folgen ist die Pruefung: JEDES neue Ziel
+    laeuft wieder durch `_pruefe_ziel`, sonst waere die Weiterleitung genau das
+    Loch, das der Schutz stopfen soll ("hole https://harmlos.example", das auf
+    169.254.169.254 zeigt).
+    """
+    ziel = url
+    for _ in range(_MAX_UMLEITUNGEN + 1):
+        try:
+            return hole(ziel, kopfzeilen=kopfzeilen, timeout=timeout, max_bytes=max_bytes)
+        except urllib.error.HTTPError as e:
+            if e.code not in (301, 302, 303, 307, 308):
+                raise
+            ort = e.headers.get("Location") or ""
+            if not ort:
+                raise
+            ziel = urllib.parse.urljoin(ziel, ort)
+    raise NetzFehler("Zu viele Weiterleitungen")

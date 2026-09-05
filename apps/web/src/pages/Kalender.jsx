@@ -10,6 +10,7 @@ import Zeitleiste from "../components/Zeitleiste.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import UntisImport from "../components/UntisImport.jsx";
+import KalenderAdresseHilfe from "../components/KalenderAdresseHilfe.jsx";
 import CaldavZugaenge from "../components/CaldavZugaenge.jsx";
 import { kursLabel } from "../core/kurslabel.js";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
@@ -992,11 +993,18 @@ function ExtInfoModal({ ev, onClose, onHide, t }) {
 // schreibt die ganze Liste (leere URLs fallen weg).
 function ExtCalEditor({ cals, mit, onChange, onMit, onSave, t }) {
   const rows = cals.length ? cals : [{ url: "", color: "", name: "" }];
+  const [hilfe, setHilfe] = useState(false);
   const setRow = (i, patch) => { const next = rows.map((r, j) => (j === i ? { ...r, ...patch } : r)); onChange(next); };
   const addRow = () => onChange([...rows, { url: "", color: "", name: "" }]);
   const delRow = (i) => { const next = rows.filter((_, j) => j !== i); onChange(next.length ? next : [{ url: "", color: "", name: "" }]); };
   return (
     <div>
+      {/* „Wo finde ich die Adresse?" ist die Frage, an der das Abonnieren
+          scheitert — als Knopf neben der Liste, nicht als Absatz darueber. */}
+      <button onClick={() => setHilfe(true)} style={{ ...btnSecondary, ...btnSmall, marginBottom: 8 }}>
+        {t("kalhilfe.titel")}
+      </button>
+      <KalenderAdresseHilfe offen={hilfe} onClose={() => setHilfe(false)} />
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {rows.map((c, i) => (
           <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
