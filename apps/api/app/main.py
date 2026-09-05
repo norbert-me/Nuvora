@@ -1210,6 +1210,73 @@ async def set_channel(body: ChannelBody, user=Depends(_require_admin), db=Depend
     return {"channel": body.channel}
 
 
+# ─── App-Downloads ───
+#
+# Die fertigen Apps liegen als Anhaenge am GitHub-Release (der Release-Workflow
+# baut sie). Der Server holt die Liste und ordnet sie den Plattformen zu; die
+# Oberflaeche zeigt nur, was es wirklich gibt — ein Knopf, der auf eine Datei
+# zeigt, die niemand gebaut hat, ist schlimmer als kein Knopf.
+#
+# Warum ueber den Server und nicht direkt aus dem Browser: die CSP dieser Seite
+# laesst nur Verbindungen zur eigenen Herkunft zu (`connect-src 'self'`), ein
+# fetch auf api.github.com waere still geblockt. Zudem wird so je Instanz
+# einmal geholt und nicht je Lehrkraft.
+_apps_cache = {"ts": 0.0, "daten": None}
+
+# Welche Plattformen es gibt und woran ihre Datei zu erkennen ist. Reihenfolge =
+# Anzeigereihenfolge. Was (noch) keine Datei hat, erscheint als „in Vorbereitung"
+# statt zu verschwinden: die Frage „gibt es das fuer Windows?" soll die Seite
+# beantworten, auch wenn die Antwort „noch nicht" ist.
+APP_PLATTFORMEN = [
+    ("mac_arm", "macOS (Apple Silicon)", lambda n: n.endswith(".dmg") and "arm64" in n),
+    ("mac_intel", "macOS (Intel)", lambda n: n.endswith(".dmg") and "arm64" not in n),
+    ("windows", "Windows", lambda n: n.endswith((".exe", ".msi"))),
+    ("linux", "Linux", lambda n: n.endswith((".AppImage", ".deb"))),
+    ("android", "Android", lambda n: n.endswith(".apk")),
+    ("ios", "iPhone / iPad", lambda n: n.endswith(".ipa")),
+]
+
+
+def _fetch_apps() -> dict:
+    """Version und Dateien des neuesten Releases (ohne Entwuerfe)."""
+    import json as _json
+    from .netz import hole
+    text = hole(GITHUB_RELEASES_URL, kopfzeilen={"Accept": "application/vnd.github+json"}, timeout=6)
+    data = _json.loads(text)
+    for rel in (data if isinstance(data, list) else []):
+        if rel.get("draft") or rel.get("prerelease"):
+            continue
+        dateien = {}
+        for a in rel.get("assets") or []:
+            name = a.get("name") or ""
+            for key, _label, passt in APP_PLATTFORMEN:
+                if key not in dateien and passt(name):
+                    dateien[key] = {"name": name, "url": a.get("browser_download_url") or "",
+                                    "size": a.get("size") or 0}
+        return {"version": (rel.get("tag_name") or "").lstrip("vV"), "dateien": dateien,
+                "seite": rel.get("html_url") or ""}
+    return {"version": "", "dateien": {}, "seite": ""}
+
+
+@app.get("/api/apps")
+async def apps(user=Depends(get_current_user)):
+    """Die ladbaren Apps je Plattform — fuer jede Lehrkraft, nicht nur die
+    Administration: das ist ein Weg zur eigenen Arbeitsumgebung, keine
+    Einstellung der Installation."""
+    if _apps_cache["daten"] is None or _time.time() - _apps_cache["ts"] > 3600:
+        try:
+            _apps_cache["daten"] = await asyncio.to_thread(_fetch_apps)
+            _apps_cache["ts"] = _time.time()
+        except Exception:
+            pass  # alten Stand behalten; ohne Netz zeigt die Seite „noch nichts"
+    d = _apps_cache["daten"] or {"version": "", "dateien": {}, "seite": ""}
+    return {
+        "version": d["version"], "seite": d["seite"],
+        "plattformen": [{"key": k, "label": label, "datei": d["dateien"].get(k)}
+                        for k, label, _ in APP_PLATTFORMEN],
+    }
+
+
 @app.post("/api/mail-test")
 async def mail_test(to: str, user=Depends(_require_admin)):
     from . import mailer

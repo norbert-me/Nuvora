@@ -894,6 +894,17 @@ def teste_kern(api, b, u):
             raise AssertionError(f"neueste Sicherung '{neueste}' ist nicht heil: {pruef}")
         return f"{len(liste)} Sicherungen, neueste ('{neueste}') geprueft und heil"
 
+    def apps():
+        # Die Downloads holt der Server beim Release-Anbieter. Ist er nicht
+        # erreichbar, steht hier eine leere Liste — das ist ein Befund, aber
+        # keiner ueber die Seite: deshalb Warnung statt Fehler.
+        out = api.call("GET", "/api/apps", erwartet=(200,))
+        keys = [p["key"] for p in out.get("plattformen", [])]
+        if "mac_arm" not in keys or "windows" not in keys:
+            raise AssertionError(f"Plattformliste unvollstaendig: {keys}")
+        mit = [p["key"] for p in out["plattformen"] if p.get("datei")]
+        return f"{len(keys)} Plattformen, {len(mit)} mit Datei (Stand {out.get('version') or '—'})"
+
     b.pruefe("Kern", "Klassen und Schueler", klassen)
     b.pruefe("Kern", "Reihenfolge", reihenfolge)
     b.pruefe("Kern", "Kurse", kurse)
@@ -906,6 +917,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Zugangs-Zettel", zugangsdruck)
     b.pruefe("Kern", "Modulregister", modulregister)
     b.pruefe("Kern", "Sicherung", sicherung)
+    b.pruefe("Kern", "App-Downloads", apps, schwere="warnung")
 
 
 # ── je Modul eine Probe: anlegen, lesen, aendern, loeschen ──

@@ -139,6 +139,12 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     onUserUpdate?.(updated);
   };
   const [showPw, setShowPw] = useState(false);
+  // Die ladbaren Apps kommen vom Server (er holt sie beim Release-Anbieter) —
+  // aus dem Browser waere der Aufruf durch die CSP geblockt.
+  const [apps, setApps] = useState(null);
+  useEffect(() => {
+    fetch("/api/apps").then((r) => (r.ok ? r.json() : null)).then(setApps).catch(() => {});
+  }, []);
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminMsg, setAdminMsg] = useState("");
   const [setup, setSetup] = useState(null);
@@ -393,6 +399,28 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             window.location.href = "/";
           }} style={btnSecondary}>{t("profile.tutorialRestart")}</button>
         </Zeile>
+      </Abschnitt>
+
+      {/* App laden: derselbe Nuvora-Server, nur in einem eigenen Fenster. Es
+          steht hier und nicht in der Fusszeile, weil es zur eigenen
+          Arbeitsumgebung gehoert wie die Sprache. Plattformen ohne fertige
+          Datei bleiben SICHTBAR und sagen „in Vorbereitung" — die Frage „gibt
+          es das fuer Windows?" beantwortet die Seite sonst gar nicht. */}
+      <Abschnitt id="apps" titel={t("profile.apps")}>
+        {(apps?.plattformen || []).map((p, i) => (
+          <Zeile key={p.key} label={p.label} erste={i === 0}
+            hint={p.datei ? `${p.datei.name} · ${Math.round((p.datei.size || 0) / 1048576)} MB` : t("profile.appsBald")}>
+            {p.datei ? (
+              <a href={p.datei.url} style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>
+                {t("profile.appsLaden")}
+              </a>
+            ) : (
+              <span style={{ fontSize: 13, color: "var(--text3)" }}>—</span>
+            )}
+          </Zeile>
+        ))}
+        {apps && !apps.version && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 0" }}>{t("profile.appsKeine")}</p>}
+        {apps?.version && <p style={{ fontSize: 12, color: "var(--text3)", margin: "8px 0 0" }}>{t("profile.appsStand", { version: apps.version })}</p>}
       </Abschnitt>
 
       {isAdmin && (

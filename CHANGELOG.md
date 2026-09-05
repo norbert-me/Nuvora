@@ -21,6 +21,10 @@ Notiz zur größten Fassung die dünnste.
 
 **Konto und Zugänge**
 
+- Im Profil steht „App laden": die Desktop-App für macOS lässt sich direkt
+  herunterladen. Windows, Linux, Android und iPhone stehen schon in der Liste
+  und sagen, dass sie in Vorbereitung sind.
+
 - Links, die aus dem Haus gehen (Bestätigungsmail, QR-Zettel, Kalender-Abo,
   CalDAV-Profil, Code-Detektiv-Beitritt), tragen jetzt immer die öffentliche
   Adresse der Installation — nicht mehr die, über die man gerade zugreift.
