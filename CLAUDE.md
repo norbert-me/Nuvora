@@ -155,6 +155,15 @@ Wer an den Datenformen etwas ändert, ändert den Adapter — nicht die Oberflä
 
 > **Fachbegriff:** Ein **Lernpfad** besteht aus mehreren **Lernleitern**. Das sind zwei Dinge, nicht alter und neuer Name — nicht zusammenführen. Nur die Produktmarke hieß früher „Lernleiter".
 
+### PAP-Editor — `apps/api/app/routers/pap.py` + `apps/web/src/pages/Pap.jsx`
+
+Programmablaufpläne nach DIN 66001. **Zwei Wege in denselben Editor, und das ist der ganze Sinn des Moduls:**
+
+- **Unüberwacht** (Reiter „Zeichnen"): der Editor ist eine Seite. Gezeichnet wird ohne Zuordnung, gespeichert im `localStorage` — wie beim Code-Detektiv. Kein Server-Speicher: das wäre eine dritte Ablage neben Aufgabe und Abgabe, nach der niemand gefragt hat.
+- **Überwacht** (Reiter „Aufgaben"): die Lehrkraft legt eine Aufgabe an, das Kind öffnet sie über **seinen bestehenden QR-Zugang** (`/lernen/<token>`, dritter Reiter) und gibt ab. Kein Live-Mitschauen und keine Sitzung — was zählt, ist der Stand am Ende; eine Übertragung in Echtzeit wäre ein zweites Bauwerk (WebSocket, Wiederverbinden) für eine Frage, die sich beim Herumgehen durch den Raum ohnehin beantwortet.
+
+Vier Entscheidungen: **(a) Der Server kennt keine Semantik.** `_diagramm()` prüft die **Form** (bekannte Symbolarten, Größengrenze, Texte gekürzt, Koordinaten als Zahlen) und lässt alles Fachliche zu — eine Verzweigung ohne Nein-Zweig ist die Arbeit eines Kindes, kein Datenfehler. Was fachlich gilt, gehört in den Editor und ins Heft. **(b) Eine Abgabe je Kind und Aufgabe** (`uq_pap_abgabe`), gemergt statt gelöscht und neu angelegt: am Datensatz hängt der Zeitstempel, den die Lehrkraft liest. Kein Verlauf — „welche Fassung meinte sie?" hat niemand gefragt. **(c) Die Abgabenliste zeigt auch die LEEREN Zeilen**: „wer hat noch nichts?" ist die eigentliche Frage, und eine Liste nur der Fertigen beantwortet sie nicht. **(d) Die Aufgaben-ID allein reicht nicht** — beim Speichern wird geprüft, ob die Aufgabe zu diesem Kind gehört, sonst wäre sie ein Weg in fremde Klassen. Der ausgeteilte Zugang stirbt wie jeder andere mit dem Modul (`_student_by_token`, dieselbe Meldung wie bei Karten). Gezeichnet wird als **SVG**, nicht auf einem Canvas: ein Symbol ist ein Element mit einer id — anklickbar, verschiebbar, beschriftbar, und der Ausdruck bleibt Text. Regressionstest `apps/api/tests/test_pap.py`, Probe „PAP" in `scripts/selftest.py`, Roundtrip `inhalt_pap` in `scripts/systemtest.py`.
+
 ### Code-Detektiv — `apps/web/src/codedetektiv/`
 
 Ursprünglich eigenständige Client-App (React 19 + Vite), **inzwischen nativ in die Shell portiert** (kein iframe mehr). Der Code läuft unverändert auf React 18 (keine React-19-only-APIs, reiner localStorage-Client). Sein CSS ist unter `.cd-scope` isoliert (`makecode.css` hatte globale `*`/`body`/`:root`), interne Navigation auf `/code-detektiv/*` umgeschrieben, als nested Route in `main.jsx` gemountet. `@dnd-kit` + `lzma` sind dafür web-Dependencies. Das alte Verzeichnis `apps/code-detektiv` und sein Container gibt es nicht mehr. Kein Backend, kein Login — reines Werkzeug, im Rahmen über `ModuleGate`.

@@ -12,6 +12,7 @@ import { useParams } from "react-router-dom";
 import RechtsFuss from "../components/RechtsFuss.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { alsJson } from "../core/melden.js";
+import PapEditor from "../components/PapEditor.jsx";
 
 const API = "/api/karten";
 
@@ -24,7 +25,15 @@ export default function Lernen() {
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [results, setResults] = useState(null); // CardVote-Ergebnisse (Token-öffentlich)
-  const [tab, setTab] = useState(null);         // "karten" | "ergebnisse"
+  const [tab, setTab] = useState(null);         // "karten" | "ergebnisse" | "pap"
+  // PAP-Aufgaben dieses Kindes. Leer, wenn das Modul aus ist oder es keine
+  // gibt — dann erscheint der Reiter gar nicht erst.
+  const [papListe, setPapListe] = useState([]);
+
+  useEffect(() => {
+    fetch(`/api/lernen/${token}/pap`).then((r) => (r.ok ? r.json() : []))
+      .then((d) => setPapListe(Array.isArray(d) ? d : [])).catch(() => setPapListe([]));
+  }, [token]);
 
   useEffect(() => {
     fetch(`${API}/lernen/${token}/results`).then((r) => (r.ok ? r.json() : [])).then((d) => setResults(Array.isArray(d) ? d : [])).catch(() => setResults([]));
@@ -73,12 +82,27 @@ export default function Lernen() {
   // dann zeigt die Seite nur die Testergebnisse.
   const hatKarten = (data.total || 0) > 0 || (data.cards || []).length > 0 || (data.learned || 0) > 0;
   const aktiverTab = tab || (hatKarten ? "karten" : "ergebnisse");
-  const tabBar = hatKarten ? (
+  const tabOpts = [
+    ...(hatKarten ? [["karten", t("karten.tabCards")]] : []),
+    ["ergebnisse", t("lernen.tabResults")],
+    ...(papListe.length ? [["pap", t("pap.titel")]] : []),
+  ];
+  const tabBar = tabOpts.length > 1 ? (
     <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
-      <Tabs value={aktiverTab} onChange={setTab}
-        options={[["karten", t("karten.tabCards")], ["ergebnisse", t("lernen.tabResults")]]} />
+      <Tabs value={aktiverTab} onChange={setTab} options={tabOpts} />
     </div>
   ) : null;
+
+  if (aktiverTab === "pap") {
+    return (
+      <Center hinweis={t("lernen.footerHint")}>
+        <div style={{ width: "100%", maxWidth: 900 }}>
+          {tabBar}
+          <PapAufgaben token={token} liste={papListe} t={t} />
+        </div>
+      </Center>
+    );
+  }
 
   if (aktiverTab === "ergebnisse") {
     return <Center hinweis={t("lernen.footerHint")}><div style={{ width: "100%", maxWidth: 460 }}>{tabBar}<Ergebnisse t={t} results={results} /></div></Center>;
@@ -243,5 +267,44 @@ function Grade({ label, color, onClick }) {
     <button onClick={onClick} style={{ ...btnPrimary, background: color, color: C.aufAkzent, width: "100%", boxSizing: "border-box", padding: "12px 4px", fontSize: 13 }}>
       {label}
     </button>
+  );
+}
+
+
+// Der ueberwachte Weg: die Aufgabe der Lehrkraft, im selben Editor. Gespeichert
+// wird auf Knopfdruck (die Speichern-Regel gilt auch hier) — und „abgeben" ist
+// ein zweiter Knopf, weil Zwischenstand und Abgabe nicht dasselbe sind: das
+// Kind soll aufhoeren duerfen, ohne zu behaupten, es sei fertig.
+function PapAufgaben({ token, liste, t }) {
+  const [gewaehlt, setGewaehlt] = useState(liste[0]?.id ?? null);
+  const [stand, setStand] = useState(() => Object.fromEntries(
+    liste.map((a) => [a.id, a.daten || a.vorlage || { knoten: [], kanten: [] }])));
+  const [meldung, setMeldung] = useState("");
+  const a = liste.find((x) => x.id === gewaehlt);
+  if (!a) return null;
+
+  const sende = async (abgegeben) => {
+    const r = await fetch(`/api/lernen/${token}/pap/${a.id}`,
+      alsJson("PUT", { daten: stand[a.id], abgegeben })).catch(() => null);
+    setMeldung(r && r.ok ? t(abgegeben ? "pap.abgegeben" : "common.saved") : t("lernen.offline"));
+  };
+
+  return (
+    <div style={{ ...cardStyle, padding: 16 }}>
+      {liste.length > 1 && (
+        <select value={gewaehlt} onChange={(e) => setGewaehlt(Number(e.target.value))}
+          style={{ marginBottom: 12, padding: 6 }}>
+          {liste.map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}
+        </select>
+      )}
+      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{a.title}</h2>
+      {a.beschreibung && <p style={{ fontSize: 13, color: "var(--text2)", marginTop: 0 }}>{a.beschreibung}</p>}
+      <PapEditor wert={stand[a.id]} onChange={(d) => setStand((v) => ({ ...v, [a.id]: d }))} />
+      <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <button onClick={() => sende(false)} style={btnSecondary}>{t("common.save")}</button>
+        <button onClick={() => sende(true)} style={btnPrimary}>{t("pap.abgeben")}</button>
+        {meldung && <span style={{ fontSize: 13, color: "var(--text3)" }}>{meldung}</span>}
+      </div>
+    </div>
   );
 }

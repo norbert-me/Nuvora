@@ -83,6 +83,7 @@ export const ZIELE = [
   { pfad: "/notizbrett?tab=notizen", key: "notizbrett.tabNotes", modul: "notizbrett", worte: ["notiz", "zettel", "merken"] },
   { pfad: "/notizbrett?tab=aufgaben", key: "notizbrett.tabTodos", modul: "notizbrett", worte: ["to-do", "todo", "aufgabe", "erledigen"] },
   { pfad: "/tafel", key: "tafel.title", modul: "tafel", worte: ["tafel", "whiteboard", "anschrieb"] },
+  { pfad: "/pap", key: "pap.titel", modul: "pap", worte: ["pap", "ablaufplan", "flussdiagramm", "programmablaufplan", "struktogramm", "informatik"] },
   { pfad: "/mathespiele", key: "mathefussball.title", modul: "mathespiele", worte: ["spiel", "fußball", "üben"] },
 ];
 

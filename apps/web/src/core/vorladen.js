@@ -29,6 +29,7 @@ const JE_MODUL = {
   unterrichtsplanung: ["/api/methoden/list", "/api/methoden/folders"],
   notizbrett: ["/api/notizblock"],
   "code-detektiv": ["/api/codedetektiv/puzzles"],
+  pap: ["/api/pap/aufgaben"],
 };
 
 // Dasselbe je Klasse: die meisten Seiten zeigen nichts ohne eine gewaehlte

@@ -1116,6 +1116,22 @@ def probe_zufall(api, u):
     return "ziehen und Gedaechtnis leeren"
 
 
+def probe_pap(api, u):
+    # Der Editor selbst braucht keinen Server (er laeuft ohne Konto). Geprueft
+    # wird der ueberwachte Weg: Aufgabe anlegen, Abgabenliste lesen, aufraeumen.
+    a = api.call("POST", "/api/pap/aufgaben", {
+        "title": f"{PRAEFIX} Ablauf", "beschreibung": "Zeichne den Ablauf",
+        "class_id": u.class_id,
+    }, erwartet=(201,))
+    liste = api.call("GET", f"/api/pap/aufgaben/{a['id']}/abgaben", erwartet=(200,))
+    if not isinstance(liste, list):
+        raise AssertionError("Abgabenliste ist keine Liste")
+    api.call("PUT", f"/api/pap/aufgaben/{a['id']}",
+             {"title": f"{PRAEFIX} Ablauf 2", "class_id": u.class_id}, erwartet=(200,))
+    api.call("DELETE", f"/api/pap/aufgaben/{a['id']}", erwartet=(200,))
+    return f"Aufgabe anlegen, {len(liste)} Kinder in der Abgabenliste, aendern, loeschen"
+
+
 def probe_unterrichtsplanung(api, u):
     # Das Modul ist die Einstiegs-/Methodensammlung. Die frueher hier gepruefte
     # Wochenplanung (/api/planung) gibt es nicht mehr: die Jahresplanung liegt
@@ -1171,6 +1187,7 @@ PROBEN = {
     "unterrichtsplanung": probe_unterrichtsplanung,
     "notizbrett": probe_notizbrett,
     "code-detektiv": probe_code_detektiv,
+    "pap": probe_pap,
     "tafel": None,
     "mathespiele": None,
 }

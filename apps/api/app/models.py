@@ -1526,3 +1526,46 @@ class NotepadNote(Base):
     height: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class PapAufgabe(Base):
+    """Modul PAP: eine Aufgabe („Zeichne den Ablauf fuer …") der Lehrkraft.
+
+    Der Editor selbst laeuft ohne Konto und ohne Aufgabe — wer nur zeichnen
+    will, braucht hier nichts. Eine Aufgabe ist der ueberwachte Weg: sie haengt
+    an einem Kurs oder einer Klasse, das Kind oeffnet sie ueber seinen QR-Zugang
+    und gibt ab, die Lehrkraft sieht die Abgaben.
+    """
+    __tablename__ = "pap_aufgaben"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    beschreibung: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # An wen sie geht. Ohne beides ist sie ein Entwurf, den niemand sieht.
+    class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True)
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True)
+    # Optional an ein Kern-Thema gebunden (Regel 3: nie Voraussetzung).
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True)
+    # Startdiagramm: was das Kind beim Oeffnen vorfindet (leer = leeres Blatt).
+    vorlage: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PapAbgabe(Base):
+    """Die Zeichnung eines Kindes zu einer Aufgabe — eine je Kind und Aufgabe.
+
+    Kein Verlauf und keine zweite Fassung: das Kind arbeitet weiter, bis es
+    fertig ist, und die Lehrkraft schaut auf den Stand. Eine Versionierung waere
+    eine zweite Frage („welche Fassung meinte sie?"), die niemand gestellt hat.
+    """
+    __tablename__ = "pap_abgaben"
+    __table_args__ = (UniqueConstraint("aufgabe_id", "student_id", name="uq_pap_abgabe"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    aufgabe_id: Mapped[int] = mapped_column(ForeignKey("pap_aufgaben.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
+    daten: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    abgegeben: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -205,6 +205,9 @@ def endpunkte(u):
         "code-detektiv": [
             ("GET", "/api/codedetektiv/puzzles"),
         ],
+        "pap": [
+            ("GET", "/api/pap/aufgaben"),
+        ],
         # Reines Frontend, kein Backend — im Browser-Test geprueft.
         "tafel": [],
         "mathespiele": [],
@@ -235,6 +238,7 @@ def tore(u):
         "unterrichtsplanung": [("GET", "/api/methoden/list"), ("GET", "/api/methoden/folders")],
         "notizbrett": [("GET", "/api/notizblock"), ("GET", "/api/todo")],
         "code-detektiv": [("GET", "/api/codedetektiv/puzzles")],
+        "pap": [("GET", "/api/pap/aufgaben")],
         "tafel": [],
         "mathespiele": [],
     }
@@ -1125,6 +1129,58 @@ def inhalt_code_detektiv(api, u, spuren):
     return "Raetsel samt Bausteinen wiedergefunden; Beitritt und Ergebnis ohne Anmeldung"
 
 
+def inhalt_pap(api, u, spuren):
+    """PAP: Aufgabe anlegen, das Kind gibt ueber seinen Zugang ab, die Lehrkraft
+    findet die Abgabe wieder.
+
+    Der unueberwachte Weg braucht keinen Server (der Editor speichert im
+    Browser) — geprueft wird deshalb genau der Weg, der Daten anfasst.
+    """
+    anonym = Api(api.basis, debug=api.debug)
+    a = api.call("POST", "/api/pap/aufgaben", {
+        "title": f"{PRAEFIX} Ablauf", "beschreibung": "Zeichne den Ablauf",
+        "class_id": u.class_id,
+    }, erwartet=(201,))
+    spuren.append(("PAP-Aufgabe", lambda: api.call(
+        "DELETE", f"/api/pap/aufgaben/{a['id']}", erwartet=(200, 404))))
+
+    zugaenge = api.call("POST", f"/api/karten/classes/{u.class_id}/tokens", erwartet=(200, 201))
+    eintrag = _finde(zugaenge, student_id=u.students[0])
+    if not eintrag:
+        raise AssertionError("kein Zugang fuer das erste Kind erzeugt")
+    token = eintrag["token"]
+
+    offen = anonym.call("GET", f"/api/lernen/{token}/pap", erwartet=(200,))
+    if not _finde(offen, id=a["id"]):
+        raise AssertionError("die Aufgabe erreicht das Kind nicht")
+
+    diagramm = {"knoten": [{"id": "n1", "art": "start", "text": "Start", "x": 40, "y": 20},
+                           {"id": "n2", "art": "anweisung", "text": "x = 1", "x": 40, "y": 120},
+                           # Unbekannte Art: muss beim Speichern herausfallen.
+                           {"id": "n9", "art": "quatsch", "text": "?", "x": 0, "y": 0}],
+                "kanten": [{"von": "n1", "nach": "n2", "label": ""},
+                           {"von": "n2", "nach": "weg", "label": ""}]}
+    anonym.call("PUT", f"/api/lernen/{token}/pap/{a['id']}",
+                {"daten": diagramm, "abgegeben": True}, erwartet=(200,))
+
+    abgaben = api.call("GET", f"/api/pap/aufgaben/{a['id']}/abgaben", erwartet=(200,))
+    meins = _finde(abgaben, student_id=u.students[0])
+    if not meins or not meins.get("abgegeben"):
+        raise AssertionError(f"Abgabe fehlt bei der Lehrkraft: {meins}")
+    arten = [k["art"] for k in (meins.get("daten") or {}).get("knoten", [])]
+    if arten != ["start", "anweisung"]:
+        raise AssertionError(f"Server hat die Symbole nicht bereinigt: {arten}")
+    if len((meins.get("daten") or {}).get("kanten", [])) != 1:
+        raise AssertionError("Kante ins Leere wurde gespeichert")
+
+    # Wer nichts gemacht hat, steht trotzdem in der Liste — das ist die Frage,
+    # die die Lehrkraft stellt.
+    if len(abgaben) < len(u.students):
+        raise AssertionError(f"Abgabenliste zeigt nur {len(abgaben)} von {len(u.students)} Kindern")
+    return f"Aufgabe, Abgabe ueber den Zugang, {len(abgaben)} Kinder in der Liste"
+
+
+
 INHALT = {
     "cardvote": inhalt_cardvote,
     "lernpfad": inhalt_lernpfad,
@@ -1136,6 +1192,7 @@ INHALT = {
     "unterrichtsplanung": inhalt_unterrichtsplanung,
     "notizbrett": inhalt_notizbrett,
     "code-detektiv": inhalt_code_detektiv,
+    "pap": inhalt_pap,
     "tafel": None,
     "mathespiele": None,
 }

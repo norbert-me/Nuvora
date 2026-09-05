@@ -208,6 +208,7 @@ const KlassenarbeitVergleich = React.lazy(() => import("./pages/Klassenarbeit.js
 const Notizbrett = React.lazy(() => import("./pages/Notizbrett.jsx"));
 const Mathefussball = React.lazy(() => import("./pages/Mathefussball.jsx"));
 const Tafel = React.lazy(() => import("./pages/Tafel.jsx"));
+const Pap = React.lazy(() => import("./pages/Pap.jsx"));
 const NichtGefunden = React.lazy(() => import("./pages/NichtGefunden.jsx"));
 
 // Ladezustand fuer nachgeladene Seiten: dieselben pulsierenden Balken wie beim
@@ -268,6 +269,8 @@ function helpArea(pathname) {
   if (pathname.startsWith("/zufall")) return "zufall";
   if (pathname.startsWith("/notizbrett")) return "notizbrett";
   if (pathname.startsWith("/tafel")) return "tafel";
+  // Nicht startsWith("/pap") — das faengt auch /papierkorb, und der gehoert dem Kern.
+  if (pathname === "/pap" || pathname.startsWith("/pap/")) return "pap";
   if (pathname.startsWith("/mathespiele")) return "mathespiele";
   return "core";
 }
@@ -280,6 +283,7 @@ const UPLAN = "/unterrichtsplanung";
 const ZUF = "/zufall";
 const ORG = "/orga";
 const NOTIZBRETT = "/notizbrett";
+const PAP = "/pap";
 const MATHEF = "/mathespiele";
 const TAFEL = "/tafel";
 
@@ -956,6 +960,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={NOTIZBRETT} element={user ? <ModuleGate moduleKey="notizbrett"><Notizbrett /></ModuleGate> : <Landing />} />
           <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathespiele"><Mathefussball /></ModuleGate> : <Landing />} />
           <Route path={TAFEL} element={user ? <ModuleGate moduleKey="tafel"><Tafel /></ModuleGate> : <Landing />} />
+          <Route path={PAP} element={user ? <ModuleGate moduleKey="pap"><Pap /></ModuleGate> : <Landing />} />
           <Route path={`${AUSW}/vergleich`} element={user ? <ModuleGate moduleKey="auswertung"><KlassenarbeitVergleich /></ModuleGate> : <Landing />} />
           <Route path={ORG} element={user ? <ModuleGate moduleKey="orga"><Orga /></ModuleGate> : <Landing />} />
 

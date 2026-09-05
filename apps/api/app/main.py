@@ -13,7 +13,7 @@ from .models import AppSetting, Base, Kurs, Session as SessionModel, User
 # den frueheren Ring main -> routers.backup -> main aufloest. Hier nur noch
 # hereingeholt, damit die Routen weiter unten `_require_admin` benutzen koennen.
 from .admin import _require_admin, APP_VERSION  # noqa: F401 — Routen unten
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, caldav, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, trash, selftest, backup
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, caldav, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, pap, trash, selftest, backup
 from . import websocket as ws
 from .routers.auth import _hash_pw, _verify_token, get_current_user, rate_limit, TOKEN_TTL
 from .routers.karten import uebernahme_deck_kurse
@@ -205,6 +205,8 @@ app.include_router(material.router)
 app.include_router(klassenarbeit.router)
 app.include_router(todos.router)
 app.include_router(notizblock.router)
+app.include_router(pap.router)
+app.include_router(pap.lern_router)
 app.include_router(trash.router)
 app.include_router(selftest.router)
 # Sicherungen: Serververwaltung, kein Modul (steht deshalb nicht in REGISTRY).
@@ -927,6 +929,7 @@ PAPIERKORB_TABELLEN = (
     # Fragen vor Themen: eine Frage zeigt per topic_id auf ihr Thema. Andersherum
     # bliebe sie fuer den Rest des Laufs auf eine geloeschte ID zeigen.
     ("questions", "Frage(n)"), ("topics", "Thema/Themen"),
+    ("pap_aufgaben", "PAP-Aufgabe(n)"),
 )
 
 

@@ -233,6 +233,24 @@ REGISTRY: List[ModuleDef] = [
         stage="stable",
     ),
     ModuleDef(
+        key="pap",
+        group="unterricht",
+        name="PAP-Editor",
+        description=(
+            "Programmablaufpläne nach DIN 66001 zeichnen: Start/Ende, "
+            "Anweisung, Verzweigung, Ein- und Ausgabe, Unterprogramm — "
+            "verbinden, verschieben, als Bild oder Ausdruck ausgeben. "
+            "Zwei Wege in denselben Editor: unüberwacht arbeitet jeder mit dem "
+            "Link, ohne Konto und ohne Zuordnung (gespeichert nur im eigenen "
+            "Browser); überwacht legst du eine Aufgabe an, die Kinder öffnen "
+            "sie über ihren QR-Zugang und geben ab, und du siehst je Kind den "
+            "Stand — auch, wer noch nichts hat. Kein Live-Mitschauen: was "
+            "zählt, ist der Stand am Ende."
+        ),
+        path="/pap",
+        stage="beta",
+    ),
+    ModuleDef(
         key="tafel",
         group="werkzeug",
         name="Tafel",
