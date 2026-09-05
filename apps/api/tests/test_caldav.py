@@ -828,11 +828,12 @@ async def test_profil_traegt_nur_einmal(welt):
 
 @pytest.mark.asyncio
 async def test_profil_laeuft_ab(welt):
-    # Eigener Name: `X` ist in dieser Datei schon das Blatt-Modul app.caldav.
-    import app.routers.caldav as R
-    token = R._profil_merken(welt["user_id"], "iPhone", "geheim-1234")
-    _, *rest = R._PROFILE[token]      # Ablauf auf 0 = abgelaufen
-    R._PROFILE[token] = (0.0, *rest)
+    # Gleiche Einbindungsform wie in den Nachbartests (from ... import), sonst
+    # steht dasselbe Modul zweimal unter zwei Namen im Testlauf.
+    from app.routers.caldav import _PROFILE, _profil_merken
+    token = _profil_merken(welt["user_id"], "iPhone", "geheim-1234")
+    _, *rest = _PROFILE[token]        # Ablauf auf 0 = abgelaufen
+    _PROFILE[token] = (0.0, *rest)
     assert (await _ruf(welt["app"], "GET", f"/api/caldav-zugaenge/profil/{token}", auth=False)).status == 404
 
 
