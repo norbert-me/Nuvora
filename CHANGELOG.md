@@ -12,19 +12,22 @@ Zwischenfassung (x.y.0) hängt sie **alle Abschnitte der vorigen Reihe** an: wer
 von 4.1.0 auf 4.2.0 geht, hat 4.1.1 bis 4.1.9 nie gesehen — sonst wäre die
 Notiz zur größten Fassung die dünnste.
 
-## 4.1.8 — 04.09.2026
+## 4.1.8 — 05.09.2026
 
 **Startseite und Kalender**
 
 - Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
   Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
 
-**Kalender**
+**Konto und Zugänge**
 
 - Links, die aus dem Haus gehen (Bestätigungsmail, QR-Zettel, Kalender-Abo,
   CalDAV-Profil, Code-Detektiv-Beitritt), tragen jetzt immer die öffentliche
   Adresse der Installation — nicht mehr die, über die man gerade zugreift.
 - Die Anmeldemaske heißt „Nuvora", nicht mehr „CardVote".
+
+**Kalender**
+
 - Der Stundenplan kennt eine 0. Stunde — eine Zeile vor der ersten, mit
   eigener Uhrzeit. Die Nummern der übrigen Stunden bleiben, wie sie waren.
 - Der Raum lässt sich für eine einzelne Stundenplan-Stunde setzen oder mit

@@ -49,14 +49,14 @@ class _Req:
 
 @pytest.mark.asyncio
 async def test_ohne_schalter_bleibt_der_feed_bei_den_eigenen(s):
-    u = await _user(s, mit=False)
+    await _user(s, mit=False)
     text = (await K.ics_feed("tokfremd", _Req(), s)).body.decode()
     assert "Zahnarzt" not in text
 
 
 @pytest.mark.asyncio
 async def test_mit_schalter_stehen_sie_im_feed(s):
-    u = await _user(s, mit=True)
+    await _user(s, mit=True)
     text = (await K.ics_feed("tokfremd", _Req(), s)).body.decode()
     assert "Zahnarzt" in text
     assert "nuvora-ext-" in text

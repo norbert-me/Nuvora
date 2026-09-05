@@ -2805,26 +2805,6 @@
         doc.setDrawColor(0); doc.setLineWidth(0.4);
     }
 
-    // Hinweis-Kasten mit Titel + Fliesstext (mehrzeilig) auf dem Blatt.
-    function pdfHinweis(doc, marginL, contentW, y, titel, zeilen) {
-        const padX = 4, padY = 3.5;
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-        const titelLines = doc.splitTextToSize(titel, contentW - 2 * padX);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-        const bodyLines = [];
-        zeilen.forEach(z => doc.splitTextToSize(z, contentW - 2 * padX).forEach(l => bodyLines.push(l)));
-        const boxH = padY * 2 + titelLines.length * 4.6 + bodyLines.length * 4.2 + 1;
-        doc.setDrawColor(180); doc.setLineWidth(0.3); doc.setFillColor(245, 247, 250);
-        doc.roundedRect(marginL, y, contentW, boxH, 2, 2, 'FD');
-        doc.setDrawColor(0);
-        let ty = y + padY + 3.5;
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30);
-        titelLines.forEach(l => { doc.text(l, marginL + padX, ty); ty += 4.6; });
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60);
-        bodyLines.forEach(l => { doc.text(l, marginL + padX, ty); ty += 4.2; });
-        doc.setTextColor(0);
-        return y + boxH + 5;
-    }
 
     // Abschnittsueberschrift auf dem Blatt („Wiederholung", „Zusatzaufgaben"):
     // fett, duenne Linie darunter. EINE Form fuer beide — vorher hatte der

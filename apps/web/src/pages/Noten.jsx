@@ -1759,5 +1759,3 @@ const td = tdBasis;
 // liegen, sonst schiebt sich beim Scrollen eine Zeile darueber.
 // Die klebende erste Spalte kommt aus Icons.jsx (sechs Stellen hatten sie).
 const stickyL = klebtLinks, stickyLh = klebtLinksOben;
-const dtS = { color: "var(--text3)", fontWeight: 500 };
-const ddS = { margin: 0, color: "var(--text)" };
