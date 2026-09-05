@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..besitz import eigene_klasse, eigenes
 from ..kursmitglieder import class_kurs_ids, eigener_kurs, member_student_ids, student_kurs_ids
 from ..nebenlauf import mit_wiederholung
+from ..oeffentlich import basis as oeffentliche_basis
 from ..zeit import als_utc, jetzt, tagesbeginn
 from ..themenprofil import KartenStand
 from ..pdfdruck import neue_seite
@@ -1094,7 +1095,7 @@ async def zugaenge_pdf(class_id: int, base: str = "", subset_kurs: Optional[int]
     if changed:
         await db.commit()
 
-    basis = (base or "").rstrip("/")
+    basis = oeffentliche_basis(base)
     if basis and not (basis.startswith("http://") or basis.startswith("https://")):
         basis = ""
 
@@ -1430,10 +1431,13 @@ async def qr_png(token: str, base: str = "", db: AsyncSession = Depends(get_db))
     # zum Ueben, ohne sie zu den Testergebnissen. Erst wenn beide aus sind, ist
     # er tot — und dann verschwindet er auch aus der Klassenansicht.
     st = await _student_by_token(db, token, modul=("karten", "cardvote"))
-    # Nur die eigene Origin zulassen, kein offener QR-Generator.
+    # Nur die eigene Origin zulassen, kein offener QR-Generator — und die
+    # oeffentliche Adresse schlaegt sie: ein QR-Code mit der LAN-Adresse haengt
+    # im Ordner des Kindes und ist ausserhalb der Schule tot.
     base = base.rstrip("/")
     if base and not (base.startswith("http://") or base.startswith("https://")):
         base = ""
+    base = oeffentliche_basis(base)
     url = f"{base}/lernen/{st.karten_token}"
     img = qrcode.make(url)
     buf = io.BytesIO()

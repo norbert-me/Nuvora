@@ -63,7 +63,9 @@ async def _purge_user_content(db: AsyncSession, user_id: int):
                 pass  # Datei schon weg / nicht vorhanden
 
 RESET_TTL = 3600  # Passwort-Reset-Link 1 Stunde gültig
-SITE_URL = os.environ.get("SITE_URL", "").rstrip("/")
+from ..oeffentlich import site_url as _site_url  # eine Quelle fuer die oeffentliche Adresse
+
+SITE_URL = _site_url()
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -629,6 +631,19 @@ async def reset_password(body: ResetPasswordBody, request: Request, db: AsyncSes
 
 class VerifyEmailBody(BaseModel):
     token: str
+
+
+@router.get("/basis")
+async def oeffentliche_adresse():
+    """Die oeffentliche Adresse dieser Installation ("" = nicht konfiguriert).
+
+    Die Oberflaeche baut daraus Links, die AUS DEM HAUS gehen (Beitrittslink
+    fuers Kind, QR-Zettel). `location.origin` taugt dafuer nicht: wer im
+    Schulnetz ueber die LAN-Adresse arbeitet, verteilt sonst Links, die
+    ausserhalb tot sind. Ohne Anmeldung, weil hier nichts steht, was nicht in
+    jeder Bestaetigungsmail schon stuende.
+    """
+    return {"url": SITE_URL}
 
 
 @router.post("/verify-email")

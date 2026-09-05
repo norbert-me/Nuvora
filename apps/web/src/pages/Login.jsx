@@ -83,7 +83,7 @@ export default function Login({ onLogin }) {
   return (
     <div style={{ ...pageForm, padding: "24px 0" }}>
       <div style={{ ...cardStyle, padding: 24, boxShadow: SHADOW.ruhig }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", textAlign: "center", margin: "0 0 4px" }}>CardVote</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", textAlign: "center", margin: "0 0 4px" }}>Nuvora</h2>
         <p style={{ color: "var(--text3)", fontSize: 14, textAlign: "center", marginBottom: 24, marginTop: 4 }}>
           {subtitle}
         </p>

@@ -23,6 +23,7 @@ import {
 } from '../data/bloecke.js';
 import { importPuzzleFromHex } from '../data/makecodeImport';
 import { useCdText } from '../i18n.js';
+import { oeffentlicheBasis } from "../../core/basis";
 
 function groupByCategory(templates) {
   const groups = {};
@@ -48,6 +49,10 @@ export default function Admin() {
   const base = useCdBase();
   const { state, dispatch } = useStore();
 
+  // Der Beitrittslink geht AUS DEM HAUS (Kinder tippen ihn ab) — deshalb die
+  // oeffentliche Adresse und nicht die des Browsers.
+  const [basis, setBasis] = useState(window.location.origin);
+  useEffect(() => { oeffentlicheBasis().then(setBasis); }, []);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [topicId, setTopicId] = useState('');
@@ -270,7 +275,7 @@ export default function Admin() {
                           {currentPuzzle && ` - ${currentPuzzle.title}`}
                         </p>
                         <p style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 4 }}>
-                          {t('cd.admin.beitritt_link', 'Beitreten (Schüler, ohne Login):')} <strong>{window.location.origin}/cd/{session.id}</strong>
+                          {t('cd.admin.beitritt_link', 'Beitreten (Schüler, ohne Login):')} <strong>{basis}/cd/{session.id}</strong>
                         </p>
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>

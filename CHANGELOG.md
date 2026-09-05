@@ -21,6 +21,10 @@ Notiz zur größten Fassung die dünnste.
 
 **Kalender**
 
+- Links, die aus dem Haus gehen (Bestätigungsmail, QR-Zettel, Kalender-Abo,
+  CalDAV-Profil, Code-Detektiv-Beitritt), tragen jetzt immer die öffentliche
+  Adresse der Installation — nicht mehr die, über die man gerade zugreift.
+- Die Anmeldemaske heißt „Nuvora", nicht mehr „CardVote".
 - Der Stundenplan kennt eine 0. Stunde — eine Zeile vor der ersten, mit
   eigener Uhrzeit. Die Nummern der übrigen Stunden bleiben, wie sie waren.
 - Der Raum lässt sich für eine einzelne Stundenplan-Stunde setzen oder mit

@@ -45,6 +45,7 @@ from .. import caldav as X
 from ..database import get_db
 from ..models import (CaldavToken, CalendarEntry, Kurs, SchoolClass,
                       SlotCancellation, TimetableSlot, User)
+from ..oeffentlich import site_url as _site_url
 from ..zeit import tagesbeginn
 from .auth import _hash_pw, _verify_pw, rate_limit
 from .kalender import (_d_iso, _kurs_label, ext_dateiname, ext_uid,
@@ -1084,9 +1085,15 @@ async def profil(token: str, request: Request, db: AsyncSession = Depends(get_db
     # sofort 403 bekaeme, waere eine Einladung in eine Sackgasse.
     if not u or not await is_active(db, u.id, MODULE_KEY):
         raise HTTPException(404, "Dieser Link ist abgelaufen.")
-    ssl = request.url.scheme == "https"
+    # Die Adresse im Profil ist die OEFFENTLICHE (SITE_URL), nicht die des
+    # Aufrufs: wer die Seite im Schulnetz ueber die LAN-Adresse oeffnet,
+    # richtete sonst ein iPhone ein, das ausserhalb des Hauses nichts findet.
+    from urllib.parse import urlsplit
+    oeff = urlsplit(_site_url()) if _site_url() else None
+    ssl = (oeff.scheme == "https") if oeff else (request.url.scheme == "https")
     text = _mobileconfig(
-        host=request.url.hostname or "", port=request.url.port or (443 if ssl else 80),
+        host=(oeff.hostname if oeff else request.url.hostname) or "",
+        port=(oeff.port if oeff else request.url.port) or (443 if ssl else 80),
         ssl=ssl, pfad=f"/api/caldav/p/{u.id}/", benutzer=u.email or "", passwort=klartext,
         name=name, uuid_profil=str(_uuid.uuid4()), uuid_payload=str(_uuid.uuid4()))
     return Response(text, media_type="application/x-apple-aspen-config", headers={

@@ -19,6 +19,7 @@ from ..zeit import tagesbeginn
 # FastAPI, ohne Datenbank, testbar ohne Server). Eine zweite Fassung hier waere
 # die, in der eine Pruefung fehlt.
 from ..caldav import rrule_pruefen, stundenzeit
+from ..oeffentlich import basis as oeffentliche_basis
 from ..felder import ohne_leer, ohne_none
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
@@ -1586,7 +1587,7 @@ async def subscribe_url(request: _Request, user: User = Depends(require_module),
     if not user.calendar_token:
         user.calendar_token = _secrets.token_urlsafe(24)
         await db.commit()
-    base = str(request.base_url).rstrip("/")  # z.B. https://host
+    base = oeffentliche_basis(str(request.base_url))  # z.B. https://host
     path = f"/api/kalender/feed/{user.calendar_token}.ics"
     return {"url": base + path,
             "webcal": ("webcal://" + base.split("://", 1)[-1] + path) if "://" in base else base + path,
@@ -1612,7 +1613,7 @@ async def resync_subscribe(request: _Request, user: User = Depends(require_modul
     Cache-Takt zu haengen. Gibt die neue URL zum erneuten Abonnieren zurueck."""
     user.calendar_token = _secrets.token_urlsafe(24)
     await db.commit()
-    base = str(request.base_url).rstrip("/")
+    base = oeffentliche_basis(str(request.base_url))
     path = f"/api/kalender/feed/{user.calendar_token}.ics"
     return {"url": base + path, "webcal": ("webcal://" + base.split("://", 1)[-1] + path) if "://" in base else base + path}
 
