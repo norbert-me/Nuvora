@@ -34,6 +34,15 @@ Notiz zur größten Fassung die dünnste.
 
 **Kalender**
 
+- Externe Kalender und der WebUntis-Abo-Link lassen sich wieder abrufen, wenn
+  der Anbieter weiterleitet (Apple, Google und WebUntis tun das häufig).
+- WebUntis-Zeiten in UTC werden umgerechnet — sonst landeten die Stunden auf
+  der falschen Stundennummer oder der Import blieb leer.
+- Neuer Knopf „Wo finde ich die Adresse meines Kalenders?" — der Weg dorthin
+  für Apple, Google, WebUntis und Outlook, Schritt für Schritt.
+- Das Tutorial erklärt den Kalender in beide Richtungen: fremde Kalender
+  einblenden, Stundenplan aus WebUntis holen, Nuvora ins Handy bringen.
+
 - Der Stundenplan kennt eine 0. Stunde — eine Zeile vor der ersten, mit
   eigener Uhrzeit. Die Nummern der übrigen Stunden bleiben, wie sie waren.
 - Der Raum lässt sich für eine einzelne Stundenplan-Stunde setzen oder mit
