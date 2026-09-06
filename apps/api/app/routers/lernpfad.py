@@ -22,6 +22,7 @@ from sqlalchemy.orm import selectinload
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
 from ..besitz import eigenes
 from ..database import get_db
+from ..kursmitglieder import kurs_der_klasse
 from ..models import Exercise, LearningLadder, LearningPath, SchoolClass, Topic, User
 from .auth import rate_limit
 from .modules import modul_pflicht
@@ -331,7 +332,11 @@ async def add_ladder(
     await _owned_path(db, user, path_id)
     await _check_class(db, user, body.class_id)
     await _check_topic(db, user, body.topic_id)
-    ladder = LearningLadder(**body.model_dump(), path_id=path_id)
+    # Die Lernleiter traegt ihren Kurs — dieselben Kinder bekommen in Mathe
+    # andere Stufen als in Deutsch (Umbau vom 06.09.2026).
+    daten = body.model_dump()
+    ladder = LearningLadder(**daten, path_id=path_id,
+                            kurs_id=await kurs_der_klasse(db, daten["class_id"]) if daten.get("class_id") else None)
     db.add(ladder)
     await db.commit()
     await db.refresh(ladder)

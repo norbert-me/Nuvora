@@ -85,6 +85,21 @@ async def member_student_ids(db, kurs_id) -> set:
     return ids | einzeln
 
 
+async def kurs_der_klasse(db, class_id) -> int | None:
+    """Der EINE Kurs dieser Klasse — oder None, wenn es keinen oder mehrere gibt.
+
+    Gebraucht beim Schreiben: seit dem Umbau auf Kurse traegt jede neue Zeile
+    ihre `kurs_id`. Die Startmigration holt nur den Bestand; ohne diese Frage
+    beim Anlegen entstuenden ab morgen wieder Zeilen ohne Kurs, und die
+    Klassenspalte liesse sich nie entfernen.
+
+    Mehrdeutig heisst None: liegt die Klasse in zwei Kursen, waere jede Wahl
+    geraten — dieselbe Regel wie in der Migration.
+    """
+    ids = await class_kurs_ids(db, class_id)
+    return next(iter(ids)) if len(ids) == 1 else None
+
+
 async def class_kurs_ids(db, class_id, only_active=True) -> set:
     """Kurse (nicht gelöscht), in denen die Klasse Mitglied ist (kurs_tags ∪ kurs_id)."""
     ids = set((await db.execute(select(KursTag.kurs_id).where(KursTag.class_id == class_id))).scalars().all())

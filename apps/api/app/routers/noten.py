@@ -23,7 +23,7 @@ from sqlalchemy.orm import selectinload
 
 from ..besitz import eigene_klasse, eigenes, kurs_oder_klasse
 from ..scoring import note_aus_pct
-from ..kursmitglieder import eigener_kurs, member_student_ids, sibling_class_ids
+from ..kursmitglieder import eigener_kurs, member_student_ids, sibling_class_ids, kurs_der_klasse
 from ..felder import ohne_leer, ohne_none
 from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
@@ -285,7 +285,9 @@ async def toggle_divider(class_id: int, body: DividerIn, term: str = "1", user: 
     if existing:
         await db.delete(existing)
     else:
-        db.add(QuartalDivider(class_id=class_id, owner_id=user.id, term=term, after_category_id=body.after_category_id))
+        db.add(QuartalDivider(class_id=class_id, owner_id=user.id, term=term,
+                              kurs_id=kurs_id if kurs_id is not None else await kurs_der_klasse(db, class_id),
+                              after_category_id=body.after_category_id))
     await db.commit()
     rows = (await db.execute(select(QuartalDivider).where(
         QuartalDivider.class_id == class_id, QuartalDivider.owner_id == user.id, QuartalDivider.term == term,
@@ -1447,7 +1449,8 @@ async def import_noten(class_id: int, body: dict, term: str = "1", kurs_id: Opti
     for d in daten.dividers:
         cid = cat_map.get((d.s, d.c))
         if cid:
-            db.add(QuartalDivider(class_id=class_id, owner_id=user.id, term=term, after_category_id=cid))
+            db.add(QuartalDivider(class_id=class_id, owner_id=user.id, term=term,
+                                  kurs_id=await kurs_der_klasse(db, class_id), after_category_id=cid))
     await db.commit()
     return {"imported": len(daten.sections)}
 

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import klasse_oder_403
 from ..database import get_db
+from ..kursmitglieder import kurs_der_klasse
 from ..schueler import in_klasse
 from ..models import User, ZufallDraw
 from .modules import modul_pflicht
@@ -64,7 +65,8 @@ async def record_draw(class_id: int, body: DrawIn, user: User = Depends(require_
         # Zeitstempel bewusst hier setzen, nicht per server_default: das Update
         # oben nimmt die Python-Uhr. Zwei Uhren, und bei zwei Ziehungen in
         # derselben Sekunde faellt "nicht zweimal am Stueck" auf die falsche.
-        db.add(ZufallDraw(owner_id=user.id, class_id=class_id, student_id=body.student_id,
+        db.add(ZufallDraw(owner_id=user.id, class_id=class_id,
+                          kurs_id=await kurs_der_klasse(db, class_id), student_id=body.student_id,
                           count=1, drawn_at=datetime.now(timezone.utc)))
     await db.commit()
     return {"ok": True}

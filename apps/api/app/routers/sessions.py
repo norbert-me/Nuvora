@@ -8,6 +8,7 @@ from sqlalchemy import select, or_, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..besitz import oder_403
 from ..database import get_db
+from ..kursmitglieder import kurs_der_klasse
 from ..importe import geprueft
 from ..models import Session, QuestionSetItem, SchoolClass, QuestionSet, User
 from .auth import get_current_user, rate_limit, client_ip
@@ -103,7 +104,11 @@ async def create_session(body: SessionCreate, user: User = Depends(get_current_u
         if eigen is None:
             raise HTTPException(404, "Quiz nicht gefunden")
 
-    session = Session(**body.model_dump(), owner_id=user.id, code=code)
+    # Die Sitzung traegt ihren Kurs (Umbau vom 06.09.2026): die Ergebnisse
+    # gehoeren zu dem Unterricht, in dem sie entstanden sind. Mehrdeutig (Klasse
+    # in mehreren Kursen) bleibt leer — dort waere jede Wahl geraten.
+    kurs_id = await kurs_der_klasse(db, body.class_id) if body.class_id else None
+    session = Session(**body.model_dump(), owner_id=user.id, code=code, kurs_id=kurs_id)
     if body.question_set_id:
         first = await db.execute(
             select(QuestionSetItem)

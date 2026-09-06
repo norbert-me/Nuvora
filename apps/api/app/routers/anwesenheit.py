@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import klasse_oder_403
-from ..kursmitglieder import sibling_class_ids
+from ..kursmitglieder import kurs_der_klasse, sibling_class_ids
 from ..schueler import in_klasse, sortiert
 from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
@@ -119,7 +119,7 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
             continue
         # class_id der kanonischen Zeile behalten (gehört evtl. einer Fach-Klasse
         # des Kurses); Anwesenheit ist ohnehin kursweit geteilt.
-        kopie = Attendance(owner_id=user.id, class_id=quelle.class_id, student_id=sid, date=lo,
+        kopie = Attendance(owner_id=user.id, class_id=quelle.class_id, kurs_id=quelle.kurs_id, student_id=sid, date=lo,
                            status=quelle.status, note=quelle.note, period=period)
         db.add(kopie)
         exact[sid] = kopie
@@ -165,7 +165,13 @@ async def mark(class_id: int, body: MarkIn, user: User = Depends(require_module)
         row.period = body.period
     else:
         canon = await db.get(Student, canon_id)
-        db.add(Attendance(owner_id=user.id, class_id=(canon.class_id if canon else class_id), student_id=canon_id,
+        # Jede neue Zeile traegt ihren Kurs (Umbau vom 06.09.2026). Die
+        # Startmigration holt nur den Bestand — ohne das hier entstuenden ab
+        # morgen wieder Zeilen ohne Kurs.
+        kurs_id_neu = (canon.kurs_id if canon and canon.kurs_id
+                       else await kurs_der_klasse(db, canon.class_id if canon else class_id))
+        db.add(Attendance(owner_id=user.id, class_id=(canon.class_id if canon else class_id),
+                          kurs_id=kurs_id_neu, student_id=canon_id,
                           date=lo, status=body.status, note=body.note.strip()[:500], period=body.period))
     await db.commit()
     return {"ok": True}
