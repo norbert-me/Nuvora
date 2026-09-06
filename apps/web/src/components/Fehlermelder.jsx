@@ -119,13 +119,14 @@ export default function Fehlermelder() {
           {fertig ? (
             <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
               <div style={{ color: C.success, fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{t("melder.danke")}</div>
-              <p style={{ color: "var(--text2)", fontSize: 14 }}>{t("melder.dankeText")}</p>
+
               <button onClick={schliessen} style={{ ...btnSecondary, marginTop: 12 }}>{t("common.close")}</button>
             </div>
           ) : (
             <>
-              <p style={{ fontSize: 14, color: "var(--text2)", margin: "0 0 12px" }}>{t("melder.intro")}</p>
-              <textarea value={text} onChange={(e) => setText(e.target.value.slice(0, 3000))} rows={5}
+              {/* Kein Einleitungssatz: der Platzhalter im Feld sagt dasselbe,
+                  und auf dem Handy schob der Satz das Textfeld aus dem Bild. */}
+              <textarea value={text} onChange={(e) => setText(e.target.value.slice(0, 3000))} rows={8}
                 placeholder={t("melder.platzhalter")} autoFocus
                 style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical" }} />
 
@@ -140,22 +141,16 @@ export default function Fehlermelder() {
               {/* Kein Hinweistext mehr: der Knopf darunter zeigt im Klartext,
                   was mitgeht, und beide Häkchen lassen sich abwählen —
                   nachlesbar schlägt beschrieben. */}
+              {/* Eine Zeile fuer beides: „was geht mit?" und „Datei anhaengen"
+                  sind zwei Nebensachen und standen als zwei volle Zeilen
+                  untereinander — auf dem Handy die halbe Maske. */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "8px 0" }}>
               <button onClick={() => setLogOffen((v) => !v)}
-                style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13, marginBottom: 8 }}>
+                style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13 }}>
                 {logOffen ? t("melder.logZu") : t("melder.wasGeht")}
               </button>
-              {logOffen && (
-                <pre style={{ ...cardStyle, padding: 10, maxHeight: 240, overflow: "auto", fontSize: 11,
-                  lineHeight: 1.5, color: "var(--text2)", whiteSpace: "pre-wrap", margin: "0 0 12px" }}>
-                  {[mitUmg ? `--- ${t("melder.umgebungTitel")} ---\n${umgebung()}` : "",
-                    mitLog ? `--- ${t("melder.protokollTitel")} ---\n${alsText() || t("melder.logLeer")}` : ""]
-                    .filter(Boolean).join("\n\n") || t("melder.logLeer")}
-                </pre>
-              )}
-
               {/* Anhang: bewusst KEIN automatisches Einsammeln — die Datei
                   waehlt die Lehrkraft. */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "4px 0 12px", flexWrap: "wrap" }}>
                 <button onClick={() => dateiWaehlen(async (f) => {
                   if (!f) return;
                   if (f.size > ANHANG_MAX) { setFehler(t("melder.anhangZuGross", { n: Math.round(ANHANG_MAX / 1024 / 1024) })); return; }
@@ -181,6 +176,15 @@ export default function Fehlermelder() {
                   </span>
                 )}
               </div>
+
+              {logOffen && (
+                <pre style={{ ...cardStyle, padding: 10, maxHeight: 240, overflow: "auto", fontSize: 11,
+                  lineHeight: 1.5, color: "var(--text2)", whiteSpace: "pre-wrap", margin: "0 0 12px" }}>
+                  {[mitUmg ? `--- ${t("melder.umgebungTitel")} ---\n${umgebung()}` : "",
+                    mitLog ? `--- ${t("melder.protokollTitel")} ---\n${alsText() || t("melder.logLeer")}` : ""]
+                    .filter(Boolean).join("\n\n") || t("melder.logLeer")}
+                </pre>
+              )}
 
               {fehler && <div style={{ color: C.danger, fontSize: 13, marginBottom: 8 }}>{fehler}</div>}
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>

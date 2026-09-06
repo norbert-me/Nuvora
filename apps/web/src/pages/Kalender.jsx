@@ -428,6 +428,25 @@ export default function Kalender() {
     else if (view === "week") setCursor(addDays(cursor, dir * 7));
     else setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + dir, 1));
   };
+  // Wischen blättert — auf dem Handy die natürliche Bewegung, und die Pfeile
+  // sind dort winzig. Bewusst nur WAAGERECHT und erst ab einer deutlichen
+  // Strecke: der Kalender scrollt senkrecht, und ein Blättern beim Scrollen
+  // wäre schlimmer als gar keins. Ein Finger, nicht zwei (Zoom bleibt).
+  const wisch = useRef(null);
+  const wischStart = (e) => {
+    if (e.touches.length !== 1) { wisch.current = null; return; }
+    wisch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const wischEnde = (e) => {
+    const a = wisch.current;
+    wisch.current = null;
+    if (!a || !e.changedTouches?.length) return;
+    const dx = e.changedTouches[0].clientX - a.x;
+    const dy = e.changedTouches[0].clientY - a.y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    move(dx < 0 ? 1 : -1);        // nach links wischen = vorwärts
+  };
+
   // Pfeiltasten ←/→ blättern (nur in Monat/Woche/Tag, nicht beim Tippen).
   useEffect(() => {
     const onKey = (e) => {
@@ -632,7 +651,7 @@ export default function Kalender() {
   };
 
   return (
-    <div style={{ ...pageApp }}>
+    <div style={{ ...pageApp }} onTouchStart={wischStart} onTouchEnd={wischEnde}>
       {/* Kein Titel — die Navbar zeigt den Bereich (auch die Konfig-Reiter).
           Bauform wie überall: [ Auswahl ] [ Alltag ] … [ Ansicht ] [ ⋯ ]
           (components/Werkzeugleiste.jsx) statt einer von Hand gebauten Reihe. */}
@@ -1521,7 +1540,13 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
   const idx = (p) => (p === 0 ? "Z" : p - 1);
   const timeVal = (i, f) => entwurf.wert[`t${i}${f}`] || "";
   const commitTime = (i, f, val) => entwurf.setz({ [`t${i}${f}`]: val });
-  const timeInput = { width: "100%", boxSizing: "border-box", border: "1px solid var(--border2)", borderRadius: CONTROL_R, fontSize: 12, padding: 4, background: "var(--bg)", color: "var(--text)", marginTop: 4 };
+  // Die Uhrzeit-Felder muessen in ihre Spalte passen: `width: 100%` allein
+  // reicht nicht, weil ein <input type="time"> eine eigene Mindestbreite
+  // mitbringt (Safari rund 110 px). Auf dem Handy schob es damit die ganze
+  // Tabelle nach rechts, und die Stunden standen halb ausserhalb.
+  const timeInput = { width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box",
+    border: "1px solid var(--border2)", borderRadius: CONTROL_R, fontSize: 12, padding: "4px 2px",
+    background: "var(--bg)", color: "var(--text)", marginTop: 4 };
   // Zelle des Stundenplans: aus der gemeinsamen Tabellenzelle abgeleitet, nur
   // Rahmen ringsum statt nur unten (das Raster braucht alle vier Kanten).
   const tdBase = { ...tdCell, border: "1px solid var(--border)", padding: 0, textAlign: "left", verticalAlign: "top", background: "var(--card)" };
@@ -1536,7 +1561,7 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
       <div>
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
           <thead><tr>
-            <th style={{ ...th, width: showTimes ? 96 : 26 }}></th>
+            <th style={{ ...th, width: showTimes ? 78 : 26, minWidth: showTimes ? 78 : 26 }}></th>
             {wdays.map((w) => <th key={w} style={th}>{w}</th>)}
           </tr></thead>
           <tbody>
@@ -1549,7 +1574,7 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
                     {/* Senkrecht mittig: die Zahl stand oben in der Zelle,
                         waehrend die Stunde daneben mittig sitzt — bei einer
                         Doppelstunde lagen beide sichtbar auseinander. */}
-                    <td style={{ ...tdBase, textAlign: "center", verticalAlign: "middle", padding: showTimes ? 4 : "4px 0", background: "transparent", border: "none", width: showTimes ? 96 : 26 }}>
+                    <td style={{ ...tdBase, textAlign: "center", verticalAlign: "middle", padding: showTimes ? 2 : "4px 0", background: "transparent", border: "none", width: showTimes ? 78 : 26, minWidth: showTimes ? 78 : 26 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{p}.</div>
                       {showTimes && (<>
                         <input type="time" value={timeVal(idx(p), "start")} onChange={(e) => commitTime(idx(p), "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
