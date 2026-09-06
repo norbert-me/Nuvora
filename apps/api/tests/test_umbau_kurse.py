@@ -12,13 +12,17 @@ ERWARTET = {
     "grade_sections", "grade_overrides", "grade_entries", "seating_plans",
     "orga_items", "card_decks", "card_folders", "work_analyses", "exam_dates",
     "calendar_entries", "segel_status", "timetable_slots", "pap_aufgaben",
+    "attendance", "sessions", "zufall_draws", "quartal_dividers",
+    "plan_weeks", "learning_ladders",
 }
 
 # Diese tragen `class_id` OHNE `kurs_id` — hier waere ein Anschluss kein
 # Fortschritt, sondern eine Spalte, die niemand liest. Sie kommen in Etappe 4
 # beim jeweiligen Modul dran.
-OHNE_KURS = {"learning_ladders", "plan_weeks", "sessions", "attendance",
-             "grade_categories", "zufall_draws", "quartal_dividers"}
+# Nur noch eine: eine Notenspalte haengt an ihrem ABSCHNITT, und der kennt den
+# Kurs. Ein zweiter Schluessel daneben waere eine zweite Wahrheit — genau die
+# Sorte Redundanz, die dieser Umbau beseitigen soll.
+OHNE_KURS = {"grade_categories"}
 
 
 def _spalten(name):

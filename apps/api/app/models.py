@@ -241,6 +241,9 @@ class Session(Base):
     code: Mapped[str] = mapped_column(String(4), default="0000", server_default="0000")
     name: Mapped[str] = mapped_column(String(200), default="")
     class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id"), nullable=True)
+    # Die Abstimmung laeuft in einem KURS (Fach), nicht in einer Klasse:
+    # die Ergebnisse gehoeren zu dem Unterricht, in dem sie entstanden.
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     question_set_id: Mapped[Optional[int]] = mapped_column(ForeignKey("question_sets.id"), nullable=True)
     current_question_id: Mapped[Optional[int]] = mapped_column(ForeignKey("questions.id"), nullable=True)
     owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
@@ -695,6 +698,9 @@ class LearningLadder(Base):
     class_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("school_classes.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    # Eine Lernleiter wird einem KURS zugewiesen — dieselben Kinder bekommen in
+    # Mathe andere Stufen als in Deutsch.
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     # Das Thema der Stufe. Frueher thema/unterthema als Freitext.
     topic_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True
@@ -932,6 +938,9 @@ class Attendance(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    # Anwesenheit gilt dem KURS: „wer fehlt in Mathe?" — dieselbe Person
+    # sitzt in mehreren Kursen, und ihr Fehlen ist je Kurs verschieden.
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     status: Mapped[str] = mapped_column(String(10), default="da", server_default="da")
@@ -995,6 +1004,8 @@ class ZufallDraw(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    # Wer zuletzt dran war, ist eine Frage des Unterrichts — je Kurs.
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
     count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     drawn_at: Mapped[datetime] = mapped_column(
@@ -1225,6 +1236,8 @@ class QuartalDivider(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    # Der Quartalsschnitt gehoert zum Notenbuch, und das ist je Kurs.
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     term: Mapped[str] = mapped_column(String(8), default="1", server_default="1")
     after_category_id: Mapped[int] = mapped_column(ForeignKey("grade_categories.id", ondelete="CASCADE"), index=True)
 
@@ -1242,6 +1255,8 @@ class PlanWeek(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    # Wochenplanung gehoert zum Kurs (Fach), nicht zur Personenliste.
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     # Freie Beschriftung, z.B. "Woche 12" oder "17.–21. März".
     label: Mapped[str] = mapped_column(String(120), default="", server_default="")
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

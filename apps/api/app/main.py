@@ -390,6 +390,16 @@ def _ensure_columns(sync_conn):
         ("users", "timetable_zero", "JSON"),
         ("users", "changelog_seen", "VARCHAR(20) DEFAULT '' NOT NULL"),
         ("students", "person_id", "INTEGER"),
+        # Etappe 4: die letzten Tabellen bekommen ihren Kurs. `grade_categories`
+        # bleibt bewusst aussen vor — eine Spalte haengt an ihrem Abschnitt, und
+        # DER kennt den Kurs; ein zweiter Schluessel daneben waere eine zweite
+        # Wahrheit.
+        ("attendance", "kurs_id", "INTEGER"),
+        ("sessions", "kurs_id", "INTEGER"),
+        ("zufall_draws", "kurs_id", "INTEGER"),
+        ("quartal_dividers", "kurs_id", "INTEGER"),
+        ("plan_weeks", "kurs_id", "INTEGER"),
+        ("learning_ladders", "kurs_id", "INTEGER"),
         ("notepad_notes", "width", "INTEGER DEFAULT 0 NOT NULL"),
         ("notepad_notes", "height", "INTEGER DEFAULT 0 NOT NULL"),
     ]
@@ -770,7 +780,9 @@ async def startup():
             for tbl in ("grade_sections", "grade_overrides", "grade_entries",
                         "seating_plans", "orga_items", "card_decks", "card_folders",
                         "work_analyses", "exam_dates", "calendar_entries",
-                        "segel_status", "timetable_slots", "pap_aufgaben"):
+                        "segel_status", "timetable_slots", "pap_aufgaben",
+                        "attendance", "sessions", "zufall_draws",
+                        "quartal_dividers", "plan_weeks", "learning_ladders"):
                 await db.execute(text(f"""
                     WITH single AS (
                       SELECT class_id, MIN(kurs_id) AS kurs_id FROM (
