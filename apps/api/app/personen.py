@@ -107,6 +107,16 @@ async def _fotos_nachziehen(db: AsyncSession) -> None:
             "AND s.photo IS NOT NULL "
             "AND (persons.photo IS NULL OR COALESCE(persons.photo_mime, '') = '')"))
         await db.commit()
+        # Und zurueck: eine Listenzeile OHNE Bild bekommt das der Person.
+        # Sitzplan und Klassenliste lesen noch von der Zeile — hat dieselbe
+        # Person in Mathe ein Foto und in Deutsch keins, fehlt es dort im
+        # Unterricht, obwohl es laengst hochgeladen ist.
+        await db.execute(text(
+            "UPDATE students SET photo = p.photo, photo_thumb = p.photo_thumb, "
+            "photo_mime = p.photo_mime "
+            "FROM persons p WHERE students.person_id = p.id "
+            "AND p.photo IS NOT NULL AND students.photo IS NULL"))
+        await db.commit()
     except Exception:
         await db.rollback()               # SQLite (Tests) kennt UPDATE..FROM nicht
 
