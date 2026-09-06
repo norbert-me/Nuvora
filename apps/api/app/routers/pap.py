@@ -47,7 +47,10 @@ lern_router = APIRouter(prefix="/api/lernen", tags=["pap"])
 # Datenbank.
 MAX_KNOTEN = 200
 MAX_KANTEN = 400
-ARTEN = ("start", "ende", "anweisung", "verzweigung", "eingabe", "ausgabe", "unterprogramm")
+# Die Symbole des Normblatts — plus der Kommentar, der keiner ist: er haengt am
+# Rand und beschreibt einen Schritt, statt selbst einer zu sein.
+ARTEN = ("start", "ende", "anweisung", "verzweigung", "eingabe", "ausgabe",
+         "unterprogramm", "kommentar")
 
 
 def _diagramm(roh) -> dict:

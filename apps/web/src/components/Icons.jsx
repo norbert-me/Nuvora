@@ -44,6 +44,9 @@ export const MODULE_ICONS = {
   klassenleitung: ["M7 4a2.5 2.5 0 100 5 2.5 2.5 0 000-5z", "M3 16c0-2.5 1.8-4 4-4s4 1.5 4 4", "M13 9h4", "M13 12h4", "M12 6h5a1 1 0 011 1v3"],
   mathespiele: ["M10 3a7 7 0 100 14 7 7 0 000-14z", "M10 6.5l2.5 1.8-1 3h-3l-1-3z"],
   tafel: ["M3 4h14v10H3z", "M7 8h6", "M7 11h4", "M8 17l2-3 2 3"],
+  // PAP: die drei Formen des Ablaufplans untereinander — Oval (Start),
+  // Raute (Verzweigung), Rechteck (Anweisung), verbunden.
+  pap: ["M6.5 3h7a1.5 1.5 0 010 3h-7a1.5 1.5 0 010-3z", "M10 6v2.5", "M10 8.5l3 2.5-3 2.5-3-2.5z", "M10 13.5V15", "M5 15h10v2.5H5z"],
 };
 
 export const ICONS = {

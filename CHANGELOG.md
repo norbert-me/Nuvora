@@ -37,6 +37,13 @@ Notiz zur größten Fassung die dünnste.
 
 **Neues Modul: PAP-Editor**
 
+- Die Palette zeigt die Symbole in ihrer Form, nicht als Textknöpfe.
+- Symbole wachsen mit ihrer Beschriftung, statt sie abzuschneiden.
+- Verbinden ist ein Modus: einschalten, Start und Ziel anklicken.
+- Ein Raster lässt sich ein- und ausschalten; Kommentare gibt es dazu.
+- Die Reiter stehen in der Navigation; „Neues Blatt" heißt jetzt
+  „Alles löschen" und fragt nach.
+
 - Programmablaufpläne zeichnen (Start/Ende, Anweisung, Verzweigung, Ein- und
   Ausgabe, Unterprogramm), verbinden, verschieben, drucken.
 - Zwei Wege: frei zeichnen ohne Konto und ohne Zuordnung — oder als Aufgabe,

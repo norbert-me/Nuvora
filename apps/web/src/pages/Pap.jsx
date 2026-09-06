@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import {
-  pageApp, pageTitle, cardStyle, panelStyle, btnPrimary, btnSecondary, btnSmall,
-  toolbarBtn, toolbarInput, inputStyle, Tabs, Icon, ICONS, COLORS as C, CONTROL_R, badge,
+  pageApp, cardStyle, panelStyle, btnPrimary, btnSecondary, btnSmall,
+  toolbarBtn, toolbarInput, inputStyle,  Icon, ICONS, COLORS as C, CONTROL_R, badge,
 } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import PapEditor, { leeresDiagramm } from "../components/PapEditor.jsx";
 import { useLanguage } from "../i18n";
 import { alsJson } from "../core/melden";
+import { askConfirm } from "../core/dialog.jsx";
 
 const API = "/api/pap";
 
@@ -24,15 +26,14 @@ const API = "/api/pap";
 const ENTWURF_KEY = "nuvora_pap_entwurf";
 
 export default function Pap() {
-  const { t } = useLanguage();
-  const [tab, setTab] = useState("zeichnen");
+  // Die Reiter stehen in der Navbar (?tab=zeichnen|aufgaben) — wie bei jedem
+  // anderen Modul. Als eigene Tab-Leiste auf der Seite standen sie unter einer
+  // Navigation, die dieselbe Aufgabe hat, und die Seite begann mit zwei Zeilen
+  // Bedienelementen, bevor irgendetwas zu sehen war.
+  const [params] = useSearchParams();
+  const tab = params.get("tab") === "aufgaben" ? "aufgaben" : "zeichnen";
   return (
     <div style={pageApp}>
-      <h1 style={pageTitle}>{t("pap.titel")}</h1>
-      <Tabs value={tab} onChange={setTab} options={[
-        ["zeichnen", t("pap.tabZeichnen")],
-        ["aufgaben", t("pap.tabAufgaben")],
-      ]} style={{ marginBottom: 16 }} />
       {tab === "zeichnen" ? <FreiesBlatt /> : <Aufgaben />}
     </div>
   );
@@ -51,9 +52,12 @@ function FreiesBlatt() {
   };
   return (
     <div style={{ ...cardStyle, padding: 16 }}>
-      <Werkzeugleiste style={{ marginBottom: 12 }}>
-        <button onClick={() => setzen(leeresDiagramm())} style={toolbarBtn}>{t("pap.neu")}</button>
+      <Werkzeugleiste modul="pap" style={{ marginBottom: 12 }}>
         <button onClick={() => setDrucken(true)} style={toolbarBtn}>{t("pap.drucken")}</button>
+        {/* „Neues Blatt" hiess es zuerst — und beschrieb, was danach da ist,
+            statt dessen, was passiert: das Gezeichnete ist weg. */}
+        <button onClick={async () => { if (await askConfirm(t("pap.leerenFrage"))) setzen(leeresDiagramm()); }}
+          style={{ ...toolbarBtn, color: C.danger }}>{t("pap.leeren")}</button>
       </Werkzeugleiste>
       <PapEditor wert={d} onChange={setzen} />
       {drucken && <Druck diagramm={d} titel={t("pap.titel")} onFertig={() => setDrucken(false)} />}

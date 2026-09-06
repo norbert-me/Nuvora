@@ -373,6 +373,13 @@ const getModuleNavItems = (t, location, user) => {
   }
   if (area === "mathespiele") return [{ to: MATHEF, label: t("mathefussball.title") }];
   if (area === "tafel") return [{ to: TAFEL, label: t("tafel.title") }];
+  if (area === "pap") {
+    const cur = params.get("tab");
+    return [
+      { to: PAP, label: t("pap.tabZeichnen"), active: cur !== "aufgaben" },
+      { to: `${PAP}?tab=aufgaben`, label: t("pap.tabAufgaben"), active: cur === "aufgaben" },
+    ];
+  }
   if (area === "orga") {
     const tab = params.get("tab");
     // Welche Reiter es gibt, entscheidet jetzt das Modul-Zahnrad (REGISTRY-
