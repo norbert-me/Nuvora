@@ -7,10 +7,12 @@ einer Zwischenfassung stehen zehn solcher Abschnitte untereinander.
 Die technischen Begründungen stehen in [CLAUDE.md](CLAUDE.md), die
 Entwicklungsgeschichte in `git log`.
 
-Die Release-Notiz auf GitHub entsteht aus diesen Abschnitten. Bei einer neuen
-Zwischenfassung (x.y.0) hängt sie **alle Abschnitte der vorigen Reihe** an: wer
-von 4.1.0 auf 4.2.0 geht, hat 4.1.1 bis 4.1.9 nie gesehen — sonst wäre die
-Notiz zur größten Fassung die dünnste.
+Die Release-Notiz auf GitHub entsteht aus **genau einem** dieser Abschnitte —
+dem der Fassung, um die es geht. Eine Zeit lang hängte die Notiz einer
+Zwischenfassung (x.y.0) alle Abschnitte der vorigen Reihe an, damit sie nicht
+dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
+muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
+Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
 ## 4.3.0 — 08.09.2026
 
@@ -86,11 +88,6 @@ Notiz zur größten Fassung die dünnste.
 
 ## 4.2.0 — 06.09.2026
 
-**Startseite und Kalender**
-
-- Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
-  Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
-
 **Karteikarten**
 
 - Ein Stapel lässt sich im Ausrollen-Menü direkt einem oder mehreren Kursen
@@ -127,7 +124,6 @@ Notiz zur größten Fassung die dünnste.
 - Ein Raster lässt sich ein- und ausschalten; Kommentare gibt es dazu.
 - Die Reiter stehen in der Navigation; „Neues Blatt" heißt jetzt
   „Alles löschen" und fragt nach.
-
 - Programmablaufpläne zeichnen (Start/Ende, Anweisung, Verzweigung, Ein- und
   Ausgabe, Unterprogramm), verbinden, verschieben, drucken.
 - Zwei Wege: frei zeichnen ohne Konto und ohne Zuordnung — oder als Aufgabe,
@@ -142,15 +138,9 @@ Notiz zur größten Fassung die dünnste.
 **Konto und Zugänge**
 
 - Nach einem Update zeigt Nuvora beim nächsten Anmelden, was neu ist.
-
 - Im Profil steht „App laden": die Desktop-App für macOS lässt sich direkt
   herunterladen. Windows, Linux, Android und iPhone stehen schon in der Liste
   und sagen, dass sie in Vorbereitung sind.
-
-- Links, die aus dem Haus gehen (Bestätigungsmail, QR-Zettel, Kalender-Abo,
-  CalDAV-Profil, Code-Detektiv-Beitritt), tragen jetzt immer die öffentliche
-  Adresse der Installation — nicht mehr die, über die man gerade zugreift.
-- Die Anmeldemaske heißt „Nuvora", nicht mehr „CardVote".
 
 **Kalender**
 
@@ -162,6 +152,22 @@ Notiz zur größten Fassung die dünnste.
   für Apple, Google, WebUntis und Outlook, Schritt für Schritt.
 - Das Tutorial erklärt den Kalender in beide Richtungen: fremde Kalender
   einblenden, Stundenplan aus WebUntis holen, Nuvora ins Handy bringen.
+
+## 4.1.8 — 05.09.2026
+
+**Startseite und Kalender**
+
+- Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
+  Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
+
+**Konto und Zugänge**
+
+- Links, die aus dem Haus gehen (Bestätigungsmail, QR-Zettel, Kalender-Abo,
+  CalDAV-Profil, Code-Detektiv-Beitritt), tragen jetzt immer die öffentliche
+  Adresse der Installation — nicht mehr die, über die man gerade zugreift.
+- Die Anmeldemaske heißt „Nuvora", nicht mehr „CardVote".
+
+**Kalender**
 
 - Der Stundenplan kennt eine 0. Stunde — eine Zeile vor der ersten, mit
   eigener Uhrzeit. Die Nummern der übrigen Stunden bleiben, wie sie waren.
@@ -211,6 +217,7 @@ Notiz zur größten Fassung die dünnste.
   sie auf Klick auf.
 - Was heute fällig ist, steht rot (vorher gelb wie „demnächst").
 - Der Kalender-Knopf trägt sofort das heutige Datum ein und öffnet die Auswahl.
+
 ## 4.1.7 — 01.09.2026
 
 **Orga**
