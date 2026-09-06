@@ -933,9 +933,38 @@ def teste_kern(api, b, u):
                 "`python3 scripts/aufraeumen.py --module-an`")
         return f"alle {len(liste)} Module aktiv"
 
+    def personen():
+        # Die Personen-Ebene: jedes Kind einmal, egal in wie vielen Listen es
+        # steht. Ohne sie waere „wie steht Anna insgesamt da?" wieder eine
+        # Frage an den Namensvergleich.
+        liste = api.call("GET", "/api/personen", erwartet=(200,))
+        if not isinstance(liste, list):
+            raise AssertionError("Personenliste ist keine Liste")
+        meine = [p for p in liste if p.get("name", "").startswith(PRAEFIX)]
+        if not meine:
+            raise AssertionError("die eben angelegten Kinder fehlen in der Personenliste")
+        aus = api.call("GET", f"/api/personen/{meine[0]['id']}/auswertung", erwartet=(200,))
+        if "teile" not in aus:
+            raise AssertionError(f"Auswertung ohne Teile: {aus}")
+        return f"{len(liste)} Person(en), Auswertung mit {len(aus['teile'])} Kurs-Teil(en)"
+
+    def kurs_aus_kurs():
+        # Einen Kurs aus einem anderen entwickeln — der Normalfall im
+        # Schuljahr. Uebernommen werden die Kinder, nicht ihre Daten.
+        neu_kurs = api.call("POST", "/api/kurse",
+                            {"name": f"{PRAEFIX} Abkoemmling", "aus_kurs_id": u.kurs_id},
+                            erwartet=(201,))
+        mitglieder = api.call("GET", f"/api/kurse/{neu_kurs['id']}/members", erwartet=(200,))
+        api.call("DELETE", f"/api/kurse/{neu_kurs['id']}", erwartet=(204, 200))
+        if not mitglieder:
+            raise AssertionError("der neue Kurs kam ohne Kinder an")
+        return f"{len(mitglieder)} Kind(er) uebernommen"
+
     b.pruefe("Kern", "Klassen und Schueler", klassen)
     b.pruefe("Kern", "Reihenfolge", reihenfolge)
     b.pruefe("Kern", "Kurse", kurse)
+    b.pruefe("Kern", "Personen", personen)
+    b.pruefe("Kern", "Kurs aus Kurs entwickeln", kurs_aus_kurs)
     b.pruefe("Kern", "Themen", themen)
     b.pruefe("Kern", "Papierkorb", papierkorb)
     b.pruefe("Kern", "Archiv", archiv)

@@ -209,6 +209,7 @@ const Notizbrett = React.lazy(() => import("./pages/Notizbrett.jsx"));
 const Mathefussball = React.lazy(() => import("./pages/Mathefussball.jsx"));
 const Tafel = React.lazy(() => import("./pages/Tafel.jsx"));
 const Pap = React.lazy(() => import("./pages/Pap.jsx"));
+const Personen = React.lazy(() => import("./pages/Personen.jsx"));
 const PapFrei = React.lazy(() => import("./pages/PapFrei.jsx"));
 const NichtGefunden = React.lazy(() => import("./pages/NichtGefunden.jsx"));
 
@@ -425,6 +426,7 @@ const getModuleNavItems = (t, location, user) => {
   return [
     { to: "/classes", label: t("nav.classes") },
     { to: "/kurse", label: t("kurse.title") },
+    { to: "/personen", label: t("personen.titel") },
     { to: "/topics", label: t("nav.topics") },
     { to: "/modules", label: t("nav.modules") },
     // Der Papierkorb ist gemeinsam (Kern) — kein Modul hat einen eigenen.
@@ -945,6 +947,8 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path="/classes" element={user ? <Classes /> : <Landing />} />
           <Route path="/kurse" element={user ? <Kurse /> : <Landing />} />
           <Route path="/topics" element={user ? <Topics /> : <Landing />} />
+          {/* Kern: ein Kind ueber alle Kurse hinweg (Personen-Ebene). */}
+          <Route path="/personen" element={user ? <Personen /> : <Landing />} />
           <Route path="/papierkorb" element={user ? <Papierkorb /> : <Landing />} />
           {/* Der Navigationspunkt war bereits auf die Administration beschraenkt,
               die Route nicht: jede Lehrkraft sah eine Seite voller Absagen der

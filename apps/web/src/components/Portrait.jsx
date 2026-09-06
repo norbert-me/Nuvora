@@ -29,7 +29,10 @@ export function initialen(name) {
 // Sitzplan da — dort sitzen die Bilder auf einem rechteckigen Platz, und ein
 // Kreis darin verschenkt genau die Fläche, auf die es am Beamer ankommt: das
 // Gesicht. Der Radius folgt dann den Tokens (CONTROL_R) wie alles Eckige.
-export default function Portrait({ student, size = 32, zoomable = false, form = "rund", style }) {
+// `quelle`: woher kommt das Bild? "schueler" ist die Listenzeile (Bestand),
+// "person" das Kind selbst. Seit es die Personen-Ebene gibt, haengt das Foto
+// dort — die Listenzeile bleibt der Weg, solange die Module auf ihr rechnen.
+export default function Portrait({ student, size = 32, zoomable = false, form = "rund", quelle = "schueler", style }) {
   const rund = {
     // Ausnahme von den Radius-Tokens NUR beim Kreis: dort IST der Radius die
     // halbe Kante — anders wird aus dem Quadrat kein Kreis.
@@ -48,7 +51,9 @@ export default function Portrait({ student, size = 32, zoomable = false, form = 
     );
   }
   return (
-    <AuthImage src={`/api/classes/students/${student.id}/photo?klein=true`}
+    <AuthImage src={quelle === "person"
+      ? `/api/personen/${student.id}/photo?klein=true`
+      : `/api/classes/students/${student.id}/photo?klein=true`}
       alt={student.name || ""} zoomable={zoomable} style={rund} />
   );
 }

@@ -78,6 +78,28 @@ async def list_personen(user: User = Depends(get_current_user), db: AsyncSession
                       kurse=je_person.get(p.id, []), has_photo=p.has_photo) for p in leute]
 
 
+@router.get("/{person_id}/photo")
+async def photo(person_id: int, klein: bool = False,
+                user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Das Foto der Person. Personenbezogen — nie in Export oder Marktplatz.
+
+    Eigener Endpunkt statt des Umwegs ueber eine Listenzeile: das Bild gehoert
+    dem Kind, nicht einer seiner Zugehoerigkeiten.
+    """
+    from fastapi import Response
+    from sqlalchemy.orm import undefer
+
+    p = (await db.execute(select(Person).where(Person.id == person_id)
+                          .options(undefer(Person.photo), undefer(Person.photo_thumb)))).scalar_one_or_none()
+    if not p or p.owner_id != user.id:
+        raise HTTPException(404, "Person nicht gefunden")
+    daten = (p.photo_thumb if klein and p.photo_thumb else p.photo)
+    if not daten:
+        raise HTTPException(404, "Kein Foto")
+    return Response(content=daten, media_type=(("image/jpeg" if klein and p.photo_thumb else p.photo_mime) or "image/jpeg"),
+                    headers={"Cache-Control": "private, max-age=300"})
+
+
 @router.get("/{person_id}/auswertung")
 async def auswertung(person_id: int, user: User = Depends(get_current_user),
                      db: AsyncSession = Depends(get_db)):

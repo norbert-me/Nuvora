@@ -25,7 +25,10 @@ Notiz zur größten Fassung die dünnste.
   Name, Foto, Niveau, Förderangaben und Zugang hängen an der Person, nicht
   mehr an jeder einzelnen Liste. Bestehende Daten wandern beim Start mit,
   es geht nichts verloren.
-- Neu: eine Auswertung je Kind über alle Kurse hinweg.
+- Neue Seite „Personen": jedes Kind einmal, mit seinen Kursen und dem
+  Themenstand je Kurs nebeneinander.
+- Ein Kurs lässt sich „aus einem anderen entwickeln" — seine Kinder kommen
+  mit, Noten und Karten bleiben beim alten Kurs.
 
 **Kalender**
 

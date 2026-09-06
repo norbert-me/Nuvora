@@ -34,6 +34,8 @@ export default function Kurse() {
   const [allClasses, setAllClasses] = useState([]);
   // Gelöschte Kurse liegen im gemeinsamen Papierkorb des Kerns (/papierkorb).
   const [neu, setNeu] = useState("");
+  // Vorbild fuer einen neuen Kurs (leer = leerer Kurs).
+  const [ausKurs, setAusKurs] = useState("");
   const [editKurs, setEditKurs] = useState(null); // aufgeklappter Bearbeiten-Bereich (Name, E/G)
   // Name, Schuljahr, Vorjahr, E/G, Klassen und Archiv sind EIN Entwurf mit
   // EINER Speicherleiste. Vorher ging jeder Handgriff für sich zum Server: der
@@ -65,8 +67,13 @@ export default function Kurse() {
     const name = neu.trim(); if (!name) return;
     // Bei Ablehnung bleibt der getippte Name im Feld stehen — sonst wäre er weg
     // und der Kurs trotzdem nicht da.
-    if (!(await sende(`${API}/kurse`, alsJson("POST", { name }), t("kurse.add")))) return;
-    setNeu(""); load();
+    //
+    // „aus": derselbe Kurs mit anderem Fach oder im nächsten Jahr — der
+    // Normalfall. Übernommen werden die KINDER; Noten, Karten und Anwesenheit
+    // des Vorbilds bleiben, wo sie entstanden sind.
+    const rumpf = ausKurs ? { name, aus_kurs_id: Number(ausKurs) } : { name };
+    if (!(await sende(`${API}/kurse`, alsJson("POST", rumpf), t("kurse.add")))) return;
+    setNeu(""); setAusKurs(""); load();
   };
   const openEdit = (k) => {
     if (editKurs === k.id) {
@@ -145,6 +152,16 @@ export default function Kurse() {
           <>
             <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
               placeholder={t("kurse.newPlaceholder")} style={{ ...toolbarInput, flex: "1 1 200px", minWidth: 0 }} />
+            {/* Leer ODER aus einem anderen Kurs entwickeln — beides steht
+                nebeneinander, weil es dieselbe Handlung ist. Erst ab einem
+                vorhandenen Kurs sichtbar: vorher gibt es nichts zu übernehmen. */}
+            {kurse.length > 0 && (
+              <select value={ausKurs} onChange={(e) => setAusKurs(e.target.value)}
+                title={t("kurse.ausKursHinweis")} style={{ ...selectStyle, maxWidth: 220 }}>
+                <option value="">{t("kurse.ausKursLeer")}</option>
+                {kurse.map((k) => <option key={k.id} value={k.id}>{t("kurse.ausKurs", { name: k.name })}</option>)}
+              </select>
+            )}
             <AddButton onClick={anlegen} title={t("kurse.add")} />
           </>
         )}

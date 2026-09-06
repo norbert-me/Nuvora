@@ -23,6 +23,7 @@ export const ZIELE = [
   { pfad: "/", key: "nav.start", modul: null, worte: ["start", "dashboard", "übersicht"] },
   { pfad: "/classes", key: "nav.classes", modul: null, worte: ["schüler", "sus", "kinder", "namen", "förderschwerpunkt", "maßnahmen", "reihenfolge"] },
   { pfad: "/kurse", key: "kurse.title", modul: null, worte: ["fach", "fächer", "gruppen"] },
+  { pfad: "/personen", key: "personen.titel", modul: null, worte: ["kind", "person", "einzeln", "über alle kurse", "gesamtbild", "wie steht"] },
   { pfad: "/topics", key: "nav.topics", modul: null, worte: ["thema", "themen", "unterthema", "lehrplan", "jahresplanung"] },
   { pfad: "/modules", key: "nav.modules", modul: null, worte: ["module", "einschalten", "aktivieren", "werkzeuge"] },
   { pfad: "/papierkorb", key: "nav.trash", modul: null, worte: ["gelöscht", "wiederherstellen"] },

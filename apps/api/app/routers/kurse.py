@@ -51,6 +51,12 @@ class KursIn(BaseModel):
     jahrgang: Optional[int] = None
     # Stammraum ("B204"). Der Kalender setzt ihn als Ort der Stunde ein.
     raum: Optional[str] = None
+    # „Aus einem anderen Kurs entwickeln": dessen Kinder werden uebernommen.
+    # Das ist der Normalfall im Schuljahr — die Lerngruppe bleibt, das Fach
+    # wechselt (dieselben Kinder in Mathe und in der AG) oder das Jahr geht
+    # weiter. Uebernommen werden PERSONEN, nicht Daten: Noten, Karten und
+    # Anwesenheit des Vorbilds bleiben dort, wo sie entstanden sind.
+    aus_kurs_id: Optional[int] = None
 
 
 class NiveauIn(BaseModel):
@@ -221,9 +227,31 @@ async def create_kurs(body: KursIn, user: User = Depends(get_current_user), db: 
     # dort steht — dieselbe Regel wie beim Backfill der Bestandskurse.
     k = Kurs(owner_id=user.id, name=name[:100], schuljahr=schuljahr_aus_name(name))
     db.add(k)
+    await db.flush()
+
+    # Aus einem anderen Kurs entwickeln: seine Kinder mitnehmen. Kopiert werden
+    # die MITGLIEDSCHAFTEN, nicht die Kinder — dieselbe Person sitzt danach in
+    # beiden Kursen, mit einer Geschichte statt zweier halber.
+    uebernommen = 0
+    if body.aus_kurs_id:
+        vorbild = await _owned_kurs(db, user, body.aus_kurs_id)
+        # Beide Wege der Zugehoerigkeit zaehlen: einzeln hinzugefuegte Kinder
+        # (kurs_students) und die ueber eine ganze Klasse (kurs_tags).
+        sids = set((await db.execute(select(KursStudent.student_id).where(
+            KursStudent.kurs_id == vorbild.id))).scalars().all())
+        cids = (await db.execute(select(KursTag.class_id).where(
+            KursTag.kurs_id == vorbild.id))).scalars().all()
+        if cids:
+            sids |= set((await db.execute(select(Student.id).where(
+                Student.class_id.in_(list(cids))))).scalars().all())
+        for sid in sorted(sids):
+            db.add(KursStudent(kurs_id=k.id, student_id=sid))
+            uebernommen += 1
+
     await db.commit()
     await db.refresh(k)
-    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color)
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color,
+                   member_count=uebernommen)
 
 
 @router.put("/{kurs_id}", response_model=KursOut)
