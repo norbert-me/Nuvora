@@ -736,7 +736,9 @@ def inhalt_karten(api, u, spuren):
     api.call("DELETE", f"/api/karten/decks/{frei['id']}", erwartet=(204,))
     api.call("DELETE", f"/api/karten/decks/{frei['id']}/purge", erwartet=(204,))
 
-    return ("Stapel freigegeben, Karte ohne Angabe kommt als G an, E-Kind sieht "
+    zuweisung = _probe_karten_kurse(api, u)
+
+    return (f"{zuweisung}; Stapel freigegeben, Karte ohne Angabe kommt als G an, E-Kind sieht "
             "genau die E-Karte, G-Kind genau die beiden G-Karten, "
             "ohne Anmeldung gelernt, Fortschritt 0 -> 1 von 2 "
             f"(Detailsicht bestaetigt reps=1), falsche Karte in {frist:.0f} Minuten "
@@ -1127,6 +1129,30 @@ def inhalt_code_detektiv(api, u, spuren):
     if f"{PRAEFIX} Kind" not in text:
         raise AssertionError(f"beigetretenes Kind steht nicht in der Session: {text[:200]}")
     return "Raetsel samt Bausteinen wiedergefunden; Beitritt und Ergebnis ohne Anmeldung"
+
+
+def _probe_karten_kurse(api, u):
+    """Ein Stapel erreicht einen Kurs auch OHNE Kalender.
+
+    Das lief lange nur ueber die Stunde: wer einen Stapel einplant, gibt ihn
+    fuer deren Kurs frei. Ein Stapel fuer die AG haengt aber an keiner Stunde,
+    und ohne Kalendermodul erreichte er niemanden.
+    """
+    stapel = api.call("POST", "/api/karten/decks",
+                      {"name": f"{PRAEFIX} Zuweisung", "class_id": u.class_id}, erwartet=(201,))
+    api.call("PUT", f"/api/karten/decks/{stapel['id']}/kurse",
+             {"kurs_ids": [u.kurs_id]}, erwartet=(200,))
+    stand = api.call("GET", f"/api/karten/decks/{stapel['id']}/kurse", erwartet=(200,))
+    if stand.get("kurs_ids") != [u.kurs_id]:
+        raise AssertionError(f"Kurs-Zuweisung kam nicht an: {stand}")
+    # Leere Liste heisst „niemandem mehr" — der Stapel bleibt, wird aber nicht
+    # mehr ausgeteilt.
+    api.call("PUT", f"/api/karten/decks/{stapel['id']}/kurse", {"kurs_ids": []}, erwartet=(200,))
+    leer = api.call("GET", f"/api/karten/decks/{stapel['id']}/kurse", erwartet=(200,))
+    api.call("DELETE", f"/api/karten/decks/{stapel['id']}", erwartet=(204, 200))
+    if leer.get("kurs_ids"):
+        raise AssertionError(f"Zuruecknehmen wirkte nicht: {leer}")
+    return "Kurs zugewiesen und wieder zurueckgenommen (ohne Kalender)"
 
 
 def inhalt_pap(api, u, spuren):

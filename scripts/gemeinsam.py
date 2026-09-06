@@ -31,8 +31,13 @@ TIMEOUT = 30
 # nginx drosselt /api/ (limit_req, siehe nginx.conf) und antwortet dann mit 429.
 # Das ist kein Anwendungsfehler, sondern der Proxy vor der Anwendung. Wir warten
 # gestaffelt und versuchen es erneut — hoechstens so oft:
-RATELIMIT_VERSUCHE = 4
-RATELIMIT_WARTEN = (1, 2, 4, 8)   # Sekunden zwischen den Versuchen
+# Sechs Versuche mit wachsender Pause. Vier waren zu knapp: laeuft der
+# Systemtest direkt hinter dem Selbsttest, steht der Zaehler des Proxys schon
+# hoch, und die Scan-Serie (12 Bilder in Folge) lief in ein 429, das nach 15
+# Sekunden noch stand — ein roter Befund ueber die Drosselung, nicht ueber die
+# Anwendung.
+RATELIMIT_VERSUCHE = 6
+RATELIMIT_WARTEN = (1, 2, 4, 8, 15, 20)   # Sekunden zwischen den Versuchen
 RATELIMIT_MAX_WARTEN = 30         # obere Schranke fuer ein Retry-After vom Server
 
 # Farbe nur, wenn wirklich ein Terminal zuschaut — in eine Datei oder durch eine

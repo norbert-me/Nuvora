@@ -1321,6 +1321,8 @@ export default {
   "karten.draftHint": "Solo visible para ti — aún no publicado a los alumnos.",
   "karten.draft": "sin publicar",
   "karten.rolledOut": "Distribuido",
+  "karten.kurseLabel": "¿A qué cursos?",
+  "karten.kurseSpeichern": "Asignar",
   "karten.plannedFor": "Programado para {{date}}",
   "karten.rollOutNow": "Distribuir ahora",
   "karten.plan": "Programar",

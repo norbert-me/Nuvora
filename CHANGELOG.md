@@ -19,6 +19,12 @@ Notiz zur größten Fassung die dünnste.
 - Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
   Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
 
+**Karteikarten**
+
+- Ein Stapel lässt sich im Ausrollen-Menü direkt einem oder mehreren Kursen
+  zuweisen — die Planung im Kalender bleibt, ist aber nicht mehr der einzige
+  Weg. Ein Stapel für die AG hängt an keiner einzelnen Stunde.
+
 **Module**
 
 - Jedes Modul mit unabhängigen Teilen lässt sie einzeln ein- und ausblenden:

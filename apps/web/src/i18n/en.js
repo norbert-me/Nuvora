@@ -1320,6 +1320,8 @@ export default {
   "karten.draftHint": "Only visible to you — not yet rolled out to students.",
   "karten.draft": "not rolled out",
   "karten.rolledOut": "Rolled out",
+  "karten.kurseLabel": "To which courses?",
+  "karten.kurseSpeichern": "Assign",
   "karten.plannedFor": "Scheduled for {{date}}",
   "karten.rollOutNow": "Roll out now",
   "karten.plan": "Schedule",

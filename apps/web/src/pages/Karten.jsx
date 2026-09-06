@@ -48,6 +48,8 @@ export default function Karten() {
   // classId = Repräsentant-Klasse für die FK, kursId = Teilkurs (für die Decks).
   const [subsetKurs, setSubsetKurs] = useState(null);
   const [subsetKurse, setSubsetKurse] = useState([]);
+  // Die vollstaendige Kursliste: an sie wird ein Stapel ausgerollt.
+  const [alleKurse, setAlleKurse] = useState([]);
   // Alle Kurse der Lehrkraft: die Stapel-Sammlung wird ihnen zugewiesen, und
   // der Kurs sagt auch, ob mit E/G gearbeitet wird (niveau_aktiv).
   // Filter der Sammlung: null = alle Stapel, sonst „nur Stapel dieses Kurses".
@@ -325,6 +327,7 @@ export default function Karten() {
       // Stunde laeuft, gibt es keinen Kurs-Filter mehr, der die volle Liste
       // braeuchte.
       const list = Array.isArray(d) ? d : [];
+      setAlleKurse(list);
       setSubsetKurse(list.filter((k) => (k.member_count || 0) > 0));
     });
   }, []);
@@ -465,7 +468,7 @@ export default function Karten() {
               <Speicherleiste entwurf={ordnung} />
             </div>
           )}
-          {sichtbareDecks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => { setDragDeckId(d.id); ziehDeck.start(d.id, d.folder_id ?? null); }} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => ziehDeck.ueber(e, d.id, d.folder_id ?? null)} onReorderDrop={() => dropDeck(d.id)} dropSide={ziehDeck.seite(d.id)} />)}
+          {sichtbareDecks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} kurse={alleKurse} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => { setDragDeckId(d.id); ziehDeck.start(d.id, d.folder_id ?? null); }} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => ziehDeck.ueber(e, d.id, d.folder_id ?? null)} onReorderDrop={() => dropDeck(d.id)} dropSide={ziehDeck.seite(d.id)} />)}
         </>
       )}
 
@@ -614,7 +617,7 @@ function StudentDetail({ detail, t, onClose }) {
   );
 }
 
-function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove, onDragStartDeck, onDragEndDeck, dragging = false, autoOpen = false, onAutoOpened, onReorderOver, onReorderDrop, dropSide = null }) {
+function Deck({ kurse = [], deck, t, call, topics = [], showTopic = false, folders = [], onMove, onDragStartDeck, onDragEndDeck, dragging = false, autoOpen = false, onAutoOpened, onReorderOver, onReorderDrop, dropSide = null }) {
   const [planDate, setPlanDate] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -635,6 +638,10 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const [nameFocus, setNameFocus] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false); // „Verschieben"-Popover (Ziel-Ordner)
   const [rollOpen, setRollOpen] = useState(false);  // Ausrollen-Untermenü
+  // Die Kurse, an die dieser Stapel geht. Der Serverstand ist die Grundlage;
+  // geschrieben wird erst auf Knopfdruck.
+  const [kursWahl, setKursWahl] = useState(deck.kurs_ids || []);
+  useEffect(() => { setKursWahl(deck.kurs_ids || []); }, [deck.kurs_ids]);
   // Deck als Ganzes ziehbar, aber nur wenn der Zug am Griff (⠿) beginnt — sonst
   // bliebe Text-/Button-Interaktion im Deck kaputt. Der Griff setzt das Flag per
   // mousedown; das Wurzel-draggable prüft es beim dragstart.
@@ -879,6 +886,32 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
                         style={{ ...toolbarBtnPrimary, opacity: planDate ? 1 : 0.4 }}>{t("karten.plan")}</button>
                     </div>
                     <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>{t("karten.planTime")}</div>
+                  </div>
+                )}
+                {/* An WEN? Das lief lange nur ueber den Kalender: wer einen
+                    Stapel in einer Stunde einplant, gibt ihn damit fuer deren
+                    Kurs frei. Das reicht nicht — ein Stapel fuer die AG oder
+                    fuer „alle meine Siebten" haengt an keiner einzelnen Stunde,
+                    und ohne Kalendermodul erreichte er ueberhaupt niemanden.
+                    Die API dafuer gab es die ganze Zeit (PUT .../kurse), nur
+                    die Hand in der Oberflaeche fehlte. */}
+                {kurse.length > 0 && (
+                  <div style={{ padding: "8px 10px", borderTop: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("karten.kurseLabel")}</div>
+                    <div style={{ display: "grid", gap: 2, maxHeight: 180, overflowY: "auto" }}>
+                      {kurse.map((k) => (
+                        <label key={k.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "2px 0" }}>
+                          <input type="checkbox" checked={kursWahl.includes(k.id)}
+                            onChange={(ev) => setKursWahl(ev.target.checked ? [...kursWahl, k.id] : kursWahl.filter((x) => x !== k.id))} />
+                          {k.name}
+                        </label>
+                      ))}
+                    </div>
+                    <button onClick={async () => {
+                      await fetch(`${API}/decks/${deck.id}/kurse`, alsJson("PUT", { kurs_ids: kursWahl })).catch(() => {});
+                      setRollOpen(false);
+                      call(() => Promise.resolve());
+                    }} style={{ ...toolbarBtnPrimary, marginTop: 6, width: "100%" }}>{t("karten.kurseSpeichern")}</button>
                   </div>
                 )}
                 {status !== "entwurf" && <button onClick={() => { setRollOpen(false); setRelease(null); }} style={{ ...menuRow, color: C.danger }}><Icon d={ICONS.ban} size={15} color={C.danger} /> {t("karten.withdraw")}</button>}
