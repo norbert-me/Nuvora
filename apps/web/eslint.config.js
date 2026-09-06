@@ -9,6 +9,13 @@
 //
 // Gegenstueck fuer Python: scripts/pruefe_namen.py (dort kam derselbe Fehler
 // einmal aus einem fehlenden Import).
+//
+// Dazu EINE zweite Regel, aus demselben Grund: `react/jsx-no-undef`. `no-undef`
+// sieht JSX-Komponenten NICHT — `<BugAdmin />` ohne Import lief durch Linter
+// und Build und starb erst im Browser mit „Can't find variable: BugAdmin",
+// mitten in einer Seite, die vorher funktionierte. Derselbe Vorfall wie mit
+// `abs`, nur eine Ebene hoeher.
+import react from "eslint-plugin-react";
 import globals from "globals";
 
 export default [
@@ -37,8 +44,10 @@ export default [
     // ("Definition for rule not found"). Wir pruefen genau eine Regel, also
     // werden Inline-Anweisungen ignoriert statt gepflegt.
     linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: "off" },
+    plugins: { react },
     rules: {
       "no-undef": "error",
+      "react/jsx-no-undef": "error",
     },
   },
 ];

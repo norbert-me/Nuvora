@@ -212,7 +212,7 @@ if ! python3 scripts/pruefe_namen.py apps/api/app; then
 fi
 # Dasselbe fuer die Oberflaeche: eine Variable, die es nicht gibt, baut sauber
 # durch und stirbt erst beim Rendern („Can't find variable: abs" im Sitzplan).
-# Nur die Regel no-undef, siehe apps/web/eslint.config.js. Fehlt eslint (frisch
+# Zwei Regeln: no-undef und react/jsx-no-undef (siehe apps/web/eslint.config.js). Fehlt eslint (frisch
 # geklont, kein npm install), wird uebersprungen statt abgebrochen — eine
 # fehlende Werkbank ist kein Befund ueber den Code.
 if [ -x apps/web/node_modules/.bin/eslint ]; then

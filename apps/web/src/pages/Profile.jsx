@@ -8,6 +8,7 @@ import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson } from "../core/melden.js";
 import { useModules } from "../core/modules.js";
+import BugAdmin from "../components/BugAdmin.jsx";
 
 const API = "/api";
 
