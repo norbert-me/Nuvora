@@ -19,6 +19,15 @@ Notiz zur größten Fassung die dünnste.
 - Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
   Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
 
+**Kalender**
+
+- Wird der Kurs einer Stundenplan-Stunde gewechselt, heißt sie danach auch so.
+  Die Auswahl sprang bisher auf den alten Kurs zurück.
+- Der Dialog heißt „Neuer Eintrag", solange es noch keinen gibt — vorher stand
+  „Eintrag bearbeiten" über leeren Feldern, und der fehlende Papierkorb wirkte
+  wie ein Fehler.
+- Beim Anlegen aus einer Stunde steht der Kurs im Kopf, wie in der Ansicht.
+
 **Klassen**
 
 - Die Klassenmaske hat nur noch einen Ausgang: die Überschrift. Der zweite

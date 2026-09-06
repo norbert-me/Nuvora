@@ -1998,7 +1998,11 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onRau
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 2 }}>{t("kalender.timetable")}</h3>
         <div style={{ fontSize: 12, color: "var(--text3)" }}>{wdays[slot.weekday]} · {slot.period}. {t("kalender.period")}</div>
         <div style={lbl}>{t("kalender.kursOrClass")}</div>
-        <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={slot.kurs_id ?? null} allowNone noneLabel={`– ${t("kalender.noClass")} –`} autoFocus
+        {/* kursValue ist der GEWAEHLTE Kurs, nicht der gespeicherte: mit
+            `slot.kurs_id` sprang die Auswahl nach jedem Wechsel auf den alten
+            Kurs zurueck — der Name der Stunde blieb dann „7.5 LZ", obwohl
+            laengst „7.5 GA" gewaehlt war. */}
+        <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={kursId} allowNone noneLabel={`– ${t("kalender.noClass")} –`} autoFocus
           onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }}
           onKurs={setKursId} style={dialogSelect} />
         {classId && (
@@ -2196,12 +2200,19 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
   ].filter(Boolean);
   const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: 14 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
   return (
-    <Modal onClose={onClose} width={460} style={{ padding: 0 }} label={!edit ? (title || clsName || t("kalender.entry")) : ((entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry"))}>
+    <Modal onClose={onClose} width={460} style={{ padding: 0 }} label={!edit ? (title || clsName || t("kalender.entry")) : (entry.id ? t("kalender.editEntry") : t("kalender.newEntry"))}>
         <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 5 }}>{!edit ? (title || clsName || t("kalender.entry")) : ((entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry"))}</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 5 }}>{!edit ? (title || clsName || t("kalender.entry")) : (entry.id ? t("kalender.editEntry") : t("kalender.newEntry"))}</h3>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {entry.period != null && <span style={{ ...chipStyle, fontWeight: 700, background: "var(--accent)", color: C.aufAkzent }}>{entry.period}. {t("kalender.period")}</span>}
+              {/* Welcher Kurs — auch beim ANLEGEN aus einer Stunde. Dort stand
+                  bisher nur „1. Stunde, 08:10, Montag"; die Ansicht daneben
+                  zeigt den Kurs als Ueberschrift, und zwei Dialoge zur selben
+                  Stunde sahen dadurch aus wie zwei verschiedene Dinge. */}
+              {edit && !entry.id && clsName && (
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{clsName}</span>
+              )}
               {/* Die UHRZEIT gehoert in den Kopf, nicht nur als Hinweis unter
                   leere Felder: „2. Stunde" beantwortet nicht, wann die Stunde
                   ist — und genau danach schaut man, wenn man einen Termin
