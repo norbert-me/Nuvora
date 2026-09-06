@@ -81,6 +81,8 @@ export default {
 
   // Común
   "common.save": "Guardar",
+  "common.search": "Buscar …",
+  "common.noResults": "Sin resultados",
   "common.saved": "Guardado",
   "common.cancel": "Cancelar",
   "publish.title": "Publicar en el mercado",

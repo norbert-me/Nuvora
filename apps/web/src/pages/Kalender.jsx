@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, Segment, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, pageApp, Popover } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import ThemenWahl from "../components/ThemenWahl.jsx";
+import SuchSelect from "../components/SuchSelect.jsx";
 import Zeitleiste from "../components/Zeitleiste.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
@@ -2446,17 +2447,17 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
           </div>
         </>)}
         <div style={lbl}>{t("kalender.topic")}</div>
-        <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={dialogSelect}>
-          <option value="">– {t("kalender.noTopic")} –</option>
-          {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
-        </select>
+        {/* Suchbar: bei sechzig Themen ist eine Liste zum Scrollen keine
+            Auswahl mehr — wer sein Thema kennt, tippt es. */}
+        <SuchSelect value={topicId} onChange={setTopicId} style={{ width: "100%" }}
+          leerLabel={`– ${t("kalender.noTopic")} –`}
+          optionen={themen.geordnet.map((tp) => ({ wert: tp.id, label: topicLabel(tp) }))} />
         {aktiv.unterrichtsplanung && (
           <>
             <div style={lbl}>{t("kalender.method")}</div>
-            <select value={methodId} onChange={(e) => setMethodId(e.target.value)} style={dialogSelect}>
-              <option value="">– {t("kalender.noMethod")} –</option>
-              {[...methods].sort(byLabel((m) => m.title)).map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
-            </select>
+            <SuchSelect value={methodId} onChange={setMethodId} style={{ width: "100%" }}
+              leerLabel={`– ${t("kalender.noMethod")} –`}
+              optionen={[...methods].sort(byLabel((m) => m.title)).map((m) => ({ wert: m.id, label: m.title }))} />
           </>
         )}
         {(aktiv.cardvote || aktiv.karten || aktiv.lernpfad) && (
@@ -2468,29 +2469,29 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
         {aktiv.cardvote && (
           <>
             <div style={lbl}>{t("kalender.planCardvote")}</div>
-            <select value={quizId} onChange={(e) => setQuizId(e.target.value)} style={dialogSelect}>
-              <option value="">– {t("kalender.none")} –</option>
-              {[...quizze].sort(byLabel((q) => q.folder ? `${q.folder} / ${q.name}` : q.name)).map((q) => <option key={q.id} value={q.id}>{q.folder ? `${q.folder} / ${q.name}` : q.name}</option>)}
-            </select>
+            <SuchSelect value={quizId} onChange={setQuizId} style={{ width: "100%" }}
+              leerLabel={`– ${t("kalender.none")} –`}
+              optionen={[...quizze].sort(byLabel((q) => q.folder ? `${q.folder} / ${q.name}` : q.name))
+                .map((q) => ({ wert: q.id, label: q.folder ? `${q.folder} / ${q.name}` : q.name }))} />
           </>
         )}
         {aktiv.karten && (
           <>
             <div style={lbl}>{t("kalender.planKarten")}</div>
-            <select value={deckId} onChange={(e) => setDeckId(e.target.value)} style={dialogSelect} disabled={!classId} title={!classId ? t("kalender.pickClassFirst") : undefined}>
-              <option value="">– {t("kalender.none")} –</option>
-              {[...decks].sort(byLabel((d) => d.name)).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
+            <SuchSelect value={deckId} onChange={setDeckId} style={{ width: "100%" }}
+              disabled={!classId} title={!classId ? t("kalender.pickClassFirst") : undefined}
+              leerLabel={`– ${t("kalender.none")} –`}
+              optionen={[...decks].sort(byLabel((d) => d.name)).map((d) => ({ wert: d.id, label: d.name }))} />
             {deckId && <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("kalender.deckReleaseHint")}</div>}
           </>
         )}
         {aktiv.lernpfad && (
           <>
             <div style={lbl}>{t("kalender.planLernleiter")}</div>
-            <select value={ladderId} onChange={(e) => setLadderId(e.target.value)} style={dialogSelect}>
-              <option value="">– {t("kalender.none")} –</option>
-              {[...ladders].sort(byLabel((l) => topicName(l.topic_id) || l.path || "")).map((l) => <option key={l.id} value={l.id}>{(topicName(l.topic_id) || l.path || t("kalender.planLernleiter"))}</option>)}
-            </select>
+            <SuchSelect value={ladderId} onChange={setLadderId} style={{ width: "100%" }}
+              leerLabel={`– ${t("kalender.none")} –`}
+              optionen={[...ladders].sort(byLabel((l) => topicName(l.topic_id) || l.path || ""))
+                .map((l) => ({ wert: l.id, label: topicName(l.topic_id) || l.path || t("kalender.planLernleiter") }))} />
           </>
         )}
         {aktiv["code-detektiv"] && (istInformatik || puzzleId) && (

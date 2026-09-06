@@ -80,6 +80,8 @@ export default {
 
   // Common
   "common.save": "Save",
+  "common.search": "Search …",
+  "common.noResults": "Nothing found",
   "common.saved": "Saved",
   "common.cancel": "Cancel",
   "publish.title": "Publish to marketplace",

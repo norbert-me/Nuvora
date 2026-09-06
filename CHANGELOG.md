@@ -52,6 +52,10 @@ Notiz zur größten Fassung die dünnste.
 
 **Kalender**
 
+- Lange Auswahllisten (Thema, Einstieg, Quiz, Kartenstapel, Lernleiter) haben
+  ein Suchfeld — tippen statt scrollen. Kurze Listen bleiben, wie sie waren.
+- Wischen nach links oder rechts blättert Tag, Woche und Monat.
+
 - Trägt ein Eintrag einen anderen Kurs als die Stundenplan-Vorlage, zeigt der
   Tag jetzt den des Eintrags — vorher stand im Kalender „7.5 LZ" und im
   geöffneten Eintrag „7.5 GA".
