@@ -85,3 +85,62 @@ async def test_fremde_lehrkraft_bleibt_getrennt(s):
     annas = (await s.execute(sa.select(Person).where(Person.name == "Anna"))).scalars().all()
     assert {p.owner_id for p in annas} == {u1.id, u2.id}
     assert len(annas) == 2
+
+
+@pytest.mark.asyncio
+async def test_uebernahme_verliert_keine_angaben(s):
+    """Der Umzug auf die Personen-Ebene darf NICHTS verlieren.
+
+    Geprueft wird jedes Feld, das der Person gehoert — inklusive der Art.-9-
+    Angaben und des ausgeteilten Zugangs. Ein Umzug, bei dem ein Foerder-
+    schwerpunkt still verschwindet, faellt erst auf, wenn ihn jemand braucht.
+    """
+    import sqlalchemy as sa
+    from app.models import SchoolClass, Student, User
+
+    u = User(email="voll@b.de", password_hash="x", name="L")
+    s.add(u)
+    await s.flush()
+    c = SchoolClass(name="9c", owner_id=u.id)
+    s.add(c)
+    await s.flush()
+    s.add(Student(
+        class_id=c.id, name="Dana", card_id=3, niveau="G",
+        foerder=["LRS", "Dyskalkulie"],
+        massnahmen=[{"art": "Zeitzuschlag", "detail": "+25 %", "arbeit": True}],
+        notizen="Elterngespräch am 12.9.", klassenlehrer="Frau Meier",
+        karten_token="tok-dana", photo_mime="image/jpeg"))
+    await s.commit()
+
+    await uebernahme_personen(s)
+    p = (await s.execute(sa.select(Person).where(Person.name == "Dana"))).scalars().one()
+    assert p.niveau == "G"
+    assert p.foerder == ["LRS", "Dyskalkulie"]
+    assert p.massnahmen == [{"art": "Zeitzuschlag", "detail": "+25 %", "arbeit": True}]
+    assert p.notizen == "Elterngespräch am 12.9."
+    assert p.klassenlehrer == "Frau Meier"
+    assert p.karten_token == "tok-dana", "der ausgeteilte QR-Zettel muss weiter gelten"
+    assert p.photo_mime == "image/jpeg"
+
+
+@pytest.mark.asyncio
+async def test_namenlose_zeile_wird_uebersprungen(s):
+    """Eine leere Zeile (angelegt, noch nicht benannt) ist kein Kind — sie darf
+    keine namenlose Person erzeugen, die in jeder Liste auftaucht."""
+    import sqlalchemy as sa
+    from app.models import SchoolClass, Student, User
+    from app.personen import sichere_personen
+
+    u = User(email="leer@b.de", password_hash="x", name="L")
+    s.add(u)
+    await s.flush()
+    c = SchoolClass(name="9d", owner_id=u.id)
+    s.add(c)
+    await s.flush()
+    z = Student(class_id=c.id, name="   ", card_id=1)
+    s.add(z)
+    await s.commit()
+
+    await sichere_personen(s, [z], u.id)
+    await s.commit()
+    assert (await s.execute(sa.select(Person))).scalars().all() == []

@@ -411,6 +411,58 @@ async def add_kind(kurs_id: int, body: KindIn, user: User = Depends(get_current_
                    position=z.position or 0, niveau=z.niveau or "", has_photo=z.has_photo)
 
 
+class KinderImportIn(BaseModel):
+    """Mehrere Kinder auf einmal — eine Zeile je Name.
+
+    Der Alltag beim Anlegen eines Kurses ist eine Namensliste aus der
+    Schulverwaltung: kopieren, einfuegen, fertig. Ohne diesen Weg tippt man
+    dreissig Namen einzeln, und genau dafuer gab es bisher nur den Umweg ueber
+    die Klassenmaske.
+    """
+    text: str = ""
+
+
+@router.post("/{kurs_id}/kinder/import", response_model=List[KindOut], status_code=201)
+async def import_kinder(kurs_id: int, body: KinderImportIn,
+                        user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    kurs = await _owned_kurs(db, user, kurs_id)
+    namen = []
+    for zeile in (body.text or "").splitlines():
+        # Aus Tabellen kommt oft „Meyer<TAB>Anna" oder „Meyer, Anna" — beides
+        # ist EIN Kind, kein zweites.
+        name = " ".join(zeile.replace("\t", " ").strip().split())
+        if name and name not in namen:
+            namen.append(name)
+    if not namen:
+        raise HTTPException(400, "Keine Namen gefunden")
+    if len(namen) > 200:
+        raise HTTPException(400, "Zu viele Zeilen auf einmal (max. 200)")
+
+    klasse = await _traegerklasse(db, user, kurs)
+    bestand = await roster_kurs(db, kurs_id)
+    schon = {" ".join((z.name or "").split()).casefold() for z in bestand}
+    naechste = max([z.card_id for z in bestand] or [0])
+    platz = len(bestand)
+    neue = []
+    for name in namen:
+        if name.casefold() in schon:
+            continue                       # doppelte Namen ueberspringen, nicht verdoppeln
+        naechste += 1
+        z = Student(class_id=klasse.id, kurs_id=kurs.id, name=name[:200],
+                    card_id=naechste, position=platz)
+        platz += 1
+        db.add(z)
+        neue.append(z)
+    await db.flush()
+    for z in neue:
+        db.add(KursStudent(kurs_id=kurs.id, student_id=z.id))
+    await sichere_personen(db, neue, user.id)
+    await db.commit()
+    return [KindOut(student_id=z.id, person_id=z.person_id, name=z.name, card_id=z.card_id,
+                    position=z.position or 0, niveau=z.niveau or "", has_photo=z.has_photo)
+            for z in neue]
+
+
 class ReihenfolgeIn(BaseModel):
     student_ids: List[int]
 

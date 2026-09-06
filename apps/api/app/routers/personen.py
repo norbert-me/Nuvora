@@ -11,7 +11,7 @@ Seite, nur weniger Zeilen.
 """
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -98,6 +98,85 @@ async def photo(person_id: int, klein: bool = False,
         raise HTTPException(404, "Kein Foto")
     return Response(content=daten, media_type=(("image/jpeg" if klein and p.photo_thumb else p.photo_mime) or "image/jpeg"),
                     headers={"Cache-Control": "private, max-age=300"})
+
+
+class PersonPatch(BaseModel):
+    """Was der PERSON gehoert — nicht ihrer Zugehoerigkeit zu einer Liste."""
+    name: Optional[str] = None
+    niveau: Optional[str] = None
+    notizen: Optional[str] = None
+    klassenlehrer: Optional[str] = None
+
+
+@router.patch("/{person_id}", response_model=PersonOut)
+async def update_person(person_id: int, body: PersonPatch,
+                        user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Angaben der Person aendern — nur gesetzte Felder.
+
+    Der Name wandert MIT auf alle Listenzeilen: sie tragen ihn heute noch
+    selbst, und ein Kind, das im Kurs „Anna Meyer" heisst und im Notenbuch
+    „Anna M.", waere derselbe Bruch, den die Personen-Ebene beseitigen soll.
+    Die uebrigen Angaben stehen ab jetzt nur noch hier.
+    """
+    p = await _eigene(db, person_id, user)
+    if body.name is not None:
+        neu_name = " ".join((body.name or "").split())[:200]
+        if not neu_name:
+            raise HTTPException(400, "Name darf nicht leer sein")
+        p.name = neu_name
+        for z in await _zeilen(db, p):
+            z.name = neu_name
+    for feld in ("niveau", "notizen", "klassenlehrer"):
+        wert = getattr(body, feld)
+        if wert is not None:
+            setattr(p, feld, wert)
+    await db.commit()
+    await db.refresh(p)
+    return PersonOut(id=p.id, name=p.name, niveau=p.niveau or "", has_photo=p.has_photo)
+
+
+@router.post("/{person_id}/photo", response_model=PersonOut)
+async def upload_photo(person_id: int, file: UploadFile = File(...),
+                       user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Das Foto gehoert dem KIND, nicht einer seiner Listen.
+
+    Frueher hing es an der Zeile: dasselbe Kind hatte in Mathe ein Bild und in
+    Deutsch keins, weil dort eine andere Zeile stand. Hochgeladen wird deshalb
+    hierher — und die Listenzeilen bekommen es mit, solange sie es noch selbst
+    fuehren (Sitzplan und Klassenliste lesen weiter von dort).
+    """
+    from starlette.concurrency import run_in_threadpool
+
+    from ..uploads import bildtyp, vorschaubild
+    from .auth import rate_limit
+
+    rate_limit("person_photo", f"u{user.id}", 120, 60, "Zu viele Uploads. Bitte kurz warten.")
+    p = await _eigene(db, person_id, user)
+    daten = await file.read()
+    if not daten:
+        raise HTTPException(400, "Datei ist leer")
+    if len(daten) > 5 * 1024 * 1024:
+        raise HTTPException(413, "Bild zu groß (max. 5 MB)")
+    # Der gemeldete Typ ist eine Behauptung — die ersten Bytes entscheiden.
+    p.photo = daten
+    p.photo_mime = bildtyp(daten)
+    p.photo_thumb = await run_in_threadpool(vorschaubild, daten)
+    for z in await _zeilen(db, p):
+        z.photo, z.photo_mime, z.photo_thumb = p.photo, p.photo_mime, p.photo_thumb
+    await db.commit()
+    await db.refresh(p)
+    return PersonOut(id=p.id, name=p.name, niveau=p.niveau or "", has_photo=p.has_photo)
+
+
+@router.delete("/{person_id}/photo", response_model=PersonOut)
+async def delete_photo(person_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    p = await _eigene(db, person_id, user)
+    p.photo, p.photo_mime, p.photo_thumb = None, "", None
+    for z in await _zeilen(db, p):
+        z.photo, z.photo_mime, z.photo_thumb = None, "", None
+    await db.commit()
+    await db.refresh(p)
+    return PersonOut(id=p.id, name=p.name, niveau=p.niveau or "", has_photo=p.has_photo)
 
 
 @router.get("/{person_id}/auswertung")

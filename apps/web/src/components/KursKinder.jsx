@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import {
   AddButton, Icon, ICONS, COLORS as C, CONTROL_R, badge, btnSecondary, btnSmall,
-  iconBtn, sectionLabel, toolbarInput,
+  dateiWaehlen, iconBtn, sectionLabel, toolbarInput,
 } from "./Icons.jsx";
 import Portrait from "./Portrait.jsx";
 import SchuelerAngaben from "./SchuelerAngaben.jsx";
-import { askConfirm } from "../core/dialog.jsx";
+import BildZuschnitt from "./BildZuschnitt.jsx";
+import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n";
 
 // Die Kinder eines Kurses — dort gepflegt, wo man mit ihnen arbeitet.
@@ -25,6 +26,9 @@ export default function KursKinder({ kursId, t: tProp }) {
   const [offen, setOffen] = useState(null);
   const [zieht, setZieht] = useState(null);
   const [ueber, setUeber] = useState(null);
+  const [zuschnitt, setZuschnitt] = useState(null);   // { personId, datei }
+  const [importOffen, setImportOffen] = useState(false);
+  const [importText, setImportText] = useState("");
 
   const laden = () => fetch(`/api/kurse/${kursId}/kinder`)
     .then((r) => (r.ok ? r.json() : [])).then((d) => setListe(Array.isArray(d) ? d : [])).catch(() => {});
@@ -38,6 +42,40 @@ export default function KursKinder({ kursId, t: tProp }) {
       body: JSON.stringify({ name }),
     }).catch(() => null);
     if (r && r.ok) { setNeu(""); laden(); }
+  };
+
+  // Name UND Foto gehören der Person — nicht der Zeile, in der sie gerade
+  // steht. Deshalb gehen beide an /api/personen; die Listenzeilen bekommen es
+  // mit, solange sie es noch selbst führen.
+  const umbenennen = async (kind) => {
+    const name = await askPrompt(text("kurse.kindName"), { initial: kind.name });
+    if (!name || !name.trim() || !kind.person_id) return;
+    await fetch(`/api/personen/${kind.person_id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim() }),
+    }).catch(() => {});
+    laden();
+  };
+
+  const fotoWaehlen = (kind) => {
+    if (!kind.person_id) return;
+    dateiWaehlen((datei) => setZuschnitt({ personId: kind.person_id, datei }), "image/*");
+  };
+
+  const fotoHochladen = async (personId, quadrat) => {
+    const daten = new FormData();
+    daten.append("file", quadrat);
+    await fetch(`/api/personen/${personId}/photo`, { method: "POST", body: daten }).catch(() => {});
+    laden();
+  };
+
+  const importieren = async () => {
+    if (!importText.trim()) return;
+    const r = await fetch(`/api/kurse/${kursId}/kinder/import`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: importText }),
+    }).catch(() => null);
+    if (r && r.ok) { setImportText(""); setImportOffen(false); laden(); }
   };
 
   const entfernen = async (kind) => {
@@ -76,7 +114,24 @@ export default function KursKinder({ kursId, t: tProp }) {
         <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
           placeholder={text("kurse.kindNeu")} style={{ ...toolbarInput, flex: "1 1 200px", minWidth: 0 }} />
         <AddButton onClick={anlegen} title={text("kurse.kindNeu")} />
+        <button onClick={() => setImportOffen((v) => !v)} style={{ ...btnSecondary, ...btnSmall }}>
+          {text("kurse.kindListe")}
+        </button>
       </div>
+
+      {/* Namensliste einfügen: der Alltag beim Anlegen eines Kurses. Eine Zeile
+          je Kind, Doppelte werden übersprungen statt verdoppelt. */}
+      {importOffen && (
+        <div style={{ marginBottom: 12 }}>
+          <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={5}
+            placeholder={text("kurse.kindListePlatzhalter")}
+            style={{ ...toolbarInput, width: "100%", boxSizing: "border-box", height: "auto", resize: "vertical", lineHeight: 1.5 }} />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 6 }}>
+            <button onClick={() => { setImportOffen(false); setImportText(""); }} style={{ ...btnSecondary, ...btnSmall }}>{text("common.abort")}</button>
+            <button onClick={importieren} style={{ ...btnSecondary, ...btnSmall }}>{text("kurse.kindListeAn")}</button>
+          </div>
+        </div>
+      )}
 
       {liste.length === 0 && <p style={{ fontSize: 13, color: "var(--text3)" }}>{text("kurse.kinderLeer")}</p>}
 
@@ -99,8 +154,17 @@ export default function KursKinder({ kursId, t: tProp }) {
             <span style={{ width: 26, textAlign: "right", fontSize: 13, color: "var(--text3)" }}>{platz + 1}.</span>
             <Portrait student={{ id: k.person_id || k.student_id, name: k.name, has_photo: k.has_photo }}
               size={28} form="eckig" quelle={k.person_id ? "person" : "schueler"} />
-            <span style={{ flex: 1, fontSize: 14 }}>{k.name}</span>
+            {/* Der Name IST der Knopf zum Umbenennen — kein Stift daneben,
+                der einen zweiten Zustand aufmacht. */}
+            <button onClick={() => umbenennen(k)} title={text("kurse.kindName")}
+              style={{ flex: 1, fontSize: 14, textAlign: "left", border: "none", background: "none", cursor: "pointer", color: "var(--text)", padding: 0 }}>
+              {k.name}
+            </button>
             {k.niveau && <span style={badge(k.niveau === "E" ? C.info : C.success)}>{k.niveau}</span>}
+            <button onClick={() => fotoWaehlen(k)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
+              title={text("kurse.kindFoto")} aria-label={text("kurse.kindFoto")}>
+              <Icon d={ICONS.camera} size={15} />
+            </button>
             <button onClick={() => setOffen(offen === k.student_id ? null : k.student_id)}
               style={{ ...btnSecondary, ...btnSmall }}>{text("kurse.kindAngaben")}</button>
             <button onClick={() => entfernen(k)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
@@ -110,6 +174,12 @@ export default function KursKinder({ kursId, t: tProp }) {
           </div>
         );
       })}
+
+      {zuschnitt && (
+        <BildZuschnitt datei={zuschnitt.datei}
+          onAbbruch={() => setZuschnitt(null)}
+          onFertig={(quadrat) => { const pid = zuschnitt.personId; setZuschnitt(null); fotoHochladen(pid, quadrat); }} />
+      )}
 
       {offen != null && (
         <div style={{ marginTop: 12 }}>

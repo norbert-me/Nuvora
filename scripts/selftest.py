@@ -969,6 +969,23 @@ def teste_kern(api, b, u):
             raise AssertionError(f"Entfernen wirkte nicht: {len(rest)} Kind(er) uebrig")
         return "anlegen, sortieren (Kartennummern bleiben), entfernen"
 
+    def kurs_namensliste():
+        # Namensliste einfuegen — der Alltag beim Anlegen eines Kurses.
+        kurs = api.call("POST", "/api/kurse", {"name": f"{PRAEFIX} Listenkurs"}, erwartet=(201,))
+        neu_kinder = api.call("POST", f"/api/kurse/{kurs['id']}/kinder/import",
+                              {"text": f"{PRAEFIX} Eins\n\n{PRAEFIX} Zwei\n{PRAEFIX} Eins\n"},
+                              erwartet=(201,))
+        person = neu_kinder[0].get("person_id")
+        # Der Name gehoert der Person — und wandert auf ihre Listenzeilen mit.
+        api.call("PATCH", f"/api/personen/{person}", {"name": f"{PRAEFIX} Umbenannt"}, erwartet=(200,))
+        liste = api.call("GET", f"/api/kurse/{kurs['id']}/kinder", erwartet=(200,))
+        api.call("DELETE", f"/api/kurse/{kurs['id']}", erwartet=(204, 200))
+        if len(neu_kinder) != 2:
+            raise AssertionError(f"Doppelte nicht uebersprungen: {len(neu_kinder)} angelegt")
+        if not any(x["name"] == f"{PRAEFIX} Umbenannt" for x in liste):
+            raise AssertionError(f"Umbenennen kam nicht an der Zeile an: {[x['name'] for x in liste]}")
+        return "zwei aus vier Zeilen (Doppelte weg), Umbenennen wirkt bis in die Liste"
+
     def kurs_aus_kurs():
         # Einen Kurs aus einem anderen entwickeln — der Normalfall im
         # Schuljahr. Uebernommen werden die Kinder, nicht ihre Daten.
@@ -987,6 +1004,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Personen", personen)
     b.pruefe("Kern", "Kurs aus Kurs entwickeln", kurs_aus_kurs)
     b.pruefe("Kern", "Kinder im Kurs", kurs_kinder)
+    b.pruefe("Kern", "Namensliste in den Kurs", kurs_namensliste)
     b.pruefe("Kern", "Themen", themen)
     b.pruefe("Kern", "Papierkorb", papierkorb)
     b.pruefe("Kern", "Archiv", archiv)

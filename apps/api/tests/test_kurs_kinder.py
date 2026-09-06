@@ -95,3 +95,25 @@ async def test_im_kurs_angelegtes_kind_geht_beim_entfernen_wirklich(s):
     assert (await K.list_kinder(kurs.id, user=u, db=s)) == []
     drin = (await s.execute(sa.select(KursStudent).where(KursStudent.kurs_id == kurs.id))).scalars().all()
     assert drin == []
+
+
+@pytest.mark.asyncio
+async def test_namensliste_auf_einmal(s):
+    """Der Alltag: Namensliste aus der Schulverwaltung kopieren und einfuegen."""
+    u, kurs = await _konto(s)
+    neu = await K.import_kinder(kurs.id, K.KinderImportIn(
+        text="Anna Meyer\nBen Schulz\n\n  Anna Meyer  \nCem Yilmaz\n"), user=u, db=s)
+    # Leerzeilen fallen weg, Doppelte auch — ein Kind, nicht zwei.
+    assert [x.name for x in neu] == ["Anna Meyer", "Ben Schulz", "Cem Yilmaz"]
+    assert [x.card_id for x in neu] == [1, 2, 3]
+    assert all(x.person_id for x in neu)
+
+
+@pytest.mark.asyncio
+async def test_import_haengt_hinten_an_und_zaehlt_weiter(s):
+    u, kurs = await _konto(s)
+    await K.add_kind(kurs.id, K.KindIn(name="Zuerst"), user=u, db=s)
+    neu = await K.import_kinder(kurs.id, K.KinderImportIn(text="Danach"), user=u, db=s)
+    assert neu[0].card_id == 2 and neu[0].position == 1
+    liste = await K.list_kinder(kurs.id, user=u, db=s)
+    assert [x.name for x in liste] == ["Zuerst", "Danach"]

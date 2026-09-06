@@ -27,8 +27,10 @@ Notiz zur größten Fassung die dünnste.
   es geht nichts verloren.
 - Neue Seite „Personen": jedes Kind einmal, mit seinen Kursen und dem
   Themenstand je Kurs nebeneinander.
-- Die Kinder eines Kurses werden im Kurs gepflegt: anlegen, sortieren,
-  Angaben, entfernen — ohne den Umweg über die Klassenmaske.
+- Die Kinder eines Kurses werden im Kurs gepflegt: anlegen, umbenennen,
+  sortieren, Foto, Angaben, entfernen — ohne den Umweg über die
+  Klassenmaske. Eine Namensliste füllt den Kurs in einem Zug.
+- Foto und Name gehören jetzt dem Kind, nicht mehr jeder einzelnen Liste.
 - Ein Kurs lässt sich „aus einem anderen entwickeln" — seine Kinder kommen
   mit, Noten und Karten bleiben beim alten Kurs.
 
