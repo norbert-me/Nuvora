@@ -108,6 +108,14 @@
       /* Nav-Leiste bleibt ohne Balken. */
       nav > div { scrollbar-width: none; }
       nav > div::-webkit-scrollbar { display: none; }
+      /* Ein Kasten in der Tagesspur ist so hoch wie seine Stunde — bei zehn
+         Minuten sind das 22 px. Der normale 12-px-Balken waere darin die halbe
+         Hoehe; hier reicht ein Strich, der beim Ueberfahren erscheint. */
+      .tagblock::-webkit-scrollbar { width: 5px; }
+      .tagblock::-webkit-scrollbar-thumb { background: transparent; border: none; border-radius: 3px; }
+      .tagblock:hover::-webkit-scrollbar-thumb { background: var(--border2); }
+      .tagblock { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+      .tagblock:hover { scrollbar-color: var(--border2) transparent; }
       @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
       @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.05); } }
     

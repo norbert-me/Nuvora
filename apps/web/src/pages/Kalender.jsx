@@ -1454,9 +1454,16 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
             <div key={it.key} style={{ position: "absolute", top: yOf(it.start) + 1, height: Math.max(BLOCK_MIN_H, yOf(it.end) - yOf(it.start) - 2),
               left: `calc(50px + ${it.lane || 0} * (100% - 58px) / ${it.lanes || 1})`,
               width: `calc((100% - 58px) / ${it.lanes || 1} - 3px)` }}>
-              <button onClick={it.onClick} title={`${it.label}${it.sub ? " — " + it.sub : ""}`}
+              {/* Kurze Stunden sind niedriger als ihr Text: bei zehn Minuten
+                  bleibt Platz fuer eine Zeile, und die zweite (was geplant ist)
+                  war einfach abgeschnitten. Der Kasten laesst sich deshalb
+                  INNEN scrollen — `contain` haelt dabei die Tagesspur an, sonst
+                  rutscht beim Weiterrollen der ganze Tag weg. Die Hoehe des
+                  Kastens bleibt die der Stunde: sie sagt, wie lang sie ist. */}
+              <button onClick={it.onClick} className="tagblock" title={`${it.label}${it.sub ? " — " + it.sub : ""}`}
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%",
-                  textAlign: "left", padding: "4px 8px", borderRadius: CONTROL_R, overflow: "hidden", cursor: "pointer",
+                  textAlign: "left", padding: "4px 8px", borderRadius: CONTROL_R, cursor: "pointer",
+                  overflowX: "hidden", overflowY: "auto", overscrollBehavior: "contain",
                   border: it.dashed ? "1px dashed var(--border2)" : "none", borderLeft: `3px solid ${it.col}`,
                   background: it.dashed ? "var(--bg2)" : it.col + "22", color: "var(--text)" }}>
                 <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.label}</div>
