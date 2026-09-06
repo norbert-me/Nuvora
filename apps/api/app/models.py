@@ -1633,3 +1633,40 @@ class PapAbgabe(Base):
     daten: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     abgegeben: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class BugReport(Base):
+    """Eine Fehlermeldung aus der Oberflaeche — in der Datenbank, nicht als Mail.
+
+    Vorher ging jede Meldung per E-Mail an den Betreiber. Das hatte drei
+    Nachteile, und alle drei trafen im Alltag zu: sie war weg, sobald das
+    Postfach aufgeraeumt wurde; sie liess sich nicht durchsehen („was kam
+    diese Woche?"); und sie brauchte ein funktionierendes SMTP, sonst war die
+    Meldung schlicht verloren.
+
+    Hier liegt sie. Die Administration sieht alle, kann sie loeschen und den
+    Melde-Knopf im Ganzen ab- und wieder anschalten. Damit faellt auch der
+    Grund fuer die alte Mengenbremse weg: was zu viel ist, entscheidet der
+    Betreiber, indem er loescht oder abschaltet — nicht ein Zaehler, der eine
+    echte Meldung im ungeeignetsten Moment abweist.
+    """
+    __tablename__ = "bug_reports"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Der Melder. SET NULL statt CASCADE: eine Meldung ueberlebt das Konto,
+    # das sie geschrieben hat — sonst verschwindet mit einem geloeschten
+    # Konto auch der Fehlerbericht, an dem noch gearbeitet wird.
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    email: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    message: Mapped[str] = mapped_column(Text, default="", server_default="")
+    seite: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    fassung: Mapped[str] = mapped_column(String(20), default="", server_default="")
+    browser: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    # Beides nur, wenn der Melder es freigegeben hat (Haekchen im Dialog).
+    umgebung: Mapped[str] = mapped_column(Text, default="", server_default="")
+    log: Mapped[str] = mapped_column(Text, default="", server_default="")
+    anhang_name: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    anhang_typ: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    anhang: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    erledigt: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

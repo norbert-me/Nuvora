@@ -54,8 +54,15 @@ async def _zeilen(db: AsyncSession, person: Person) -> List[Student]:
 async def list_personen(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Alle Kinder dieser Lehrkraft — einmal je Kind, nicht je Liste."""
     leute = (await db.execute(select(Person).where(
-        Person.owner_id == user.id, Person.deleted_at.is_(None)
-    ).order_by(Person.name))).scalars().all()
+        Person.owner_id == user.id, Person.deleted_at.is_(None)))).scalars().all()
+    # Nach NACHNAMEN — so steht jede Klassenliste, und so sucht man ein Kind.
+    # „Nachname" ist das letzte Wort; mehr gibt ein freier Namenstext nicht her,
+    # und ein Konto, das „Meyer, Anna" schreibt, bekommt dasselbe Ergebnis.
+    def _sortier(p: Person):
+        teile = (p.name or "").replace(",", " ").split()
+        return ((teile[-1] if teile else "").casefold(), (p.name or "").casefold())
+
+    leute.sort(key=_sortier)
     if not leute:
         return []
     # Kurse je Person: ueber die Zeilen und deren Klassen. Zwei Wege fuehren
@@ -67,10 +74,30 @@ async def list_personen(user: User = Depends(get_current_user), db: AsyncSession
         SchoolClass.owner_id == user.id))).scalars().all()}
     kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)))).scalars().all()}
+    # Ein Kind sitzt in MEHREREN Kursen — und auf drei Wegen: der Kurs an der
+    # Zeile, der Kurs ihrer Klasse und die einzelne Mitgliedschaft
+    # (kurs_students). Der dritte fehlte, und genau ueber ihn laufen alle
+    # Kurse, die im Kurs selbst angelegt wurden: die Liste zeigte dann zu
+    # wenige oder gar keine.
+    from ..models import KursStudent, KursTag
+
+    sids = [z.id for z in zeilen]
+    einzeln = {}
+    if sids:
+        for kid, sid in (await db.execute(select(KursStudent.kurs_id, KursStudent.student_id)
+                                          .where(KursStudent.student_id.in_(sids)))).all():
+            einzeln.setdefault(sid, []).append(kid)
+    ueber_klasse = {}
+    for kid, cid in (await db.execute(select(KursTag.kurs_id, KursTag.class_id))).all():
+        ueber_klasse.setdefault(cid, []).append(kid)
+
     je_person = {}
     for z in zeilen:
         namen = je_person.setdefault(z.person_id, [])
-        for kid in (z.kurs_id, getattr(klassen.get(z.class_id), "kurs_id", None)):
+        kandidaten = [z.kurs_id, getattr(klassen.get(z.class_id), "kurs_id", None)]
+        kandidaten += einzeln.get(z.id, [])
+        kandidaten += ueber_klasse.get(z.class_id, [])
+        for kid in kandidaten:
             k = kurse.get(kid)
             if k and k.name not in namen:
                 namen.append(k.name)

@@ -390,6 +390,7 @@ def _ensure_columns(sync_conn):
         ("users", "timetable_zero", "JSON"),
         ("users", "changelog_seen", "VARCHAR(20) DEFAULT '' NOT NULL"),
         ("students", "person_id", "INTEGER"),
+        # bug_reports ist eine neue Tabelle — create_all legt sie an.
         # Etappe 4: die letzten Tabellen bekommen ihren Kurs. `grade_categories`
         # bleibt bewusst aussen vor — eine Spalte haengt an ihrem Abschnitt, und
         # DER kennt den Kurs; ein zweiter Schluessel daneben waere eine zweite
@@ -1478,64 +1479,48 @@ class BugBody(_BaseModel):
     anhang_daten: str = ""   # base64, ohne data:-Praefix
 
 
+@app.get("/api/bugreport/status")
+async def bugreport_status(user=Depends(get_current_user), db=Depends(get_db)):
+    """Darf gemeldet werden? Der Knopf fragt das, bevor er sich zeigt."""
+    row = await db.get(AppSetting, "bugreport_aus")
+    return {"an": not (row and row.value == "1")}
+
+
 @app.post("/api/bugreport")
-async def bugreport(body: BugBody, request: Request, user=Depends(get_current_user)):
-    """Fehlermeldung aus der Oberflaeche — mit dem Protokoll der letzten Minuten.
+async def bugreport(body: BugBody, request: Request, user=Depends(get_current_user), db=Depends(get_db)):
+    """Fehlermeldung aus der Oberflaeche — sie wird GESPEICHERT, nicht gemailt.
 
-    Nur fuer ANGEMELDETE: das ist der erste und wirksamste Spam-Schutz. Ein
-    offenes Formular an einer festen Adresse wird gefunden und zugemuellt; hier
-    braucht es ein bestaetigtes Konto, und wer eins missbraucht, ist bekannt.
+    Vorher ging jede Meldung per E-Mail an den Betreiber: weg, sobald das
+    Postfach aufgeraeumt wurde, nicht durchsuchbar, und ohne funktionierendes
+    SMTP schlicht verloren. Jetzt liegt sie in der Datenbank; die
+    Administration sieht alle, loescht einzeln und kann den Melde-Knopf im
+    Ganzen abschalten.
 
-    Darueber hinaus drei Bremsen, weil ein Konto auch aus Versehen Unfug
-    schicken kann (ein Knopf, der klemmt, ein Skript in einer Schleife):
+    Damit faellt die alte Mengenbremse weg. Sie sollte Missbrauch begrenzen,
+    traf aber im Alltag den Falschen: wer drei Dinge hintereinander findet,
+    ist der beste Melder, den ein Werkzeug haben kann — und bekam beim vierten
+    Mal eine Absage. Was zu viel ist, entscheidet jetzt der Betreiber, indem
+    er loescht oder abschaltet.
 
-      1. je Konto 5 Meldungen je Stunde,
-      2. zusaetzlich je IP 10 je Stunde — ein Angreifer mit zehn Konten sitzt
-         meist auf einer Leitung,
-      3. harte Laengen: alles darueber wird abgeschnitten, nicht abgelehnt —
-         eine abgeschnittene Meldung ist besser als keine.
-
-    Kopfzeilen-Injektion ist ausgeschlossen (Zeilenumbrueche raus, siehe unten);
-    der Absender der Mail bleibt SMTP_FROM, Reply-To zeigt auf das Konto.
+    Der Spam-Schutz bleibt die Anmeldung: ein offenes Formular an fester
+    Adresse wird gefunden und zugemuellt; hier braucht es ein bestaetigtes
+    Konto, und wer eins missbraucht, ist bekannt.
     """
-    from . import mailer
+    from .models import BugReport
 
-    rate_limit("bug_user", f"u{user.id}", 5, 3600, "Zu viele Meldungen. Bitte spaeter erneut.")
-    rate_limit("bug_ip", client_ip(request), 10, 3600, "Zu viele Meldungen. Bitte spaeter erneut.")
+    aus = await db.get(AppSetting, "bugreport_aus")
+    if aus and aus.value == "1":
+        raise HTTPException(403, "Fehlermeldungen sind derzeit abgeschaltet.")
 
-    to = contact_recipient()
-    if not to:
-        raise HTTPException(503, "Fehlermeldung derzeit nicht moeglich")
-
-    def _hdr(s: str) -> str:
+    def _sauber(s: str) -> str:
         return (s or "").replace("\r", " ").replace("\n", " ").strip()
 
     text = (body.message or "").strip()[:3000]
     if not text:
         raise HTTPException(400, "Bitte beschreibe kurz, was passiert ist")
-    log = (body.log or "").strip()[:20000]
-    umgebung = (body.umgebung or "").strip()[:2000]
-    # Der User-Agent sagt, welcher Browser — das ist bei einer Anzeigefrage oft
-    # die halbe Antwort und steht ohnehin in jedem Request.
-    browser = _hdr(request.headers.get("user-agent", ""))[:200]
 
-    rumpf = (
-        f"Konto: {user.email} (#{user.id})\n"
-        f"Seite: {_hdr(body.seite)[:200]}\n"
-        f"Fassung: {APP_VERSION}\n"
-        f"Browser: {browser}\n\n"
-        f"{text}\n"
-    )
-    if umgebung:
-        rumpf += f"\n--- Umgebung (vom Melder freigegeben) ---\n{umgebung}\n"
-    if log:
-        rumpf += f"\n--- Protokoll (vom Melder freigegeben) ---\n{log}\n"
-
-    # Anhang: die Groesse entscheidet sich an dem, was eine Mail traegt — nicht
-    # an dem, was der Browser hochladen kann. Zu gross wird ABGELEHNT statt
-    # abgeschnitten: ein halber Screenshot ist kein Screenshot, und eine Mail,
-    # die der naechste Server verwirft, kommt nirgends an.
-    anhang = None
+    daten = None
+    name = typ = ""
     if body.anhang_daten:
         import base64
         import binascii
@@ -1543,22 +1528,89 @@ async def bugreport(body: BugBody, request: Request, user=Depends(get_current_us
             daten = base64.b64decode(body.anhang_daten, validate=True)
         except (binascii.Error, ValueError):
             raise HTTPException(400, "Anhang konnte nicht gelesen werden")
-        if len(daten) > mailer.ANHANG_MAX:
-            raise HTTPException(413, f"Anhang zu groß (max. {mailer.ANHANG_MAX // (1024 * 1024)} MB)")
-        name = _hdr(body.anhang_name)[:120] or "anhang"
-        # Nur Dateiname, kein Pfad — und keine Kopfzeilen-Tricks im Namen.
+        # Zu gross wird ABGELEHNT statt abgeschnitten: ein halber Screenshot
+        # ist kein Screenshot.
+        if len(daten) > 3 * 1024 * 1024:
+            raise HTTPException(413, "Anhang zu groß (max. 3 MB)")
+        name = _sauber(body.anhang_name)[:120] or "anhang"
         name = name.replace("/", "_").replace("\\", "_").replace('"', "_")
-        typ = _hdr(body.anhang_typ)[:100] or "application/octet-stream"
+        typ = _sauber(body.anhang_typ)[:100] or "application/octet-stream"
         if typ.count("/") != 1 or any(c in typ for c in ";, "):
             typ = "application/octet-stream"
-        anhang = (name, typ, daten)
-        rumpf += f"\n--- Anhang: {name} ({len(daten) // 1024} KB) ---\n"
 
-    ok = await mailer.send_email(to, f"Nuvora Fehlermeldung von {user.email}", rumpf,
-                                 reply_to=_hdr(user.email), anhang=anhang)
-    if not ok:
-        raise HTTPException(503, "Meldung konnte nicht gesendet werden")
+    db.add(BugReport(
+        user_id=user.id, email=(user.email or "")[:200], message=text,
+        seite=_sauber(body.seite)[:200], fassung=APP_VERSION,
+        browser=_sauber(request.headers.get("user-agent", ""))[:200],
+        umgebung=(body.umgebung or "").strip()[:2000],
+        log=(body.log or "").strip()[:20000],
+        anhang=daten, anhang_name=name, anhang_typ=typ))
+    await db.commit()
     return {"ok": True}
+
+
+class BugSchalter(_BaseModel):
+    an: bool
+
+
+@app.put("/api/admin/bugreport")
+async def bugreport_schalten(body: BugSchalter, user=Depends(_require_admin), db=Depends(get_db)):
+    """Den Melde-Knopf im Ganzen ab- oder anschalten."""
+    row = await db.get(AppSetting, "bugreport_aus")
+    wert = "0" if body.an else "1"
+    if row:
+        row.value = wert
+    else:
+        db.add(AppSetting(key="bugreport_aus", value=wert))
+    await db.commit()
+    return {"an": body.an}
+
+
+@app.get("/api/admin/bugreports")
+async def bugreports(user=Depends(_require_admin), db=Depends(get_db)):
+    """Alle Meldungen, neueste zuerst — von wem, wann, was.
+
+    Ohne Anhang-Bytes: die Liste soll schnell sein, und ein Screenshot gehoert
+    in die Einzelansicht, nicht in eine Uebersicht von hundert Zeilen.
+    """
+    from sqlalchemy import select as _select
+
+    from .models import BugReport
+
+    rows = (await db.execute(_select(BugReport).order_by(BugReport.created_at.desc()).limit(500))).scalars().all()
+    return [{
+        "id": r.id, "email": r.email, "message": r.message, "seite": r.seite,
+        "fassung": r.fassung, "browser": r.browser, "umgebung": r.umgebung, "log": r.log,
+        "anhang_name": r.anhang_name, "erledigt": r.erledigt,
+        "created_at": r.created_at.isoformat() if r.created_at else "",
+    } for r in rows]
+
+
+@app.delete("/api/admin/bugreports/{report_id}", status_code=204)
+async def bugreport_loeschen(report_id: int, user=Depends(_require_admin), db=Depends(get_db)):
+    from .models import BugReport
+
+    r = await db.get(BugReport, report_id)
+    if r:
+        await db.delete(r)
+        await db.commit()
+
+
+@app.get("/api/admin/bugreports/{report_id}/anhang")
+async def bugreport_anhang(report_id: int, user=Depends(_require_admin), db=Depends(get_db)):
+    """Der Anhang einer Meldung — einzeln, damit die Liste leicht bleibt."""
+    from sqlalchemy import select as _select
+    from sqlalchemy.orm import undefer
+    from starlette.responses import Response as _Resp
+
+    from .models import BugReport
+
+    r = (await db.execute(_select(BugReport).where(BugReport.id == report_id)
+                          .options(undefer(BugReport.anhang)))).scalar_one_or_none()
+    if not r or not r.anhang:
+        raise HTTPException(404, "Kein Anhang")
+    return _Resp(content=r.anhang, media_type=r.anhang_typ or "application/octet-stream",
+                 headers={"Content-Disposition": f'inline; filename="{r.anhang_name or "anhang"}"'})
 
 
 @app.post("/api/contact")

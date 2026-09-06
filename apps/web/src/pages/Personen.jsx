@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
-  pageApp, pageTitle, cardStyle, panelStyle, btnSecondary, btnSmall, badge,
-  COLORS as C, CONTROL_R, sectionLabel, toolbarInput,
+  pageApp, pageTitle, cardStyle, panelStyle, badge, Icon, ICONS,
+  COLORS as C, sectionLabel, toolbarInput,
 } from "../components/Icons.jsx";
 import Portrait from "../components/Portrait.jsx";
 import { useLanguage } from "../i18n";
@@ -50,49 +50,60 @@ export default function Personen() {
 
       {gefiltert.map((p) => (
         <div key={p.id} style={{ ...cardStyle, padding: 12, marginBottom: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {/* Name UND Bild öffnen dasselbe: die Person. Ein eigener Knopf
+              „Auswertung" daneben war ein dritter Weg zum selben Ort — und die
+              Zeile stand voller Angaben (Kurs, E/G), die man beim Suchen nicht
+              liest, auf dem Handy aber umbricht. */}
+          <button onClick={() => zeigen(p)}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%",
+              border: "none", background: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
             <Portrait student={{ id: p.id, name: p.name, has_photo: p.has_photo }} size={34} form="eckig" quelle="person" />
-            <span style={{ fontWeight: 600, flex: 1 }}>{p.name}</span>
-            {p.niveau && <span style={badge(p.niveau === "E" ? C.info : C.success)}>{p.niveau}</span>}
-            {/* Die Kurse sagen, wo dieses Kind ueberall sitzt — genau das war
-                vorher nur durch Namensvergleich zu erkennen. */}
-            <span style={{ fontSize: 12, color: "var(--text3)" }}>{(p.kurse || []).join(" · ")}</span>
-            <button onClick={() => zeigen(p)} style={{ ...btnSecondary, ...btnSmall }}>
-              {offen === p.id ? t("personen.zu") : t("personen.auswertung")}
-            </button>
-          </div>
+            <span style={{ fontWeight: 600, flex: 1, color: "var(--text)" }}>{p.name}</span>
+            <span style={{ color: "var(--text3)", display: "inline-flex",
+              transform: offen === p.id ? "rotate(90deg)" : "none", transition: "transform .15s" }}>
+              <Icon d={ICONS.open} size={14} />
+            </span>
+          </button>
 
           {offen === p.id && (
             <div style={{ ...panelStyle, padding: 12, marginTop: 12 }}>
               {!stand && <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("common.loading")}</p>}
-              {stand && (stand.teile || []).length === 0 && (
-                <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("personen.nochNichts")}</p>
-              )}
-              {stand && (stand.teile || []).map((teil) => (
-                <div key={teil.student_id} style={{ marginBottom: 12 }}>
-                  <div style={{ ...sectionLabel, margin: "0 0 6px" }}>{teil.kurs || "—"}</div>
-                  {(teil.themen || []).length === 0 ? (
-                    <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("personen.keineThemen")}</p>
-                  ) : (
-                    <div style={{ display: "grid", gap: 4 }}>
-                      {(teil.themen || []).slice(0, 8).map((th, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                          <span style={{ flex: 1 }}>{th.thema || th.name || "—"}</span>
-                          {/* Ohne Zahl heisst: zu wenig Daten. Eine erfundene
-                              Prozentzahl waere schlimmer als keine. */}
-                          {th.pct == null ? (
-                            <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("personen.zuWenig")}</span>
-                          ) : (
-                            <span style={{ ...badge(th.pct >= 75 ? C.success : th.pct >= 50 ? C.warning : C.danger) }}>
-                              {Math.round(th.pct)} %
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+              {stand && (
+                <>
+                  {/* Die Angaben zur Person stehen HIER — beim Namen, nicht in
+                      jeder Zeile der Liste. */}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+                    {stand.niveau && <span style={badge(stand.niveau === "E" ? C.info : C.success)}>{stand.niveau}</span>}
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>{(p.kurse || []).join(" · ")}</span>
+                  </div>
+                  {(stand.teile || []).length === 0 && (
+                    <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("personen.nochNichts")}</p>
                   )}
-                </div>
-              ))}
+                  {(stand.teile || []).map((teil) => (
+                    <div key={teil.student_id} style={{ marginBottom: 12 }}>
+                      <div style={{ ...sectionLabel, margin: "0 0 6px" }}>{teil.kurs || "—"}</div>
+                      {(teil.themen || []).length === 0 ? (
+                        <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("personen.keineThemen")}</p>
+                      ) : (
+                        <div style={{ display: "grid", gap: 4 }}>
+                          {(teil.themen || []).slice(0, 8).map((th, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                              <span style={{ flex: 1 }}>{th.thema || th.name || "—"}</span>
+                              {th.pct == null ? (
+                                <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("personen.zuWenig")}</span>
+                              ) : (
+                                <span style={{ ...badge(th.pct >= 75 ? C.success : th.pct >= 50 ? C.warning : C.danger) }}>
+                                  {Math.round(th.pct)} %
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>

@@ -2,18 +2,24 @@
 
 Protokoll und Umgebung bleiben inhaltsfrei — der Anhang darf Inhalte tragen,
 weil ihn die Lehrkraft ausgesucht hat. Was hier bewacht wird, ist die Grenze:
-eine Mail, die der naechste Server wegen ihrer Groesse verwirft, kommt nirgends
-an und meldet es niemandem. Deshalb wird zu Grosses ABGELEHNT statt
-abgeschnitten (ein halber Screenshot ist keiner), und Dateiname wie MIME-Typ
-werden entschaerft, bevor sie in Kopfzeilen landen.
+zu Grosses wird ABGELEHNT statt abgeschnitten (ein halber Screenshot ist
+keiner), und Dateiname wie MIME-Typ werden entschaerft, bevor sie irgendwo
+landen.
+
+Seit dem Umbau (06.09.2026) wird die Meldung GESPEICHERT statt gemailt: sie
+war sonst weg, sobald das Postfach aufgeraeumt wurde, liess sich nicht
+durchsehen und ging ohne funktionierendes SMTP verloren. Geprueft wird
+deshalb die gespeicherte Zeile.
 """
 import base64
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import undefer
 
-from app import mailer
 from app.main import BugBody, bugreport
+from app.models import BugReport, User
 
 
 class _Anfrage:
@@ -21,67 +27,77 @@ class _Anfrage:
     client = None
 
 
-class _Konto:
-    id = 4711
-    email = "l@schule.de"
-
-
 @pytest.fixture
-def gesendet(monkeypatch):
-    """Nichts verschicken — nur festhalten, WAS verschickt worden waere."""
-    box = {}
+async def konto(s):
+    u = User(email="l@schule.de", password_hash="x", name="L")
+    s.add(u)
+    await s.commit()
+    return u
 
-    async def _fake(to, subject, body, reply_to="", anhang=None):
-        box.update(to=to, subject=subject, body=body, anhang=anhang)
-        return True
 
-    monkeypatch.setattr(mailer, "send_email", _fake)
-    monkeypatch.setenv("ADMIN_EMAIL", "betreiber@schule.de")
-    return box
+async def _melden(s, konto, **felder):
+    await bugreport(BugBody(**felder), _Anfrage(), user=konto, db=s)
+    # `anhang` ist deferred (Listen sollen die Bytes nicht mitschleppen) — hier
+    # ausdruecklich mitladen, sonst laeuft der Zugriff in ein Nachladen, das
+    # async nicht darf.
+    return (await s.execute(select(BugReport).options(undefer(BugReport.anhang)))).scalars().all()
+
 
 
 @pytest.mark.asyncio
-async def test_anhang_geht_mit(gesendet):
+async def test_anhang_wird_gespeichert(s, konto):
     daten = b"%PDF-1.4 Beispiel"
-    await bugreport(BugBody(message="Knopf klemmt", anhang_name="fehler.pdf",
-                            anhang_typ="application/pdf",
-                            anhang_daten=base64.b64encode(daten).decode()),
-                    request=_Anfrage(), user=_Konto())
-    name, typ, roh = gesendet["anhang"]
-    assert (name, typ, roh) == ("fehler.pdf", "application/pdf", daten)
-    assert "fehler.pdf" in gesendet["body"], "der Anhang wird im Text genannt"
+    rows = await _melden(s, konto, message="Knopf klemmt", anhang_name="fehler.pdf",
+                         anhang_typ="application/pdf",
+                         anhang_daten=base64.b64encode(daten).decode())
+    assert len(rows) == 1
+    r = rows[0]
+    assert (r.anhang_name, r.anhang_typ) == ("fehler.pdf", "application/pdf")
+    assert r.anhang == daten
+    assert r.email == "l@schule.de" and r.message == "Knopf klemmt"
 
 
 @pytest.mark.asyncio
-async def test_zu_grosser_anhang_wird_abgelehnt(gesendet):
-    zu_gross = base64.b64encode(b"x" * (mailer.ANHANG_MAX + 1)).decode()
+async def test_zu_grosser_anhang_wird_abgelehnt(s, konto):
+    zu_gross = base64.b64encode(b"x" * (3 * 1024 * 1024 + 1)).decode()
     with pytest.raises(HTTPException) as e:
-        await bugreport(BugBody(message="Bild", anhang_name="a.png", anhang_typ="image/png",
-                                anhang_daten=zu_gross), request=_Anfrage(), user=_Konto())
+        await _melden(s, konto, message="Bild", anhang_name="a.png",
+                      anhang_typ="image/png", anhang_daten=zu_gross)
     assert e.value.status_code == 413
 
 
 @pytest.mark.asyncio
-async def test_name_und_typ_werden_entschaerft(gesendet):
-    await bugreport(BugBody(message="x", anhang_name="../../etc/passwd\nBcc: wer@anders.de",
-                            anhang_typ="text/plain; charset=utf-8\nX-Spam: nein",
-                            anhang_daten=base64.b64encode(b"hallo").decode()),
-                    request=_Anfrage(), user=_Konto())
-    name, typ, _ = gesendet["anhang"]
-    assert "\n" not in name and "/" not in name
-    assert typ == "application/octet-stream", "ein Typ mit Zusaetzen wird nicht uebernommen"
+async def test_name_und_typ_werden_entschaerft(s, konto):
+    rows = await _melden(s, konto, message="Test",
+                         anhang_name="../../etc/passwd\nX: y",
+                         anhang_typ="image/png; charset=evil",
+                         anhang_daten=base64.b64encode(b"abc").decode())
+    r = rows[0]
+    assert "/" not in r.anhang_name and "\n" not in r.anhang_name
+    assert r.anhang_typ == "application/octet-stream"
 
 
 @pytest.mark.asyncio
-async def test_kaputte_base64_wird_abgewiesen(gesendet):
+async def test_kaputte_base64_wird_abgewiesen(s, konto):
     with pytest.raises(HTTPException) as e:
-        await bugreport(BugBody(message="x", anhang_name="a.png", anhang_typ="image/png",
-                                anhang_daten="das ist kein base64!!"),
-                        request=_Anfrage(), user=_Konto())
+        await _melden(s, konto, message="Test", anhang_name="a.png",
+                      anhang_typ="image/png", anhang_daten="kein base64!!")
     assert e.value.status_code == 400
 
 
 @pytest.mark.asyncio
-async def test_ohne_anhang_bleibt_alles_wie_bisher(gesendet):
-    await bugreport(BugBody(message="Nur Text"), request=_Anfrage(), user=_Konto())
-    assert gesendet["anhang"] is None
+async def test_ohne_anhang_bleibt_alles_wie_bisher(s, konto):
+    rows = await _melden(s, konto, message="Nur Text")
+    assert rows[0].anhang is None and rows[0].anhang_name == ""
+
+
+@pytest.mark.asyncio
+async def test_abgeschaltet_heisst_abgeschaltet(s, konto):
+    """Die Administration kann den Melde-Knopf im Ganzen abschalten."""
+    from app.models import AppSetting
+
+    s.add(AppSetting(key="bugreport_aus", value="1"))
+    await s.commit()
+    with pytest.raises(HTTPException) as e:
+        await _melden(s, konto, message="Test")
+    assert e.value.status_code == 403
