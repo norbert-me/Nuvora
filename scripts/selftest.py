@@ -918,6 +918,21 @@ def teste_kern(api, b, u):
             raise AssertionError("nach dem Bestaetigen steht die Liste immer noch offen")
         return f"Fassung {out['version']}, {len(out.get('abschnitte') or [])} Abschnitt(e), Bestaetigen wirkt"
 
+    def modulzustand():
+        # Ein abgebrochener Testlauf laesst Module abgeschaltet zurueck — der
+        # naechste Lauf haelt das fuer den Ausgangszustand und stellt ihn brav
+        # wieder her. Sichtbar wird der Rest erst viel spaeter im Browser-
+        # Rundgang, als „ModuleGate wirft auf /modules zurueck" an einer
+        # scheinbar zufaelligen Seite. Deshalb hier, am Anfang, in einem Satz.
+        liste = api.call("GET", "/api/modules", erwartet=(200,))
+        aus = sorted(m["key"] for m in liste if m.get("available") and not m.get("active"))
+        if aus:
+            raise AssertionError(
+                f"{len(aus)} Modul(e) abgeschaltet: {', '.join(aus)} — Rest eines "
+                "abgebrochenen Laufs? Wiederherstellen mit "
+                "`python3 scripts/aufraeumen.py --module-an`")
+        return f"alle {len(liste)} Module aktiv"
+
     b.pruefe("Kern", "Klassen und Schueler", klassen)
     b.pruefe("Kern", "Reihenfolge", reihenfolge)
     b.pruefe("Kern", "Kurse", kurse)
@@ -929,6 +944,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Themenstand", themenstand)
     b.pruefe("Kern", "Zugangs-Zettel", zugangsdruck)
     b.pruefe("Kern", "Modulregister", modulregister)
+    b.pruefe("Kern", "Modul-Zustand des Testkontos", modulzustand, schwere="warnung")
     b.pruefe("Kern", "Sicherung", sicherung)
     b.pruefe("Kern", "App-Downloads", apps, schwere="warnung")
     b.pruefe("Kern", "Was ist neu?", was_ist_neu)
