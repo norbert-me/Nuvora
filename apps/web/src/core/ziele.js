@@ -21,7 +21,9 @@
 export const ZIELE = [
   // ── Kern ──
   { pfad: "/", key: "nav.start", modul: null, worte: ["start", "dashboard", "übersicht"] },
-  { pfad: "/classes", key: "nav.classes", modul: null, worte: ["schüler", "sus", "kinder", "namen", "förderschwerpunkt", "maßnahmen", "reihenfolge"] },
+  // Nicht mehr in der Navigation, aber auffindbar: Bestandsklassen leben dort
+  // weiter, bis der Umbau auf Kurse abgeschlossen ist.
+  { pfad: "/classes", key: "nav.classes", modul: null, worte: ["klasse", "klassen", "bestand", "alte klassen"] },
   { pfad: "/kurse", key: "kurse.title", modul: null, worte: ["fach", "fächer", "gruppen"] },
   { pfad: "/personen", key: "personen.titel", modul: null, worte: ["kind", "person", "einzeln", "über alle kurse", "gesamtbild", "wie steht"] },
   { pfad: "/topics", key: "nav.topics", modul: null, worte: ["thema", "themen", "unterthema", "lehrplan", "jahresplanung"] },

@@ -424,7 +424,10 @@ const getModuleNavItems = (t, location, user) => {
   }
   // Kern: der Nuvora-Schriftzug links fuehrt zur Startseite.
   return [
-    { to: "/classes", label: t("nav.classes") },
+    // „Klassen" ist aus der Navigation raus (Umbau vom 06.09.2026): Kinder
+    // werden im KURS gepflegt, und wer ein einzelnes Kind sucht, geht ueber
+    // „Personen". Die Seite selbst bleibt erreichbar — sie ist noch der Ort
+    // fuer Bestandsklassen, und alte Lesezeichen sollen nicht ins Leere gehen.
     { to: "/kurse", label: t("kurse.title") },
     { to: "/personen", label: t("personen.titel") },
     { to: "/topics", label: t("nav.topics") },

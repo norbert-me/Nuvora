@@ -760,8 +760,17 @@ async def startup():
             # mit, sonst „verschwinden" sie, sobald der Selektor den Kurs
             # mitschickt. Karten haben ihre kurs_id schon beim Anlegen bekommen
             # (cls.kurs_id).
-            for tbl in ("grade_sections", "grade_overrides", "seating_plans",
-                        "orga_items", "card_decks"):
+            # Etappe 4 des Umbaus auf Kurse (06.09.2026): JEDE Tabelle, die
+            # beide Schluessel traegt, wird angeschlossen — nicht nur die fuenf
+            # von damals. Solange irgendwo `kurs_id` leer bleibt, muss der
+            # Lesepfad weiter ueber die Klasse raten, und `class_id` laesst
+            # sich nie entfernen. Idempotent (nur NULL wird gefuellt), und
+            # mehrdeutige Faelle (Klasse in mehreren Kursen) bleiben bewusst
+            # leer: dort waere jede Wahl geraten.
+            for tbl in ("grade_sections", "grade_overrides", "grade_entries",
+                        "seating_plans", "orga_items", "card_decks", "card_folders",
+                        "work_analyses", "exam_dates", "calendar_entries",
+                        "segel_status", "timetable_slots", "pap_aufgaben"):
                 await db.execute(text(f"""
                     WITH single AS (
                       SELECT class_id, MIN(kurs_id) AS kurs_id FROM (

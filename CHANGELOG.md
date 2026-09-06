@@ -21,6 +21,10 @@ Notiz zur größten Fassung die dünnste.
 
 **Kern: die Person**
 
+- „Klassen" ist aus der Navigation verschwunden: Kinder werden im Kurs
+  gepflegt, ein einzelnes Kind findest du unter „Personen". Die Seite bleibt
+  erreichbar, solange es Bestandsklassen gibt.
+
 - Ein Kind gibt es jetzt einmal — auch wenn es in mehreren Kursen sitzt.
   Name, Foto, Niveau, Förderangaben und Zugang hängen an der Person, nicht
   mehr an jeder einzelnen Liste. Bestehende Daten wandern beim Start mit,
