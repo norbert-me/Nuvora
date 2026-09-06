@@ -19,6 +19,13 @@ Notiz zur größten Fassung die dünnste.
 - Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
   Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
 
+**Auswertung und Profil**
+
+- Die CardVote-Auswertung geht nach Kurs statt nach Klasse — und wahlweise
+  nach Person, mit Suchfeld.
+- Alle abschaltbaren Teile der eingeschalteten Module stehen zusätzlich im
+  Profil, an einer Stelle.
+
 **Fehler melden**
 
 - Meldungen werden gespeichert statt gemailt. Die Administration sieht im
@@ -51,6 +58,10 @@ Notiz zur größten Fassung die dünnste.
   mit, Noten und Karten bleiben beim alten Kurs.
 
 **Kalender**
+
+- Die Zeitleiste zeigt das Datum rechts (links staute sich auf dem Handy
+  alles Übrige), schreibt „1. Stunde" aus, und ein Klick darauf führt in den
+  Tag, wo die Stunde geplant wird.
 
 - Lange Auswahllisten (Thema, Einstieg, Quiz, Kartenstapel, Lernleiter) haben
   ein Suchfeld — tippen statt scrollen. Kurze Listen bleiben, wie sie waren.

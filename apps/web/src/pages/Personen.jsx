@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   pageApp, pageTitle, cardStyle, panelStyle, badge, Icon, ICONS,
   COLORS as C, sectionLabel, toolbarInput,
@@ -21,12 +22,22 @@ export default function Personen() {
   const { t } = useLanguage();
   const [liste, setListe] = useState([]);
   const [suche, setSuche] = useState("");
+  // Aus der Auswertung kommt man mit ?person=<id> direkt zu einem Kind — der
+  // Sprung soll dort landen, wo die Antwort steht, nicht in der Liste.
+  const [params] = useSearchParams();
   const [offen, setOffen] = useState(null);
   const [stand, setStand] = useState(null);
 
   useEffect(() => {
-    fetch("/api/personen").then((r) => (r.ok ? r.json() : [])).then((d) => setListe(Array.isArray(d) ? d : [])).catch(() => {});
-  }, []);
+    fetch("/api/personen").then((r) => (r.ok ? r.json() : [])).then((d) => {
+      const liste = Array.isArray(d) ? d : [];
+      setListe(liste);
+      const ziel = Number(params.get("person"));
+      const p = ziel && liste.find((x) => x.id === ziel);
+      if (p) zeigen(p);
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
 
   const zeigen = async (p) => {
     if (offen === p.id) { setOffen(null); return; }

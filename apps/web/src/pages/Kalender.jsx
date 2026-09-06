@@ -845,7 +845,13 @@ export default function Kalender() {
           )} />
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
-      {view === "zeitleiste" && <Zeitleiste />}
+      {view === "zeitleiste" && <Zeitleiste onStunde={(p) => {
+        // Klick auf eine Stunde fuehrt in den Tag — dort wird geplant, mit
+        // demselben Dialog wie ueberall. Eine zweite Planungsmaske in der
+        // Zeitleiste waere dieselbe Sache zweimal.
+        const d = parseYmd(p.date);
+        if (d) { setCursor(d); setView("day"); }
+      }} />}
       {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} hatNull={!!tt.zero} aktiv={aktiv} topics={topics} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
 
       {/* Was im ANGEZEIGTEN Zeitraum ausgeblendet ist — eine Fläche über dem

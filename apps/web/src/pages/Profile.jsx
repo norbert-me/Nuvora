@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
-import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel,
+import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel, Toggle,
   sectionLabel, Tabs, th as thBasis, td as tdBasis, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson } from "../core/melden.js";
+import { useModules } from "../core/modules.js";
 
 const API = "/api";
 
@@ -97,6 +98,9 @@ const Abschnitt = ({ id, titel, zu = true, kopf = null, children }) => {
 const TrashIcon = ({ size = 16 }) => <Icon d={ICONS.trash} size={size} color={C.danger} />;
 
 export default function Profile({ user, onLogout, onUserUpdate }) {
+  // Alle abschaltbaren Teile der EINGESCHALTETEN Module — an einer Stelle.
+  const { modules, setOption } = useModules();
+  const modulTeile = modules.filter((m) => m.active && (m.optionen || []).length > 0);
   const { t, lang, setLang } = useLanguage();
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
@@ -400,6 +404,27 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           }} style={btnSecondary}>{t("profile.tutorialRestart")}</button>
         </Zeile>
       </Abschnitt>
+
+      {/* Die abschaltbaren Teile ALLER eingeschalteten Module — an einer
+          Stelle. Im Zahnrad der jeweiligen Seite stehen sie weiterhin (dort
+          sieht man, was sie tun); hier findet man sie, ohne zu wissen, in
+          welchem Modul der Schalter steckt. Ein Modul erscheint erst, wenn es
+          eingeschaltet ist: Schalter fuer etwas, das es nicht gibt, sind
+          Rauschen. */}
+      {modulTeile.length > 0 && (
+        <Abschnitt id="modulteile" titel={t("profile.modulTeile")}>
+          {modulTeile.map((m, i) => (
+            <Zeile key={m.key} label={m.name} erste={i === 0}>
+              <div style={{ display: "grid", gap: 8 }}>
+                {m.optionen.map((o) => (
+                  <Toggle key={o.key} checked={(m.optionen_an || {})[o.key] !== false}
+                    onChange={(v) => setOption(m.key, o.key, v)} label={o.name} />
+                ))}
+              </div>
+            </Zeile>
+          ))}
+        </Abschnitt>
+      )}
 
       {/* App laden: derselbe Nuvora-Server, nur in einem eigenen Fenster. Es
           steht hier und nicht in der Fusszeile, weil es zur eigenen

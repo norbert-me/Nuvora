@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { askConfirm } from "../core/dialog.jsx";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, cardStyle, sectionLabel, Tabs, COLORS as C, pageApp } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, cardStyle, sectionLabel, Tabs, COLORS as C, pageApp , toolbarInput } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { hol } from "../core/melden.js";
@@ -9,6 +9,15 @@ import { hol } from "../core/melden.js";
 const API = "/api";
 
 export default function Tests() {
+  // Kurse und Personen — die zwei Wege in die Auswertung.
+  const [nach, setNach] = useState("kurs");
+  const [kurse, setKurse] = useState([]);
+  const [personen, setPersonen] = useState([]);
+  const [suche, setSuche] = useState("");
+  useEffect(() => {
+    fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => setKurse(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch("/api/personen").then((r) => (r.ok ? r.json() : [])).then((d) => setPersonen(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
   const { t, lang } = useLanguage();
   const [sessions, setSessions] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -61,19 +70,42 @@ export default function Tests() {
   return (
     <div style={{ ...pageApp }}>
       {/* Oben: je Klasse die Gesamtauswertung. Darunter die einzelnen Quiz. */}
-      {classes.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ ...sectionLabel, marginBottom: 12 }}>{t("tests.byClass")}</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {classes.map((c) => (
-              <Link key={c.id} to={`/cardvote/class-evaluation/${c.id}`}
-                style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", textDecoration: "none", color: "var(--text)" }}>
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</span>
+      {/* Auswertung nach KURS oder nach Person — zwei Fragen, die man
+          wirklich stellt: „wie steht die Lerngruppe da?" und „wie steht dieses
+          Kind da?". Vorher gab es nur Klassen, und die sind seit dem Umbau
+          nicht mehr die Ebene, in der unterrichtet wird. Bei vielen Kindern
+          waere eine Kachelwand keine Auswahl — deshalb ein Suchfeld. */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+          <div style={sectionLabel}>{t("tests.byKurs")}</div>
+          <Tabs value={nach} onChange={setNach} style={{ marginLeft: "auto" }}
+            options={[["kurs", t("tests.nachKurs")], ["person", t("tests.nachPerson")]]} />
+        </div>
+
+        {nach === "person" && (
+          <input value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("personen.suche")}
+            style={{ ...toolbarInput, width: "100%", maxWidth: 320, marginBottom: 8 }} />
+        )}
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {nach === "kurs" && kurse.map((k) => (
+            <Link key={k.id} to={`/cardvote/class-evaluation/${(k.classes || [])[0]?.id ?? k.id}`}
+              style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", textDecoration: "none", color: "var(--text)" }}>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>{k.name}</span>
+            </Link>
+          ))}
+          {nach === "person" && personen
+            .filter((p) => !suche.trim() || p.name.toLowerCase().includes(suche.trim().toLowerCase()))
+            .slice(0, 60)
+            .map((p) => (
+              <Link key={p.id} to={`/personen?person=${p.id}`}
+                style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", textDecoration: "none", color: "var(--text)" }}>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</span>
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>{(p.kurse || []).join(" · ")}</span>
               </Link>
             ))}
-          </div>
         </div>
-      )}
+      </div>
 
       {/* Aktiv/Archiv ist ein Zwei-Zustands-Umschalter — also `Tabs`, nicht ein
           Knopf, der seine Beschriftung wechselt. */}

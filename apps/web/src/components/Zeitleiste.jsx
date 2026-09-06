@@ -27,7 +27,7 @@ const ARTEN = {
   stunde: { farbe: "var(--border2)", icon: null },
 };
 
-export default function Zeitleiste() {
+export default function Zeitleiste({ onStunde }) {
   const { t } = useLanguage();
   // Die Kurswahl gehoert der Leiste selbst: sie ist eine eigene Ansicht mit
   // eigener Frage („welcher Kurs?") und haengt nicht am Datum, das die
