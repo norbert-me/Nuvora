@@ -12,12 +12,7 @@ Zwischenfassung (x.y.0) hängt sie **alle Abschnitte der vorigen Reihe** an: wer
 von 4.1.0 auf 4.2.0 geht, hat 4.1.1 bis 4.1.9 nie gesehen — sonst wäre die
 Notiz zur größten Fassung die dünnste.
 
-## 4.2.0 — 06.09.2026
-
-**Startseite und Kalender**
-
-- Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
-  Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
+## 4.3.0 — 08.09.2026
 
 **Auswertung und Profil**
 
@@ -43,7 +38,6 @@ Notiz zur größten Fassung die dünnste.
 - „Klassen" ist aus der Navigation verschwunden: Kinder werden im Kurs
   gepflegt, ein einzelnes Kind findest du unter „Personen". Die Seite bleibt
   erreichbar, solange es Bestandsklassen gibt.
-
 - Ein Kind gibt es jetzt einmal — auch wenn es in mehreren Kursen sitzt.
   Name, Foto, Niveau, Förderangaben und Zugang hängen an der Person, nicht
   mehr an jeder einzelnen Liste. Bestehende Daten wandern beim Start mit,
@@ -62,11 +56,9 @@ Notiz zur größten Fassung die dünnste.
 - Die Zeitleiste zeigt das Datum rechts (links staute sich auf dem Handy
   alles Übrige), schreibt „1. Stunde" aus, und ein Klick darauf führt in den
   Tag, wo die Stunde geplant wird.
-
 - Lange Auswahllisten (Thema, Einstieg, Quiz, Kartenstapel, Lernleiter) haben
   ein Suchfeld — tippen statt scrollen. Kurze Listen bleiben, wie sie waren.
 - Wischen nach links oder rechts blättert Tag, Woche und Monat.
-
 - Trägt ein Eintrag einen anderen Kurs als die Stundenplan-Vorlage, zeigt der
   Tag jetzt den des Eintrags — vorher stand im Kalender „7.5 LZ" und im
   geöffneten Eintrag „7.5 GA".
@@ -91,6 +83,13 @@ Notiz zur größten Fassung die dünnste.
 - QR-Zugang und CardVote-Abstimmkarte werden klar auseinandergehalten: der
   Menüpunkt heißt „QR-Zugänge drucken (je Kind einer)" und sagt auf
   Nachfrage, wofür er ist und was er nicht ist.
+
+## 4.2.0 — 06.09.2026
+
+**Startseite und Kalender**
+
+- Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
+  Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
 
 **Karteikarten**
 
@@ -212,7 +211,6 @@ Notiz zur größten Fassung die dünnste.
   sie auf Klick auf.
 - Was heute fällig ist, steht rot (vorher gelb wie „demnächst").
 - Der Kalender-Knopf trägt sofort das heutige Datum ein und öffnet die Auswahl.
-
 ## 4.1.7 — 01.09.2026
 
 **Orga**
