@@ -36,6 +36,18 @@ TIMEOUT = 30
 # hoch, und die Scan-Serie (12 Bilder in Folge) lief in ein 429, das nach 15
 # Sekunden noch stand — ein roter Befund ueber die Drosselung, nicht ueber die
 # Anwendung.
+# Mindestabstand zwischen zwei Aufrufen. Der Proxy laesst 30 Anfragen je
+# Sekunde durch (limit_req in nginx.conf) — ein Testlauf schafft bei 13 ms
+# Antwortzeit locker das Doppelte und rennt damit DAUERHAFT gegen die Sperre:
+# der Burst-Puffer ist nach kurzer Zeit voll ("excess: 80"), und dann hilft auch
+# kein Warten mehr, weil der naechste Schwall sofort wieder anfaellt.
+#
+# Gebremst wird deshalb der Test, nicht der Proxy: das Limit schuetzt die echte
+# Installation, und eine Lehrkraft feuert nie 70 Anfragen je Sekunde. Der
+# Testlauf dauert dadurch etwas laenger — 25 Aufrufe je Sekunde sind mit
+# Sicherheitsabstand unter der Grenze.
+ABSTAND_S = float(os.environ.get("SELFTEST_ABSTAND", "0.04"))
+
 RATELIMIT_VERSUCHE = 6
 RATELIMIT_WARTEN = (1, 2, 4, 8, 15, 20)   # Sekunden zwischen den Versuchen
 RATELIMIT_MAX_WARTEN = 30         # obere Schranke fuer ein Retry-After vom Server
@@ -135,6 +147,7 @@ class Api:
         self.protokoll = []   # (methode, pfad, status, ms) — fuer --debug
         self.letzte_kopfe = {}
         self.ratelimit_treffer = 0   # wie oft wegen 429 gewartet wurde
+        self._letzter_ruf = 0.0      # fuer den Mindestabstand (siehe ABSTAND_S)
 
     @staticmethod
     def _wartezeit(versuch, antwortkopfe):
@@ -153,6 +166,12 @@ class Api:
         # Anfrage wurde also gar nicht verarbeitet — es gibt nichts, was doppelt
         # passieren koennte. Fuer jeden anderen Status wird nie wiederholt.
         for versuch in range(RATELIMIT_VERSUCHE):
+            # Selbstbremse: nie schneller als der Proxy erlaubt.
+            if ABSTAND_S > 0:
+                warte = self._letzter_ruf + ABSTAND_S - time.monotonic()
+                if warte > 0:
+                    time.sleep(warte)
+            self._letzter_ruf = time.monotonic()
             start = time.monotonic()
             req = urllib.request.Request(url, data=daten, method=methode)
             if daten is not None:
