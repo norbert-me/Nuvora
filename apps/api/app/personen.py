@@ -84,10 +84,17 @@ async def uebernahme_personen(db: AsyncSession) -> int:
     # Fotos wandern in einem Rutsch mit — als SQL, damit die Blobs nicht durch
     # den Anwendungsspeicher laufen (ein Klassensatz sind schnell 100 MB).
     try:
+        # Der TYP muss mitkommen: `has_photo` haengt an `photo_mime`, und ohne
+        # ihn liegt das Bild zwar in der Datenbank, gilt aber als „kein Foto" —
+        # genau so war ein uebernommenes Portraet unsichtbar. Nachgezogen wird
+        # auch bei Personen, die ihre Bytes schon haben, deren Typ aber leer
+        # blieb (die erste gefundene Zeile hatte keins, eine spaetere schon).
         await db.execute(text(
-            "UPDATE persons SET photo = s.photo, photo_thumb = s.photo_thumb "
+            "UPDATE persons SET photo = s.photo, photo_thumb = s.photo_thumb, "
+            "photo_mime = s.photo_mime "
             "FROM students s WHERE s.person_id = persons.id "
-            "AND persons.photo IS NULL AND s.photo IS NOT NULL"))
+            "AND s.photo IS NOT NULL "
+            "AND (persons.photo IS NULL OR COALESCE(persons.photo_mime, '') = '')"))
         await db.commit()
     except Exception:
         await db.rollback()               # SQLite (Tests) kennt UPDATE..FROM nicht
