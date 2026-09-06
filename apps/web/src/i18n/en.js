@@ -180,7 +180,7 @@ export default {
   "kurse.kindNeu": "Name — Enter adds",
   "kurse.kinderLeer": "No students in this course yet.",
   "kurse.kindAngaben": "Details",
-  "kurse.kindWeg": "Remove “{{name}}” from this course? Grades and cards are kept.",
+  "kurse.kindWeg": "Remove “{{name}}” from this course? If this is the student's only course, their grades and cards go too.",
   "kurse.ausKursLeer": "Empty course",
   "kurse.ausKurs": "from “{{name}}”",
   "kurse.ausKursHinweis": "Develop from another course: its students come along. Grades, cards and attendance stay with the old course.",

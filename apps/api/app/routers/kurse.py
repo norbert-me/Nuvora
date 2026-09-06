@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 
 from ..besitz import eigenes
 from ..kursmitglieder import (
+    class_kurs_ids,
     eigener_kurs as _owned_kurs,
     member_class_ids,
     member_student_ids,
@@ -436,18 +437,34 @@ async def remove_kind(kurs_id: int, student_id: int,
                       user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Das Kind aus diesem Kurs nehmen.
 
-    Nur die Mitgliedschaft geht — die Zeile und alles, was daran haengt (Noten,
-    Karten), bleibt. Kommt das Kind ueber eine ganze Klasse in den Kurs, ist
-    hier nichts zu entfernen: dann gehoert die Entscheidung der Klasse, und ein
-    stilles Nichtstun waere die schlechtere Antwort als ein klarer Hinweis.
+    Zwei Faelle, und sie sind wirklich verschieden:
+
+    * Das Kind haengt EINZELN am Kurs (kurs_students) oder sitzt in der
+      Traegerklasse dieses Kurses — dann ist der Kurs sein einziger Ort, und
+      Entfernen heisst: die Zeile geht, mit allem, was an ihr haengt (Noten,
+      Karten-Fortschritt). Die Oberflaeche fragt vorher; ein „entfernt" ohne
+      Wirkung waere die schlechtere Antwort.
+    * Es kommt ueber eine ganze FREMDE Klasse in den Kurs (sie gehoert noch
+      anderen Kursen). Dann gehoert die Entscheidung dorthin: 409 mit Grund.
     """
-    await _owned_kurs(db, user, kurs_id)
-    await _own_student(db, user, student_id)
-    weg = await db.execute(delete(KursStudent).where(
-        KursStudent.kurs_id == kurs_id, KursStudent.student_id == student_id))
-    if not weg.rowcount:
+    kurs = await _owned_kurs(db, user, kurs_id)
+    zeile = await _own_student(db, user, student_id)
+    klasse = await db.get(SchoolClass, zeile.class_id)
+    # Traegerklasse heisst: sie haengt an genau diesem Kurs und an keinem
+    # anderen. Nur dann ist die Zeile hier zu Hause.
+    andere = await class_kurs_ids(db, zeile.class_id)
+    eigen = klasse is not None and (klasse.kurs_id == kurs.id or andere == {kurs.id})
+
+    # Erst pruefen, dann anfassen: ein Rollback mitten in der Anfrage laesst
+    # geladene Objekte abgelaufen zurueck, und der naechste Zugriff darauf
+    # scheitert an einer Stelle, die mit der Sache nichts zu tun hat.
+    if not eigen and zeile.class_id in await member_class_ids(db, [kurs_id]):
         raise HTTPException(409, "Dieses Kind gehört über seine Klasse zum Kurs — "
                                  "dort entfernen, nicht hier.")
+    await db.execute(delete(KursStudent).where(
+        KursStudent.kurs_id == kurs_id, KursStudent.student_id == student_id))
+    if eigen:
+        await db.delete(zeile)
     await db.commit()
 
 

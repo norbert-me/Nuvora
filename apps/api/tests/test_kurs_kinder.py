@@ -57,30 +57,41 @@ async def test_sortieren_laesst_die_kartennummern_stehen(s):
 
 
 @pytest.mark.asyncio
-async def test_ueber_die_klasse_gekommenes_kind_wird_nicht_still_entfernt(s):
+async def test_kind_einer_geteilten_klasse_wird_nicht_still_entfernt(s):
+    """Sitzt das Kind ueber eine Klasse im Kurs, die AUCH anderen Kursen
+    gehoert, gehoert die Entscheidung dorthin — 409 statt stillem Nichtstun."""
     u, kurs = await _konto(s)
+    zweiter = Kurs(owner_id=u.id, name="Chor")
+    s.add(zweiter)
+    await s.flush()
     c = SchoolClass(name="8a", owner_id=u.id)
     s.add(c)
     await s.flush()
     z = Student(class_id=c.id, name="Cem", card_id=1)
     s.add(z)
     await s.flush()
-    s.add(KursTag(kurs_id=kurs.id, class_id=c.id))
+    s.add_all([KursTag(kurs_id=kurs.id, class_id=c.id), KursTag(kurs_id=zweiter.id, class_id=c.id)])
     await s.commit()
 
     with pytest.raises(HTTPException) as e:
         await K.remove_kind(kurs.id, z.id, user=u, db=s)
     assert e.value.status_code == 409
+    assert await s.get(Student, z.id) is not None
 
 
 @pytest.mark.asyncio
-async def test_entfernen_loescht_nur_die_mitgliedschaft(s):
+async def test_im_kurs_angelegtes_kind_geht_beim_entfernen_wirklich(s):
+    """Ein hier angelegtes Kind hat nur diesen einen Ort. „Entfernt" muss dann
+    auch entfernt heissen — die Oberflaeche fragt vorher, weil die Kaskade
+    Noten und Karten-Fortschritt mitnimmt. Die PERSON bleibt: sie kann in
+    anderen Kursen weiterleben."""
     import sqlalchemy as sa
     u, kurs = await _konto(s)
     a = await K.add_kind(kurs.id, K.KindIn(name="Anna"), user=u, db=s)
     await K.remove_kind(kurs.id, a.student_id, user=u, db=s)
 
-    assert await s.get(Student, a.student_id) is not None, "die Zeile bleibt — an ihr haengen Noten"
+    assert await s.get(Student, a.student_id) is None
     assert await s.get(Person, a.person_id) is not None
+    assert (await K.list_kinder(kurs.id, user=u, db=s)) == []
     drin = (await s.execute(sa.select(KursStudent).where(KursStudent.kurs_id == kurs.id))).scalars().all()
     assert drin == []

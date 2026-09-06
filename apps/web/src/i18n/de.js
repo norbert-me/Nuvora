@@ -182,7 +182,7 @@ export default {
   "kurse.kindNeu": "Name — Enter legt an",
   "kurse.kinderLeer": "Noch keine Kinder in diesem Kurs.",
   "kurse.kindAngaben": "Angaben",
-  "kurse.kindWeg": "„{{name}}“ aus diesem Kurs nehmen? Noten und Karten bleiben erhalten.",
+  "kurse.kindWeg": "„{{name}}“ aus diesem Kurs nehmen? Gehört das Kind nur zu diesem Kurs, gehen auch seine Noten und Karten mit.",
   "kurse.ausKursLeer": "Leerer Kurs",
   "kurse.ausKurs": "aus „{{name}}“",
   "kurse.ausKursHinweis": "Aus einem anderen Kurs entwickeln: seine Kinder kommen mit. Noten, Karten und Anwesenheit bleiben beim alten Kurs.",

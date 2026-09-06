@@ -181,7 +181,7 @@ export default {
   "kurse.kindNeu": "Nombre — Intro añade",
   "kurse.kinderLeer": "Aún no hay alumnado en este curso.",
   "kurse.kindAngaben": "Datos",
-  "kurse.kindWeg": "¿Quitar a «{{name}}» de este curso? Las notas y tarjetas se conservan.",
+  "kurse.kindWeg": "¿Quitar a «{{name}}» de este curso? Si es su único curso, también se van sus notas y tarjetas.",
   "kurse.ausKursLeer": "Curso vacío",
   "kurse.ausKurs": "desde «{{name}}»",
   "kurse.ausKursHinweis": "Desarrollar desde otro curso: su alumnado viene con él. Notas, tarjetas y asistencia se quedan en el curso antiguo.",
