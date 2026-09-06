@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import {
   pageApp, cardStyle, panelStyle, btnPrimary, btnSecondary, btnSmall,
-  toolbarBtn, toolbarInput, inputStyle,  Icon, ICONS, COLORS as C, CONTROL_R, badge,
+  toolbarBtn, toolbarInput, inputStyle, Icon, ICONS, COLORS as C, CONTROL_R, badge, sectionLabel,
 } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -11,6 +11,7 @@ import PapEditor, { leeresDiagramm } from "../components/PapEditor.jsx";
 import { useLanguage } from "../i18n";
 import { alsJson } from "../core/melden";
 import { askConfirm } from "../core/dialog.jsx";
+import { oeffentlicheBasis } from "../core/basis.js";
 
 const API = "/api/pap";
 
@@ -61,6 +62,31 @@ function FreiesBlatt() {
       </Werkzeugleiste>
       <PapEditor wert={d} onChange={setzen} />
       {drucken && <Druck diagramm={d} titel={t("pap.titel")} onFertig={() => setDrucken(false)} />}
+      <Austeilen />
+    </div>
+  );
+}
+
+// Die zwei Wege ins Kinderhandy — beide an EINER Stelle, weil sie sich nur
+// dort unterscheiden, wo man sie vergleicht: der freie Link geht an alle und
+// ordnet nichts zu, der überwachte Weg läuft über den QR-Zugang, den es im
+// Kern längst gibt.
+function Austeilen() {
+  const { t } = useLanguage();
+  const [basis, setBasis] = useState(window.location.origin);
+  const [kopiert, setKopiert] = useState(false);
+  useEffect(() => { oeffentlicheBasis().then(setBasis); }, []);
+  const link = `${basis}/pap-frei`;
+  return (
+    <div style={{ ...panelStyle, padding: 12, marginTop: 16 }}>
+      <div style={{ ...sectionLabel, margin: "0 0 8px" }}>{t("pap.austeilen")}</div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13, color: "var(--text2)" }}>{t("pap.linkFrei")}</span>
+        <code style={{ fontSize: 12, background: "var(--bg)", padding: "4px 8px", borderRadius: CONTROL_R, overflowWrap: "anywhere" }}>{link}</code>
+        <button onClick={() => { navigator.clipboard?.writeText(link); setKopiert(true); setTimeout(() => setKopiert(false), 2000); }}
+          style={{ ...btnSecondary, ...btnSmall }}>{kopiert ? t("pap.linkKopiert") : t("pap.kopieren")}</button>
+      </div>
+      <p style={{ fontSize: 12, color: "var(--text3)", margin: "10px 0 0" }}>{t("pap.linkUeberwacht")}</p>
     </div>
   );
 }

@@ -209,6 +209,7 @@ const Notizbrett = React.lazy(() => import("./pages/Notizbrett.jsx"));
 const Mathefussball = React.lazy(() => import("./pages/Mathefussball.jsx"));
 const Tafel = React.lazy(() => import("./pages/Tafel.jsx"));
 const Pap = React.lazy(() => import("./pages/Pap.jsx"));
+const PapFrei = React.lazy(() => import("./pages/PapFrei.jsx"));
 const NichtGefunden = React.lazy(() => import("./pages/NichtGefunden.jsx"));
 
 // Ladezustand fuer nachgeladene Seiten: dieselben pulsierenden Balken wie beim
@@ -304,6 +305,8 @@ const getModuleNavItems = (t, location, user) => {
     : pathname.startsWith(NOTIZBRETT) ? "notizbrett"
     : pathname.startsWith(MATHEF) ? "mathespiele"
     : pathname.startsWith(TAFEL) ? "tafel"
+    // Nicht startsWith("/pap") — das faengt auch /papierkorb (Kern).
+    : (pathname === PAP || pathname.startsWith(`${PAP}?`) || pathname.startsWith(`${PAP}/`)) ? "pap"
     : pathname.startsWith(KA) ? "karten"
     // Bereich aus der Query (Hilfe, Marktplatz). Der Einstiege-Marktplatz nutzt
     // weiterhin area=methoden — auf die Navbar von „Unterrichtsplanung" mappen.
@@ -1248,6 +1251,9 @@ function Wurzel() {
             <Routes>
               {/* Kartenlernen der Schueler: oeffentlich, ohne Login, ueber Token. */}
               <Route path="/lernen/:token" element={<Lernen />} />
+              {/* PAP-Editor ohne Login: der unueberwachte Weg. Nichts wird
+                  zugeordnet, gespeichert wird im Browser des Kindes. */}
+              <Route path="/pap-frei" element={<PapFrei />} />
               {/* Code-Detektiv: öffentliches Beitreten der Schüler ohne Login. */}
               <Route path="/cd/:code/*" element={<PublicCd />} />
               <Route path="/*" element={<AppRoutes user={user} setUser={setUser} logout={logout} />} />

@@ -37,6 +37,12 @@ Notiz zur größten Fassung die dünnste.
 
 **Neues Modul: PAP-Editor**
 
+- Doppelklick auf ein Symbol öffnet die Beschriftung als Popup.
+- Verbindungen lassen sich anklicken, beschriften und löschen; der
+  Verbinden-Modus sagt unter dem Blatt, was er gerade will.
+- Ein neues Symbol hängt sich unter das gewählte und wird gleich verbunden.
+- Neuer Link zum freien Editor ohne Anmeldung (/pap-frei) zum Austeilen —
+  daneben steht, wie der überwachte Weg über den QR-Zugang läuft.
 - Die Palette zeigt die Symbole in ihrer Form, nicht als Textknöpfe.
 - Symbole wachsen mit ihrer Beschriftung, statt sie abzuschneiden.
 - Verbinden ist ein Modus: einschalten, Start und Ziel anklicken.

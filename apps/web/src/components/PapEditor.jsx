@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Icon, ICONS, COLORS as C, CONTROL_R, toolbarBtn, toolbarBtnPrimary, toolbarInput, Toggle } from "./Icons.jsx";
+import { Icon, ICONS, COLORS as C, CONTROL_R, toolbarBtn, toolbarBtnPrimary, toolbarInput, Toggle, Modal, DialogKopf } from "./Icons.jsx";
 import { useLanguage } from "../i18n";
 
 // Editor für Programmablaufpläne (DIN 66001).
@@ -143,6 +143,13 @@ export default function PapEditor({ wert, onChange, lesen = false, hoehe = 520, 
   // „Verbinden", dann das Ziel; für jede Linie dreimal.
   const [verbinden, setVerbinden] = useState(false);
   const [von, setVon] = useState(null);
+  // Eine ANGEKLICKTE Verbindung: sie wird hervorgehoben und laesst sich
+  // loeschen. Vorher lag dafuer ein unsichtbarer 7-px-Kreis auf der Mitte der
+  // Linie — den traf man nicht, und dass es ihn gab, sah man auch nicht.
+  const [kante, setKante] = useState(null);
+  // Text bearbeiten im Popup (Doppelklick aufs Symbol). Das Feld unter dem
+  // Blatt war weit weg von dem, was man gerade beschriftet.
+  const [textEdit, setTextEdit] = useState(null);   // { id, wert }
   const [rasterIntern, setRasterIntern] = useState(true);
   const raster = rasterVon === undefined ? rasterIntern : rasterVon;
   const setRaster = onRaster || setRasterIntern;
@@ -156,11 +163,28 @@ export default function PapEditor({ wert, onChange, lesen = false, hoehe = 520, 
   const knotenVon = useMemo(() => Object.fromEntries(knoten.map((k) => [k.id, k])), [knoten]);
 
   const hinzu = (art) => {
-    // Neue Symbole stapeln sich sonst übereinander: jedes kommt eine Reihe
-    // tiefer als das unterste, das schon da ist.
+    // Ist ein Symbol gewählt, hängt sich das neue DARUNTER an und wird gleich
+    // verbunden — ein Ablaufplan ist meistens eine Kette, und sie von Hand
+    // zusammenzuklicken ist der langweiligste Teil der Arbeit. Ohne Auswahl
+    // (leeres Blatt) kommt es unter das unterste Symbol.
+    const anker = gewaehlt ? knotenVon[gewaehlt] : null;
     const unten = knoten.reduce((m, k) => Math.max(m, k.y + k.h), 0);
-    const k = { id: uid(), art, text: t(`pap.art.${art}`), x: 60, y: unten ? unten + 40 : 20 };
-    setz({ ...d, knoten: [...d.knoten, k] });
+    const pos = anker
+      ? { x: anker.x + Math.round((anker.w - B) / 2), y: anker.y + anker.h + 50 }
+      : { x: 60, y: unten ? unten + 40 : 20 };
+    const k = { id: uid(), art, text: t(`pap.art.${art}`), x: Math.max(0, pos.x), y: pos.y };
+    // Der Kommentar ist kein Schritt — er wird nicht in die Kette gehängt,
+    // sondern daneben gesetzt.
+    const kette = anker && art !== "kommentar" && anker.art !== "kommentar" && anker.art !== "ende";
+    if (art === "kommentar" && anker) { k.x = anker.x + anker.w + 40; k.y = anker.y; }
+    const raus = d.kanten.filter((e) => e.von === (anker && anker.id)).length;
+    const label = kette && anker.art === "verzweigung"
+      ? (raus === 0 ? t("pap.ja") : raus === 1 ? t("pap.nein") : "")
+      : "";
+    setz({
+      knoten: [...d.knoten, k],
+      kanten: kette ? [...d.kanten, { von: anker.id, nach: k.id, label }] : d.kanten,
+    });
     setGewaehlt(k.id);
   };
 
@@ -243,7 +267,7 @@ export default function PapEditor({ wert, onChange, lesen = false, hoehe = 520, 
         <svg ref={svgRef} width={breite} height={tiefe} className="pap-blatt"
           onMouseMove={beimZiehen} onMouseUp={endeZiehen} onMouseLeave={endeZiehen}
           onTouchMove={beimZiehen} onTouchEnd={endeZiehen}
-          onClick={() => { setGewaehlt(null); setVon(null); }}
+          onClick={() => { setGewaehlt(null); setVon(null); setKante(null); }}
           style={{ display: "block", touchAction: "none" }}>
           <defs>
             <marker id="pap-pfeil" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
@@ -261,17 +285,24 @@ export default function PapEditor({ wert, onChange, lesen = false, hoehe = 520, 
             const a = knotenVon[e.von], b = knotenVon[e.nach];
             if (!a || !b) return null;
             const [p1, p2] = anschluss(a, b);
+            const gewaehltK = kante === i;
             return (
               <g key={i}>
-                <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="var(--text3)" strokeWidth={1.5} markerEnd="url(#pap-pfeil)" />
-                {e.label && (
-                  <text x={(p1.x + p2.x) / 2 + 6} y={(p1.y + p2.y) / 2 - 4} fontSize={12} fill="var(--text2)">{e.label}</text>
-                )}
+                {/* Die dicke, durchsichtige Linie ist das Trefferfeld: eine
+                    1,5-px-Linie klickt niemand, schon gar nicht mit dem Finger. */}
                 {!lesen && (
-                  <circle cx={(p1.x + p2.x) / 2} cy={(p1.y + p2.y) / 2} r={7} fill="transparent" style={{ cursor: "pointer" }}
-                    onClick={(ev) => { ev.stopPropagation(); setz({ ...d, kanten: d.kanten.filter((_, j) => j !== i) }); }}>
-                    <title>{t("pap.kanteWeg")}</title>
-                  </circle>
+                  <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="transparent" strokeWidth={14}
+                    style={{ cursor: "pointer" }}
+                    onClick={(ev) => { ev.stopPropagation(); setKante(gewaehltK ? null : i); setGewaehlt(null); }}>
+                    <title>{t("pap.kanteWaehlen")}</title>
+                  </line>
+                )}
+                <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} pointerEvents="none"
+                  stroke={gewaehltK ? C.danger : "var(--text3)"} strokeWidth={gewaehltK ? 2.5 : 1.5}
+                  markerEnd="url(#pap-pfeil)" />
+                {e.label && (
+                  <text x={(p1.x + p2.x) / 2 + 6} y={(p1.y + p2.y) / 2 - 4} fontSize={12} fill="var(--text2)"
+                    pointerEvents="none">{e.label}</text>
                 )}
               </g>
             );
@@ -282,8 +313,10 @@ export default function PapEditor({ wert, onChange, lesen = false, hoehe = 520, 
               onClick={(ev) => {
                 ev.stopPropagation();
                 if (lesen) return;
+                setKante(null);
                 if (!zieh.current || !zieh.current.bewegt) treffer(k.id);
-              }}>
+              }}
+              onDoubleClick={(ev) => { ev.stopPropagation(); if (!lesen) setTextEdit({ id: k.id, wert: k.text || "" }); }}>
               <Form art={k.art} x={k.x} y={k.y} w={k.w} h={k.h}
                 aktiv={gewaehlt === k.id || von === k.id} />
               {k.zeilen.map((z, i) => (
@@ -297,15 +330,60 @@ export default function PapEditor({ wert, onChange, lesen = false, hoehe = 520, 
         </svg>
       </div>
 
-      {!lesen && gew && (
+      {/* Was gerade dran ist, steht UNTER dem Blatt und nicht nur als Zustand
+          eines Knopfes: „warum passiert beim Klicken nichts?" war die Frage,
+          solange der Verbinden-Modus nur ein dunkler Knopf am Rand war. */}
+      {!lesen && verbinden && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, padding: "8px 12px",
+          border: `1px solid ${C.accent || "var(--accent)"}`, borderRadius: CONTROL_R, background: "var(--bg2)" }}>
+          <span style={{ fontSize: 13, color: "var(--text2)", flex: 1 }}>
+            {von ? t("pap.verbindeZiel") : t("pap.verbindeStart")}
+          </span>
+          <button onClick={() => { setVerbinden(false); setVon(null); }} style={toolbarBtn}>{t("pap.verbindeFertig")}</button>
+        </div>
+      )}
+
+      {!lesen && kante != null && d.kanten[kante] && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10 }}>
+          <input value={d.kanten[kante].label || ""} placeholder={t("pap.kanteText")}
+            onChange={(ev) => setz({ ...d, kanten: d.kanten.map((e, j) => (j === kante ? { ...e, label: ev.target.value.slice(0, 20) } : e)) })}
+            style={{ ...toolbarInput, width: 140 }} />
+          <button onClick={() => { setz({ ...d, kanten: d.kanten.filter((_, j) => j !== kante) }); setKante(null); }}
+            style={{ ...toolbarBtn, color: C.danger }}>{t("pap.kanteWeg")}</button>
+        </div>
+      )}
+
+      {!lesen && gew && kante == null && (
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
-          <input value={gew.text} onChange={(ev) => aendere(gew.id, { text: ev.target.value.slice(0, 200) })}
-            placeholder={t("pap.text")} style={{ ...toolbarInput, flex: 1, minWidth: 160 }} />
+          <button onClick={() => setTextEdit({ id: gew.id, wert: gew.text || "" })} style={{ ...toolbarBtn, flex: 1, minWidth: 160, justifyContent: "flex-start" }}>
+            {gew.text || t("pap.text")}
+          </button>
           <button onClick={() => loesche(gew.id)} className="icon-btn" style={{ ...toolbarBtn, color: C.danger }}
             title={t("common.delete")} aria-label={t("common.delete")}>
             <Icon d={ICONS.trash} size={15} color={C.danger} />
           </button>
         </div>
+      )}
+
+      {textEdit && (
+        <Modal onClose={() => setTextEdit(null)} width={420} label={t("pap.text")}>
+          <DialogKopf titel={t("pap.text")} onClose={() => setTextEdit(null)} schliessenLabel={t("common.close")} />
+          <textarea autoFocus value={textEdit.wert} rows={3}
+            onChange={(ev) => setTextEdit({ ...textEdit, wert: ev.target.value.slice(0, 200) })}
+            onKeyDown={(ev) => {
+              // Enter schliesst, Shift+Enter macht eine Zeile: in einem Symbol
+              // ist der Text fast immer eine Zeile, und ein Dialog, den man nur
+              // mit der Maus schliessen kann, kostet bei zwanzig Symbolen Zeit.
+              if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); aendere(textEdit.id, { text: textEdit.wert }); setTextEdit(null); }
+              if (ev.key === "Escape") setTextEdit(null);
+            }}
+            style={{ ...toolbarInput, width: "100%", boxSizing: "border-box", height: "auto", resize: "vertical", lineHeight: 1.5 }} />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+            <button onClick={() => setTextEdit(null)} style={toolbarBtn}>{t("common.abort")}</button>
+            <button onClick={() => { aendere(textEdit.id, { text: textEdit.wert }); setTextEdit(null); }}
+              style={toolbarBtnPrimary}>{t("common.save")}</button>
+          </div>
+        </Modal>
       )}
     </div>
   );
