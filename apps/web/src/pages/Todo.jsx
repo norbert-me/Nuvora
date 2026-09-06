@@ -266,7 +266,7 @@ export default function Todo({ embedded } = {}) {
           damit Abstand, Umbruch und Ausrichtung nicht je Seite neu erfunden
           werden. `flex: 20` am Textfeld, weil die Leiste rechts einen eigenen
           Dehnraum hat: sonst teilte sich das Feld den Platz mit ihm. */}
-      <Werkzeugleiste style={{ marginBottom: 16 }}>
+      <Werkzeugleiste modul="notizbrett" style={{ marginBottom: 16 }}>
         <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("todo.placeholder")} style={{ ...toolbarInput, flex: 20, minWidth: 160 }} />
         {/* Datum/Uhrzeit erst per Icon dazuschalten (Default heute bzw. nächste
             volle Stunde) — kein leeres Feld, das nach nichts aussieht. */}

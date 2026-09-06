@@ -6,6 +6,11 @@
 // sieht die Kartenreiter nicht. Diese Liste macht jeden Reiter auffindbar,
 // ohne ihn vorher zu kennen.
 //
+// `option: "<key>"` haengt ein Ziel an einen abschaltbaren TEIL seines Moduls
+// (REGISTRY, modules.py). Ist der Teil aus, verschwindet der Reiter aus
+// Navigation, Suche UND der Modul-Kachel auf der Startseite — sonst zeigte die
+// Kachel Inhalte auf, die es fuer diese Lehrkraft gar nicht mehr gibt.
+//
 // `modul: null` heißt Kern (immer da). Alles andere erscheint nur, wenn das
 // Modul für diese Lehrkraft läuft (Regel 3 — kein Weg zu einem Modul, das die
 // Lehrkraft nicht hat). `worte` sind zusätzliche Suchbegriffe: wonach man
@@ -46,29 +51,28 @@ export const ZIELE = [
   { pfad: "/lernpfad?tab=lernpfade", key: "ziele.lpPfade", modul: "lernpfad", worte: ["lernpfad", "leitern", "zuweisen"] },
 
   // ── Auswertung ──
-  { pfad: "/auswertung?tab=noten", key: "auswertung.tabGrades", modul: "auswertung", worte: ["note", "noten", "notenbuch", "zeugnis", "schnitt", "gewichtung", "kommentar", "beobachtung", "notiz"] },
-  { pfad: "/auswertung?tab=klassenarbeit", key: "auswertung.tabWorks", modul: "auswertung", worte: ["klassenarbeit", "arbeit", "punkte", "erwartungshorizont"] },
-  { pfad: "/auswertung/vergleich", key: "klassenarbeit.navCompare", modul: "auswertung", worte: ["vergleich", "klassen vergleichen", "statistik"] },
+  { pfad: "/auswertung?tab=noten", key: "auswertung.tabGrades", modul: "auswertung", option: "noten", worte: ["note", "noten", "notenbuch", "zeugnis", "schnitt", "gewichtung", "kommentar", "beobachtung", "notiz"] },
+  { pfad: "/auswertung?tab=klassenarbeit", key: "auswertung.tabWorks", modul: "auswertung", option: "klassenarbeit", worte: ["klassenarbeit", "arbeit", "punkte", "erwartungshorizont"] },
+  { pfad: "/auswertung/vergleich", key: "klassenarbeit.navCompare", modul: "auswertung", option: "klassenarbeit", worte: ["vergleich", "klassen vergleichen", "statistik"] },
 
   // ── Karteikarten ──
   { pfad: "/karten?tab=cards", key: "karten.tabCards", modul: "karten", worte: ["karteikarten", "stapel", "deck", "üben"] },
-  { pfad: "/karten?tab=progress", key: "karten.tabProgress", modul: "karten", worte: ["fortschritt", "lernstand"] },
+  { pfad: "/karten?tab=progress", key: "karten.tabProgress", modul: "karten", option: "fortschritt", worte: ["fortschritt", "lernstand"] },
   { pfad: "/karten?tab=qr", key: "karten.tabQr", modul: "karten", worte: ["qr", "zugang", "code", "zettel drucken"] },
   { pfad: "/marktplatz?area=karten&kind=karten_deck", key: "market.kindDeck", modul: "karten", worte: ["marktplatz", "stapel teilen", "deck übernehmen", "fremde karten"] },
 
   // ── Kalender ──
   { pfad: "/kalender", key: "kalender.title", modul: "kalender", worte: ["termin", "woche", "monat", "tag"] },
-  { pfad: "/kalender?view=timetable", key: "kalender.timetable", modul: "kalender", worte: ["stundenplan", "stunden", "slots"] },
-  { pfad: "/kalender?view=breaks", key: "kalender.breaksTab", modul: "kalender", worte: ["ferien", "feiertag", "frei"] },
+  { pfad: "/kalender?view=timetable", key: "kalender.timetable", modul: "kalender", option: "stundenplan", worte: ["stundenplan", "stunden", "slots"] },
+  { pfad: "/kalender?view=breaks", key: "kalender.breaksTab", modul: "kalender", option: "freieTage", worte: ["ferien", "feiertag", "frei"] },
   { pfad: "/kalender?view=klassenarbeit", key: "kalender.examsTab", modul: "kalender", worte: ["klassenarbeit termin", "arbeit planen"] },
-  { pfad: "/kalender?view=zeitleiste", key: "zeitleiste.tab", modul: "kalender", worte: ["zeitleiste", "zeitstrahl", "verlauf", "was steht an", "kursverlauf"] },
+  { pfad: "/kalender?view=zeitleiste", key: "zeitleiste.tab", modul: "kalender", option: "zeitleiste", worte: ["zeitleiste", "zeitstrahl", "verlauf", "was steht an", "kursverlauf"] },
 
   // ── Orga ──
   { pfad: "/orga?tab=checklisten", key: "orga.tabChecklists", modul: "orga", worte: ["checkliste", "haken", "eingesammelt", "zettel"] },
-  { pfad: "/orga?tab=anwesenheit", key: "anwesenheit.title", modul: "orga", worte: ["fehlzeiten", "krank", "entschuldigt", "fehlt", "abwesend"] },
-  { pfad: "/orga?tab=ausleihe", key: "ausleihe.title", modul: "orga", worte: ["ausleihe", "buch", "material", "zurückgeben"] },
-  { pfad: "/orga?tab=sitzplan", key: "sitzplan.title", modul: "orga", worte: ["sitzplan", "plätze", "tische", "aufruf"] },
-  { pfad: "/orga?tab=optionen", key: "orga.tabOptions", modul: "orga", worte: ["reiter ausblenden", "einblenden", "zahnrad", "einstellungen orga", "aufräumen"] },
+  { pfad: "/orga?tab=anwesenheit", key: "anwesenheit.title", modul: "orga", option: "anwesenheit", worte: ["fehlzeiten", "krank", "entschuldigt", "fehlt", "abwesend"] },
+  { pfad: "/orga?tab=ausleihe", key: "ausleihe.title", modul: "orga", option: "ausleihe", worte: ["ausleihe", "buch", "material", "zurückgeben"] },
+  { pfad: "/orga?tab=sitzplan", key: "sitzplan.title", modul: "orga", option: "sitzplan", worte: ["sitzplan", "plätze", "tische", "aufruf"] },
 
   // ── Übrige Module ──
   { pfad: "/code-detektiv/admin", key: "cd.create", modul: "code-detektiv", worte: ["rätsel", "blöcke", "programmieren"] },
@@ -80,8 +84,8 @@ export const ZIELE = [
   // Die beiden gefilterten Marktplatz-Ansichten haengen am jeweiligen Modul
   // (Regel 3): ohne Unterrichtsplanung bzw. Karten gibt es dorthin keinen Weg.
   { pfad: "/marktplatz?area=methoden&kind=method", key: "market.kindMethod", modul: "unterrichtsplanung", worte: ["marktplatz", "methoden teilen", "einstiege übernehmen", "fremde einstiege"] },
-  { pfad: "/notizbrett?tab=notizen", key: "notizbrett.tabNotes", modul: "notizbrett", worte: ["notiz", "zettel", "merken"] },
-  { pfad: "/notizbrett?tab=aufgaben", key: "notizbrett.tabTodos", modul: "notizbrett", worte: ["to-do", "todo", "aufgabe", "erledigen"] },
+  { pfad: "/notizbrett?tab=notizen", key: "notizbrett.tabNotes", modul: "notizbrett", option: "notizen", worte: ["notiz", "zettel", "merken"] },
+  { pfad: "/notizbrett?tab=aufgaben", key: "notizbrett.tabTodos", modul: "notizbrett", option: "aufgaben", worte: ["to-do", "todo", "aufgabe", "erledigen"] },
   { pfad: "/tafel", key: "tafel.title", modul: "tafel", worte: ["tafel", "whiteboard", "anschrieb"] },
   { pfad: "/pap", key: "pap.titel", modul: "pap", worte: ["pap", "ablaufplan", "flussdiagramm", "programmablaufplan", "struktogramm", "informatik"] },
   { pfad: "/mathespiele", key: "mathefussball.title", modul: "mathespiele", worte: ["spiel", "fußball", "üben"] },

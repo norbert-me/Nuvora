@@ -28,22 +28,30 @@ export default function BildZuschnitt({ datei, onFertig, onAbbruch }) {
     if (!datei) return;
     const url = URL.createObjectURL(datei);
     const img = new Image();
-    img.onload = () => { setBild(img); setZoom(1); setPos({ x: 0, y: 0 }); };
+    img.onload = () => { setBild(img); setZoom(1); setPos({ x: 0, y: 0 }); };   // Zoom 1 = füllt aus, mittig
     img.src = url;
     return () => URL.revokeObjectURL(url);
   }, [datei]);
 
   if (!datei) return null;
 
-  // Der Maßstab, bei dem das Bild die Vorschau gerade ausfüllt — darunter
-  // entstünden Ränder, und ein Foto mit weißem Rand will niemand.
+  // Der Maßstab, bei dem das Bild die Vorschau gerade ausfüllt. Zoom 1 ist
+  // dieser Punkt; darunter wird herausgezoomt und das ganze Bild passt hinein.
+  //
+  // Herauszoomen war zuerst gesperrt („ein Foto mit weißem Rand will niemand").
+  // Im Gebrauch war das falsch herum: bei einem Hochformat schnitt der Zwang
+  // zum Ausfüllen Kopf oder Kinn ab, und lieber ist ein vollständiges Gesicht
+  // mit Rand als ein bildfüllendes halbes. Der Rand ist deshalb SCHWARZ, nicht
+  // weiß — er verschwindet im dunklen Design und rahmt im hellen wie ein Passepartout.
   const basis = bild ? Math.max(flaeche / bild.width, flaeche / bild.height) : 1;
   const bw = bild ? bild.width * basis * zoom : 0;
   const bh = bild ? bild.height * basis * zoom : 0;
-  const grenze = (p) => ({
-    x: Math.min(0, Math.max(flaeche - bw, p.x)),
-    y: Math.min(0, Math.max(flaeche - bh, p.y)),
-  });
+  // Ist das Bild größer als der Rahmen, darf es nicht hineinrutschen (kein
+  // Rand, wo Bild sein könnte); ist es kleiner, darf es frei im Rahmen sitzen.
+  const spanne = (laenge, wert) => (laenge >= flaeche
+    ? Math.min(0, Math.max(flaeche - laenge, wert))
+    : Math.min(flaeche - laenge, Math.max(0, wert)));
+  const grenze = (p) => ({ x: spanne(bw, p.x), y: spanne(bh, p.y) });
 
   const start = (e) => {
     zieh.current = { x: e.clientX, y: e.clientY, px: pos.x, py: pos.y };
@@ -61,6 +69,11 @@ export default function BildZuschnitt({ datei, onFertig, onAbbruch }) {
     const c = document.createElement("canvas");
     c.width = KANTE; c.height = KANTE;
     const ctx = c.getContext("2d");
+    // Erst den Grund, dann das Bild: beim Herauszoomen bleibt sonst
+    // durchsichtig, was JPEG nicht kann — und daraus wird beim Speichern
+    // Schwarz oder Weiß, je nach Browser.
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, KANTE, KANTE);
     // Von der Anzeige auf das Original umrechnen: was im Rahmen steht, wird
     // gezeichnet — derselbe Ausschnitt, nur in voller Auflösung.
     const f = KANTE / flaeche;
@@ -76,7 +89,7 @@ export default function BildZuschnitt({ datei, onFertig, onAbbruch }) {
       <DialogKopf titel={t("classes.cropTitle")} onClose={onAbbruch} schliessenLabel={t("common.close")} />
       <div onPointerDown={start} onPointerMove={ziehen} onPointerUp={ende} onPointerCancel={ende}
         style={{ width: flaeche, height: flaeche, maxWidth: "100%", margin: "0 auto 12px", position: "relative",
-          overflow: "hidden", borderRadius: panelStyle.borderRadius, background: "var(--bg2)", cursor: "grab", touchAction: "none" }}>
+          overflow: "hidden", borderRadius: panelStyle.borderRadius, background: "#000", cursor: "grab", touchAction: "none" }}>
         {bild && (
           <img src={bild.src} alt="" draggable={false}
             style={{ position: "absolute", left: pos.x, top: pos.y, width: bw, height: bh, userSelect: "none" }} />
@@ -84,7 +97,7 @@ export default function BildZuschnitt({ datei, onFertig, onAbbruch }) {
       </div>
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)", marginBottom: 12 }}>
         {t("classes.cropZoom")}
-        <input type="range" min="1" max="3" step="0.01" value={zoom} style={{ flex: 1 }}
+        <input type="range" min="0.3" max="3" step="0.01" value={zoom} style={{ flex: 1 }}
           onChange={(e) => { const z = Number(e.target.value); setZoom(z); setPos((p) => grenze(p)); }} />
       </label>
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>

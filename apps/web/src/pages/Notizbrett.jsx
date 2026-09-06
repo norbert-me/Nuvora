@@ -7,10 +7,15 @@ import { useSearchParams } from "react-router-dom";
 import { pageApp } from "../components/Icons.jsx";
 import Notizblock from "./Notizblock.jsx";
 import Todo from "./Todo.jsx";
+import { useModulOption } from "../core/modules.js";
 
 export default function Notizbrett() {
   const [params] = useSearchParams();
-  const tab = params.get("tab") === "aufgaben" ? "aufgaben" : "notizen";
+  // Dieselbe Regel wie in der Auswertung: ist der voreingestellte Teil im
+  // Modul-Zahnrad abgeschaltet, zeigt der Aufruf ohne ?tab den anderen.
+  const notizenAn = useModulOption("notizbrett", "notizen");
+  const gewaehlt = params.get("tab") === "aufgaben" ? "aufgaben" : "notizen";
+  const tab = gewaehlt === "notizen" && !notizenAn ? "aufgaben" : gewaehlt;
   return (
     <div style={{ ...pageApp }}>
       {tab === "aufgaben" ? <Todo embedded /> : <Notizblock embedded />}

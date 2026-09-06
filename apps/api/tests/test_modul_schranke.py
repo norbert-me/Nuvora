@@ -27,6 +27,13 @@ OFFEN = {
         "Zugangs-Zettel: derselbe Code fuehrt zu Karten ODER Testergebnissen, gilt "
         "also solange EINES der beiden Module laeuft. Der Endpunkt prueft das selbst "
         "und antwortet ohne beide mit 409 statt mit einem leeren Blatt.",
+    "/api/karten/classes/{class_id}/tokens":
+        "Zugangs-Codes gehoeren dem Kern: derselbe Zettel fuehrt je nach aktivem "
+        "Modul zu Karten, Testergebnissen ODER einer PAP-Aufgabe. Der Endpunkt "
+        "prueft selbst, ob ueberhaupt eines davon laeuft (409 statt 403).",
+    "/api/karten/classes/{class_id}/tokens/rotate":
+        "Wie oben — und Rotation muss auch dann gehen, wenn gerade nur eines der "
+        "Zielmodule aktiv ist: ein verlorener Zettel wartet nicht auf ein Modul.",
     "/api/weak-review":
         "Kern-Sicht (Startseite): schliesst die Bruecke schwach -> geuebt.",
 }

@@ -1043,9 +1043,30 @@ class StudentTokenOut(BaseModel):
     token: str
 
 
-@router.post("/classes/{class_id}/tokens", response_model=List[StudentTokenOut])
-async def ensure_tokens(class_id: int, subset_kurs: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+# Die Zugangs-Codes gehoeren dem KERN, nicht den Karteikarten: derselbe Zettel
+# fuehrt je nach aktivem Modul zu den Karten, zu den Testergebnissen oder zu
+# einer PAP-Aufgabe. Am Karten-Router hingen sie nur historisch — mit
+# abgeschalteten Karteikarten liess sich dann fuer PAP kein Zugang erzeugen.
+ZUGANG_MODULE = ("karten", "cardvote", "pap")
+
+
+async def _zugang_moeglich(db: AsyncSession, user: User) -> None:
+    """Gibt es ueberhaupt ein Ziel fuer einen ausgeteilten Code? Sonst 409.
+
+    409 und nicht 403: es fehlt keine Berechtigung, es fehlt der Sinn — ein
+    Zettel, hinter dem nichts liegt, ist ein ausgedrucktes Missverstaendnis.
+    """
+    for key in ZUGANG_MODULE:
+        if await is_active(db, user.id, key):
+            return
+    raise HTTPException(409, "Kein Modul aktiv, zu dem ein Code führen könnte "
+                             "(Karteikarten, CardVote oder PAP-Editor).")
+
+
+@kern_router.post("/classes/{class_id}/tokens", response_model=List[StudentTokenOut])
+async def ensure_tokens(class_id: int, subset_kurs: Optional[int] = None, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Erzeugt fehlende Schueler-Tokens fuer den Kurs (idempotent, je Person einer)."""
+    await _zugang_moeglich(db, user)
     await _owned_class(db, user, class_id)
     if subset_kurs is not None:
         await eigener_kurs(db, user, subset_kurs)
@@ -1079,10 +1100,7 @@ async def zugaenge_pdf(class_id: int, base: str = "", subset_kurs: Optional[int]
     from reportlab.lib.units import mm
     from reportlab.lib.utils import ImageReader
 
-    karten_an = await is_active(db, user.id, "karten")
-    cardvote_an = await is_active(db, user.id, "cardvote")
-    if not (karten_an or cardvote_an):
-        raise HTTPException(409, "Weder Karteikarten noch CardVote sind aktiv — es gibt nichts, wohin ein Code führen könnte.")
+    await _zugang_moeglich(db, user)
 
     cls = await _owned_class(db, user, class_id)
     students = await _kurs_roster(db, user, class_id, subset_kurs)
@@ -1159,9 +1177,9 @@ class StudentProgress(BaseModel):
     last_reviewed: Optional[datetime] = None  # wann zuletzt gelernt
 
 
-@router.post("/classes/{class_id}/tokens/rotate", response_model=List[StudentTokenOut])
+@kern_router.post("/classes/{class_id}/tokens/rotate", response_model=List[StudentTokenOut])
 async def rotate_tokens(class_id: int, student_id: Optional[int] = None, subset_kurs: Optional[int] = None,
-                        user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+                        user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Zugangs-Links neu vergeben — fuer die ganze Klasse oder eine Person.
 
     Der Link enthaelt den Token; wer ihn weitergibt (Klassenchat, Screenshot),
@@ -1170,6 +1188,7 @@ async def rotate_tokens(class_id: int, student_id: Optional[int] = None, subset_
     ungueltig, QR-Codes muessen neu ausgegeben werden.
     """
     rate_limit("karten_tokens", f"u{user.id}", 30, 60, "Zu viele Änderungen. Bitte kurz warten.")
+    await _zugang_moeglich(db, user)
     await _owned_class(db, user, class_id)
     students = await _kurs_roster(db, user, class_id, subset_kurs)
     if student_id is not None:
@@ -1430,7 +1449,7 @@ async def qr_png(token: str, base: str = "", db: AsyncSession = Depends(get_db))
     # Der Code gilt, solange EINES der beiden Module laeuft: mit Karten fuehrt er
     # zum Ueben, ohne sie zu den Testergebnissen. Erst wenn beide aus sind, ist
     # er tot — und dann verschwindet er auch aus der Klassenansicht.
-    st = await _student_by_token(db, token, modul=("karten", "cardvote"))
+    st = await _student_by_token(db, token, modul=ZUGANG_MODULE)
     # Nur die eigene Origin zulassen, kein offener QR-Generator — und die
     # oeffentliche Adresse schlaegt sie: ein QR-Code mit der LAN-Adresse haengt
     # im Ordner des Kindes und ist ausserhalb der Schule tot.

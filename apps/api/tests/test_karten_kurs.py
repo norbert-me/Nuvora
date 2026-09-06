@@ -36,6 +36,10 @@ async def test_deck_pro_fach(s):
 @pytest.mark.asyncio
 async def test_roster_pro_fach(s):
     u, A, B = await _kurs(s)
+    # Zugangs-Codes setzen ein Zielmodul voraus (sonst 409) — hier Karteikarten.
+    from app.models import UserModule
+    s.add(UserModule(user_id=u.id, module_key="karten"))
+    await s.commit()
     toks = await K.ensure_tokens(A.id, user=u, db=s)
     assert sorted(t.name for t in toks) == ["Lena", "Max"], "Roster der Fach-Klasse A"
 

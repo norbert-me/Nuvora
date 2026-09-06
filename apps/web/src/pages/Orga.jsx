@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, COLORS as C, CONTROL_R, ICONS, Icon, Toggle, cardStyle, iconBtn, klebtLinks, pageApp, td, th as thBase, toolbarInput } from "../components/Icons.jsx";
+import { AddButton, COLORS as C, CONTROL_R, ICONS, Icon, cardStyle, iconBtn, klebtLinks, pageApp, td, th as thBase, toolbarInput } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
@@ -30,20 +30,7 @@ export default function Orga() {
   // per ?tab=anwesenheit direkt in die Anwesenheit springen.
   const [tab, setTab] = useState(["anwesenheit", "ausleihe", "sitzplan"].includes(params.get("tab")) ? params.get("tab") : "checklisten");
   // Auf ?tab-Wechsel aus der Navbar reagieren (nicht nur beim ersten Laden).
-  useEffect(() => { setTab(["anwesenheit", "ausleihe", "sitzplan", "optionen"].includes(params.get("tab")) ? params.get("tab") : "checklisten"); }, [params]);
-
-  // Modul-Zahnrad: welche Orga-Reiter in der Navbar erscheinen. Ausgeblendete
-  // stehen in localStorage; die Navbar (main.jsx) liest das und re-rendert auf
-  // das 'nuvora:settings'-Event.
-  const ORGA_TABS = ["checklisten", "anwesenheit", "ausleihe", "sitzplan"];
-  const tabLabel = { checklisten: t("orga.tabChecklists"), anwesenheit: t("anwesenheit.title"), ausleihe: t("ausleihe.title"), sitzplan: t("sitzplan.title") };
-  const [hidden, setHidden] = useState(() => { try { return JSON.parse(localStorage.getItem("orga_hidden_tabs") || "[]"); } catch { return []; } });
-  const toggleTab = (key, show) => {
-    const next = show ? hidden.filter((k) => k !== key) : [...new Set([...hidden, key])];
-    setHidden(next);
-    try { localStorage.setItem("orga_hidden_tabs", JSON.stringify(next)); } catch { /* egal */ }
-    window.dispatchEvent(new Event("nuvora:settings")); // Navbar neu berechnen
-  };
+  useEffect(() => { setTab(["anwesenheit", "ausleihe", "sitzplan"].includes(params.get("tab")) ? params.get("tab") : "checklisten"); }, [params]);
 
   // Klassenliste, Vorwahl und „zuletzt gewaehlt" — dieselben sechs Zeilen
   // standen auf fuenf Seiten; sie liegen jetzt in core/klassenwahl.js.
@@ -117,20 +104,12 @@ export default function Orga() {
 
   return (
     <div style={{ ...pageApp }}>
-      {/* Zwischen den Werkzeugen wird über die Navbar gewechselt (?tab=…). Der
-          Reiter „Optionen" blendet Reiter ein/aus (Modul-Zahnrad als Seite). */}
-      {tab === "optionen" ? (
-        <div style={{ maxWidth: 560 }}>
-          <div style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 4 }}>
-            {ORGA_TABS.map((k) => (
-              <div key={k} style={{ display: "flex", alignItems: "center", padding: "12px 4px", borderBottom: "1px solid var(--border)" }}>
-                <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{tabLabel[k]}</span>
-                <Toggle checked={!hidden.includes(k)} onChange={(v) => toggleTab(k, v)} />
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : tab === "anwesenheit" ? <Anwesenheit /> : tab === "ausleihe" ? <Ausleihe /> : tab === "sitzplan" ? <Sitzplan /> : (<>
+      {/* Zwischen den Werkzeugen wird über die Navbar gewechselt (?tab=…).
+          Welche Reiter es gibt, steht im Modul-Zahnrad (REGISTRY-Optionen) —
+          frueher regelte das ein eigener Reiter „Optionen" mit einer Liste im
+          localStorage. Das war dieselbe Sache zweimal und stand ausserdem als
+          vermeintlicher INHALT des Moduls in Suche und Startseiten-Kachel. */}
+      {tab === "anwesenheit" ? <Anwesenheit /> : tab === "ausleihe" ? <Ausleihe /> : tab === "sitzplan" ? <Sitzplan /> : (<>
       {/* Eine Leiste statt zweier Zeilen: links die Auswahl, daneben der eine
           Handgriff (neuer Punkt). Das Feld hatte `inputStyle` Zeile fuer Zeile
           nachgebaut und stand dadurch hoeher als der Plus-Knopf daneben. */}

@@ -21,6 +21,16 @@ Notiz zur größten Fassung die dünnste.
 
 **Module**
 
+- Jedes Modul mit unabhängigen Teilen lässt sie einzeln ein- und ausblenden:
+  Notenbuch und Klassenarbeiten, Sitzplan/Anwesenheit/Ausleihe, Notizzettel
+  und Aufgaben, Stundenplan/Zeitleiste/freie Zeiträume, Karten-Fortschritt.
+  Ausgeblendetes verschwindet aus Navigation, Suche und Startseiten-Kachel.
+- Orgas eigener Reiter „Optionen" ist weg — er machte, was jetzt das Zahnrad
+  jedes Moduls macht, und stand als vermeintlicher Inhalt in der Suche.
+- Der Vergleich der Klassenarbeiten steht immer in der Navigation, nicht mehr
+  nur neben den Arbeiten.
+- Schülerfotos lassen sich beim Zuschneiden herauszoomen; der Rand wird
+  schwarz, statt das Gesicht abzuschneiden.
 - Die abschaltbaren Teile eines Moduls (z. B. SEGEL-Stufen) stellst du jetzt
   im Modul selbst ein — im Zahnrad neben den übrigen Ansichts-Schaltern,
   nicht mehr in der Modulauswahl.

@@ -152,6 +152,29 @@ export function useModulOption(modulKey, optionKey) {
  *                           unnoetig nachfragen.
  */
 /**
+ * Ist dieses ZIEL (aus ziele.js) fuer diese Lehrkraft da?
+ *
+ * Beantwortet beide Fragen auf einmal: laeuft das Modul, und ist der Teil
+ * eingeschaltet, an dem der Reiter haengt. Eine Quelle fuer Navigation, Suche
+ * und die Modul-Kacheln — vorher pruefte jede Stelle nur das Modul, und ein
+ * abgeschalteter Teil stand weiter in der Liste.
+ */
+export function useZielFilter() {
+  const { modules, bekannt } = useModules();
+  return (ziel) => {
+    if (!ziel.modul) return true;
+    const mod = modules.find((m) => m.key === ziel.modul);
+    // Solange der Stand nicht bekannt ist, nichts wegnehmen — dieselbe Regel
+    // wie bei useModulOption: kurz zu viel zu zeigen ist harmloser als eine
+    // Navigation, die sich vor den Augen umbaut.
+    if (!bekannt) return true;
+    if (!mod || !mod.active) return false;
+    if (!ziel.option) return true;
+    return (mod.optionen_an || {})[ziel.option] !== false;
+  };
+}
+
+/**
  * Die abschaltbaren TEILE eines Moduls als fertige ViewMenu-Eintraege.
  *
  *   <ViewMenu items={[ ...eigene, ...useModulTeile("orga") ]} />
@@ -164,14 +187,17 @@ export function useModulOption(modulKey, optionKey) {
  * Wichtig: die Modul-Teile gelten fuer das ganze KONTO, nicht je Kurs wie die
  * uebrigen ViewMenu-Schalter — deshalb bekommen sie ihre eigene Ueberschrift.
  */
-export function useModulTeile(modulKey) {
+export function useModulTeile(modulKey, { mitTitel = true } = {}) {
   const { t } = useLanguage();
   const { modules, setOption } = useModules();
   const mod = modules.find((m) => m.key === modulKey);
   const teile = (mod && mod.active && mod.optionen) || [];
   if (!teile.length) return [];
   return [
-    { key: `${modulKey}-teile`, art: "titel", label: t("modules.parts") },
+    // Ohne Titel, wenn das Menue NUR die Teile zeigt (eigenes Zahnrad in der
+    // Werkzeugleiste) — dann sagt schon die Ueberschrift des Menues, worum es
+    // geht, und eine zweite darunter waere dieselbe Zeile zweimal.
+    ...(mitTitel ? [{ key: `${modulKey}-teile`, art: "titel", label: t("modules.parts") }] : []),
     ...teile.map((o) => ({
       key: `${modulKey}:${o.key}`,
       label: o.name,

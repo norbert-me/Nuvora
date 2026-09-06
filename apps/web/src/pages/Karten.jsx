@@ -344,7 +344,7 @@ export default function Karten() {
 
   return (
     <div style={{ ...pageApp }}>
-      <Werkzeugleiste style={{ marginBottom: 16 }} links={<>
+      <Werkzeugleiste modul="karten" style={{ marginBottom: 16 }} links={<>
         {/* Kein Kurs-Filter mehr in der Sammlung: seit die Zuordnung ueber die
             Stunde laeuft, gehoert ein Stapel keinem Kurs mehr „an" — ein Filter
             darauf sortierte nach etwas, das die Lehrkraft gar nicht mehr setzt.

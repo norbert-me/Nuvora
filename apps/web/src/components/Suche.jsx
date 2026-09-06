@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { COLORS as C, CONTROL_R, Icon, ICONS, inputStyle, menuRow, modalOverlay, modalPanel, sectionLabel, SHADOW } from "./Icons.jsx";
 import { ZIELE, passt, rang } from "../core/ziele.js";
-import { useAktiv } from "../core/modules.js";
+import { useZielFilter } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { hol } from "../core/melden.js";
 
@@ -20,7 +20,7 @@ const MAX = 8;   // je Gruppe — mehr liest niemand, und die Liste soll nicht s
 
 export default function Suche({ offen, onClose }) {
   const { t } = useLanguage();
-  const aktiv = useAktiv();
+  const zielDa = useZielFilter();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [wahl, setWahl] = useState(0);
@@ -42,7 +42,7 @@ export default function Suche({ offen, onClose }) {
   const treffer = useMemo(() => {
     const begriff = q.trim();
     const seiten = ZIELE
-      .filter((z) => !z.modul || aktiv(z.modul))
+      .filter(zielDa)
       .map((z) => ({ ...z, titel: t(z.key) }))
       .filter((z) => !begriff || passt([z.titel, ...(z.worte || []), z.pfad].join(" "), begriff))
       .sort((a, b) => rang(a.titel, begriff) - rang(b.titel, begriff))
@@ -59,7 +59,7 @@ export default function Suche({ offen, onClose }) {
       { gruppe: t("suche.classes"), eintraege: [...klassen, ...kurse] },
       { gruppe: t("nav.topics"), eintraege: themen },
     ].filter((g) => g.eintraege.length);
-  }, [q, daten, aktiv, t]);
+  }, [q, daten, zielDa, t]);
 
   const flach = useMemo(() => treffer.flatMap((g) => g.eintraege), [treffer]);
   useEffect(() => { setWahl(0); }, [q]);

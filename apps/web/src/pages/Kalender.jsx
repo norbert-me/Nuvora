@@ -630,7 +630,7 @@ export default function Kalender() {
           Bauform wie überall: [ Auswahl ] [ Alltag ] … [ Ansicht ] [ ⋯ ]
           (components/Werkzeugleiste.jsx) statt einer von Hand gebauten Reihe. */}
       {kalAnsicht && (
-        <Werkzeugleiste
+        <Werkzeugleiste modul="kalender"
           links={(
             <span data-tour="kal-views" style={{ display: "inline-flex" }}>
               {/* Kein eigener Reiter „Heute" mehr: er zeigte dasselbe wie der

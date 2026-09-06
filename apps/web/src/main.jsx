@@ -152,7 +152,7 @@ import NuvoraHome from "./pages/NuvoraHome.jsx";
 import GuidedTour, { PATH_TOUR, tourFor } from "./components/GuidedTour.jsx";
 import { uebernehmen as ansichtenUebernehmen, vergessen as ansichtenVergessen } from "./core/ansichten.js";
 import Suche from "./components/Suche.jsx";
-import { useModules } from "./core/modules.js";
+import { useModules, useZielFilter } from "./core/modules.js";
 import { istAdmin } from "./core/admin.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
@@ -330,24 +330,23 @@ const getModuleNavItems = (t, location, user) => {
   if (area === "auswertung") {
     const cur = params.get("tab");
     const verg = pathname.startsWith(`${AUSW}/vergleich`);
-    // Der Vergleich gehoert zu den Klassenarbeiten (er vergleicht Arbeiten
-    // ueber Klassen hinweg) und steht deshalb nur da, wo man gerade damit
-    // arbeitet — nicht als dritter Reiter neben dem Notenbuch, dem er nichts
-    // sagt.
-    const beiArbeiten = verg || cur === "klassenarbeit";
+    // Der Vergleich stand frueher nur neben den Klassenarbeiten. Das war eine
+    // Falle: wer ihn sucht, steht meist im Notenbuch, sieht ihn dort nicht und
+    // haelt ihn fuer verschwunden. Jetzt immer — ein Reiter mehr ist billiger
+    // als ein Weg, den man nur mit Vorwissen findet.
     return [
-      { to: `${AUSW}?tab=noten`, label: t("auswertung.tabGrades"), active: !verg && cur !== "klassenarbeit" },
-      { to: `${AUSW}?tab=klassenarbeit`, label: t("auswertung.tabWorks"), active: !verg && cur === "klassenarbeit" },
-      ...(beiArbeiten ? [{ to: `${AUSW}/vergleich`, label: t("klassenarbeit.navCompare"), active: verg }] : []),
+      { to: `${AUSW}?tab=noten`, label: t("auswertung.tabGrades"), active: !verg && cur !== "klassenarbeit", modul: "auswertung", option: "noten" },
+      { to: `${AUSW}?tab=klassenarbeit`, label: t("auswertung.tabWorks"), active: !verg && cur === "klassenarbeit", modul: "auswertung", option: "klassenarbeit" },
+      { to: `${AUSW}/vergleich`, label: t("klassenarbeit.navCompare"), active: verg, modul: "auswertung", option: "klassenarbeit" },
     ];
   }
   if (area === "kalender") {
     const cur = params.get("view");
     return [
       { to: KAL, label: t("kalender.title"), active: !["timetable", "breaks", "klassenarbeit", "zeitleiste"].includes(cur) },
-      { to: `${KAL}?view=timetable`, label: t("kalender.timetable"), active: cur === "timetable" },
-      { to: `${KAL}?view=zeitleiste`, label: t("zeitleiste.tab"), active: cur === "zeitleiste" },
-      { to: `${KAL}?view=breaks`, label: t("kalender.breaksTab"), active: cur === "breaks" },
+      { to: `${KAL}?view=timetable`, label: t("kalender.timetable"), active: cur === "timetable", modul: "kalender", option: "stundenplan" },
+      { to: `${KAL}?view=zeitleiste`, label: t("zeitleiste.tab"), active: cur === "zeitleiste", modul: "kalender", option: "zeitleiste" },
+      { to: `${KAL}?view=breaks`, label: t("kalender.breaksTab"), active: cur === "breaks", modul: "kalender", option: "freieTage" },
       { to: `${KAL}?view=klassenarbeit`, label: t("kalender.examsTab"), active: cur === "klassenarbeit" },
     ];
   }
@@ -368,28 +367,25 @@ const getModuleNavItems = (t, location, user) => {
   if (area === "notizbrett") {
     const cur = params.get("tab");
     return [
-      { to: `${NOTIZBRETT}?tab=notizen`, label: t("notizbrett.tabNotes"), active: cur !== "aufgaben" },
-      { to: `${NOTIZBRETT}?tab=aufgaben`, label: t("notizbrett.tabTodos"), active: cur === "aufgaben" },
+      { to: `${NOTIZBRETT}?tab=notizen`, label: t("notizbrett.tabNotes"), active: cur !== "aufgaben", modul: "notizbrett", option: "notizen" },
+      { to: `${NOTIZBRETT}?tab=aufgaben`, label: t("notizbrett.tabTodos"), active: cur === "aufgaben", modul: "notizbrett", option: "aufgaben" },
     ];
   }
   if (area === "mathespiele") return [{ to: MATHEF, label: t("mathefussball.title") }];
   if (area === "tafel") return [{ to: TAFEL, label: t("tafel.title") }];
   if (area === "orga") {
     const tab = params.get("tab");
-    const items = [
-      { key: "checklisten", to: `${ORG}?tab=checklisten`, label: t("orga.tabChecklists"), active: !["anwesenheit", "ausleihe", "sitzplan", "optionen"].includes(tab) },
-      { key: "anwesenheit", to: `${ORG}?tab=anwesenheit`, label: t("anwesenheit.title"), active: tab === "anwesenheit" },
-      { key: "ausleihe", to: `${ORG}?tab=ausleihe`, label: t("ausleihe.title"), active: tab === "ausleihe" },
-      { key: "sitzplan", to: `${ORG}?tab=sitzplan`, label: t("sitzplan.title"), active: tab === "sitzplan" },
+    // Welche Reiter es gibt, entscheidet jetzt das Modul-Zahnrad (REGISTRY-
+    // Optionen), nicht mehr eine eigene Liste im localStorage und ein eigener
+    // Reiter „Optionen". Der war doppelt gemoppelt — jedes andere Modul regelt
+    // dasselbe im ViewMenu — und stand als vermeintlicher INHALT des Moduls in
+    // der Suche und auf der Startseiten-Kachel.
+    return [
+      { to: `${ORG}?tab=checklisten`, label: t("orga.tabChecklists"), active: !["anwesenheit", "ausleihe", "sitzplan", "optionen"].includes(tab) },
+      { to: `${ORG}?tab=anwesenheit`, label: t("anwesenheit.title"), active: tab === "anwesenheit", modul: "orga", option: "anwesenheit" },
+      { to: `${ORG}?tab=ausleihe`, label: t("ausleihe.title"), active: tab === "ausleihe", modul: "orga", option: "ausleihe" },
+      { to: `${ORG}?tab=sitzplan`, label: t("sitzplan.title"), active: tab === "sitzplan", modul: "orga", option: "sitzplan" },
     ];
-    // Vom Modul-Zahnrad (Orga-Optionen) ausgeblendete Reiter raus — aber den aktiven
-    // nie verstecken, und nie eine leere Leiste erzeugen (Fallback Checklisten).
-    let hidden = [];
-    try { hidden = JSON.parse(localStorage.getItem("orga_hidden_tabs") || "[]"); } catch { /* egal */ }
-    const vis = items.filter((i) => !hidden.includes(i.key) || i.active);
-    const list = vis.length ? vis : [items[0]];
-    // „Optionen" immer ganz rechts, nie ausblendbar (dort schaltet man die Reiter).
-    return [...list, { key: "optionen", to: `${ORG}?tab=optionen`, label: t("orga.tabOptions"), active: tab === "optionen" }];
   }
   if (area === "code-detektiv") {
     // Nativ eingebunden: die Nuvora-Navbar steuert die Bereiche der App direkt.
@@ -410,7 +406,7 @@ const getModuleNavItems = (t, location, user) => {
     const cur = markt ? null : params.get("tab") || "cards";
     return [
       { to: `${KA}?tab=cards`, label: t("karten.tabCards"), active: cur === "cards" },
-      { to: `${KA}?tab=progress`, label: t("karten.tabProgress"), active: cur === "progress" },
+      { to: `${KA}?tab=progress`, label: t("karten.tabProgress"), active: cur === "progress", modul: "karten", option: "fortschritt" },
       { to: `${KA}?tab=qr`, label: t("karten.tabQr"), active: cur === "qr" },
       { to: "/marktplatz?area=karten&kind=karten_deck", label: t("nav.marketplace"), active: markt },
     ];
@@ -681,7 +677,12 @@ function Nav({ user, onLogout }) {
     }).catch(() => { /* offline: der localStorage-Eintrag reicht bis zum naechsten Mal */ });
   };
 
-  const navItems = getModuleNavItems(t, location, user);
+  // Abgeschaltete Modul-Teile verschwinden aus der Leiste — der GERADE offene
+  // Reiter aber nie: sonst steht man auf einer Seite, die die Navigation nicht
+  // mehr kennt, und findet nicht zurueck.
+  const zielDa = useZielFilter();
+  const navItems = getModuleNavItems(t, location, user)
+    .filter((i) => i.active || zielDa({ modul: i.modul || null, option: i.option }));
   const allPages = [...navItems, { to: "/tutorial", label: t("nav.tutorial") }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/login", label: t("nav.login") }];
   const pageTitle = allPages.find((item) => location.pathname.startsWith(item.to))?.label || "";
 

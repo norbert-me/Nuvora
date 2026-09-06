@@ -17,28 +17,33 @@ from app.routers.modules import REGISTRY, _BY_KEY, _optionen_an
 
 def test_orga_hat_segel_als_abschaltbaren_teil():
     orga = _BY_KEY["orga"]
-    assert [o.key for o in orga.optionen] == ["segel"]
-    # An, bis jemand es abschaltet: der Bestand soll sich nicht veraendern.
-    assert orga.optionen[0].an is True
+    # Inzwischen sind auch die Reiter des Moduls abschaltbar (jedes Modul mit
+    # unabhaengigen Teilen hat solche Optionen) — SEGEL ist einer davon.
+    assert "segel" in [o.key for o in orga.optionen]
+    # An, bis jemand sie abschaltet: der Bestand soll sich nicht veraendern.
+    assert all(o.an is True for o in orga.optionen)
 
 
 def test_ohne_gespeichertes_gilt_die_voreinstellung():
-    assert _optionen_an(_BY_KEY["orga"], None) == {"segel": True}
-    assert _optionen_an(_BY_KEY["orga"], {}) == {"segel": True}
+    for gespeichert in (None, {}):
+        an = _optionen_an(_BY_KEY["orga"], gespeichert)
+        assert set(an) == {o.key for o in _BY_KEY["orga"].optionen}
+        assert all(an.values())
 
 
 def test_gespeichertes_gewinnt():
-    assert _optionen_an(_BY_KEY["orga"], {"segel": False}) == {"segel": False}
+    assert _optionen_an(_BY_KEY["orga"], {"segel": False})["segel"] is False
 
 
 def test_unbekannter_schluessel_faellt_heraus():
     # Rest aus einer Fassung, in der es die Option gab.
-    assert _optionen_an(_BY_KEY["orga"], {"segel": False, "alt": True}) == {"segel": False}
+    an = _optionen_an(_BY_KEY["orga"], {"segel": False, "alt": True})
+    assert "alt" not in an and an["segel"] is False
 
 
 def test_nicht_boolesches_gilt_als_nicht_gesetzt():
     # Ein "false" als Zeichenkette waere sonst wahr — genau falschherum.
-    assert _optionen_an(_BY_KEY["orga"], {"segel": "false"}) == {"segel": True}
+    assert _optionen_an(_BY_KEY["orga"], {"segel": "false"})["segel"] is True
 
 
 def test_module_ohne_optionen_liefern_leer():

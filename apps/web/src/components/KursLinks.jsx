@@ -17,7 +17,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Icon, ICONS, COLORS as C, chipStyle, sectionLabel } from "./Icons.jsx";
 import { rememberClass } from "../core/cache.js";
-import { useModules } from "../core/modules.js";
+import { useModules, useZielFilter } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 
 export default function KursLinks({ kurs }) {
@@ -35,19 +35,11 @@ export default function KursLinks({ kurs }) {
     if (!klassen.some((k) => k.id === classId)) setClassId(klassen[0].id);
   }, [klassen.map((k) => k.id).join(","), classId]);
   const an = (key) => modules.find((m) => m.key === key)?.active ?? false;
-  // Orga bündelt mehrere Reiter; was im Modul-Zahnrad ausgeblendet ist, gehört
+  // Orga bündelt mehrere Reiter; was im Modul-Zahnrad abgeschaltet ist, gehört
   // auch hier nicht hin — sonst führt der Kurs in etwas, das die Lehrkraft
   // abgeschaltet hat (z.B. Ausleihe).
-  const lesen = () => { try { return JSON.parse(localStorage.getItem("orga_hidden_tabs") || "[]"); } catch { return []; } };
-  const [versteckt, setVersteckt] = useState(lesen);
-  useEffect(() => {
-    // Das Modul-Zahnrad meldet Änderungen — sonst stimmte die Leiste erst nach
-    // einem Neuladen wieder.
-    const h = () => setVersteckt(lesen());
-    window.addEventListener("nuvora:settings", h);
-    return () => window.removeEventListener("nuvora:settings", h);
-  }, []);
-  const orgaAn = (tab) => an("orga") && !versteckt.includes(tab);
+  const zielDa = useZielFilter();
+  const orgaAn = (tab) => zielDa({ modul: "orga", option: tab });
   if (!classId) return null;
 
   // Klasse und Kurs stehen an JEDEM Link: die Zielseite soll den Inhalt dieses

@@ -111,6 +111,22 @@ REGISTRY: List[ModuleDef] = [
         ),
         path="/auswertung",
         stage="stable",
+        optionen=[
+            ModulOption(
+                key="noten",
+                name="Notenbuch",
+                description=(
+                    "Die Tabelle mit Spalten, Gewichten und Noten. Aus, wenn du nur Klassenarbeiten auswertest und deine Noten woanders führst."
+                ),
+            ),
+            ModulOption(
+                key="klassenarbeit",
+                name="Klassenarbeiten",
+                description=(
+                    "Punkte je Aufgabe, Notenschlüssel, Fehlerarten und der Vergleich über Klassen. Aus, wenn du nur das Notenbuch brauchst."
+                ),
+            ),
+        ],
     ),
     ModuleDef(
         key="code-detektiv",
@@ -146,6 +162,15 @@ REGISTRY: List[ModuleDef] = [
         ),
         path="/karten",
         stage="stable",
+        optionen=[
+            ModulOption(
+                key="fortschritt",
+                name="Fortschritt",
+                description=(
+                    "Der Reifegrad je Kind und Stapel. Aus, wenn du die Karten nur erstellst und druckst."
+                ),
+            ),
+        ],
     ),
     ModuleDef(
         key="kalender",
@@ -162,6 +187,29 @@ REGISTRY: List[ModuleDef] = [
         ),
         path="/kalender",
         stage="stable",
+        optionen=[
+            ModulOption(
+                key="stundenplan",
+                name="Stundenplan",
+                description=(
+                    "Das wiederkehrende Wochenraster. Aus, wenn du nur einzelne Termine einträgst."
+                ),
+            ),
+            ModulOption(
+                key="zeitleiste",
+                name="Zeitleiste",
+                description=(
+                    "Der Kurs von oben nach unten: Stunden, Themen, Freischaltungen und Klassenarbeiten auf einer Achse."
+                ),
+            ),
+            ModulOption(
+                key="freieTage",
+                name="Freie Zeiträume",
+                description=(
+                    "Ferien und Feiertage, an denen Stunden und Einträge ausgeblendet werden."
+                ),
+            ),
+        ],
     ),
     ModuleDef(
         key="orga",
@@ -177,6 +225,27 @@ REGISTRY: List[ModuleDef] = [
         path="/orga",
         stage="stable",
         optionen=[
+            ModulOption(
+                key="sitzplan",
+                name="Sitzplan",
+                description=(
+                    "Die Sitzordnung mit Fotos, Markierungen und Zoom."
+                ),
+            ),
+            ModulOption(
+                key="anwesenheit",
+                name="Anwesenheit",
+                description=(
+                    "Fehlzeiten je Tag und Stunde, mit Notiz und Entschuldigung."
+                ),
+            ),
+            ModulOption(
+                key="ausleihe",
+                name="Ausleihe",
+                description=(
+                    "Bücher, Taschenrechner, Material — wer hat was seit wann."
+                ),
+            ),
             ModulOption(
                 key="segel",
                 name="SEGEL-Stufen",
@@ -231,6 +300,22 @@ REGISTRY: List[ModuleDef] = [
         ),
         path="/notizbrett",
         stage="stable",
+        optionen=[
+            ModulOption(
+                key="notizen",
+                name="Notizzettel",
+                description=(
+                    "Freie Zettel mit Titel und Text."
+                ),
+            ),
+            ModulOption(
+                key="aufgaben",
+                name="Aufgaben",
+                description=(
+                    "Die To-do-Liste mit Datum. Datierte Aufgaben erscheinen zusätzlich im Kalender."
+                ),
+            ),
+        ],
     ),
     ModuleDef(
         key="pap",

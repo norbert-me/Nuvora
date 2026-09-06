@@ -3,7 +3,7 @@
 // Modulauswahl statt eine leere Seite zu zeigen.
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useModules, useAktiv } from "../core/modules.js";
+import { useModules, useAktiv, useZielFilter } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { lokal, sichern } from "../core/ansichten.js";
 import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLORS as C, pageApp, pageTitle, cardStyle, chipStyle, badge, btnSmall, CONTROL_H, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
@@ -298,8 +298,12 @@ export default function NuvoraHome({ user }) {
   // Zwei Ausnahmen: der Weg auf die Modul-Startseite selbst (er wiederholt nur
   // den Titel darueber) und der Marktplatz (der gehoert dem Kern, das Modul
   // verlinkt ihn nur).
+  const zielDa = useZielFilter();
   const teile = (m) => ZIELE
     .filter((z) => z.modul === m.key && z.pfad !== m.path && !z.pfad.startsWith("/marktplatz"))
+    // Abgeschaltete Teile stehen nicht auf der Kachel: sonst zaehlt sie
+    // Inhalte auf, die es fuer diese Lehrkraft gar nicht gibt.
+    .filter(zielDa)
     // Fehlt die Uebersetzung, gibt `t` den Schluessel zurueck — dann lieber
     // nichts zeigen als „orga.tabOptions" auf der Kachel.
     .map((z) => ({ key: z.key, text: t(z.key) }))
