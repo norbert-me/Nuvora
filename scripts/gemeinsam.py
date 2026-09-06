@@ -52,6 +52,34 @@ LANG_AB = 25
 
 # ─────────────────────────── HTTP ───────────────────────────
 
+def vorgeschalteter_blocker(api) -> str:
+    """Blockt ein Dienst VOR Nuvora diesen Testclient? Dann der Grund, sonst "".
+
+    Cloudflare (und aehnliche Wachhunde) weisen Skript-Clients mit 403 und
+    "error code: 1010" ab. Fuer die Testfamilie sieht das aus, als sei die
+    ganze Seite kaputt: 19 rote Zeilen, jede mit 403 — und die Installation
+    dahinter ist tadellos. Einmal vorher fragen und den Lauf mit einem Satz
+    abbrechen ist ehrlicher als zwanzig falsche Befunde.
+
+    Erkannt an der Kombination, nicht an einem Merkmal allein: 403 auf einem
+    Pfad, den jeder sehen darf, und eine Antwort, die nicht von uns stammt.
+    """
+    try:
+        status, text = api.call("GET", "/api/health", roh=True)
+    except Exception:
+        return ""
+    if status != 403:
+        return ""
+    server = (getattr(api, "letzte_kopfe", {}) or {}).get("server", "")
+    kennzeichen = "error code: 1010" in text or "cf-ray" in (getattr(api, "letzte_kopfe", {}) or {})
+    if kennzeichen or "cloudflare" in server.lower():
+        return (f"Ein vorgeschalteter Dienst ({server or 'Proxy'}) blockt diesen Testclient "
+                f"(HTTP 403). Nuvora selbst wurde gar nicht gefragt. Den Lauf gegen die "
+                f"direkte Adresse schicken: --url http://<server>:<port>, oder SELFTEST_URL "
+                f"in .deploy.env eintragen.")
+    return ""
+
+
 class ApiFehler(Exception):
     def __init__(self, methode, pfad, status, text):
         super().__init__(f"{methode} {pfad} -> {status}: {text[:200]}")

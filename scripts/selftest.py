@@ -42,7 +42,7 @@ PRAEFIX = "ZZ-Selbsttest"
 # auseinander. Von dort importiert nichts zurueck (siehe Modulkopf).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gemeinsam import (  # noqa: E402
-    Api, Bericht, Kernumgebung, melde_an, standard_argumente,
+    Api, Bericht, Kernumgebung, melde_an, standard_argumente, vorgeschalteter_blocker,
 )
 # Das Abraeumen sitzt in aufraeumen.py — dort steht das Netz (Klasse `Fund`),
 # das ausschliesslich Testpraefixe loescht. Der Import steht seit der
@@ -1967,6 +1967,14 @@ def main():
     b = Bericht()
     if not args.json:
         print(f"Nuvora-Selbsttest gegen {args.url}")
+
+    # Blockt jemand VOR Nuvora? Dann sagt der Lauf das in einem Satz, statt
+    # zwanzig 403-Zeilen ueber eine Installation zu schreiben, die gar nicht
+    # gefragt wurde.
+    blocker = vorgeschalteter_blocker(api)
+    if blocker:
+        print(f"\nAbbruch: {blocker}", file=sys.stderr)
+        return 2
 
     teste_system(api, b)
     teste_erreichbarkeit(api, b)

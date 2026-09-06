@@ -46,7 +46,7 @@ from datetime import datetime, timedelta, timezone
 # ist das Blatt (Client/Bericht), selftest.py und aufraeumen.py sitzen darauf.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gemeinsam import (  # noqa: E402
-    Api, Bericht, Kernumgebung, melde_an, standard_argumente, FETT, AUS,
+    Api, Bericht, Kernumgebung, melde_an, standard_argumente, vorgeschalteter_blocker, FETT, AUS,
 )
 from aufraeumen import merke_module, vergiss_module  # noqa: E402
 from selftest import raeume_reste  # noqa: E402
@@ -2772,6 +2772,11 @@ def main():
     b = Systembericht()
     if not args.json:
         print(f"{FETT}Nuvora-Systemtest{AUS} gegen {args.url}")
+
+    blocker = vorgeschalteter_blocker(api)
+    if blocker:
+        print(f"\nAbbruch: {blocker}", file=sys.stderr)
+        return 2
 
     # Dieselbe Anmeldung wie im Selbsttest (gemeinsam.py) — inklusive der
     # Auskunft, was zu tun ist, wenn das Testkonto gar nicht existiert.
