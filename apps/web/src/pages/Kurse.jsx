@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { liegtDavor, nachJahrAbsteigend } from "../core/schuljahr.js";
 import { MASSNAHMEN } from "../core/foerderung.js";
+import KursKinder from "../components/KursKinder.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
@@ -212,6 +213,13 @@ export default function Kurse() {
                     title={t("classes.archiveHint")}>
                     {kurs.wert.archiviert ? t("classes.unarchive") : t("classes.archive")}
                   </button>
+                </div>
+
+                {/* Die Kinder stehen im KURS — dort, wo mit ihnen gearbeitet
+                    wird. Die Klassenmaske daneben war eine zweite Liste
+                    derselben Personen (Umbau vom 06.09.2026). */}
+                <div>
+                  <KursKinder kursId={k.id} t={t} />
                 </div>
 
                 <div>

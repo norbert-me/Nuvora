@@ -226,8 +226,19 @@ def _lesbar(antwort: Antwort) -> str:
 
 
 def _funde(antwort: Antwort) -> list:
+    """Welche Markierungen stehen in dieser Antwort — als WORT, nicht als
+    Zeichenfolge.
+
+    Der Unterschied ist kein Feinschliff: „LRS" sind drei Zeichen, und die
+    Antworten enthalten Zufalls-Token (Zugangs-Codes, 32 Zeichen base64). Frueher
+    oder spaeter steht darin zufaellig „LRS" — der Zugangs-Zettel wurde so als
+    Datenleck gemeldet, obwohl er nur QR-Codes und Namen druckt. Ein Test, der
+    gelegentlich grundlos rot ist, wird irgendwann ignoriert; genau dann
+    uebersieht er das echte Leck.
+    """
     text = _lesbar(antwort)
-    return [m for m in MARKIERUNGEN if m in text]
+    return [m for m in MARKIERUNGEN
+            if re.search(r"(?<![A-Za-z0-9])" + re.escape(m) + r"(?![A-Za-z0-9])", text)]
 
 
 # ── Aufbau: eine Lehrkraft, eine Klasse, ein Datensatz je Modul ──────────────

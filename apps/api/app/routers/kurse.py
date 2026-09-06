@@ -25,9 +25,10 @@ from ..kursmitglieder import (
     schuljahr_aus_name,
     sibling_class_ids,
 )
-from ..schueler import sortiert
+from ..schueler import roster_kurs, sortiert
 from ..database import get_db
-from ..models import Kurs, KursTag, KursStudent, SchoolClass, Student, User
+from ..models import Kurs, KursTag, KursStudent, Person, SchoolClass, Student, User
+from ..personen import sichere_personen
 from .auth import get_current_user
 from .classes import MASSNAHMEN_VALUES
 
@@ -320,6 +321,133 @@ async def remove_member(kurs_id: int, class_id: int, user: User = Depends(get_cu
         SchoolClass.id == class_id, SchoolClass.kurs_id == kurs_id).values(kurs_id=None))
     await db.execute(update(Student).where(
         Student.class_id == class_id, Student.kurs_id == kurs_id).values(kurs_id=None))
+    await db.commit()
+
+
+# ─── Kinder im Kurs pflegen ───
+#
+# Der Kurs wird die Bedienebene (Umbau vom 06.09.2026): Kinder werden dort
+# angelegt, sortiert und beschrieben, wo man mit ihnen arbeitet — nicht mehr in
+# einer Klassenmaske daneben.
+#
+# Traeger bleibt vorerst die Klasse: `students.class_id` ist NOT NULL und haengt
+# an allem (Noten, Karten, Scans). Ein Kurs ohne Klasse bekommt deshalb beim
+# ersten Kind eine — sie heisst wie der Kurs und ist im Alltag unsichtbar. Diese
+# Kruecke faellt in Etappe 4, wenn `kurs_id` die Klasse ersetzt hat; bis dahin
+# waere ihr Entfernen ein Datenverlust auf Raten.
+
+
+class KindIn(BaseModel):
+    name: str = ""
+
+
+class KindOut(BaseModel):
+    student_id: int
+    person_id: Optional[int] = None
+    name: str
+    card_id: int
+    position: int = 0
+    niveau: str = ""
+    has_photo: bool = False
+
+
+async def _traegerklasse(db: AsyncSession, user: User, kurs: Kurs) -> SchoolClass:
+    """Die Klasse, in die neue Kinder dieses Kurses geschrieben werden."""
+    cid = (await db.execute(select(KursTag.class_id).where(
+        KursTag.kurs_id == kurs.id).limit(1))).scalar_one_or_none()
+    if cid:
+        c = await db.get(SchoolClass, cid)
+        if c and c.deleted_at is None:
+            return c
+    c = SchoolClass(name=kurs.name, owner_id=user.id, kurs_id=kurs.id, color=kurs.color or "")
+    db.add(c)
+    await db.flush()
+    db.add(KursTag(kurs_id=kurs.id, class_id=c.id))
+    return c
+
+
+@router.get("/{kurs_id}/kinder", response_model=List[KindOut])
+async def list_kinder(kurs_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Die Kinder dieses Kurses, in ihrer Reihenfolge."""
+    await _owned_kurs(db, user, kurs_id)
+    zeilen = await roster_kurs(db, kurs_id)
+    personen = {}
+    pids = [z.person_id for z in zeilen if z.person_id]
+    if pids:
+        personen = {p.id: p for p in (await db.execute(
+            select(Person).where(Person.id.in_(pids)))).scalars().all()}
+    out = []
+    for z in zeilen:
+        p = personen.get(z.person_id)
+        out.append(KindOut(student_id=z.id, person_id=z.person_id, name=z.name,
+                           card_id=z.card_id, position=z.position or 0,
+                           niveau=(p.niveau if p else z.niveau) or "",
+                           has_photo=bool((p and p.has_photo) or z.has_photo)))
+    return out
+
+
+@router.post("/{kurs_id}/kinder", response_model=KindOut, status_code=201)
+async def add_kind(kurs_id: int, body: KindIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Ein Kind in diesem Kurs anlegen — Person inklusive."""
+    kurs = await _owned_kurs(db, user, kurs_id)
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(400, "Name darf nicht leer sein")
+    klasse = await _traegerklasse(db, user, kurs)
+    bestand = await roster_kurs(db, kurs_id)
+    # Kartennummer und Platz haengen an der LISTE, nicht am Kind: die naechste
+    # freie Nummer, ans Ende.
+    naechste = max([z.card_id for z in bestand] or [0]) + 1
+    z = Student(class_id=klasse.id, kurs_id=kurs.id, name=name[:200],
+                card_id=naechste, position=len(bestand))
+    db.add(z)
+    await db.flush()
+    db.add(KursStudent(kurs_id=kurs.id, student_id=z.id))
+    await sichere_personen(db, [z], user.id)
+    await db.commit()
+    await db.refresh(z)
+    return KindOut(student_id=z.id, person_id=z.person_id, name=z.name, card_id=z.card_id,
+                   position=z.position or 0, niveau=z.niveau or "", has_photo=z.has_photo)
+
+
+class ReihenfolgeIn(BaseModel):
+    student_ids: List[int]
+
+
+@router.put("/{kurs_id}/kinder/reihenfolge", status_code=204)
+async def set_reihenfolge(kurs_id: int, body: ReihenfolgeIn,
+                          user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Reihenfolge setzen — `position`, NICHT die Kartennummer.
+
+    Die Kartennummer steht auf einer gedruckten Karte und wird von jedem Scan
+    referenziert; sie beim Sortieren mitzuziehen ordnete alte Ergebnisse dem
+    falschen Kind zu (siehe CLAUDE.md).
+    """
+    await _owned_kurs(db, user, kurs_id)
+    erlaubt = {z.id for z in await roster_kurs(db, kurs_id)}
+    for platz, sid in enumerate(body.student_ids):
+        if sid in erlaubt:
+            await db.execute(update(Student).where(Student.id == sid).values(position=platz))
+    await db.commit()
+
+
+@router.delete("/{kurs_id}/kinder/{student_id}", status_code=204)
+async def remove_kind(kurs_id: int, student_id: int,
+                      user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Das Kind aus diesem Kurs nehmen.
+
+    Nur die Mitgliedschaft geht — die Zeile und alles, was daran haengt (Noten,
+    Karten), bleibt. Kommt das Kind ueber eine ganze Klasse in den Kurs, ist
+    hier nichts zu entfernen: dann gehoert die Entscheidung der Klasse, und ein
+    stilles Nichtstun waere die schlechtere Antwort als ein klarer Hinweis.
+    """
+    await _owned_kurs(db, user, kurs_id)
+    await _own_student(db, user, student_id)
+    weg = await db.execute(delete(KursStudent).where(
+        KursStudent.kurs_id == kurs_id, KursStudent.student_id == student_id))
+    if not weg.rowcount:
+        raise HTTPException(409, "Dieses Kind gehört über seine Klasse zum Kurs — "
+                                 "dort entfernen, nicht hier.")
     await db.commit()
 
 

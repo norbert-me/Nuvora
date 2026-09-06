@@ -948,6 +948,27 @@ def teste_kern(api, b, u):
             raise AssertionError(f"Auswertung ohne Teile: {aus}")
         return f"{len(liste)} Person(en), Auswertung mit {len(aus['teile'])} Kurs-Teil(en)"
 
+    def kurs_kinder():
+        # Kinder im KURS pflegen — der Weg, der die Klassenmaske ersetzt.
+        kurs = api.call("POST", "/api/kurse", {"name": f"{PRAEFIX} Kinderkurs"}, erwartet=(201,))
+        a = api.call("POST", f"/api/kurse/{kurs['id']}/kinder", {"name": f"{PRAEFIX} Erstes"}, erwartet=(201,))
+        b = api.call("POST", f"/api/kurse/{kurs['id']}/kinder", {"name": f"{PRAEFIX} Zweites"}, erwartet=(201,))
+        api.call("PUT", f"/api/kurse/{kurs['id']}/kinder/reihenfolge",
+                 {"student_ids": [b["student_id"], a["student_id"]]}, erwartet=(204,))
+        liste = api.call("GET", f"/api/kurse/{kurs['id']}/kinder", erwartet=(200,))
+        namen = [x["name"] for x in liste]
+        nummern = {x["name"]: x["card_id"] for x in liste}
+        api.call("DELETE", f"/api/kurse/{kurs['id']}/kinder/{a['student_id']}", erwartet=(204,))
+        rest = api.call("GET", f"/api/kurse/{kurs['id']}/kinder", erwartet=(200,))
+        api.call("DELETE", f"/api/kurse/{kurs['id']}", erwartet=(204, 200))
+        if namen != [f"{PRAEFIX} Zweites", f"{PRAEFIX} Erstes"]:
+            raise AssertionError(f"Reihenfolge kam nicht an: {namen}")
+        if nummern.get(f"{PRAEFIX} Erstes") != 1:
+            raise AssertionError(f"Umsortieren hat die Kartennummer mitgezogen: {nummern}")
+        if len(rest) != 1:
+            raise AssertionError(f"Entfernen wirkte nicht: {len(rest)} Kind(er) uebrig")
+        return "anlegen, sortieren (Kartennummern bleiben), entfernen"
+
     def kurs_aus_kurs():
         # Einen Kurs aus einem anderen entwickeln — der Normalfall im
         # Schuljahr. Uebernommen werden die Kinder, nicht ihre Daten.
@@ -965,6 +986,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Kurse", kurse)
     b.pruefe("Kern", "Personen", personen)
     b.pruefe("Kern", "Kurs aus Kurs entwickeln", kurs_aus_kurs)
+    b.pruefe("Kern", "Kinder im Kurs", kurs_kinder)
     b.pruefe("Kern", "Themen", themen)
     b.pruefe("Kern", "Papierkorb", papierkorb)
     b.pruefe("Kern", "Archiv", archiv)
