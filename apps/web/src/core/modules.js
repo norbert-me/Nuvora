@@ -4,6 +4,7 @@
 // wird sie nur geholt und gecacht, damit Navbar und Startseite dieselbe
 // Wahrheit benutzen und nicht jede Komponente einzeln nachfragt.
 import { useState, useEffect, useCallback } from "react";
+import { useLanguage } from "../i18n/index.jsx";
 
 // Erst-Stand aus localStorage: dann zeigt die Shell die Modul-Navigation sofort
 // beim Laden, ohne auf /api/modules zu warten. Wird bei jedem Fetch aktualisiert.
@@ -150,6 +151,37 @@ export function useModulOption(modulKey, optionKey) {
  *                           API mit 401 und die Shell wuerde beim Ausloggen
  *                           unnoetig nachfragen.
  */
+/**
+ * Die abschaltbaren TEILE eines Moduls als fertige ViewMenu-Eintraege.
+ *
+ *   <ViewMenu items={[ ...eigene, ...useModulTeile("orga") ]} />
+ *
+ * Sie standen bis dahin in der Modulauswahl (/modules) — an der falschen
+ * Stelle: dort entscheidet man EINMAL, ob es ein Modul gibt, und geht wieder
+ * weg. Der Schalter „SEGEL-Stufen" gehoert dorthin, wo man ihn wirkt sieht:
+ * ins Zahnrad des Moduls, neben die uebrigen Ansichts-Schalter.
+ *
+ * Wichtig: die Modul-Teile gelten fuer das ganze KONTO, nicht je Kurs wie die
+ * uebrigen ViewMenu-Schalter — deshalb bekommen sie ihre eigene Ueberschrift.
+ */
+export function useModulTeile(modulKey) {
+  const { t } = useLanguage();
+  const { modules, setOption } = useModules();
+  const mod = modules.find((m) => m.key === modulKey);
+  const teile = (mod && mod.active && mod.optionen) || [];
+  if (!teile.length) return [];
+  return [
+    { key: `${modulKey}-teile`, art: "titel", label: t("modules.parts") },
+    ...teile.map((o) => ({
+      key: `${modulKey}:${o.key}`,
+      label: o.name,
+      hint: o.description || "",
+      value: (mod.optionen_an || {})[o.key] !== false,
+      onChange: (v) => setOption(modulKey, o.key, v),
+    })),
+  ];
+}
+
 export function useModules(enabled = true) {
   const [modules, setModules] = useState(_cache || []);
   const [loading, setLoading] = useState(!_cache);

@@ -14,7 +14,7 @@ import { Icon, ICONS, toolbarIconBtn, Toggle, Popover, sectionLabel, selectStyle
 // zwei gleichzeitig an sein koennen. Ein Auswahlfeld kann das nicht.
 export default function ViewMenu({ items = [], title = "Ansicht" }) {
   const [open, setOpen] = useState(false);
-  const anyOn = items.some((i) => (i.art === "wahl" ? !!i.value : i.value));
+  const anyOn = items.some((i) => (i.art === "titel" ? false : i.art === "wahl" ? !!i.value : i.value));
   return (
     <span style={{ position: "relative", display: "inline-flex" }}>
       <button onClick={() => setOpen((o) => !o)} className="icon-btn" title={title} aria-label={title}
@@ -27,6 +27,14 @@ export default function ViewMenu({ items = [], title = "Ansicht" }) {
           <Popover align="right" style={{ zIndex: 41, top: 36, minWidth: 220, padding: 12 }}>
             <div style={{ ...sectionLabel, margin: "2px 4px 8px" }}>{title}</div>
             {items.map((it) => (
+              it.art === "titel" ? (
+                // Abschnitt im Menue: die Modul-Teile gelten fuers ganze Konto,
+                // die uebrigen Schalter nur fuer diese Ansicht — ohne Trennung
+                // sehen beide gleich aus und meinen Verschiedenes.
+                <div key={it.key} style={{ ...sectionLabel, margin: "10px 4px 4px", borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+                  {it.label}
+                </div>
+              ) : (
               <div key={it.key} style={{ padding: "6px 4px" }}>
                 {it.art === "wahl" ? (
                   <label style={{ display: "block", fontSize: 13, color: "var(--text2)" }}>
@@ -43,6 +51,7 @@ export default function ViewMenu({ items = [], title = "Ansicht" }) {
                     der Hinweis soll genau unter der Beschriftung beginnen. */}
                 {it.hint && <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4, marginLeft: it.art === "wahl" ? 0 : 46 }}>{it.hint}</div>}
               </div>
+              )
             ))}
           </Popover>
         </>

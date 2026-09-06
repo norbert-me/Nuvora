@@ -19,6 +19,12 @@ Notiz zur größten Fassung die dünnste.
 - Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
   Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
 
+**Module**
+
+- Die abschaltbaren Teile eines Moduls (z. B. SEGEL-Stufen) stellst du jetzt
+  im Modul selbst ein — im Zahnrad neben den übrigen Ansichts-Schaltern,
+  nicht mehr in der Modulauswahl.
+
 **Neues Modul: PAP-Editor**
 
 - Programmablaufpläne zeichnen (Start/Ende, Anweisung, Verzweigung, Ein- und
