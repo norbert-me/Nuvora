@@ -19,6 +19,18 @@ Notiz zur größten Fassung die dünnste.
 - Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
   Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
 
+**Klassen**
+
+- Die Klassenmaske hat nur noch einen Ausgang: die Überschrift. Der zweite
+  „Abbrechen"-Knopf neben „Speichern" ist weg.
+- Der Satz zur CardVote-Grenze steht nicht mehr unter jeder Klasse, sondern
+  nur noch, wenn sie erreicht ist.
+- Der Hinweis „Reihenfolge = Kartennummer" erscheint erst, wenn wirklich
+  umsortiert wurde.
+- QR-Zugang und CardVote-Abstimmkarte werden klar auseinandergehalten: der
+  Menüpunkt heißt „QR-Zugänge drucken (je Kind einer)" und sagt auf
+  Nachfrage, wofür er ist und was er nicht ist.
+
 **Karteikarten**
 
 - Ein Stapel lässt sich im Ausrollen-Menü direkt einem oder mehreren Kursen

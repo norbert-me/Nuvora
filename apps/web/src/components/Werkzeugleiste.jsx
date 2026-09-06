@@ -71,7 +71,10 @@ export function MehrMenu({ eintraege = [], titel }) {
           <span onClick={() => setOffen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
           <Popover align="right" style={{ zIndex: 41, top: CONTROL_H + 2, minWidth: 210, padding: 4 }}>
             {sortiert.map((e) => (
+              // `title`: was der Eintrag tut, wenn der Name allein es nicht
+              // sagt — auf Nachfrage statt als Erklaerzeile im Menue.
               <button key={e.key} onClick={() => { setOffen(false); e.onClick(); }} disabled={e.disabled}
+                title={e.title || undefined}
                 style={{ ...menuRow, color: e.gefahr ? C.danger : "var(--text)", opacity: e.disabled ? 0.45 : 1 }}>
                 {e.icon && <Icon d={e.icon} size={15} color={e.gefahr ? C.danger : undefined} />}
                 {e.label}

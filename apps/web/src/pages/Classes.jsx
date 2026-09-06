@@ -8,7 +8,7 @@
 //
 // Kartendruck und Auswertung liegen NICHT hier, sondern im Modul unter
 // /cardvote/cards: der Kern kennt Klassen, nicht was ein Modul damit tut.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { useSearchParams } from "react-router-dom";
@@ -316,6 +316,15 @@ export default function Classes() {
   // Gezogen wird ueber die ORIGINAL-Indizes: so bleibt `idx` in der Zeile der
   // echte Platz in `students`, und kein Handgriff (umbenennen, Foto, loeschen)
   // muss davon wissen.
+  // Steht die Liste anders als beim Öffnen? Verglichen werden die
+  // Kartennummern in ihrer Reihenfolge — genau das ist die Sache, um die es
+  // geht: dieselben Kinder in anderer Folge bekommen andere Nummern.
+  const reihenfolgeGeaendert = useMemo(() => {
+    const jetzt = students.map((s) => s.card_id).join(",");
+    const vorher = (basis.students || []).map((s) => s.card_id).join(",");
+    return jetzt !== vorher;
+  }, [students, basis.students]);
+
   const reihenfolge = () => {
     const ids = students.map((_, i) => i);
     if (zieht == null || ueber == null || zieht === ueber) return ids;
@@ -346,10 +355,10 @@ export default function Classes() {
       // Schmaler als eine Modulseite (die Zeilen sind 620 breit) und trotzdem
       // mittig: mit der vollen pageApp-Breite klebte das Formular am linken Rand.
       <div style={{ ...pageApp, maxWidth: 620 }}>
-        {/* Die Ueberschrift ist der Weg zurueck. „Abbrechen" steht unten in
-            der Werkzeugleiste — wer oben am Titel steht, sucht dort und nicht
-            am anderen Ende der Maske. Dieselbe Nachfrage wie beim Abbrechen:
-            ein offener Entwurf geht nicht still verloren. */}
+        {/* Die Ueberschrift IST der Weg zurueck — und der einzige. „Abbrechen"
+            stand zusaetzlich unten in der Leiste: zwei Ausgaenge fuer dieselbe
+            Bewegung, einer davon eine Handbreite neben „Speichern". Ein offener
+            Entwurf geht trotzdem nicht still verloren (dieselbe Nachfrage). */}
         <button onClick={() => schliessen()} title={t("classes.backToList")}
           style={{ ...pageTitle, display: "inline-flex", alignItems: "center", gap: 6, border: "none",
             background: "none", padding: 0, cursor: "pointer", color: "var(--text)" }}>
@@ -364,8 +373,11 @@ export default function Classes() {
         <p style={{ color: "var(--text3)", marginBottom: 8, fontSize: 14 }}>
           {t("classes.fillHint", { filled, total: students.length })}
         </p>
-        {cardvote && (
-          <p style={{ color: "var(--text3)", marginBottom: 8, fontSize: 13 }}>{t("classes.renumberHint")}</p>
+        {/* Nur wenn wirklich umsortiert wurde: der Satz warnt vor einer Folge
+            („alte Ausdrucke passen nicht mehr"), und eine Warnung, die bei
+            jedem Öffnen dasteht, liest nach dem dritten Mal niemand. */}
+        {cardvote && reihenfolgeGeaendert && (
+          <p style={{ color: C.warning, marginBottom: 8, fontSize: 13 }}>{t("classes.renumberHint")}</p>
         )}
         <div style={{ marginBottom: 12 }}>
           {reihenfolge().map((idx, platz) => { const s = students[idx]; return (
@@ -520,7 +532,11 @@ export default function Classes() {
         <Werkzeugleiste
           links={<Speicherleiste entwurf={entwurf} immer />}
           mehr={editing.id ? [
+            // QR-Zugang und Abstimmkarte werden staendig verwechselt — beide
+            // heissen im Alltag „die Karten". Deshalb sagt der Menueeintrag,
+            // WOFUER er ist, und der Tooltip, was er NICHT ist.
             zugaengeMoeglich && { key: "qr", label: t("classes.qrPrint"), icon: ICONS.pdf || ICONS.export,
+                                  title: t("classes.qrPrintHint"),
                                   onClick: () => zugaengeDrucken(editing.id) },
             // Archivieren ist ein Umschalten und wartet wie alles andere auf
             // „Speichern" — vorher war die Klasse schon weg, während die
@@ -532,7 +548,6 @@ export default function Classes() {
           ] : []}>
           <button onClick={addRow} disabled={students.length >= MAX_CARDS}
             style={{ ...toolbarBtn, opacity: students.length >= MAX_CARDS ? 0.4 : 1 }}>{t("classes.addRow")}</button>
-          <button onClick={() => schliessen()} style={toolbarBtn}>{t("common.cancel")}</button>
         </Werkzeugleiste>
         {/* Was das Speichern zusätzlich tun wird — sonst wäre ein
             umgeschaltetes Archiv im Menü verborgen. */}
@@ -541,9 +556,13 @@ export default function Classes() {
             {entwurf.wert.archiviert ? t("classes.archive") : t("classes.unarchive")}
           </p>
         )}
-        {cardvote && (
-          <p style={{ fontSize: 12, color: students.length >= MAX_CARDS ? C.danger : "var(--text3)", margin: 0 }}>
-            {t("classes.limit", { max: MAX_CARDS, count: students.length })}
+        {/* Die Zahl der bedruckten Karten ist eine Grenze des Scanners, kein
+            Wissen, das man beim Namentippen braucht — der Satz stand unter
+            JEDER Klasse. Erreicht ist sie, sagt es der Knopf „Zeile dazu"
+            (deaktiviert) und der Hinweis darueber, sonst nichts. */}
+        {cardvote && students.length >= MAX_CARDS && (
+          <p style={{ fontSize: 12, color: C.danger, margin: 0 }}>
+            {t("classes.limitVoll", { max: MAX_CARDS })}
           </p>
         )}
         {zuschnitt && (
