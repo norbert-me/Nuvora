@@ -104,9 +104,14 @@ Pflicht-Env: `POSTGRES_PASSWORD`, `TOKEN_SECRET` — Compose bricht ohne sie bew
 
 ### Als Nächstes
 
-Keine offenen Fundament-Aufgaben. Die früher geplante Wochenplanung ist im **Modul Kalender** aufgegangen (Stundenplan + Planung von Quiz/Deck/Lernleiter + freie Tage). Weiteres nur nach Bedarf.
+**Der Umbau auf Kurse (entschieden am 06.09.2026).** Die Frage kam vom Nutzer: „was ist der Sinn von Klassen? Ich könnte doch einfach die Kurse anlegen und dabei sagen: entweder leer oder aus einer Klasse erstellen." Sie trifft einen echten Bruch — Nuvora führt heute **Fach-Klassen** („7.5 LZ", „7.5 Mathematik") mit denselben Kindern als getrennten Zeilen, zusammengehalten von `schueler.zeilen_der_person` und `_sync_siblings`. Das hielt die Daten zusammen, beantwortete aber „wie steht Anna insgesamt da?" nicht.
 
-Erledigt: Rahmen mit Modulregister; Klassen, Schüler und Themen im Kern; alle Module auf dem Kern; Datenübernahme aus der alten Lernleiter-Installation; CardVote-Ergebnisse als Note (mit Link zur Auswertung); Kalender mit Stundenplan, Planung und freien Tagen.
+Der Weg in vier Etappen, jede für sich lauffähig:
+
+1. **Person-Ebene** (erledigt): `persons` hält das Kind einmal — Name, Foto, Niveau, Förderschwerpunkte, Maßnahmen, Notizen, Klassenleitung, Zugangs-Token; `students.person_id` macht die alte Zeile zur **Zugehörigkeit**. Die Übernahme (`app/personen.py`, beim Start, idempotent) erkennt dieselbe Person am Namen je Konto — mehr gibt der Bestand nicht her, und genau so arbeitete die Krücke vorher schon. **Es wird nichts gelöscht und nichts umgehängt**: die alten Felder an `students` bleiben stehen, solange die Module darauf rechnen. Regressionstest `apps/api/tests/test_personen.py`.
+2. **Auswertung je Person** (angefangen): `GET /api/personen` und `/api/personen/{id}/auswertung` — ein Kind quer über seine Kurse. Gerechnet wird nichts Neues: der Themenstand kommt aus `results.themenprofil`, wie der Papierkorb seine Modul-Funktionen ruft. Zwei Rechnungen wären zwei Wahrheiten.
+3. **Kurse als einzige Bedienebene**: Kurs anlegen „leer" oder „aus einem anderen Kurs entwickeln" (Mitglieder übernehmen); `/classes` verschwindet aus der Navigation, die Klasse bleibt zunächst als Träger im Hintergrund.
+4. **`class_id` aus den Modulen entfernen** (`kurs_id` überall), dann fällt `school_classes`. Das ist der teure Teil: `class_id` steht an 683 Stellen im Backend und 293 im Frontend — er wird modulweise gemacht, nicht in einem Rutsch.
 
 ### Wochenplanung (im Modul Kalender umgesetzt)
 

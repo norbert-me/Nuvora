@@ -156,6 +156,9 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
         "planungs_bloecke": await _rows(db, m.PlanBlock, in_(m.PlanBlock, "week_id", week_ids)),
         "einstiege_ordner": await _rows(db, m.MethodFolder, m.MethodFolder.owner_id == uid),
         "todos": await _rows(db, m.Todo, m.Todo.owner_id == uid),
+        # Die Person selbst — mit ihren Art.-9-Feldern. Es sind ihre eigenen
+        # Daten, Art. 15 verlangt sie vollstaendig.
+        "personen": await _rows(db, m.Person, m.Person.owner_id == uid),
         "pap_aufgaben": await _rows(db, m.PapAufgabe, m.PapAufgabe.owner_id == uid),
         # Die Zeichnungen der Kinder haengen an der Aufgabe, nicht am Konto —
         # ueber die Schueler-IDs, wie der Karten-Fortschritt.

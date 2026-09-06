@@ -46,6 +46,9 @@ KERN = (
     # Die ladbaren Apps: eine Eigenschaft der Installation, kein Modulinhalt —
     # dieselbe Antwort fuer jede Lehrkraft.
     "/api/apps",
+    # Die Person gehoert dem Kern: ein Kind ist kein Modulinhalt, und die
+    # Sicht auf sein Jahr fragt jede Quelle einzeln (Regel 3).
+    "/api/personen",
     # Die Aenderungsliste: gehoert der Installation, nicht einem Modul.
     "/api/changelog",
     # Dateiablage der Lehrkraft: haengt an Themen (Kern), gehoert keinem Modul.

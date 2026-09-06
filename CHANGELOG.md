@@ -19,6 +19,14 @@ Notiz zur größten Fassung die dünnste.
 - Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
   Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
 
+**Kern: die Person**
+
+- Ein Kind gibt es jetzt einmal — auch wenn es in mehreren Kursen sitzt.
+  Name, Foto, Niveau, Förderangaben und Zugang hängen an der Person, nicht
+  mehr an jeder einzelnen Liste. Bestehende Daten wandern beim Start mit,
+  es geht nichts verloren.
+- Neu: eine Auswertung je Kind über alle Kurse hinweg.
+
 **Kalender**
 
 - Trägt ein Eintrag einen anderen Kurs als die Stundenplan-Vorlage, zeigt der

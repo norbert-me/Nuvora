@@ -13,10 +13,11 @@ from .models import AppSetting, Base, Kurs, Session as SessionModel, User
 # den frueheren Ring main -> routers.backup -> main aufloest. Hier nur noch
 # hereingeholt, damit die Routen weiter unten `_require_admin` benutzen koennen.
 from .admin import _require_admin, APP_VERSION  # noqa: F401 — Routen unten
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, caldav, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, pap, trash, selftest, backup
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, caldav, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, pap, personen, trash, selftest, backup
 from . import websocket as ws
 from .routers.auth import _hash_pw, _verify_token, get_current_user, rate_limit, TOKEN_TTL
 from .routers.karten import uebernahme_deck_kurse
+from .personen import uebernahme_personen
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -207,6 +208,7 @@ app.include_router(todos.router)
 app.include_router(notizblock.router)
 app.include_router(pap.router)
 app.include_router(pap.lern_router)
+app.include_router(personen.router)
 app.include_router(trash.router)
 app.include_router(selftest.router)
 # Sicherungen: Serververwaltung, kein Modul (steht deshalb nicht in REGISTRY).
@@ -387,6 +389,7 @@ def _ensure_columns(sync_conn):
         ("users", "timetable_times", "JSON"),
         ("users", "timetable_zero", "JSON"),
         ("users", "changelog_seen", "VARCHAR(20) DEFAULT '' NOT NULL"),
+        ("students", "person_id", "INTEGER"),
         ("notepad_notes", "width", "INTEGER DEFAULT 0 NOT NULL"),
         ("notepad_notes", "height", "INTEGER DEFAULT 0 NOT NULL"),
     ]
@@ -830,6 +833,18 @@ async def startup():
             print(f"[STARTUP-WARN] Karten-Zuweisung nicht uebernommen: {type(e).__name__}: {e} "
                   f"— Stapel gelten dann weiter ueber ihre Herkunftsklasse.", flush=True)
 
+    # Personen-Ebene: jede Listenzeile bekommt ihr Kind (siehe app/personen.py).
+    # Idempotent und ohne Datenverlust — die alten Felder an `students` bleiben
+    # stehen, solange die Module darauf rechnen.
+    async with async_session() as db:
+        try:
+            n = await uebernahme_personen(db)
+            if n:
+                print(f"[STARTUP] Personen: {n} Person(en) aus dem Bestand angelegt.", flush=True)
+        except Exception as e:
+            await db.rollback()
+            print(f"[STARTUP-WARN] Personen-Uebernahme uebersprungen: {type(e).__name__}: {e}", flush=True)
+
     # Marktplatz: kind muss zum Snapshot-Typ passen. Vor der kind-Spalte
     # veröffentlichte Karten-Decks/Einstiege trugen den Default
     # "cardvote_questionset" und wurden dann als Quiz behandelt (Vorschau im
@@ -930,6 +945,7 @@ PAPIERKORB_TABELLEN = (
     # bliebe sie fuer den Rest des Laufs auf eine geloeschte ID zeigen.
     ("questions", "Frage(n)"), ("topics", "Thema/Themen"),
     ("pap_aufgaben", "PAP-Aufgabe(n)"),
+    ("persons", "Person(en)"),
 )
 
 

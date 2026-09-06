@@ -382,6 +382,51 @@ class SchoolClass(Base):
     owner: Mapped[Optional["User"]] = relationship(back_populates="classes")
 
 
+class Person(Base):
+    """Ein Kind — EINMAL, unabhaengig davon, in wie vielen Kursen es sitzt.
+
+    Bis hierher war die Zeile in `students` gleichzeitig die Person UND ihre
+    Zugehoerigkeit: dieselbe Anna hatte in „7.5 LZ" und „7.5 Mathematik" zwei
+    Zeilen, zusammengehalten von `schueler.zeilen_der_person` (schreibt Niveau
+    und Foerderdaten auf alle) und `_sync_siblings` (zieht die Reihenfolge
+    nach). Das funktionierte, war aber eine Kruecke: „wie steht Anna insgesamt
+    da?" liess sich nicht beantworten, ohne vorher zu raten, welche Zeilen
+    dieselbe Person meinen.
+
+    Deshalb diese Ebene. Was der PERSON gehoert, steht hier: Name, Foto,
+    Niveau, Foerderschwerpunkte, Massnahmen, Notizen, Klassenleitung und der
+    ausgeteilte Zugang. Was der Zugehoerigkeit gehoert (Kartennummer,
+    Reihenfolge in genau dieser Liste), bleibt an `students`.
+
+    ACHTUNG, besonders schuetzenswert: `foerder`, `massnahmen` und `notizen`
+    sind Daten nach DSGVO Art. 9. Sie duerfen NIE in Exporte oder
+    Veroeffentlichungen gelangen — dieselbe Regel wie bisher an `students`,
+    nur an einer Stelle statt an fuenf Kopien.
+    """
+    __tablename__ = "persons"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")  # "E" | "G" | ""
+    foerder: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    massnahmen: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    notizen: Mapped[str] = mapped_column(Text, default="", server_default="")
+    klassenlehrer: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    # Der ausgeteilte Zugang gehoert dem KIND, nicht einer seiner Listen: ein
+    # Kind hat einen QR-Zettel, nicht drei.
+    karten_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
+    photo: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    photo_mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    photo_thumb: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    @property
+    def has_photo(self) -> bool:
+        return bool(self.photo_mime)
+
+
 class Student(Base):
     __tablename__ = "students"
 
@@ -402,6 +447,10 @@ class Student(Base):
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     name: Mapped[str] = mapped_column(String(200))
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"))
+    # Welche PERSON sitzt hier? Neu (siehe Person): die Zeile ist damit die
+    # Zugehoerigkeit, nicht mehr das Kind selbst. Nullable, solange der Bestand
+    # wandert — danach traegt jede Zeile eine Person.
+    person_id: Mapped[Optional[int]] = mapped_column(ForeignKey("persons.id", ondelete="CASCADE"), nullable=True, index=True)
     # Zugehöriger Kurs (Lerngruppe der Klasse). Anwesenheit wird über den Kurs
     # geteilt: gleichnamige SuS der Fach-Klassen desselben Kurses gelten als
     # dieselbe Person. Karten/Noten bleiben pro Klasse (Student-Zeile).
