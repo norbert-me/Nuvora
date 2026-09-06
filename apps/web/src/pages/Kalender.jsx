@@ -515,6 +515,13 @@ export default function Kalender() {
   // per className raten. Eine Klasse kann in mehreren Kursen liegen — nur kurs_id
   // weiß, welcher gemeint war.
   const slotName = (s) => (s && s.kurs_id && kursName(s.kurs_id)) || className(s && s.class_id);
+  // Wie heisst DIESER Eintrag? Derselbe Vorrang wie beim Slot: der ausdruecklich
+  // gewaehlte Kurs, sonst die Klasse. Gebraucht wird das, weil ein Eintrag einen
+  // ANDEREN Kurs tragen kann als die Stundenplan-Vorlage, an der er haengt —
+  // dann stand im Kalender der Kurs der Vorlage („7.5 LZ") und im Dialog der des
+  // Eintrags („7.5 GA"), und niemand konnte sagen, welcher nun gilt. Fuer den
+  // Tag gilt der Eintrag: er ist die konkretere Angabe.
+  const eintragName = (e) => (e && e.kurs_id && kursName(e.kurs_id)) || className(e && e.class_id);
 
   // Ausgeblendetes im SICHTBAREN Zeitraum. Der Zeitraum ist der Punkt: im
   // Tagesblick interessiert nicht, was im November weggeblendet wurde.
@@ -859,7 +866,7 @@ export default function Kalender() {
         </div>
       )}
       {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?todo=${td.id}` : "/notizbrett")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
-      {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?todo=${td.id}` : "/notizbrett")} slotsFor={slotsFor} onCancelSlot={cancelSlot} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?todo=${td.id}` : "/notizbrett")} slotsFor={slotsFor} onCancelSlot={cancelSlot} frei={frei} className={className} slotName={slotName} eintragName={eintragName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {untisOffen && (
         <UntisImport onClose={() => setUntisOffen(false)} kurse={kurse} klassen={classes} periods={tt.periods}
           onFertig={() => { loadTt(); loadBreaks(); loadCancels(); }} />
@@ -1282,7 +1289,7 @@ function FreiMarker({ label, t }) {
   );
 }
 
-function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDay, todoByDay, onTodo, slotsFor, onCancelSlot, frei, className, slotName, slotColor, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
+function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDay, todoByDay, onTodo, slotsFor, onCancelSlot, frei, className, slotName, eintragName = () => "", slotColor, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
   const list = byDay(day);
   const f = frei && frei(day);
   // An freien Tagen faellt der Stundenplan weg — die Termine des Tages nicht.
@@ -1304,6 +1311,10 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   // JEDES MAL, wenn die Flaeche entsteht, und zwar auf die erste Stunde des
   // Tages statt auf eine feste Uhrzeit.
   const HOUR = 40;
+  // Kleinste Hoehe eines Kastens: darunter waere er ein Strich ohne Text. Sie
+  // steht hier und nicht nur im Style, weil auch die Spaltenrechnung sie
+  // braucht (siehe flaechenEnde).
+  const BLOCK_MIN_H = 22;
   // Ganztägig / ohne verortbare Uhrzeit -> Banner oben (auch externe Termine).
   // Einträge mit freier Uhrzeit gehören in die Zeitspur, nicht ins Banner.
   const ganztags = list.filter((e) => e.period == null && hmToMin(e.start_time) == null);
@@ -1317,7 +1328,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
     const eintrag = list.find((e) => e.period === s.period);
     timed.push({ key: "s" + s.id, start: sm, end: em != null ? em : sm + 45,
       col: s.class_id || s.kurs_id ? slotColor(s) : "var(--accent)",
-      label: slotName(s) || s.title || topicName(s.topic_id) || "—",
+      label: (eintrag && eintragName(eintrag)) || slotName(s) || s.title || topicName(s.topic_id) || "—",
       sub: eintrag ? (eintrag.title || topicName(eintrag.topic_id) || t("kalender.planned")) + (linked(eintrag) ? " ↗" : "") : "",
       // Leere Stundenplan-Stunde (kein Eintrag): kann für diesen Tag entfallen.
       onCancel: eintrag ? null : () => onCancelSlot && onCancelSlot(day, s.period),
@@ -1345,14 +1356,25 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   });
 
   // Überlappende Termine nebeneinander: jedem Termin eine Spalte (lane) zuweisen,
-  // die Breite pro Cluster durch die Spaltenzahl teilen. So verdecken sich
-  // gleichzeitige Ereignisse nicht mehr.
+  // die Breite pro Cluster durch die Spaltenzahl teilen.
+  //
+  // Gerechnet wird mit der GEZEICHNETEN Flaeche, nicht mit der reinen Zeit.
+  // Eine 0. Stunde von 07:55 bis 08:05 endet vor der ersten (08:10) und
+  // ueberlappt zeitlich mit nichts — sie wird aber mit der Mindesthoehe
+  // gezeichnet (sonst waere sie ein Strich) und deckt die naechste Stunde
+  // zu. „Ueberlappung der Zeit" und „Ueberlappung der Kaesten" sind zwei
+  // verschiedene Fragen; hier zaehlt die zweite.
+  const MINDEST_MIN = ((BLOCK_MIN_H + 3) / HOUR) * 60;   // Mindesthoehe in Minuten
+  const flaechenEnde = (e) => Math.max(e.end, e.start + MINDEST_MIN);
   {
     const items = timed.slice().sort((a, b) => a.start - b.start || a.end - b.end);
     items.forEach((e) => { e.lane = 0; e.lanes = 1; });
     for (let i = 0; i < items.length; i++) {
       const used = new Set();
-      for (let j = 0; j < i; j++) { const f = items[j]; if (f.start < items[i].end && items[i].start < f.end) used.add(f.lane); }
+      for (let j = 0; j < i; j++) {
+        const f = items[j];
+        if (f.start < flaechenEnde(items[i]) && items[i].start < flaechenEnde(f)) used.add(f.lane);
+      }
       let c = 0; while (used.has(c)) c++;
       items[i].lane = c;
     }
@@ -1360,7 +1382,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
     let cStart = 0, cMax = 0, cEnd = -Infinity;
     for (let i = 0; i < items.length; i++) {
       if (i > cStart && items[i].start >= cEnd) { for (let k = cStart; k < i; k++) items[k].lanes = cMax + 1; cStart = i; cMax = 0; cEnd = -Infinity; }
-      cMax = Math.max(cMax, items[i].lane); cEnd = Math.max(cEnd, items[i].end);
+      cMax = Math.max(cMax, items[i].lane); cEnd = Math.max(cEnd, flaechenEnde(items[i]));
     }
     for (let k = cStart; k < items.length; k++) items[k].lanes = cMax + 1;
   }
@@ -1429,7 +1451,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
             </div>
           ))}
           {timed.map((it) => (
-            <div key={it.key} style={{ position: "absolute", top: yOf(it.start) + 1, height: Math.max(22, yOf(it.end) - yOf(it.start) - 2),
+            <div key={it.key} style={{ position: "absolute", top: yOf(it.start) + 1, height: Math.max(BLOCK_MIN_H, yOf(it.end) - yOf(it.start) - 2),
               left: `calc(50px + ${it.lane || 0} * (100% - 58px) / ${it.lanes || 1})`,
               width: `calc((100% - 58px) / ${it.lanes || 1} - 3px)` }}>
               <button onClick={it.onClick} title={`${it.label}${it.sub ? " — " + it.sub : ""}`}

@@ -21,6 +21,12 @@ Notiz zur größten Fassung die dünnste.
 
 **Kalender**
 
+- Trägt ein Eintrag einen anderen Kurs als die Stundenplan-Vorlage, zeigt der
+  Tag jetzt den des Eintrags — vorher stand im Kalender „7.5 LZ" und im
+  geöffneten Eintrag „7.5 GA".
+- Kurze Stunden (etwa eine 0. Stunde über zehn Minuten) legen sich nicht mehr
+  über die nächste: nebeneinander gestellt wird, was sich als Kasten
+  überlappt, nicht nur, was sich zeitlich überschneidet.
 - Wird der Kurs einer Stundenplan-Stunde gewechselt, heißt sie danach auch so.
   Die Auswahl sprang bisher auf den alten Kurs zurück.
 - Der Dialog heißt „Neuer Eintrag", solange es noch keinen gibt — vorher stand
