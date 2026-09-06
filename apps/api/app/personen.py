@@ -94,6 +94,40 @@ async def uebernahme_personen(db: AsyncSession) -> int:
     return neu
 
 
+async def sichere_personen(db: AsyncSession, zeilen, owner_id: int) -> int:
+    """Jede dieser Listenzeilen bekommt ihr Kind — beim Anlegen und Aendern.
+
+    Die Uebernahme beim Start holt den BESTAND; ohne diesen Aufruf haette jede
+    danach angelegte Zeile keine Person, und die Personenliste liefe der
+    Wirklichkeit hinterher (genau so ist die erste Selbsttest-Probe rot
+    geworden). Dieselbe Regel wie dort: gleicher Name je Konto = dasselbe Kind.
+
+    Commit macht der Aufrufer — er ist mitten in seiner eigenen Transaktion.
+    """
+    offen = [z for z in zeilen if getattr(z, "person_id", None) is None]
+    if not offen or not owner_id:
+        return 0
+    vorhanden = {}
+    for p in (await db.execute(select(Person).where(Person.owner_id == owner_id))).scalars().all():
+        vorhanden[" ".join((p.name or "").split()).casefold()] = p
+    neu = 0
+    for z in offen:
+        key = _schluessel(z)
+        if not key:
+            continue                       # namenlose Zeile: noch kein Kind
+        p = vorhanden.get(key)
+        if p is None:
+            p = Person(owner_id=owner_id, name=z.name or "")
+            for f in PERSON_FELDER:
+                setattr(p, f, getattr(z, f, None))
+            db.add(p)
+            await db.flush()
+            vorhanden[key] = p
+            neu += 1
+        z.person_id = p.id
+    return neu
+
+
 async def person_von_zeile(db: AsyncSession, student_id: int):
     """Die Person hinter einer Listenzeile — oder None."""
     z = await db.get(Student, student_id)

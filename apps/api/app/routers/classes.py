@@ -7,6 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..personen import sichere_personen
 from ..schueler import sortiert, zeilen_der_person
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
@@ -219,6 +220,11 @@ async def create_class(body: ClassCreate, user: User = Depends(get_current_user)
         db.add(Student(card_id=s.card_id, name=s.name, class_id=sc.id, kurs_id=kurs.id, position=pos,
                        niveau=s.niveau, foerder=s.foerder, massnahmen=_massnahmen(s), notizen=s.notizen,
                        klassenlehrer=s.klassenlehrer))
+    await db.flush()
+    # Jede neue Zeile bekommt ihr Kind (Personen-Ebene). Ohne das laeuft die
+    # Personenliste dem Bestand hinterher — die Uebernahme beim Start holt nur,
+    # was VOR ihr da war.
+    await sichere_personen(db, await sortiert(db, Student.class_id == sc.id), user.id)
     await db.commit()
     return await _load_class(db, sc.id)
 
@@ -373,6 +379,7 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
     if body.renumber:
         await _renumber(db, sc)
     await _sync_siblings(db, sc)
+    await sichere_personen(db, await sortiert(db, Student.class_id == sc.id), user.id)
     await db.commit()
     return await _load_class(db, class_id)
 
