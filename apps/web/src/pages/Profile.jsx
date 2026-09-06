@@ -432,6 +432,14 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             <div style={{ height: 1, flex: 1, background: "var(--border2)" }} />
           </div>
 
+          {/* Fehlermeldungen: an/aus und alle ansehen. Sie liegen in der
+              Datenbank, nicht im Postfach — deshalb gehoert die Verwaltung
+              hierher und nicht in eine Mail-Regel. */}
+          <div style={{ ...abschnitt, marginBottom: 16 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("bugadmin.titel")}</div>
+            <BugAdmin />
+          </div>
+
           {setup && !(setup.smtp && setup.site_json && setup.admin_email && setup.contact_deliverable) && (
             <div style={{ ...abschnitt, marginBottom: 16 }}>
               <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.setup")}</div>

@@ -21,6 +21,13 @@ import { alsJson } from "../core/melden.js";
 import { useLanguage } from "../i18n/index.jsx";
 
 export default function Fehlermelder() {
+  // Der Knopf zeigt sich nur, wenn die Administration das Melden erlaubt hat.
+  // Sonst stuende er da und die Meldung liefe beim Absenden in ein 403.
+  const [erlaubt, setErlaubt] = useState(true);
+  useEffect(() => {
+    fetch("/api/bugreport/status").then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setErlaubt(!!d.an); }).catch(() => {});
+  }, []);
   const { t } = useLanguage();
   const [offen, setOffen] = useState(false);
   const [text, setText] = useState("");
@@ -88,6 +95,9 @@ export default function Fehlermelder() {
     setOffen(false);
     setText(""); setFertig(false); setFehler(""); setLogOffen(false); setDatei(null);
   };
+
+
+  if (!erlaubt) return null;
 
   return (
     <>

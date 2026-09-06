@@ -19,6 +19,18 @@ Notiz zur größten Fassung die dünnste.
 - Die Einrichtung der Startseite und die Start-Ansicht des Kalenders hängen am
   Konto statt am Browser — am zweiten Gerät stand sonst wieder der alte Stand.
 
+**Fehler melden**
+
+- Meldungen werden gespeichert statt gemailt. Die Administration sieht im
+  Profil alle Meldungen mit Absender, kann sie löschen, den Anhang öffnen und
+  das Melden ganz abschalten.
+- Keine Begrenzung mehr, wie oft gemeldet werden darf.
+- Der Melde-Dialog ist kürzer: kein Einleitungssatz, größeres Textfeld,
+  „Was wird mitgeschickt?" und „Datei anhängen" in einer Zeile, und nach dem
+  Absenden steht nur noch „Danke!".
+- Der Hinweis auf Rückmeldungen in der Fußzeile ist weg — er führte über das
+  Kontaktformular an Protokoll und Umgebung vorbei.
+
 **Kern: die Person**
 
 - „Klassen" ist aus der Navigation verschwunden: Kinder werden im Kurs
