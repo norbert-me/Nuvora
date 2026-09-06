@@ -814,7 +814,12 @@ async def startup():
                 if owner is None:
                     continue
                 kid = (await db.execute(text(
-                    "INSERT INTO kurse (owner_id, name) VALUES (:o, :n) RETURNING id"
+                    # `fach` ausdruecklich: die Spalte ist NOT NULL, und auf
+                    # gewachsenen Installationen hat sie keinen DEFAULT (sie
+                    # wurde vor der Default-Regel angelegt). Ohne das brach die
+                    # ganze Kurs-Migration ab — sichtbar nur als STARTUP-WARN,
+                    # waehrend die Zuordnung Jahr fuer Jahr ungemacht blieb.
+                    "INSERT INTO kurse (owner_id, name, fach) VALUES (:o, :n, '') RETURNING id"
                 ), {"o": owner, "n": cname or ""})).scalar()
                 await db.execute(text("UPDATE school_classes SET kurs_id = :k WHERE id = :c"), {"k": kid, "c": cid})
             if rows:
@@ -853,6 +858,20 @@ async def startup():
             await db.rollback()
             print(f"[STARTUP-WARN] Karten-Zuweisung nicht uebernommen: {type(e).__name__}: {e} "
                   f"— Stapel gelten dann weiter ueber ihre Herkunftsklasse.", flush=True)
+
+    # Fehlende Spalten-Defaults nachziehen. `_ensure_columns` legt Spalten an,
+    # aendert aber nie bestehende — auf gewachsenen Installationen steht
+    # deshalb NOT NULL ohne DEFAULT, und jedes INSERT, das die Spalte nicht
+    # nennt, scheitert. Idempotent und billig.
+    async with async_session() as db:
+        try:
+            for tabelle, spalte in (("kurse", "fach"), ("kurse", "raum"),
+                                    ("kurse", "schuljahr"), ("kurse", "color")):
+                await db.execute(text(f"ALTER TABLE {tabelle} ALTER COLUMN {spalte} SET DEFAULT ''"))
+            await db.commit()
+        except Exception as e:
+            await db.rollback()
+            print(f"[STARTUP-WARN] Defaults nicht gesetzt: {type(e).__name__}: {e}", flush=True)
 
     # Personen-Ebene: jede Listenzeile bekommt ihr Kind (siehe app/personen.py).
     # Idempotent und ohne Datenverlust — die alten Felder an `students` bleiben

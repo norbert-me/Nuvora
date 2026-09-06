@@ -54,6 +54,11 @@ async def uebernahme_personen(db: AsyncSession) -> int:
         .where(Student.person_id.is_(None))
     )).all()
     if not offen:
+        # Nichts Neues zu verknuepfen — die Bilder aber trotzdem nachziehen.
+        # Der Nachzug stand frueher HINTER diesem Ausstieg und lief damit nur
+        # beim allerersten Start; ein spaeter hochgeladenes Foto (oder ein
+        # fehlender Typ) blieb fuer immer liegen.
+        await _fotos_nachziehen(db)
         return 0
 
     # Was es schon gibt, wird wiederverwendet: die Uebernahme laeuft bei jedem
@@ -83,6 +88,12 @@ async def uebernahme_personen(db: AsyncSession) -> int:
 
     # Fotos wandern in einem Rutsch mit — als SQL, damit die Blobs nicht durch
     # den Anwendungsspeicher laufen (ein Klassensatz sind schnell 100 MB).
+    await _fotos_nachziehen(db)
+    return neu
+
+
+async def _fotos_nachziehen(db: AsyncSession) -> None:
+    """Bilder von den Listenzeilen an die Person — Bytes UND Typ."""
     try:
         # Der TYP muss mitkommen: `has_photo` haengt an `photo_mime`, und ohne
         # ihn liegt das Bild zwar in der Datenbank, gilt aber als „kein Foto" —
@@ -98,7 +109,6 @@ async def uebernahme_personen(db: AsyncSession) -> int:
         await db.commit()
     except Exception:
         await db.rollback()               # SQLite (Tests) kennt UPDATE..FROM nicht
-    return neu
 
 
 async def sichere_personen(db: AsyncSession, zeilen, owner_id: int) -> int:
