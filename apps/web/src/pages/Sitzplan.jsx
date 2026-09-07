@@ -385,13 +385,25 @@ export default function Sitzplan() {
 
   // Tafel ziehen (Pointer). Breite/Höhe der Tafel-Fläche.
   const TAFEL_W = 200, TAFEL_H = 30;
+  // Auf dem iPhone reisst ein Zug sonst ab: Safari entscheidet nach den ersten
+  // Millimetern selbst, ob die Geste zur Seite gehoert (Scrollen, Zoomen, das
+  // Zurueck-Wischen am Rand) und schickt dann `pointercancel` — der Platz bleibt
+  // auf halbem Weg liegen, und es sieht aus, als reagiere er nicht. Der Zeiger
+  // wird deshalb auf dem Element FESTGEHALTEN (setPointerCapture); alle
+  // weiteren Ereignisse gehen dann garantiert dorthin, auch wenn der Finger
+  // darueber hinausrutscht.
+  const zeigerHalten = (e) => {
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* aelterer Browser */ }
+  };
   const onTafelDown = (e) => {
     snapshot();
     e.preventDefault();
+    zeigerHalten(e);
     const rect = canvasRef.current.getBoundingClientRect();
     tafelRef.current = { dx: (e.clientX - rect.left) / zoom - (tafel.x + versatzX), dy: (e.clientY - rect.top) / zoom - (tafel.y + versatzY) };
     window.addEventListener("pointermove", onTafelMove);
     window.addEventListener("pointerup", onTafelUp);
+    window.addEventListener("pointercancel", onTafelUp);
   };
   const onTafelMove = (e) => {
     const d = tafelRef.current; if (!d) return;
@@ -404,6 +416,7 @@ export default function Sitzplan() {
   const onTafelUp = () => {
     window.removeEventListener("pointermove", onTafelMove);
     window.removeEventListener("pointerup", onTafelUp);
+    window.removeEventListener("pointercancel", onTafelUp);
     const norm = normalisieren(seats, tafel);
     if (norm.dx || norm.dy) {
       versatzNeutral(norm.dx, norm.dy);
@@ -419,6 +432,7 @@ export default function Sitzplan() {
   // ── Ziehen platzierter Tische (Pointer, damit es flüssig folgt) ──
   const onSeatDown = (e, seat) => {
     e.preventDefault();
+    zeigerHalten(e);
     const rect = canvasRef.current.getBoundingClientRect();
     // Der Schnappschuss fuer „Rueckgaengig" entsteht erst beim ersten
     // WIRKLICHEN Zug (siehe onMove): ein blosser Klick auf einen Platz ist
@@ -432,6 +446,8 @@ export default function Sitzplan() {
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    // Abgebrochene Geste zaehlt wie loslassen — sonst haengt der Zug fest.
+    window.addEventListener("pointercancel", onUp);
   };
   const onMove = (e) => {
     const d = dragRef.current; if (!d) return;
@@ -450,6 +466,7 @@ export default function Sitzplan() {
   const onUp = () => {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
     const d = dragRef.current;
     dragRef.current = null;
     // Wurde ueber den linken/oberen Rand hinaus gezogen, wandert die ganze
@@ -481,12 +498,14 @@ export default function Sitzplan() {
   const onRotDown = (e, seat) => {
     snapshot();
     e.preventDefault(); e.stopPropagation();
+    zeigerHalten(e);
     const cx = seat.x + versatzX + SEAT_W / 2, cy = seat.y + versatzY + SEAT_H / 2;
     // Relativ drehen: Start-Zeigerwinkel und Start-Drehung merken, damit das
     // Greifen des Griffs nicht sofort auf einen absoluten Winkel springt.
     rotRef.current = { sid: seat.sid, cx, cy, startAngle: _angle(e, cx, cy), startRot: seat.rot || 0 };
     window.addEventListener("pointermove", onRotMove);
     window.addEventListener("pointerup", onRotUp);
+    window.addEventListener("pointercancel", onRotUp);
   };
   const onRotMove = (e) => {
     const d = rotRef.current; if (!d) return;
@@ -497,6 +516,7 @@ export default function Sitzplan() {
   const onRotUp = () => {
     window.removeEventListener("pointermove", onRotMove);
     window.removeEventListener("pointerup", onRotUp);
+    window.removeEventListener("pointercancel", onRotUp);
     rotRef.current = null;
   };
 
@@ -505,10 +525,12 @@ export default function Sitzplan() {
   const onTafelRotDown = (e) => {
     snapshot();
     e.preventDefault(); e.stopPropagation();
+    zeigerHalten(e);
     const cx = tafel.x + versatzX + TAFEL_W / 2, cy = tafel.y + versatzY + TAFEL_H / 2;
     tafelRotRef.current = { cx, cy, startAngle: _angle(e, cx, cy), startRot: tafel.rot || 0 };
     window.addEventListener("pointermove", onTafelRotMove);
     window.addEventListener("pointerup", onTafelRotUp);
+    window.addEventListener("pointercancel", onTafelRotUp);
   };
   const onTafelRotMove = (e) => {
     const d = tafelRotRef.current; if (!d) return;
@@ -519,6 +541,7 @@ export default function Sitzplan() {
   const onTafelRotUp = () => {
     window.removeEventListener("pointermove", onTafelRotMove);
     window.removeEventListener("pointerup", onTafelRotUp);
+    window.removeEventListener("pointercancel", onTafelRotUp);
     tafelRotRef.current = null;
   };
 
@@ -594,6 +617,7 @@ export default function Sitzplan() {
     panRef.current = { x: e.clientX, y: e.clientY, l: scrollRef.current.scrollLeft, t: scrollRef.current.scrollTop };
     window.addEventListener("pointermove", onPanMove);
     window.addEventListener("pointerup", onPanUp);
+    window.addEventListener("pointercancel", onPanUp);
   };
   const onPanMove = (e) => {
     const p = panRef.current; if (!p) return;
@@ -603,6 +627,7 @@ export default function Sitzplan() {
   const onPanUp = () => {
     window.removeEventListener("pointermove", onPanMove);
     window.removeEventListener("pointerup", onPanUp);
+    window.removeEventListener("pointercancel", onPanUp);
     panRef.current = null;
   };
 
