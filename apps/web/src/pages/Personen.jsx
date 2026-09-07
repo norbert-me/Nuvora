@@ -158,7 +158,9 @@ export default function Personen() {
                   {/* Die Angaben zur Person stehen HIER — beim Namen, nicht in
                       jeder Zeile der Liste. */}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
-                    {stand.niveau && <span style={badge(stand.niveau === "E" ? C.info : C.success)}>{stand.niveau}</span>}
+                    {/* Kein E/G-Abzeichen über den Kursnamen: das Niveau gilt je
+                        Kurs, und über einer Liste aus vier Kursen behauptet ein
+                        einzelnes „G" etwas, das so nicht stimmt. */}
                     <span style={{ fontSize: 12, color: "var(--text3)", flex: 1 }}>{(p.kurse || []).join(" · ")}</span>
                     {/* Bild und Name gehören der Person — hier sind sie
                         änderbar, statt dass man dafür in eine Liste geht, in
@@ -189,7 +191,7 @@ export default function Personen() {
                           hängen am Kurs (mehr Zeit in Mathe heißt nicht dasselbe
                           wie in Sport) — dafür ist unten je Kurs dieselbe Maske
                           mit seiner kursId eingehängt. */}
-                      <SchuelerAngaben studentId={stand.teile[0].student_id} t={t} />
+                      <SchuelerAngaben studentId={stand.teile[0].student_id} ohneNiveau t={t} />
                     </div>
                   )}
                   {/* In welchen Kurs gehört das Kind? Hier, beim Kind — der

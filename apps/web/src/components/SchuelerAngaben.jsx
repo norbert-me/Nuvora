@@ -24,7 +24,7 @@ import { COLORS as C, ICONS, Icon, NiveauToggle, chipStyle, iconBtn, inputStyle,
 
 const titel = { fontSize: 13, fontWeight: 600, color: "var(--text)", margin: "14px 0 6px" };
 
-export default function SchuelerAngaben({ studentId, kursId = null, t }) {
+export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau = false, t }) {
   const [person, setPerson] = useState(null);
   const [basis, setBasis] = useState(null);
   const entwurfRef = useRef(null);
@@ -65,12 +65,18 @@ export default function SchuelerAngaben({ studentId, kursId = null, t }) {
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-        <NiveauToggle wert={w.niveau} onChange={(v) => e.setz({ niveau: v })} size={26} title={t("noten.course")} />
-        <span style={{ fontSize: 13, color: "var(--text2)" }}>
-          {w.niveau === "E" ? t("noten.courseE") : w.niveau === "G" ? t("noten.courseG") : t("noten.courseNone")}
-        </span>
-      </div>
+      {/* E/G gilt je KURS (in Mathe E, in Deutsch G) — auf der Personenseite,
+          die alle Kurse eines Kindes nebeneinander zeigt, wäre ein einzelnes „G"
+          eine Aussage, die so nicht stimmt. Dort wird die Zeile deshalb
+          ausgelassen (`ohneNiveau`); gepflegt wird sie im Kurs. */}
+      {!ohneNiveau && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+          <NiveauToggle wert={w.niveau} onChange={(v) => e.setz({ niveau: v })} size={26} title={t("noten.course")} />
+          <span style={{ fontSize: 13, color: "var(--text2)" }}>
+            {w.niveau === "E" ? t("noten.courseE") : w.niveau === "G" ? t("noten.courseG") : t("noten.courseNone")}
+          </span>
+        </div>
+      )}
 
       <div style={titel}>{t("classes.supportNeeds")}</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
