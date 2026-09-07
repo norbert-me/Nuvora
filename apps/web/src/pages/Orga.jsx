@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { undoDelete } from "../core/undo.jsx";
+import { askConfirm } from "../core/dialog.jsx";
 import { AddButton, COLORS as C, CONTROL_R, ICONS, Icon, cardStyle, iconBtn, klebtLinks, pageApp, td, th as thBase, toolbarInput } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
@@ -131,7 +132,13 @@ export default function Orga() {
               <tr>
                 <th style={{ ...th, ...klebtLinks, textAlign: "left", minWidth: 140 }}>{cls?.name}</th>
                 {items.map((it) => (
-                  <th key={it.id} style={{ ...th, minWidth: 90 }}>
+                  // Der Spaltenkopf IST der Löschknopf: ein Mülleimer je Spalte
+                  // stand dreißigmal in einer Zeile und machte die Kopfzeile zu
+                  // einer Reihe roter Symbole. Gefragt wird trotzdem — mit
+                  // Mülleimer im Dialog, damit klar ist, worauf man geklickt hat.
+                  <th key={it.id} style={{ ...th, minWidth: 90, cursor: "pointer" }}
+                    title={t("orga.spalteLoeschenHinweis")}
+                    onClick={async () => { if (await askConfirm(t("orga.spalteLoeschen", { name: it.name }), { danger: true, ok: t("common.delete") })) loeschen(it.id); }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                       <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</span>
                       {/* Zähler zählt den ENTWURF mit — sonst widerspräche er
@@ -139,7 +146,6 @@ export default function Orga() {
                       {(() => { const n = students.filter((s) => e.wert[`${it.id}:${s.id}`]).length; return (
                         <span style={{ fontSize: 11, fontWeight: 700, color: n === students.length ? C.success : "var(--text3)" }}>{n}/{students.length}</span>
                       ); })()}
-                      <button onClick={() => loeschen(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={13} color={C.danger} /></button>
                     </div>
                   </th>
                 ))}

@@ -5,7 +5,7 @@
 //   const txt = await askPrompt("Kurze Beschreibung:");
 // <DialogHost/> wird einmal in der Shell gemountet.
 import { useState, useEffect, useId } from "react";
-import { Modal, btnPrimary, btnSecondary, inputStyle, COLORS as C } from "../components/Icons.jsx";
+import { Modal, Icon, ICONS, btnPrimary, btnSecondary, inputStyle, COLORS as C } from "../components/Icons.jsx";
 
 let _push = null;               // vom Host registriert
 const _queue = [];              // bevor der Host bereit ist
@@ -76,7 +76,13 @@ export function DialogHost() {
   // key: jede Nachfrage ist ein eigener Dialog (Fokus neu setzen und zurueckgeben).
   return (
     <Modal key={cur.id} onClose={abbrechen} width={380} labelledby={titelId} overlayStyle={{ zIndex: 3000 }}>
-      <div id={titelId} style={{ fontSize: 16, lineHeight: 1.5, marginBottom: cur.kind === "prompt" ? 12 : 16, whiteSpace: "pre-wrap" }}>{cur.message}</div>
+      {/* Bei einer gefährlichen Frage steht der Mülleimer daneben: die Frage
+          kommt oft aus einem Klick, der selbst kein Symbol trägt (ein
+          Tabellenkopf etwa), und dann sagt erst das Bild, worum es geht. */}
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: cur.kind === "prompt" ? 12 : 16 }}>
+        {cur.danger && <Icon d={ICONS.trash} size={20} color={C.danger} />}
+        <div id={titelId} style={{ fontSize: 16, lineHeight: 1.5, whiteSpace: "pre-wrap", flex: 1 }}>{cur.message}</div>
+      </div>
       {cur.kind === "prompt" && (
         <input autoFocus value={val} onChange={(e) => setVal(e.target.value)} placeholder={cur.placeholder}
           onKeyDown={(e) => { if (e.key === "Enter") bestaetigen(); }}

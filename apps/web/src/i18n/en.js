@@ -1658,6 +1658,8 @@ export default {
   "orga.newPlaceholder": "New item, e.g. signature test 1",
   "orga.add": "Add",
   "orga.noStudents": "This class has no students.",
+  "orga.spalteLoeschen": "Delete column “{{name}}” with all its ticks?",
+  "orga.spalteLoeschenHinweis": "Click to delete the column",
   "orga.noItems": "No item yet. Add one above.",
   "orga.delConfirm": "Delete this item?",
   "orga.done": "Done",

@@ -1659,6 +1659,8 @@ export default {
   "orga.newPlaceholder": "Nuevo punto, p. ej. firma examen 1",
   "orga.add": "Crear",
   "orga.noStudents": "Esta clase no tiene alumnos.",
+  "orga.spalteLoeschen": "¿Eliminar la columna «{{name}}» con todas sus marcas?",
+  "orga.spalteLoeschenHinweis": "Haz clic para eliminar la columna",
   "orga.noItems": "Aún no hay ningún punto. Crea uno arriba.",
   "orga.delConfirm": "¿Eliminar este punto?",
   "orga.done": "Hecho",

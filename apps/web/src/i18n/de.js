@@ -1811,6 +1811,8 @@ export default {
   "orga.newPlaceholder": "Neuer Punkt, z.B. Unterschrift KA1",
   "orga.add": "Anlegen",
   "orga.noStudents": "Diese Klasse hat keine Schüler.",
+  "orga.spalteLoeschen": "Spalte „{{name}}“ mit allen Häkchen löschen?",
+  "orga.spalteLoeschenHinweis": "Anklicken löscht die Spalte",
   "orga.noItems": "Noch kein Orga-Punkt. Lege oben einen an.",
   "orga.delConfirm": "Diesen Punkt löschen?",
   "orga.done": "Erledigt",
