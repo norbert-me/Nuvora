@@ -32,6 +32,23 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Notenbuch: wer am Tag der Spalte gefehlt hat oder zu spät kam, ist in der
   Spalte farbig markiert.
 
+**Schulnetz und Apps**
+
+- Weniger Datenverkehr: alte Schriftfassungen werden nicht mehr vorgeladen
+  (2,7 statt 3,7 MB), und auf langsamer Verbindung lädt Nuvora nur, was gerade
+  gebraucht wird. Dazu ein Schalter „Datensparen" im Profil.
+- Die Desktop-App sagt, wenn eine neuere Fassung bereitsteht — mit Ladeknopf,
+  wegklickbar je Fassung.
+
+**Personen und Kurse**
+
+- Die Personenseite zeigt Angaben, Förderbedarf, Noten beider Halbjahre je Kurs
+  und den QR-Zugang; Foto und Name sind dort änderbar.
+- Kurse haben kein Klassen-Feld mehr; Kinder werden über eine Personensuche
+  hinzugefügt.
+- Archivieren wirkt sofort und wartet nicht mehr auf „Speichern".
+- Die Begrüßung auf der Startseite ist weg.
+
 **Zeitleiste**
 
 - Ohne eingetragenes Schuljahr sagt die Zeitleiste, warum die Halbjahrs-Wahl
