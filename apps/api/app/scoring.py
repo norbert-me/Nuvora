@@ -16,6 +16,15 @@ Die Regeln:
 * **Minuspunkte** (Quiz-Flag): eine falsche Antwort kostet ihr Gewicht, die
   Punktzahl fällt nie unter 0. Wer die Karte unten lässt, antwortet nicht:
   0 Punkte, kein Abzug.
+* **Bei dem Thema gefehlt** (je Kind und Session gesetzt): Fragen zu einem
+  Thema, das das Kind verpasst hat, zaehlen NICHT zur Basis — es kann nichts
+  wissen, was es nie hatte. Richtige Antworten darauf geben Bonus wie eine
+  E-Frage, und Minuspunkte greifen dort nie. Beides landet in einem Topf: der
+  Bonus ist zusammen auf hoechstens eine Notenstufe gedeckelt, sonst waere
+  „hat gefehlt" ein Weg zu einer besseren Note als bei voller Anwesenheit.
+  Sind ALLE Fragen betroffen, gaebe es keine Basis mehr, an der ein Bonus
+  haengen koennte — dann zaehlen sie regulaer (eine Wertung aus lauter Bonus
+  waere keine).
 * **Keine Abgabe**: wer gar nichts abgegeben hat, gilt als krank und bleibt aus
   der Wertung — die Lehrkraft kann ihn auf „anwesend" stellen, dann zählt seine
   0 überall mit (siehe status_of).
@@ -84,14 +93,37 @@ def status_of(card_id: int, has_any_scan: bool, config: Optional[dict]) -> str:
     return "anwesend" if has_any_scan else "krank"
 
 
+def gefehlt_von(card_id, config: Optional[dict]):
+    """Themen, bei denen dieses Kind gefehlt hat (aus eval_config).
+
+    `eval_config["gefehlt"]` ist {card_id: [topic_id, ...]} — dieselbe Ablage
+    und derselbe Schluessel wie bei krank/anwesend, damit die Auswertung eine
+    Stelle behaelt, an der die Ausnahmen eines Kindes stehen.
+    """
+    roh = ((config or {}).get("gefehlt") or {})
+    if not isinstance(roh, dict):
+        return []
+    werte = roh.get(str(card_id), roh.get(card_id)) or []
+    if not isinstance(werte, (list, tuple, set)):
+        return []
+    out = []
+    for x in werte:
+        try:
+            out.append(int(x))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
             minuspunkte: bool = False, weights: Optional[dict] = None,
-            scale: Optional[dict] = None) -> dict:
+            scale: Optional[dict] = None, gefehlt_topics=None) -> dict:
     """Punkte und Prozent für ein Kind.
 
-    questions: [{"id", "correct_answer", "niveau"}] — "niveau" ist "E" oder "".
+    questions: [{"id", "correct_answer", "niveau", "topic_id"}] — "niveau" ist "E" oder "".
     answers:   {question_id: "A"|None}
     niveau:    Kursniveau des Kindes ("E" | "G" | "")
+    gefehlt_topics: Themen, bei denen dieses Kind gefehlt hat (topic_ids)
     """
     w = weights or {}
     scale = {int(k): v for k, v in (scale or DEFAULT_SCALE).items()}
@@ -120,8 +152,24 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
     zaehlend = [q for q in questions if q.get("correct_answer")]
     # Ohne E/G-Flag oder für ein Kind im E-Kurs zählt alles regulär.
     differenziert = bool(niveau_aktiv) and niveau != "E"
-    basis = [q for q in zaehlend if not differenziert or (q.get("niveau") or "") != "E"]
-    extra = [q for q in zaehlend if differenziert and (q.get("niveau") or "") == "E"]
+    fehlt = {int(x) for x in (gefehlt_topics or []) if str(x).lstrip("-").isdigit()}
+
+    def verpasst(q):
+        tid = q.get("topic_id")
+        return bool(fehlt) and tid is not None and int(tid) in fehlt
+
+    def ist_extra(q):
+        return verpasst(q) or (differenziert and (q.get("niveau") or "") == "E")
+
+    basis = [q for q in zaehlend if not ist_extra(q)]
+    extra = [q for q in zaehlend if ist_extra(q)]
+    # Keine Basis mehr, weil ein verpasstes Thema alles herausgenommen hat: dann
+    # haengt der Bonus an nichts. Die verpassten Fragen zaehlen dann regulaer.
+    # (Der reine E/G-Fall — ein G-Kind ohne eine einzige G-Frage — bleibt davon
+    # unberuehrt: dort ist „keine Basis" seit jeher gewollt.)
+    if not basis and any(verpasst(q) for q in extra):
+        basis = [q for q in extra if verpasst(q)]
+        extra = [q for q in extra if not verpasst(q)]
 
     base_max = sum(gewicht(q["id"]) for q in basis)
     score = sum(gewicht(q["id"]) for q in basis if richtig(q))
@@ -147,4 +195,7 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
         "e_correct": e_richtig,
         "e_wrong": e_falsch,
         "e_total": len(extra),
+        # Wie viele der Bonus-Fragen aus einem verpassten Thema stammen — die
+        # Auswertung sagt sonst „E-Bonus", wo gar keine E-Frage im Spiel war.
+        "gefehlt_total": sum(1 for q in extra if verpasst(q)),
     }

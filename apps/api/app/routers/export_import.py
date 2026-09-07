@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 # Die Standard-Notenskala stand hier ein zweites Mal (wortgleich, nur ohne
 # Unterstrich im Namen) und in noten.py ein drittes Mal mit Text-Schluesseln.
 # Es gibt eine: die in scoring.py, wo auch gerechnet wird.
-from ..scoring import DEFAULT_SCALE, bewerte, status_of
+from ..scoring import DEFAULT_SCALE, bewerte, gefehlt_von, status_of
 from ..schueler import sortiert
 from ..pdfdruck import als_anhang, neue_seite
 from ..austauschformat import quiz_inhalt, quiz_schnappschuss
@@ -707,7 +707,8 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
 
     config = session.eval_config or {}
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
-    qdicts = [{"id": q.id, "correct_answer": q._shuffled_correct, "niveau": getattr(q, "_niveau", "")} for q in questions]
+    qdicts = [{"id": q.id, "correct_answer": q._shuffled_correct, "niveau": getattr(q, "_niveau", ""),
+               "topic_id": getattr(q, "topic_id", None)} for q in questions]
     row = 3
     for student in students:
         has_any = any((student.card_id, q.id) in scan_map for q in questions)
@@ -727,7 +728,8 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
             cell.alignment = Alignment(horizontal="center")
         eigene = {q.id: scan_map.get((student.card_id, q.id)) for q in questions}
         w = bewerte(qdicts, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv,
-                    minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"))
+                    minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
+                    gefehlt_topics=gefehlt_von(student.card_id, config))
         ws.cell(row=row, column=len(questions) + 2, value=f"{w['score']:g}/{w['max_score']:g}")
         ws.cell(row=row, column=len(questions) + 3, value=f"{round(w['pct'])}%")
         row += 1
@@ -785,7 +787,8 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
 
     scanned_question_ids = set(qid for (_, qid) in scan_map)
 
-    qdicts = [{"id": qn.id, "correct_answer": qn._shuffled_correct, "niveau": getattr(qn, "_niveau", "")}
+    qdicts = [{"id": qn.id, "correct_answer": qn._shuffled_correct, "niveau": getattr(qn, "_niveau", ""),
+               "topic_id": getattr(qn, "topic_id", None)}
               for qn in questions if qn.id in scanned_question_ids]
     for student in students:
         has_any = any((student.card_id, qn.id) in scan_map for qn in questions)
@@ -793,7 +796,8 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
             continue
         eigene = {qn["id"]: scan_map.get((student.card_id, qn["id"])) for qn in qdicts}
         pct = round(bewerte(qdicts, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv,
-                            minuspunkte=minuspunkte, weights=weights, scale=scale)["pct"])
+                            minuspunkte=minuspunkte, weights=weights, scale=scale,
+                            gefehlt_topics=gefehlt_von(student.card_id, config))["pct"])
         grade = _decimal_grade(pct, scale)
         lines.append(",".join([esc(student.name), esc(str(grade)), esc(""), esc("")]))
 
@@ -881,7 +885,8 @@ def _build_student_pdf_single(student, questions, scan_map, session, config, niv
     # (E/G-Bonus, Minuspunkte) — sonst stuende im PDF etwas anderes als am Schirm.
     wertung = bewerte(questions, eigene, niveau=student.get("niveau", ""),
                       niveau_aktiv=niveau_aktiv, minuspunkte=minuspunkte,
-                      weights=weights, scale=scale)
+                      weights=weights, scale=scale,
+                      gefehlt_topics=gefehlt_von(student["card_id"], config))
     score, max_score, pct = wertung["score"], wertung["max_score"], round(wertung["pct"])
     grade = _decimal_grade(pct, scale)
 
@@ -1016,7 +1021,8 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
 
         wertung = bewerte(student_questions, eigene, niveau=student.get("niveau", ""),
                           niveau_aktiv=niveau_aktiv, minuspunkte=minuspunkte,
-                          weights=weights, scale=scale)
+                          weights=weights, scale=scale,
+                          gefehlt_topics=gefehlt_von(student["card_id"], config))
         score, student_max, pct = wertung["score"], wertung["max_score"], round(wertung["pct"])
         grade = _decimal_grade(pct, scale)
 

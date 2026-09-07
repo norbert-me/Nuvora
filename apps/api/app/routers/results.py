@@ -15,7 +15,7 @@ from ..kursmitglieder import sibling_class_ids
 from ..schueler import roster_klasse
 from ..models import Scan, Session, SchoolClass, Student, QuestionSet, QuestionSetItem, Question, User, Topic
 from .auth import get_current_user
-from ..scoring import bewerte, note_aus_pct, status_of
+from ..scoring import bewerte, gefehlt_von, note_aus_pct, status_of
 # Punktelogik der Klassenarbeit (Teilaufgaben, Altformat, Abwesende) — die
 # Fruehwarnung rechnet sie NICHT nach, sie ruft sie auf. Kein Importring:
 # klassenarbeit.py holt nur database/models/auth/modules.
@@ -103,7 +103,9 @@ async def _fragen_und_flags(db: AsyncSession, session):
         for item in await _set_items(db, session.question_set_id):
             q = item.question
             questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer),
-                              "niveau": item.niveau or ""})
+                              "niveau": item.niveau or "",
+                              # Fuer „bei dem Thema gefehlt" — bewerte() braucht das Thema.
+                              "topic_id": q.topic_id})
 
     qs_flags = await db.get(QuestionSet, session.question_set_id) if session.question_set_id else None
     niveau_aktiv = bool(qs_flags.niveau_aktiv) if qs_flags else False
@@ -322,6 +324,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
         wertung = bewerte(
             questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv,
             minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
+            gefehlt_topics=gefehlt_von(student["card_id"], config),
         )
         rows.append({
             "card_id": student["card_id"],
@@ -674,6 +677,7 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
                     "id": q.id,
                     "correct_answer": qmap.get(str(q.id), q.correct_answer),
                     "niveau": item.niveau or "",
+                    "topic_id": q.topic_id,
                 })
 
         scan_result = await db.execute(select(Scan).where(Scan.session_id == session.id))
@@ -704,7 +708,8 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
                 continue
             eigene = {q["id"]: scan_map.get((student["card_id"], q["id"])) for q in questions}
             wertung = bewerte(questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv,
-                              minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"))
+                              minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
+                              gefehlt_topics=gefehlt_von(student["card_id"], config))
             student_scores[student["card_id"]] = {
                 "score": wertung["score"], "total": wertung["max_score"], "present": has_any,
                 "status": status, "pct": wertung["pct"], "niveau": student["niveau"],
@@ -784,7 +789,8 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
                     continue   # krank bleibt aus dem Schnitt, eine gewertete 0 nicht
                 eigene = {q["id"]: scan_map.get((student.card_id, q["id"])) for q in questions}
                 w = bewerte(questions, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv,
-                            minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"))
+                            minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
+                            gefehlt_topics=gefehlt_von(student.card_id, config))
                 all_pcts.append(round(w["pct"]))
 
         avg_pct = round(sum(all_pcts) / len(all_pcts)) if all_pcts else None
@@ -861,7 +867,8 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
                     continue
                 eigene = {q["id"]: scan_map.get((student.card_id, q["id"])) for q in questions}
                 pct = round(bewerte(questions, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv,
-                                    minuspunkte=minuspunkte, weights=weights, scale=scale)["pct"])
+                                    minuspunkte=minuspunkte, weights=weights, scale=scale,
+                                    gefehlt_topics=gefehlt_von(student.card_id, config))["pct"])
                 for g in range(1, 6):
                     if pct >= scale.get(g, 0):
                         grade_dist[g] += 1

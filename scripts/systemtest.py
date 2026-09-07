@@ -1893,6 +1893,32 @@ def teste_cardvote_voll(api, b, u, sch, spuren):
         return "krank/anwesend schaltet die Wertung wie dokumentiert"
 
     b.pruefe("CardVote", "Krank bleibt aus der Wertung", krank)
+
+    def gefehlt():
+        """„Bei dem Thema gefehlt" wird gespeichert und gelesen — und der
+        dokumentierte Grenzfall haelt: sind ALLE Fragen aus dem verpassten
+        Thema, bliebe keine Basis uebrig, an der ein Bonus haengen koennte,
+        also wird regulaer gewertet (die Wertung darf sich nicht aendern)."""
+        sid = zustand["sitzung"]["id"]
+        vorher = _finde(api.call("GET", f"/api/sessions/{sid}/evaluation",
+                                 erwartet=(200,))["students"], card_id=1)
+        api.call("PUT", f"/api/sessions/{sid}/eval-config",
+                 {"gefehlt": {"1": [u.topic_id]}}, erwartet=(200,))
+        cfg = api.call("GET", f"/api/sessions/{sid}/eval-config", erwartet=(200,))
+        if (cfg.get("gefehlt") or {}).get("1") != [u.topic_id]:
+            raise AssertionError(f"gefehlt nicht gespeichert: {cfg.get('gefehlt')}")
+        nachher = _finde(api.call("GET", f"/api/sessions/{sid}/evaluation",
+                                  erwartet=(200,))["students"], card_id=1)
+        if not gleich(nachher["pct"], vorher["pct"], 0.05):
+            raise AssertionError("alle Fragen verpasst: Wertung haette gleich bleiben muessen "
+                                 f"({vorher['pct']} -> {nachher['pct']})")
+        # Der Vorschlag aus der Anwesenheit darf ohne die noetigen Module nicht
+        # scheitern — leer statt 403 (Regel 3).
+        api.call("GET", f"/api/sessions/{sid}/gefehlt-vorschlag", erwartet=(200,))
+        api.call("PUT", f"/api/sessions/{sid}/eval-config", {}, erwartet=(200,))
+        return "gefehlt speichert, Grenzfall wertet regulaer, Vorschlag antwortet leer"
+
+    b.pruefe("CardVote", "Bei dem Thema gefehlt", gefehlt)
     return zustand
 
 

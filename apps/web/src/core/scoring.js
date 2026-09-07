@@ -31,8 +31,10 @@ export function statusOf(cardId, hasAnyScan, config) {
   return hasAnyScan ? "anwesend" : "krank";
 }
 
-// questions: [{ id, correct_answer, niveau }] · answers: { [questionId]: "A" | null }
-export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, minuspunkte = false, weights = {}, scale = null } = {}) {
+// questions: [{ id, correct_answer, niveau, topic_id }] · answers: { [questionId]: "A" | null }
+// gefehltTopics: Themen, bei denen dieses Kind gefehlt hat — ihre Fragen zaehlen
+// nicht zur Basis, sondern geben Bonus wie E-Fragen (siehe app/scoring.py).
+export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, minuspunkte = false, weights = {}, scale = null, gefehltTopics = null } = {}) {
   const s = scale || DEFAULT_SCALE;
   const gewicht = (qid) => Number(weights[String(qid)] ?? weights[qid] ?? 1) || 0;
   const gegeben = (q) => answers[q.id] ?? answers[String(q.id)] ?? null;
@@ -40,8 +42,18 @@ export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, 
 
   const zaehlend = questions.filter((q) => q.correct_answer);
   const differenziert = !!niveauAktiv && niveau !== "E";
-  const basis = zaehlend.filter((q) => !differenziert || (q.niveau || "") !== "E");
-  const extra = differenziert ? zaehlend.filter((q) => (q.niveau || "") === "E") : [];
+  const fehlt = new Set((gefehltTopics || []).map(Number).filter((x) => Number.isFinite(x)));
+  const verpasst = (q) => fehlt.size > 0 && q.topic_id != null && fehlt.has(Number(q.topic_id));
+  const istExtra = (q) => verpasst(q) || (differenziert && (q.niveau || "") === "E");
+  let basis = zaehlend.filter((q) => !istExtra(q));
+  let extra = zaehlend.filter(istExtra);
+  // Keine Basis mehr, weil ein verpasstes Thema alles herausgenommen hat: dann
+  // haengt der Bonus an nichts, die verpassten Fragen zaehlen regulaer. Der
+  // reine E/G-Fall (G-Kind ohne eine einzige G-Frage) bleibt unberuehrt.
+  if (!basis.length && extra.some(verpasst)) {
+    basis = extra.filter(verpasst);
+    extra = extra.filter((q) => !verpasst(q));
+  }
 
   const baseMax = basis.reduce((sum, q) => sum + gewicht(q.id), 0);
   let score = basis.reduce((sum, q) => sum + (richtig(q) ? gewicht(q.id) : 0), 0);
@@ -66,5 +78,6 @@ export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, 
     eCorrect: eRichtig,
     eWrong: eFalsch,
     eTotal: extra.length,
+    gefehltTotal: extra.filter(verpasst).length,
   };
 }

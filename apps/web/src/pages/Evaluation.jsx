@@ -96,7 +96,7 @@ export default function Evaluation() {
   // Vorher lief jede dieser Aenderungen nach 800 ms von selbst zum Server —
   // man sah nur ein kurzes „gespeichert" und hatte nichts in der Hand.
   const [gespeicherteConfig, setGespeicherteConfig] = useState({
-    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [],
+    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [], gefehlt: {},
   });
   // Was sonst noch in der Konfiguration steht (Zeiten aus der Live-Sitzung).
   // Die PUT ersetzt sie als Ganzes — ohne diese Kopie waeren sie nach dem
@@ -106,12 +106,12 @@ export default function Evaluation() {
     const r = await fetch(`${API}/sessions/${id}/eval-config`, alsJson("PUT", {
         ...restConfig.current,
         weights: wert.weights, grade_scale: wert.gradeScale,
-        krank: wert.krank, anwesend: wert.anwesend,
+        krank: wert.krank, anwesend: wert.anwesend, gefehlt: wert.gefehlt,
       })).catch(() => null);
     if (!r || !r.ok) return false;
     setGespeicherteConfig(wert);
   });
-  const { weights, gradeScale, krank: krankListe, anwesend: anwesendListe } = eConf.wert;
+  const { weights, gradeScale, krank: krankListe, anwesend: anwesendListe, gefehlt: gefehltMap } = eConf.wert;
 
   // Nach dem Laden die Arbeitskopie auf den geladenen Stand setzen. `useEntwurf`
   // uebernimmt einen neuen Stand nur, wenn NICHTS offen ist — und beim ersten
@@ -144,7 +144,7 @@ export default function Evaluation() {
       clearTimeout(timer);
       if (weg.current) { navigate("/", { replace: true }); return; }
       if (evalData && evalData.questions && evalData.students) setData({ ...evalData, _evalConfig: config || {} });
-      const { weights: _w, grade_scale: _g, krank: _k, anwesend: _a, ...rest } = config || {};
+      const { weights: _w, grade_scale: _g, krank: _k, anwesend: _a, gefehlt: _f, ...rest } = config || {};
       restConfig.current = rest;
       let skala = (config && config.grade_scale) || null;
       if (!skala) {
@@ -158,6 +158,8 @@ export default function Evaluation() {
         gradeScale: skala || DEFAULT_SCALE,
         krank: (config && Array.isArray(config.krank)) ? config.krank : [],
         anwesend: (config && Array.isArray(config.anwesend)) ? config.anwesend : [],
+        // „bei dem Thema gefehlt": { card_id: [topic_id, ...] }
+        gefehlt: (config && config.gefehlt && typeof config.gefehlt === "object") ? config.gefehlt : {},
       });
       setLadeStand((n) => n + 1);
     });
@@ -183,6 +185,36 @@ export default function Evaluation() {
     const anwesend = anwesendListe.map(String).filter((x) => x !== key);
     if (neu === "krank") krank.push(key); else anwesend.push(key);
     eConf.setz({ krank, anwesend });
+  };
+
+  // Ein Thema, bei dem dieses Kind gefehlt hat, an- oder abhaken. Seine Fragen
+  // zaehlen dann nicht zur Basis, sondern geben Bonus (core/scoring.js).
+  const setGefehlt = (cardId, topicId, an) => {
+    const key = String(cardId);
+    eConf.setz((v) => {
+      const map = { ...(v.gefehlt || {}) };
+      const alt = (map[key] || []).map(Number).filter((x) => x !== Number(topicId));
+      const neu = an ? [...alt, Number(topicId)] : alt;
+      if (neu.length) map[key] = neu; else delete map[key];
+      return { gefehlt: map };
+    });
+  };
+  // Vorschlag aus der Anwesenheit (Kalender + Orga). Leer, wenn eins der beiden
+  // Module fehlt — die Haken von Hand gibt es trotzdem.
+  const [vorschlag, setVorschlag] = useState({});
+  const [gefehltFuer, setGefehltFuer] = useState(null);   // Kind, dessen Themen offen sind
+  useEffect(() => {
+    hol(`${API}/sessions/${id}/gefehlt-vorschlag`)
+      .then((d) => setVorschlag(d && typeof d === "object" ? d : {}))
+      .catch(() => { /* ohne Vorschlag bleibt es bei den Haken von Hand */ });
+  }, [id]);
+
+  const themenListe = useThemen();
+  const themaName = (tid) => {
+    const tp = themenListe.find((x) => x.id === Number(tid));
+    if (!tp) return `#${tid}`;
+    const p = tp.parent_id ? themenListe.find((x) => x.id === tp.parent_id) : null;
+    return p ? `${p.name} / ${tp.name}` : tp.name;
   };
 
   const updateWeight = (qId, val) => {
@@ -223,12 +255,15 @@ export default function Evaluation() {
 
   // E/G und Minuspunkte kommen vom Quiz; die Wertung selbst steht in
   // core/scoring.js (gleiche Regeln wie am Server).
+  // Themen, die dieses Quiz ueberhaupt abfragt — nur die kann jemand verpasst haben.
+  const quizThemen = [...new Set(questions.map((q) => q.topic_id).filter(Boolean))];
   const niveauAktiv = !!data.niveau_aktiv;
   const minuspunkte = !!data.minuspunkte;
   const werte = (s) => bewerte(
-    questions.map((q) => ({ id: q.id, correct_answer: q.correct_answer, niveau: q.niveau || "" })),
+    questions.map((q) => ({ id: q.id, correct_answer: q.correct_answer, niveau: q.niveau || "", topic_id: q.topic_id ?? null })),
     Object.fromEntries(s.answers.map((a) => [a.question_id, a.answer])),
-    { niveau: s.niveau || "", niveauAktiv, minuspunkte, weights, scale: gradeScale },
+    { niveau: s.niveau || "", niveauAktiv, minuspunkte, weights, scale: gradeScale,
+      gefehltTopics: (gefehltMap || {})[String(s.card_id)] || [] },
   );
 
   // „krank" bleibt aus jeder Wertung. Wer anwesend war und nichts abgegeben
@@ -779,6 +814,27 @@ const gradeDistribution = (() => {
                         {t("eval.noSubmission")}
                       </button>
                     )}
+                    {/* „Bei dem Thema gefehlt": ein Haken je Thema. Der Punkt
+                        steht nur da, wo es etwas zu sehen gibt — gesetzt, oder
+                        aus der Anwesenheit vorgeschlagen. */}
+                    {quizThemen.length > 0 && (() => {
+                      const eigene = (gefehltMap || {})[String(student.card_id)] || [];
+                      const vor = (vorschlag[String(student.card_id)] || []).filter((x) => !eigene.includes(Number(x)));
+                      if (!eigene.length && !vor.length) return (
+                        <button onClick={() => setGefehltFuer(student)} title={t("eval.gefehltSet")} aria-label={t("eval.gefehltSet")}
+                          className="icon-btn" style={{ ...iconBtn, marginLeft: 6, width: 24, height: 24 }}>
+                          <Icon d={ICONS.calendar} size={13} color="var(--text3)" />
+                        </button>
+                      );
+                      return (
+                        <button onClick={() => setGefehltFuer(student)}
+                          title={eigene.length ? t("eval.gefehltCount").replace("{n}", String(eigene.length)) : t("eval.gefehltVorschlag")}
+                          style={{ ...chipStyle, marginLeft: 6, cursor: "pointer", borderStyle: eigene.length ? "solid" : "dashed",
+                                   color: eigene.length ? C.warning : "var(--text3)" }}>
+                          {eigene.length ? `${t("eval.gefehltShort")} ${eigene.length}` : t("eval.gefehltVorschlagShort")}
+                        </button>
+                      );
+                    })()}
                   </td>
                   {student.answers.map((a, i) => (
                     <td
@@ -946,6 +1002,45 @@ const gradeDistribution = (() => {
           <p style={{ fontSize: 12, color: "var(--text3)", padding: "8px 12px", background: "var(--bg2)", borderRadius: panelStyle.borderRadius }}>{t("cv.discMin")}</p>
         </div>
       )}
+
+      {/* „Bei dem Thema gefehlt": ein Haken je Thema des Quiz. Der Vorschlag aus
+          der Anwesenheit steht daneben — entschieden wird hier, nicht dort. */}
+      {gefehltFuer && (() => {
+        const key = String(gefehltFuer.card_id);
+        const eigene = (gefehltMap || {})[key] || [];
+        const vor = (vorschlag[key] || []).map(Number);
+        return (
+          <Modal onClose={() => setGefehltFuer(null)} width={460} label={t("eval.gefehltTitle")}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("eval.gefehltTitle")}</h3>
+            <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12 }}>{gefehltFuer.name}</div>
+            {/* Was die Regel tut, sieht man dem Haken nicht an — Rechenregeln
+                bleiben stehen (siehe CLAUDE.md), Selbsterklärendes nicht. */}
+            <p style={{ fontSize: 13, color: "var(--text2)", marginBottom: 12 }}>{t("eval.gefehltHint")}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {quizThemen.map((tid) => {
+                const an = eigene.map(Number).includes(Number(tid));
+                return (
+                  <label key={tid} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer" }}>
+                    <input type="checkbox" checked={an} onChange={(e) => setGefehlt(gefehltFuer.card_id, tid, e.target.checked)} />
+                    <span style={{ flex: 1 }}>{themaName(tid)}</span>
+                    {vor.includes(Number(tid)) && !an && (
+                      <span style={{ ...chipStyle, color: "var(--text3)", borderStyle: "dashed" }}>{t("eval.gefehltVorschlagShort")}</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 20, alignItems: "center" }}>
+              {vor.some((x) => !eigene.map(Number).includes(x)) && (
+                <button style={btnSecondary} onClick={() => vor.forEach((tid) => setGefehlt(gefehltFuer.card_id, tid, true))}>
+                  {t("eval.gefehltUebernehmen")}
+                </button>
+              )}
+              <button style={{ ...btnPrimary, marginLeft: "auto" }} onClick={() => setGefehltFuer(null)}>{t("common.close")}</button>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }

@@ -255,3 +255,42 @@ describe("statusOf — wer nichts abgibt, gilt als krank", () => {
     expect(statusOf(3, false, null)).toBe("krank");
   });
 });
+
+// „Bei dem Thema gefehlt" — dieselben Faelle wie in apps/api/tests/test_scoring.py.
+// Zwei Fassungen derselben Regel, also auch zwei Faenge.
+describe("Bei dem Thema gefehlt", () => {
+  const fragen = [
+    { id: 1, correct_answer: "A", niveau: "", topic_id: 10 },
+    { id: 2, correct_answer: "A", niveau: "", topic_id: 10 },
+    { id: 3, correct_answer: "A", niveau: "", topic_id: 20 },
+    { id: 4, correct_answer: "A", niveau: "", topic_id: 20 },
+  ];
+
+  it("nimmt die Fragen des verpassten Themas aus der Basis", () => {
+    const a = { 1: "A", 2: "A", 3: "B", 4: "B" };
+    expect(bewerte(fragen, a).basePct).toBe(50);
+    const w = bewerte(fragen, a, { gefehltTopics: [20] });
+    expect(w.maxScore).toBe(2);
+    expect(w.basePct).toBe(100);
+    expect(w.gefehltTotal).toBe(2);
+  });
+
+  it("gibt darauf Bonus statt Basis-Punkte", () => {
+    const w = bewerte(fragen, { 1: "A", 2: "B", 3: "A", 4: "A" }, { gefehltTopics: [20] });
+    expect(w.basePct).toBe(50);
+    expect(w.bonusPct).toBeGreaterThan(0);
+  });
+
+  it("rechnet dort keine Minuspunkte an", () => {
+    const w = bewerte(fragen, { 1: "A", 2: "A", 3: "B", 4: "B" }, { minuspunkte: true, gefehltTopics: [20] });
+    expect(w.score).toBe(2);
+    expect(w.basePct).toBe(100);
+  });
+
+  it("wertet regulaer, wenn ALLE Themen verpasst wurden", () => {
+    const w = bewerte(fragen, { 1: "A", 2: "A", 3: "A", 4: "B" }, { gefehltTopics: [10, 20] });
+    expect(w.maxScore).toBe(4);
+    expect(w.basePct).toBe(75);
+    expect(w.bonusPct).toBe(0);
+  });
+});

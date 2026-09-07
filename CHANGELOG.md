@@ -14,6 +14,28 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+**Kalender und Tafel**
+
+- Der Verlaufsplan eines Kalendereintrags zeigt zu jeder Phase die Uhrzeit und
+  über der Liste die Summe gegen die Länge der Stunde.
+- Neues Tafel-Feld: der Verlaufsplan der laufenden Stunde, die aktuelle Phase
+  hervorgehoben, daneben die Restzeit.
+- Die Startseiten-Kachel „Heute" zeigt nur noch, was noch kommt.
+
+**Auswertung**
+
+- CardVote: „bei dem Thema gefehlt" je Kind — dessen Fragen zählen nicht zur
+  Basis, richtige Antworten geben Bonus (höchstens eine Notenstufe), Abzüge
+  greifen dort nicht. Vorschlag aus der Anwesenheit, entschieden wird per Haken.
+- Notenbuch: wer am Tag der Spalte gefehlt hat oder zu spät kam, ist in der
+  Spalte farbig markiert.
+
+**Kleinigkeiten**
+
+- Die Datei-Vorschau hat ein Schließkreuz.
+
 ## 4.3.0 — 08.09.2026
 
 **Auswertung und Profil**
