@@ -1936,6 +1936,8 @@ export default {
   "bugadmin.alle": "Alle ansehen",
   "bugadmin.leer": "Noch keine Meldungen.",
   "bugadmin.mehrLaden": "Weitere laden",
+  "appupdate.text": "Version {{version}} der App steht bereit.",
+  "appupdate.laden": "Laden",
   "bugadmin.mehr": "Mehr",
   "bugadmin.zu": "Weniger",
   "bugadmin.loeschenFrage": "Diese Meldung endgültig löschen?",

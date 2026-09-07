@@ -1950,6 +1950,8 @@ export default {
   "bugadmin.alle": "View all",
   "bugadmin.leer": "No reports yet.",
   "bugadmin.mehrLaden": "Load more",
+  "appupdate.text": "Version {{version}} of the app is available.",
+  "appupdate.laden": "Download",
   "bugadmin.mehr": "More",
   "bugadmin.zu": "Less",
   "bugadmin.loeschenFrage": "Delete this report permanently?",

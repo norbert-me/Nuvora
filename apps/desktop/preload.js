@@ -4,7 +4,14 @@
 // contextIsolation an, kein Node im Renderer — nichts weiter wird freigegeben.
 const { contextBridge, ipcRenderer } = require("electron");
 
+// Die Fassung der Huelle kommt als Startargument herein (siehe main.js) und
+// geht nur LESEND hinaus: die Seite soll wissen, welche App laeuft, damit sie
+// auf eine neuere hinweisen kann — mehr nicht.
+const fassung = (process.argv.find((a) => a.startsWith("--nuvora-version=")) || "").split("=")[1] || "";
+
 contextBridge.exposeInMainWorld("nuvora", {
   setUrl: (url) => ipcRenderer.invoke("nuvora:set-url", url),
   retry: () => ipcRenderer.invoke("nuvora:retry"),
+  appVersion: fassung,
+  platform: process.platform,
 });

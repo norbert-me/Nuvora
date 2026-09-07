@@ -77,6 +77,12 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       spellcheck: true,
+      // Die Fassung der Huelle als Startargument: die Weboberflaeche kann
+      // daraus sehen, ob eine neuere App vorliegt, und es sagen. Ueber ein
+      // Argument und nicht ueber einen ipc-Aufruf, weil der Renderer die
+      // Antwort schon beim ersten Rendern braucht und ein `app.getVersion()`
+      // im Renderer nicht zu haben ist (kein Node dort, und das ist gut so).
+      additionalArguments: [`--nuvora-version=${app.getVersion()}`],
     },
   });
 

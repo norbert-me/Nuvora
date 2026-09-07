@@ -158,6 +158,7 @@ import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";
 import Fehlermelder from "./components/Fehlermelder.jsx";
+import AppUpdate from "./components/AppUpdate.jsx";
 import WasIstNeu from "./components/WasIstNeu.jsx";
 import { notiereAufruf, notiereSeite, protokollStarten } from "./core/protokoll.js";
 import { btnPrimary, btnSecondary, btnSmall, Skeleton, Modal, pageForm, pageTitle, pageIntro,
@@ -957,6 +958,9 @@ function AppRoutes({ user, setUser, logout }) {
   return (
     <>
       <Nav user={user} onLogout={logout} />
+      {/* Nur in einer App-Huelle sichtbar, und nur bis jemand sie wegklickt —
+          je Fassung (components/AppUpdate.jsx). */}
+      <AppUpdate />
       {user && <FirstRun user={user} />}
       <ContentWrapper>
         <LadeFehler pfad={location.pathname}>

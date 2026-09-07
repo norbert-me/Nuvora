@@ -1951,6 +1951,8 @@ export default {
   "bugadmin.alle": "Ver todos",
   "bugadmin.leer": "Aún no hay avisos.",
   "bugadmin.mehrLaden": "Cargar más",
+  "appupdate.text": "La versión {{version}} de la app está disponible.",
+  "appupdate.laden": "Descargar",
   "bugadmin.mehr": "Más",
   "bugadmin.zu": "Menos",
   "bugadmin.loeschenFrage": "¿Borrar este aviso definitivamente?",
