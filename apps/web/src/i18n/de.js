@@ -418,6 +418,8 @@ export default {
   "pap.kanteWeg": "Verbindung entfernen",
   "pap.neu": "Neues Blatt",
   "pap.drucken": "Drucken",
+  "pap.fehltKurs": "Zuerst einen Kurs oder eine Klasse wählen.",
+  "pap.fehltTitel": "Die Aufgabe braucht einen Titel.",
   "pap.aufgabeTitel": "Titel der Aufgabe",
   "pap.aufgabeText": "Was sollen die Kinder zeichnen?",
   "pap.keineAufgaben": "Noch keine Aufgabe. Die Kinder öffnen sie später über ihren QR-Zugang.",

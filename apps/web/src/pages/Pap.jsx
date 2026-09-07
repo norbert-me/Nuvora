@@ -10,7 +10,7 @@ import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import PapEditor, { leeresDiagramm } from "../components/PapEditor.jsx";
 import { useLanguage } from "../i18n";
 import { alsJson } from "../core/melden";
-import { askConfirm } from "../core/dialog.jsx";
+import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { oeffentlicheBasis } from "../core/basis.js";
 
 const API = "/api/pap";
@@ -122,12 +122,22 @@ function Aufgaben() {
   const laden = () => fetch(`${API}/aufgaben`).then((r) => (r.ok ? r.json() : [])).then(setListe).catch(() => {});
   useEffect(() => { laden(); }, []);
 
+  // Was zum Anlegen fehlt — als Satz, nicht als stiller Abbruch. Vorher tat der
+  // Knopf schlicht nichts, wenn Kurs oder Titel fehlten: von außen sieht das
+  // aus, als sei er kaputt.
+  const fehlt = !(wahl.classId || wahl.kursId) ? t("pap.fehltKurs")
+    : !titel.trim() ? t("pap.fehltTitel") : "";
+
   const anlegen = async () => {
-    if (!titel.trim() || !(wahl.classId || wahl.kursId)) return;
+    if (fehlt) { showAlert(fehlt); return; }
     const r = await fetch(`${API}/aufgaben`, alsJson("POST", {
       title: titel.trim(), beschreibung, class_id: wahl.classId, kurs_id: wahl.kursId,
     })).catch(() => null);
-    if (r && r.ok) { setTitel(""); setBeschreibung(""); laden(); }
+    if (r && r.ok) { setTitel(""); setBeschreibung(""); laden(); return; }
+    // Auch die Absage des Servers gehört auf den Bildschirm.
+    let grund = "";
+    try { const b = r ? await r.json() : null; grund = typeof b?.detail === "string" ? b.detail : ""; } catch { /* egal */ }
+    showAlert(grund || t("common.notWork"));
   };
 
   const loeschen = async (id) => {
@@ -144,7 +154,8 @@ function Aufgaben() {
             onChange={(classId, kursId) => setWahl({ classId, kursId })} />
           <input value={titel} onChange={(e) => setTitel(e.target.value)} placeholder={t("pap.aufgabeTitel")}
             style={{ ...toolbarInput, flex: 1, minWidth: 160 }} />
-          <button onClick={anlegen} style={btnPrimary}>{t("common.add")}</button>
+          <button onClick={anlegen} style={{ ...btnPrimary, opacity: fehlt ? 0.5 : 1 }}
+            title={fehlt || undefined}>{t("common.add")}</button>
         </Werkzeugleiste>
         <textarea value={beschreibung} onChange={(e) => setBeschreibung(e.target.value.slice(0, 4000))}
           rows={2} placeholder={t("pap.aufgabeText")}

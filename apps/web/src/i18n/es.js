@@ -417,6 +417,8 @@ export default {
   "pap.kanteWeg": "Quitar conexión",
   "pap.neu": "Hoja nueva",
   "pap.drucken": "Imprimir",
+  "pap.fehltKurs": "Elige primero un curso o una clase.",
+  "pap.fehltTitel": "La tarea necesita un título.",
   "pap.aufgabeTitel": "Título de la tarea",
   "pap.aufgabeText": "¿Qué deben dibujar?",
   "pap.keineAufgaben": "Todavía no hay tareas. El alumnado la abrirá con su acceso QR.",

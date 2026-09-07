@@ -2581,7 +2581,6 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
           {/* Summe gegen die Stundenlaenge — beim Tippen sichtbar, sonst faellt
               erst im Unterricht auf, dass der Plan zehn Minuten zu lang ist. */}
           {summenText(verlauf) && <span style={{ color: (stundenLaenge != null && dauerSumme(verlauf) > stundenLaenge) ? C.danger : "var(--text3)" }}>{summenText(verlauf)}</span>}
-          <button onClick={addPhase} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("kalender.verlaufAdd")} aria-label={t("kalender.verlaufAdd")}><Icon d={ICONS.plus} size={15} color="var(--accent)" /></button>
         </div>
         {verlauf.length === 0 && <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("kalender.verlaufEmpty")}</div>}
         {(() => { const zt = phasenZeit(verlauf); return verlauf.map((p, i) => (
@@ -2598,6 +2597,12 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
             <textarea value={p.text} onChange={(e) => setPhase(i, "text", e.target.value)} rows={2} placeholder={t("kalender.verlaufText")} style={{ ...fld, resize: "vertical", padding: 8 }} />
           </div>
         )); })()}
+        {/* Das Plus steht UNTER der Liste: eine Phase wird hinten angehängt, und
+            ein Knopf über der Liste zeigt in die falsche Richtung — man tippt
+            die Stunde von vorn nach hinten. */}
+        <button onClick={addPhase} style={{ ...toolbarBtn, width: "100%", justifyContent: "center", gap: 6 }}>
+          <Icon d={ICONS.plus} size={15} color="var(--accent)" /> {t("kalender.verlaufAdd")}
+        </button>
 
         </>)}
         <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, end_date: mehrtaegig ? (() => { const [y, m, d] = endVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : null, title, notes, start_time: mehrtaegig ? "" : (startTime || ""), end_time: mehrtaegig ? "" : (endTime || ""), location: ort, rrule: rruleBauen(), exdate: Array.isArray(entry.exdate) ? entry.exdate : [], verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>

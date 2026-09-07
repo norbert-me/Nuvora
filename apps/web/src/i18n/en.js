@@ -416,6 +416,8 @@ export default {
   "pap.kanteWeg": "Remove connection",
   "pap.neu": "New sheet",
   "pap.drucken": "Print",
+  "pap.fehltKurs": "Choose a course or class first.",
+  "pap.fehltTitel": "The task needs a title.",
   "pap.aufgabeTitel": "Assignment title",
   "pap.aufgabeText": "What should the students draw?",
   "pap.keineAufgaben": "No assignment yet. Students open it later through their QR access.",

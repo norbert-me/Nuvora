@@ -370,24 +370,31 @@ async def _check_verknuepfungen(db: AsyncSession, user: User, body) -> None:
     """
     from ..models import CardDeck, LearningLadder, Method, QuestionSet
 
-    # (Feld, Modul, Modell, Eigentuemer-Spalte)
+    # (Feld, Modul, Modell, Eigentuemer-Spalte, Klartext)
+    #
+    # Der Klartext ist kein Zierrat: der Dialog verknuepft bis zu vier Dinge auf
+    # einmal, und „Verknuepfter Eintrag nicht gefunden" sagte nicht, welches —
+    # man klickte danach alle vier durch. Er steht deutsch da, weil die Meldung
+    # unveraendert in der Oberflaeche landet.
     felder = (
-        ("cardvote_set_id", "cardvote", QuestionSet, "owner_id"),
-        ("karten_deck_id", "karten", CardDeck, "owner_id"),
-        ("lernpfad_ladder_id", "lernpfad", LearningLadder, None),
-        ("method_id", "unterrichtsplanung", Method, "owner_id"),
+        ("cardvote_set_id", "cardvote", QuestionSet, "owner_id", "Quiz"),
+        ("karten_deck_id", "karten", CardDeck, "owner_id", "Kartenstapel"),
+        ("lernpfad_ladder_id", "lernpfad", LearningLadder, None, "Lernleiter"),
+        ("method_id", "unterrichtsplanung", Method, "owner_id", "Einstieg"),
     )
-    for feld, modul, modell, eigner in felder:
+    for feld, modul, modell, eigner, klartext in felder:
         wert = getattr(body, feld, None)
         if wert is None:
             continue
         if not await is_active(db, user.id, modul):
-            raise HTTPException(403, f"Modul {modul} ist nicht aktiv")
+            raise HTTPException(403, f"{klartext} lässt sich nicht verknüpfen: "
+                                     f"das Modul {modul} ist nicht eingeschaltet")
         obj = await db.get(modell, wert)
         # Die Lernleiter haengt am Pfad, nicht direkt am Konto — dort prueft der
         # Lernpfad-Router; hier reicht, dass es sie gibt.
         if not obj:
-            raise HTTPException(404, "Verknüpfter Eintrag nicht gefunden")
+            raise HTTPException(404, f"{klartext} nicht gefunden (Nr. {wert}) — "
+                                     "vermutlich gelöscht; die Verknüpfung im Eintrag entfernen")
         if eigner and getattr(obj, eigner, None) != user.id:
             # Ein Quiz IN einem Ordner traegt seinen Besitzer nicht selbst
             # (`question_sets.owner_id` ist nullable — der Ordner haelt ihn).
@@ -401,7 +408,8 @@ async def _check_verknuepfungen(db: AsyncSession, user: User, body) -> None:
                 ordner = await db.get(Folder, obj.folder_id)
                 besitzer = ordner.owner_id if ordner else None
             if besitzer != user.id:
-                raise HTTPException(404, "Verknüpfter Eintrag nicht gefunden")
+                raise HTTPException(404, f"{klartext} nicht gefunden (Nr. {wert}) — "
+                                         "gehört zu einem anderen Konto")
 
 
 @router.post("/entries", response_model=EntryOut, status_code=201)
