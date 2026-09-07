@@ -101,3 +101,20 @@ async def test_abgeschaltet_heisst_abgeschaltet(s, konto):
     with pytest.raises(HTTPException) as e:
         await _melden(s, konto, message="Test")
     assert e.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_browserkennung_nur_mit_umgebung(s, konto):
+    """Ohne das Haekchen „Technische Angaben" bleibt auch die Kennung des
+    Browsers draussen. Sie stand vorher immer im Bericht, weil der Server sie
+    aus der Kopfzeile las — der Dialog versprach etwas anderes."""
+    rows = await _melden(s, konto, message="ohne Umgebung")
+    assert rows[0].browser == ""
+
+    for r in rows:
+        await s.delete(r)
+    await s.commit()
+
+    rows = await _melden(s, konto, message="mit Umgebung", umgebung="Fenster: 390x844")
+    assert rows[0].browser == "Testbrowser"
+    assert rows[0].umgebung == "Fenster: 390x844"

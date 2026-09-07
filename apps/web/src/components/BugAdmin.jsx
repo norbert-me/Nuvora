@@ -4,6 +4,7 @@ import {
   Icon, ICONS, iconBtn, sectionLabel,
 } from "./Icons.jsx";
 import { askConfirm } from "../core/dialog.jsx";
+import AuthImage from "./AuthImage.jsx";
 import { useLanguage } from "../i18n";
 
 // Fehlermeldungen für die Administration.
@@ -71,6 +72,14 @@ export default function BugAdmin() {
                 </span>
                 {/* Von wem — die Rückfrage geht sonst ins Leere. */}
                 <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{r.email || "—"}</span>
+                {/* Dass etwas anhaengt, muss man sehen, ohne jede Meldung
+                    aufzuklappen — meistens ist es ein Bildschirmfoto, und das
+                    ist der halbe Bericht. */}
+                {r.anhang_name && (
+                  <span title={r.anhang_name} style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--text3)" }}>
+                    <Icon d={ICONS.image} size={15} color="var(--text3)" />
+                  </span>
+                )}
                 <button onClick={() => setGross(gross === r.id ? null : r.id)} style={{ ...btnSecondary, ...btnSmall }}>
                   {gross === r.id ? t("bugadmin.zu") : t("bugadmin.mehr")}
                 </button>
@@ -80,6 +89,14 @@ export default function BugAdmin() {
                 </button>
               </div>
               <p style={{ fontSize: 13, margin: "6px 0 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{r.message}</p>
+              {/* Ein Bild wird als Bild gezeigt, nicht als Dateiname: ein
+                  Bildschirmfoto beantwortet die Meldung oft allein. Klick macht
+                  es gross (AuthImage — der Endpunkt braucht den Token). */}
+              {r.anhang_name && /^image\//.test(r.anhang_typ || "") && (
+                <AuthImage src={`/api/admin/bugreports/${r.id}/anhang`} alt={r.anhang_name}
+                  style={{ marginTop: 8, maxHeight: 120, maxWidth: "100%", objectFit: "contain",
+                           borderRadius: cardStyle.borderRadius, border: "1px solid var(--border2)" }} />
+              )}
               {gross === r.id && (
                 <div style={{ marginTop: 8, fontSize: 12, color: "var(--text2)" }}>
                   <div style={{ ...sectionLabel, margin: "0 0 4px" }}>{r.seite} · {r.fassung}</div>

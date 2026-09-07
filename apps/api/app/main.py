@@ -1541,7 +1541,14 @@ async def bugreport(body: BugBody, request: Request, user=Depends(get_current_us
     db.add(BugReport(
         user_id=user.id, email=(user.email or "")[:200], message=text,
         seite=_sauber(body.seite)[:200], fassung=APP_VERSION,
-        browser=_sauber(request.headers.get("user-agent", ""))[:200],
+        # Die Kennung des Browsers ist eine technische Angabe wie jede andere in
+        # der Umgebung — sie kommt nur mit, wenn das Haekchen "Technische
+        # Angaben" gesetzt war. Vorher las der Server sie aus der Kopfzeile und
+        # speicherte sie IMMER: im Dialog stand "wird nicht mitgeschickt", im
+        # Bericht stand sie trotzdem. Ein Versprechen, das nur der Server bricht,
+        # ist schlimmer als keins.
+        browser=(_sauber(request.headers.get("user-agent", ""))[:200]
+                 if (body.umgebung or "").strip() else ""),
         umgebung=(body.umgebung or "").strip()[:2000],
         log=(body.log or "").strip()[:20000],
         anhang=daten, anhang_name=name, anhang_typ=typ))
@@ -1581,7 +1588,10 @@ async def bugreports(user=Depends(_require_admin), db=Depends(get_db)):
     return [{
         "id": r.id, "email": r.email, "message": r.message, "seite": r.seite,
         "fassung": r.fassung, "browser": r.browser, "umgebung": r.umgebung, "log": r.log,
-        "anhang_name": r.anhang_name, "erledigt": r.erledigt,
+        # Der Typ steht in der Liste, damit die Uebersicht ein Bild als Bild
+        # zeigen kann, statt nur seinen Dateinamen.
+        "anhang_name": r.anhang_name, "anhang_typ": r.anhang_typ or "",
+        "erledigt": r.erledigt,
         "created_at": r.created_at.isoformat() if r.created_at else "",
     } for r in rows]
 
