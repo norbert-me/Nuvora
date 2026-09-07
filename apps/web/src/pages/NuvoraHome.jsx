@@ -311,7 +311,6 @@ export default function NuvoraHome({ user }) {
   const [dragKey, setDragKey] = useState(null);
   const [overKey, setOverKey] = useState(null);
 
-  const firstName = (user?.name || "").split(" ")[0];
   const name = (m) => (t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name);
 
   // Woraus besteht das Modul? Aus derselben Liste, die auch die Suche
@@ -381,9 +380,10 @@ export default function NuvoraHome({ user }) {
   return (
     <div style={{ ...pageApp }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>
-          {firstName ? t("home.welcome", { name: firstName }) : t("home.welcomePlain")}
-        </h1>
+        {/* Keine Begruessung mehr. „Hallo Nina" beantwortet keine Frage, stand
+            aber bei jedem Aufruf als groesste Zeile ueber dem, weswegen man
+            gekommen ist. Der Platz bleibt leer statt gefuellt. */}
+        <span style={{ flex: 1 }} />
         {/* Der Knopf richtet jetzt auch die Widgets ein — er gehoert also auch
             dorthin, wo nur ein Modul laeuft. Vorher hing er an „mehr als eine
             Kachel", weil es nur ums Sortieren ging.

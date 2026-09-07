@@ -112,8 +112,6 @@ export default function Kurse() {
       if (!(await sende(`${API}/kurse/${k.id}/classes/${id}`, { method: "POST" }, t("kurse.addClass")))) return false;
     for (const id of kursBasis.klassen.filter((x) => !w.klassen.includes(x)))
       if (!(await sende(`${API}/kurse/${k.id}/classes/${id}`, { method: "DELETE" }, t("kurse.unlink")))) return false;
-    if (w.archiviert !== kursBasis.archiviert
-      && !(await sende(`${API}/kurse/${k.id}/archive`, { method: "POST" }, t("classes.archive")))) return false;
     setKursBasis(w);
     load(); loadClasses();
   };
@@ -207,11 +205,18 @@ export default function Kurse() {
                     E/G und Archiv gehen zusammen hinaus. */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <Speicherleiste entwurf={kurs} immer />
-                  <button onClick={() => kurs.setz((w) => ({ archiviert: !w.archiviert }))}
-                    style={{ ...btnSecondary, ...btnSmall, marginLeft: "auto",
-                      borderColor: kurs.wert.archiviert !== kursBasis.archiviert ? "var(--accent)" : "var(--border2)" }}
+                  {/* Archivieren wirkt SOFORT und wartet nicht auf „Speichern":
+                      es ist eine Handlung, kein Feld — wie Löschen. Als Teil des
+                      Entwurfs stand die Maske nach einem Klick auf „nicht
+                      gespeichert", obwohl niemand etwas getippt hatte, und der
+                      Knopf sah aus wie ein Umschalter, der nichts tut. */}
+                  <button onClick={async () => {
+                      if (!(await sende(`${API}/kurse/${k.id}/archive`, { method: "POST" }, t("classes.archive")))) return;
+                      load(); loadClasses();
+                    }}
+                    style={{ ...btnSecondary, ...btnSmall, marginLeft: "auto" }}
                     title={t("classes.archiveHint")}>
-                    {kurs.wert.archiviert ? t("classes.unarchive") : t("classes.archive")}
+                    {archiv ? t("classes.unarchive") : t("classes.archive")}
                   </button>
                 </div>
 

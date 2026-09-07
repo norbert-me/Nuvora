@@ -194,13 +194,6 @@ export default function Classes() {
       showAlert(detail || t("common.notWork"));
       return false;   // Entwurf bleibt offen — nichts geht verloren
     }
-    // Archivieren wandert mit demselben Speichern hinaus. Der Endpunkt schaltet
-    // um, deshalb nur bei echter Änderung.
-    if (wert.archiviert !== basis.archiviert) {
-      const angelegt = editing.id ? null : await res.json().catch(() => null);
-      const id = editing.id || angelegt?.id;
-      if (id) await fetch(`${API}/classes/${id}/archive`, { method: "POST" }).catch(() => {});
-    }
     // Nach dem Speichern ist nichts mehr offen — deshalb ohne Nachfrage.
     schliessen({ fragen: false });
     load();
@@ -538,24 +531,22 @@ export default function Classes() {
             zugaengeMoeglich && { key: "qr", label: t("classes.qrPrint"), icon: ICONS.pdf || ICONS.export,
                                   title: t("classes.qrPrintHint"),
                                   onClick: () => zugaengeDrucken(editing.id) },
-            // Archivieren ist ein Umschalten und wartet wie alles andere auf
-            // „Speichern" — vorher war die Klasse schon weg, während die
-            // getippten Namen daneben noch ungespeichert dastanden.
-            { key: "archiv", label: entwurf.wert.archiviert ? t("classes.unarchive") : t("classes.archive"), icon: ICONS.archive,
-              onClick: () => entwurf.setz((w) => ({ archiviert: !w.archiviert })) },
+            // Archivieren wirkt SOFORT: es ist eine Handlung, kein Feld — wie
+            // Löschen daneben. Als Teil des Entwurfs stand die Maske nach einem
+            // Klick auf „nicht gespeichert", obwohl niemand etwas getippt hatte.
+            // Offene Eingaben gehen trotzdem nicht verloren: geschlossen wird
+            // mit der üblichen Nachfrage.
+            { key: "archiv", label: archiv ? t("classes.unarchive") : t("classes.archive"), icon: ICONS.archive,
+              onClick: async () => {
+                await fetch(`${API}/classes/${editing.id}/archive`, { method: "POST" }).catch(() => {});
+                if (schliessen()) load();
+              } },
             { key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true,
               onClick: () => { remove(editing.id); schliessen({ fragen: false }); } },
           ] : []}>
           <button onClick={addRow} disabled={students.length >= MAX_CARDS}
             style={{ ...toolbarBtn, opacity: students.length >= MAX_CARDS ? 0.4 : 1 }}>{t("classes.addRow")}</button>
         </Werkzeugleiste>
-        {/* Was das Speichern zusätzlich tun wird — sonst wäre ein
-            umgeschaltetes Archiv im Menü verborgen. */}
-        {entwurf.wert.archiviert !== basis.archiviert && (
-          <p style={{ fontSize: 13, color: C.warning, margin: "0 0 8px" }}>
-            {entwurf.wert.archiviert ? t("classes.archive") : t("classes.unarchive")}
-          </p>
-        )}
         {/* Die Zahl der bedruckten Karten ist eine Grenze des Scanners, kein
             Wissen, das man beim Namentippen braucht — der Satz stand unter
             JEDER Klasse. Erreicht ist sie, sagt es der Knopf „Zeile dazu"
