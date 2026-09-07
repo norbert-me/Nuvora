@@ -2087,6 +2087,12 @@
         // Niveau vorsieht: die ersten Aufgaben sind bei allen dieselben, ein
         // E-Kind bekommt zusaetzlich die E-Aufgaben. Differenziert wird also
         // ueber Menge und Anforderung, nicht ueber verschiedene Blaetter.
+        // Fester Startwert: derselbe Pool ergibt bei jedem Aufruf und fuer jedes
+        // Kind dieselbe Reihenfolge. Der Schueler-Seed daneben bleibt bestehen,
+        // wo er hingehoert — die WIEDERHOLUNG wird vor diesem Aufruf gezogen
+        // und ist weiterhin individuell (sie haengt daran, was DIESES Kind
+        // vorher hatte). Danach zaehlt der Zufall nicht mehr mit: die
+        // regulaeren Aufgaben stehen fest.
         const REIHEN_SEED = 20260907;
         const reihenfolge = (pool) => { seedRng(REIHEN_SEED); return selectForStudent(pool, pool.length, null); };
 
@@ -3069,7 +3075,10 @@
             } else {
                 doc.setFont('helvetica', 'italic');
                 doc.setFontSize(9);
-                doc.setTextColor(120);
+                // 90 statt 120: auf einem muede gedruckten Schulkopierer
+                // verschwindet helles Grau, und der Satz ist die einzige
+                // Anweisung in dieser Zeile.
+                doc.setTextColor(90);
                 doc.text('nur durchlesen', pruefX, y + MITTE_11PT);
                 doc.setTextColor(0);
                 doc.setFont('helvetica', 'normal');
