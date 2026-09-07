@@ -2076,6 +2076,20 @@
         const utList = selectedUt.length ? selectedUt.slice().sort() : [''];
         const utCount = utList.length;
 
+        // Dieselben Aufgaben fuer E und G.
+        //
+        // Vorher zog jeder Schueler seine eigene Auswahl (Zufall je Niveau) —
+        // dann sass die Klasse an einem Thema, aber niemand an derselben
+        // Aufgabe: gemeinsames Besprechen, Partnerarbeit und ein Blick uebers
+        // Heft des Nachbarn fielen weg, und die Lehrkraft hatte dreissig
+        // verschiedene Blaetter zu ueberblicken. Jetzt steht die Reihenfolge je
+        // Pool EINMAL fest, und jedes Kind nimmt davon so viele, wie sein
+        // Niveau vorsieht: die ersten Aufgaben sind bei allen dieselben, ein
+        // E-Kind bekommt zusaetzlich die E-Aufgaben. Differenziert wird also
+        // ueber Menge und Anforderung, nicht ueber verschiedene Blaetter.
+        const REIHEN_SEED = 20260907;
+        const reihenfolge = (pool) => { seedRng(REIHEN_SEED); return selectForStudent(pool, pool.length, null); };
+
         previewData = klasseSchueler.map(s => {
             seedRng(getStudentSeed(s.niveau, s.foerder));
             let totalBasis, totalG, totalE;
@@ -2092,7 +2106,7 @@
             }
 
             const tasks = [];
-            const wdh = selectWiederholung(s, vorherigeLl);
+            const wdh = selectWiederholung(s, vorherigeLl, config.wdh);
             wdh.forEach(a => tasks.push({ ...a, section: 'Wiederholung', selected: true }));
 
             // Eine Aufgabe, die schon als Wiederholung oben steht, darf unten
@@ -2114,16 +2128,19 @@
                 const gNum = ui < utCount - 1 ? Math.floor(totalG / utCount) : totalG - Math.floor(totalG / utCount) * (utCount - 1);
                 const eNum = ui < utCount - 1 ? Math.floor(totalE / utCount) : totalE - Math.floor(totalE / utCount) * (utCount - 1);
 
-                const selBasis = selectForStudent(utBasis, Math.min(bNum, utBasis.length), s.foerder);
+                // Aus der gemeinsamen Reihenfolge die ersten n — so hat das
+                // G-Kind mit vier Aufgaben genau die vier, mit denen das
+                // E-Kind anfaengt.
+                const selBasis = reihenfolge(utBasis).slice(0, Math.min(bNum, utBasis.length));
                 selBasis.forEach(a => tasks.push({ ...a, section: 'Basis', selected: true }));
 
                 if (s.niveau === 'E') {
-                    const selE = selectForStudent(utE, Math.min(eNum, utE.length), s.foerder);
-                    const selG = selectForStudent(utG, Math.min(gNum, utG.length), s.foerder);
+                    const selE = reihenfolge(utE).slice(0, Math.min(eNum, utE.length));
+                    const selG = reihenfolge(utG).slice(0, Math.min(gNum, utG.length));
                     const stufe = interleaveEG(selE, selG);
                     stufe.forEach(a => tasks.push({ ...a, selected: true }));
                 } else {
-                    const selG = selectForStudent(utG, Math.min(gNum, utG.length), s.foerder);
+                    const selG = reihenfolge(utG).slice(0, Math.min(gNum, utG.length));
                     selG.forEach(a => tasks.push({ ...a, section: 'G-Niveau', selected: true }));
                 }
             });
@@ -2140,7 +2157,7 @@
                     : [...basisAufgaben, ...gAufgaben];
                 const rest = erlaubt.filter(a =>
                     !usedIds.has(a._id) && utList.includes(a.unterthema || ''));
-                const nach = selectForStudent(rest, Math.min(fehlt, rest.length), s.foerder);
+                const nach = reihenfolge(rest).slice(0, Math.min(fehlt, rest.length));
                 nach.forEach(a => tasks.push({ ...a, section: getKategorie(a) === 'Basis' ? 'Basis' : (getKategorie(a) === 'E-Niveau' ? 'E-Niveau' : 'G-Niveau'), selected: true }));
             }
 
@@ -2187,10 +2204,11 @@
     // Niveau des Schuelers (E bzw. G). Bevorzugt Aufgaben, die dieser Schueler
     // noch nicht hatte; erst wenn es davon zu wenige gibt, werden schon
     // gestellte Aufgaben wiederholt.
-    const WDH_MAX = 2;
+    const WDH_MAX = 2;   // Vorgabe, wenn im Generator nichts eingestellt ist
 
-    function selectWiederholung(student, vorherigeLl) {
-        if (!vorherigeLl.length) return [];
+    function selectWiederholung(student, vorherigeLl, anzahl) {
+        const max = Number.isFinite(anzahl) ? anzahl : WDH_MAX;
+        if (!vorherigeLl.length || max <= 0) return [];
 
         const vorherigeUt = new Set();
         const schonGehabt = new Set();
@@ -2209,9 +2227,9 @@
         const neu = pool.filter(a => !schonGehabt.has(a._id));
         const rest = pool.filter(a => schonGehabt.has(a._id));
 
-        const gewaehlt = selectForStudent(neu, Math.min(WDH_MAX, neu.length), student.foerder);
-        if (gewaehlt.length < WDH_MAX && rest.length) {
-            gewaehlt.push(...selectForStudent(rest, Math.min(WDH_MAX - gewaehlt.length, rest.length), student.foerder));
+        const gewaehlt = selectForStudent(neu, Math.min(max, neu.length), student.foerder);
+        if (gewaehlt.length < max && rest.length) {
+            gewaehlt.push(...selectForStudent(rest, Math.min(max - gewaehlt.length, rest.length), student.foerder));
         }
         return gewaehlt;
     }
@@ -3428,7 +3446,20 @@
                 </div>
             </div>`;
 
-        // 4. Erklärungen (optional)
+        // 4. Wiederholung: nur sinnvoll ab der zweiten Lernleiter eines Pfads —
+        // die erste hat kein Thema davor, aus dem wiederholt werden könnte.
+        html += `
+            <div class="cfg-block cfg-block-start">
+                <div class="cfg-label">Wiederholung voranstellen ${info('Aufgaben aus den Unterthemen der vorherigen Lernleitern. Erst ab der zweiten Lernleiter eines Pfads.')}</div>
+                <div class="cfg-controls">
+                    <span class="cfg-numwrap">
+                        <input type="number" min="0" max="10" value="${WDH_MAX}" id="cfg-wdh" class="cfg-num">
+                        <span class="cfg-hint">Aufgaben</span>
+                    </span>
+                </div>
+            </div>`;
+
+        // 5. Erklärungen (optional)
         if (erklCount) {
             html += `
             <div class="cfg-block cfg-block-start">
@@ -3515,7 +3546,7 @@
         setzGeneratorPrefs();
         // Jede Änderung an den Reglern sofort merken, damit sie den Reload
         // überlebt — nicht erst beim Generieren.
-        ['cfg-max', 'cfg-pflicht', 'cfg-g-basis', 'cfg-g-g', 'cfg-e-basis', 'cfg-e-g', 'cfg-e-e', 'cfg-erkl'].forEach(id => {
+        ['cfg-max', 'cfg-pflicht', 'cfg-g-basis', 'cfg-g-g', 'cfg-e-basis', 'cfg-e-g', 'cfg-e-e', 'cfg-erkl', 'cfg-wdh'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.addEventListener('input', () => saveGenPrefs());
         });
@@ -3532,7 +3563,11 @@
             eBasis: parseInt(document.getElementById('cfg-e-basis')?.value) || 30,
             eG: parseInt(document.getElementById('cfg-e-g')?.value) || 30,
             eE: parseInt(document.getElementById('cfg-e-e')?.value) || 40,
-            erkl: parseInt(document.getElementById('cfg-erkl')?.value) || 0
+            erkl: parseInt(document.getElementById('cfg-erkl')?.value) || 0,
+            // Wie viele Wiederholungsaufgaben vorne stehen. Die Zahl stand fest
+            // auf zwei — an einer Doppelstunde zu wenig, an einer Randstunde zu
+            // viel, und beides entscheidet die Lehrkraft besser als der Code.
+            wdh: Math.max(0, parseInt(document.getElementById('cfg-wdh')?.value ?? WDH_MAX))
         };
     }
 
@@ -3575,6 +3610,7 @@
         set('cfg-g-basis', cfg.gBasis); set('cfg-g-g', cfg.gG);
         set('cfg-e-basis', cfg.eBasis); set('cfg-e-g', cfg.eG); set('cfg-e-e', cfg.eE);
         set('cfg-erkl', cfg.erkl);
+        set('cfg-wdh', cfg.wdh);
     }
 
     // Seeded RNG für deterministic Auswahl
