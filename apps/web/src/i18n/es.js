@@ -1105,7 +1105,6 @@ export default {
   "kalender.resyncConfirm": "¿Restablecer la conexión del calendario? La URL antigua deja de ser válida de inmediato; debes volver a suscribirte con la nueva URL.",
   "kalender.resyncDone": "Nueva URL de suscripción creada. Quita el calendario Nuvora antiguo y suscríbete a la URL mostrada.",
   "kalender.extTitle": "Mostrar un calendario externo (solo lectura)",
-  "kalender.extText": "Pega el enlace ICS de tu calendario de Google/Apple. Campo vacío = desactivado.",
   "kalender.extEventNote": "Del calendario suscrito — solo lectura.",
   "kalender.extDate": "Fecha",
   "kalender.extTime": "Hora",

@@ -1104,7 +1104,6 @@ export default {
   "kalender.resyncConfirm": "Reset the calendar connection? The old subscription URL becomes invalid immediately; you must re-subscribe with the new URL.",
   "kalender.resyncDone": "New subscription URL created. Remove the old Nuvora calendar and subscribe to the shown URL.",
   "kalender.extTitle": "Show an external calendar (read only)",
-  "kalender.extText": "Paste the ICS link of your Google/Apple calendar. Empty field = off.",
   "kalender.extEventNote": "From the subscribed calendar — read-only.",
   "kalender.extDate": "Date",
   "kalender.extTime": "Time",

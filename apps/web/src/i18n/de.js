@@ -1089,7 +1089,6 @@ export default {
   "kalender.resyncConfirm": "Kalender-Verbindung zurücksetzen? Die alte Abo-URL wird sofort ungültig; du musst den Kalender mit der neuen URL erneut abonnieren.",
   "kalender.resyncDone": "Neue Abo-URL erzeugt. Alten Nuvora-Kalender entfernen und die angezeigte URL neu abonnieren.",
   "kalender.extTitle": "Externen Kalender einblenden (nur lesen)",
-  "kalender.extText": "ICS-Link deines Google-/Apple-Kalenders einfügen. Feld leeren = aus.",
   "kalender.extEventNote": "Aus dem abonnierten Kalender — nur Anzeige.",
   "kalender.extDate": "Datum",
   "kalender.extTime": "Uhrzeit",

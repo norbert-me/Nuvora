@@ -921,8 +921,7 @@ export default function Kalender() {
 
             {/* Andere Richtung: MEHRERE externe Kalender (ICS-URL) read-only einblenden. */}
             <div style={{ borderTop: "1px solid var(--border)", marginTop: 24, paddingTop: 16 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("kalender.extTitle")}</div>
-              <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>{t("kalender.extText")}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("kalender.extTitle")}</div>
               <ExtCalEditor cals={abo.cals || []} mit={!!abo.mit}
                 onChange={(cals) => setAbo((a) => ({ ...a, cals }))}
                 onMit={(v) => setAbo((a) => ({ ...a, mit: v }))}
