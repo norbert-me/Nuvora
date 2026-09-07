@@ -171,6 +171,14 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
                 <a href={vorschau.url} download={vorschau.name} style={{ ...btnSecondary, ...btnSmall, textDecoration: "none" }}>{t("material.download")}</a>
               </>
             )}
+            {/* Schliessen-Kreuz: Escape und Klick daneben gab es schon, aber die
+                Vorschau liegt als zweiter Dialog ueber dem Eintrag und fuellt
+                mit einem grossen Bild das Fenster — daneben ist dann nichts
+                mehr, worauf man tippen koennte. */}
+            <button onClick={() => setVorschau(null)} className="icon-btn" style={iconBtn}
+              title={t("common.close")} aria-label={t("common.close")}>
+              <Icon d={ICONS.close} size={18} />
+            </button>
           </div>
           {!vorschau.url ? (
             <div style={{ height: "72vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 14, border: "1px solid var(--border)", borderRadius: CONTROL_R }}>
