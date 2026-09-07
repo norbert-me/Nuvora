@@ -201,6 +201,7 @@ export default {
   "kurse.editName": "Name",
   "kurse.editClasses": "Classes in this course",
   "kurse.editStudents": "Individual students (parts of classes)",
+  "kurse.personSuchen": "Search person …",
   "kurse.pickClass": "Choose class …",
   "kurse.allAdded": "All already in course",
   "kurse.editMeasures": "Support measures",

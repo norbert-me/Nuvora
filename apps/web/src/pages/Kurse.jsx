@@ -13,6 +13,7 @@ import { NiveauToggle, AddButton, pageTitle, pageIntro, btnSecondary, btnSmall, 
   Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, toolbarInput, sectionLabel, Toggle, Tabs, Empty, pageApp, LoadError } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
+import SuchSelect from "../components/SuchSelect.jsx";
 
 const API = "/api";
 const editLabel = { ...sectionLabel, marginBottom: 4 };
@@ -108,10 +109,6 @@ export default function Kurse() {
                       fach: (w.fach || "").trim(), jahrgang: w.jahrgang ? Number(w.jahrgang) : 0,
                       raum: (w.raum || "").trim() };
     if (!(await sende(`${API}/kurse/${k.id}`, alsJson("PUT", koerper), t("kurse.editName")))) return false;
-    for (const id of w.klassen.filter((x) => !kursBasis.klassen.includes(x)))
-      if (!(await sende(`${API}/kurse/${k.id}/classes/${id}`, { method: "POST" }, t("kurse.addClass")))) return false;
-    for (const id of kursBasis.klassen.filter((x) => !w.klassen.includes(x)))
-      if (!(await sende(`${API}/kurse/${k.id}/classes/${id}`, { method: "DELETE" }, t("kurse.unlink")))) return false;
     setKursBasis(w);
     load(); loadClasses();
   };
@@ -125,12 +122,6 @@ export default function Kurse() {
     });
   };
 
-  // Klassen, die (noch) nicht im Entwurf dieses Kurses stehen — zum Hinzufügen.
-  const frei = (ids) => { const drin = new Set(ids); return allClasses.filter((c) => !drin.has(c.id)); };
-  // Name einer Klassen-ID: erst aus dem Kurs (dort steht sie schon), sonst aus
-  // der Gesamtliste — eine gerade hinzugefügte kennt der Kurs noch nicht.
-  const klassenName = (k, id) => k.classes.find((c) => c.id === id)?.name
-    || allClasses.find((c) => c.id === id)?.name || `#${id}`;
 
   return (
     <div style={{ ...pageApp }}>
@@ -301,30 +292,14 @@ export default function Kurse() {
                   <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("kurse.chainHint")}</div>
                 </div>
 
-                <div>
-                  <div style={editLabel}>{t("kurse.editClasses")}</div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    {/* Angezeigt wird der Entwurf, nicht der Serverstand: eine
-                        gerade gewählte Klasse steht sofort da, ist aber erst
-                        mit „Speichern" wirklich im Kurs. */}
-                    {kurs.wert.klassen.map((cid) => (
-                      <span key={cid} style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        {klassenName(k, cid)}
-                        <button onClick={() => kurs.setz((w) => ({ klassen: w.klassen.filter((x) => x !== cid) }))} title={t("kurse.unlink")}
-                          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 0, display: "flex" }}>
-                          <Icon d={ICONS.close} size={12} />
-                        </button>
-                      </span>
-                    ))}
-                    {frei(kurs.wert.klassen).length > 0 && (
-                      <select value="" onChange={(e) => { const id = Number(e.target.value); if (id) kurs.setz((w) => ({ klassen: [...w.klassen, id] })); }} style={selectStyle}>
-                        <option value="">+ {t("kurse.addClass")}</option>
-                        {frei(kurs.wert.klassen).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                    )}
-                  </div>
-                </div>
-
+                {/* Kein Klassen-Feld mehr. Der Kurs ist die Bedienebene
+                    (Umbau vom 06.09.2026): gepflegt werden KINDER, und wer sie
+                    aus einer ganzen Klasse holt, tut das beim Anlegen („aus
+                    einem anderen Kurs entwickeln") oder über die Namensliste.
+                    Ein zweites Feld daneben führte dieselben Personen ein
+                    zweites Mal — und niemand wusste, welche der beiden Listen
+                    gilt. Die Verknüpfung selbst gibt es weiter (die API), nur
+                    nicht mehr als Formularfeld. */}
                 <div>
                   <div style={editLabel}>{t("kurse.editStudents")}</div>
                   <StudentMembers kursId={k.id} allClasses={allClasses} t={t} />
@@ -336,15 +311,13 @@ export default function Kurse() {
                   <MassnahmenPanel kursId={k.id} t={t} />
                 </div>
 
-                {kurs.wert.klassen.length > 0 && (
-                  <div>
+                <div>
                     <div style={editLabel}>{t("kurse.editLevels")}</div>
                     <Toggle checked={kurs.wert.niveauAktiv} onChange={(v) => kurs.setz({ niveauAktiv: v })} label={t("kurse.niveauToggle")} />
                     {/* Teilnehmerliste immer sichtbar; der E/G-Selektor je Person nur,
                         wenn der E/G-Regler an ist. */}
                     <NiveauPanel kursId={k.id} niveauAktiv={kurs.wert.niveauAktiv} t={t} />
-                  </div>
-                )}
+                </div>
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
                   <button onClick={() => delKurs(k)} className="icon-btn" style={{ ...iconBtn }} title={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")} aria-label={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")}>
                     <Icon d={ICONS.trash} size={16} color={C.danger} />
@@ -363,7 +336,6 @@ export default function Kurse() {
 // gewählten SuS + Picker (Klasse wählen -> SuS einzeln hinzufügen).
 function StudentMembers({ kursId, allClasses, t }) {
   const [members, setMembers] = useState([]);
-  const [pickClass, setPickClass] = useState("");
   const load = () => hol(`${API}/kurse/${kursId}/members`).then((d) => {
     const liste = Array.isArray(d) ? d : [];
     setMembers(liste);
@@ -387,8 +359,13 @@ function StudentMembers({ kursId, allClasses, t }) {
   const memberIds = new Set(e.wert.ids);
   const add = (sid) => e.setz((w) => ({ ids: [...w.ids, sid] }));
   const remove = (sid) => e.setz((w) => ({ ids: w.ids.filter((x) => x !== sid) }));
-  const cls = allClasses.find((c) => String(c.id) === String(pickClass));
-  const candidates = cls ? (cls.students || []).filter((sname) => !memberIds.has(sname.id)) : [];
+  // Alle Kinder aller Klassen, die noch nicht im Kurs sind — einmal je
+  // Listenzeile, mit ihrer Klasse. Mehr weiß die Seite nicht: Mitglied wird
+  // eine ZEILE (student_id), daran hängen Noten und Karten.
+  const kandidaten = allClasses
+    .flatMap((c) => (c.students || []).map((s) => ({ id: s.id, name: s.name, class_name: c.name })))
+    .filter((s) => !memberIds.has(s.id))
+    .sort((a, b) => a.name.localeCompare(b.name, "de"));
   // Name einer Person: aus der geladenen Liste, sonst aus den Klassen (frisch
   // hinzugefügte kennt der Server noch nicht).
   const nameVon = (sid) => members.find((m) => m.student_id === sid)
@@ -410,16 +387,16 @@ function StudentMembers({ kursId, allClasses, t }) {
         </div>
       )}
       <Speicherleiste entwurf={e} style={{ marginBottom: 8 }} klein />
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <select value={pickClass} onChange={(e) => setPickClass(e.target.value)} style={selectStyle}>
-          <option value="">{t("kurse.pickClass")}</option>
-          {allClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        {cls && candidates.map((sname) => (
-          <button key={sname.id} onClick={() => add(sname.id)} style={{ ...chipStyle, cursor: "pointer", border: "1px dashed var(--border2)", background: "none" }}>+ {sname.name}</button>
-        ))}
-        {cls && candidates.length === 0 && <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("kurse.allAdded")}</span>}
-      </div>
+      {/* Gesucht wird die PERSON, nicht erst ihre Klasse. Vorher musste man
+          wissen, in welcher Liste ein Kind steht, bevor man es hinzufügen
+          konnte — genau das weiß man beim Zusammenstellen eines Kurses nicht
+          („wer kommt in den WP8?"). Die Klasse steht am Treffer, damit
+          Namensgleiche unterscheidbar bleiben. */}
+      <SuchSelect value="" onChange={(v) => { if (v) add(Number(v)); }}
+        leerLabel={t("kurse.personSuchen")} abSuche={0}
+        optionen={kandidaten.map((s) => ({ wert: String(s.id), label: `${s.name}${s.class_name ? ` · ${s.class_name}` : ""}` }))}
+        style={{ maxWidth: 320 }} />
+      {kandidaten.length === 0 && <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("kurse.allAdded")}</span>}
     </div>
   );
 }

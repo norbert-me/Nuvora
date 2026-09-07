@@ -202,6 +202,7 @@ export default {
   "kurse.editName": "Nombre",
   "kurse.editClasses": "Clases del curso",
   "kurse.editStudents": "Alumnos individuales (partes de clases)",
+  "kurse.personSuchen": "Buscar persona …",
   "kurse.pickClass": "Elegir clase …",
   "kurse.allAdded": "Todos ya en el curso",
   "kurse.editMeasures": "Medidas de apoyo",
