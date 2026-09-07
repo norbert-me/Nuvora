@@ -677,9 +677,27 @@ function Nav({ user, onLogout }) {
     if (!hit) return;
     const id = hit[1];
     if (tourGesehen(id)) return;
-    const timer = setTimeout(() => setTourId((cur) => cur || id), 900);
+    const timer = setTimeout(() => setTourId((cur) => {
+      if (cur) return cur;
+      merkeGesehen(id);
+      return id;
+    }), 900);
     return () => clearTimeout(timer);
   }, [location.pathname, user]);
+  // Gesehen heisst: sie ist gelaufen — nicht „sie wurde bis zum letzten Schritt
+  // durchgeklickt". Wer sie wegklickt, das Fenster schliesst oder mitten in der
+  // Tour auf einen Reiter geht, hat sie trotzdem gesehen; wurde sie erst am Ende
+  // vermerkt, fing sie auf jedem Geraet (und nach jedem Abbruch) wieder von vorn
+  // an. Deshalb wird beim START vermerkt und am Ende nur noch bestaetigt.
+  const merkeGesehen = (id) => {
+    if (!id) return;
+    try { localStorage.setItem(doneKey(id), "1"); } catch { /* egal */ }
+    fetch("/api/auth/tour-done", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tour: id }),
+    }).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      if (d?.tours_done) setUser((u) => (u ? { ...u, tours_done: d.tours_done } : u));
+    }).catch(() => { /* offline: der localStorage-Eintrag reicht bis zum naechsten Mal */ });
+  };
   const endTour = () => {
     const id = tourId;
     setTourId(null);
