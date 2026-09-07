@@ -246,7 +246,13 @@ export default function Kalender() {
   // Nach dem Sprung soll der getroffene Eintrag aufgehen — er steckt aber im
   // Zeitraum, der erst nachgeladen wird. Also merken und oeffnen, sobald er da
   // ist.
-  const [springZu, setSpringZu] = useState(null); // { art, id } oder null
+  // Adresse mit `entry=<id>`: den Eintrag oeffnen, sobald sein Zeitraum geladen
+  // ist — derselbe Weg wie beim Sprung aus der Suche. So kann die Startseite auf
+  // die Stunde zeigen und nicht nur auf den Tag.
+  const [springZu, setSpringZu] = useState(() => {
+    const e = Number(params.get("entry"));
+    return Number.isFinite(e) && e > 0 ? { art: "entry", id: e } : null;
+  });
 
   useEffect(() => {
     swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));

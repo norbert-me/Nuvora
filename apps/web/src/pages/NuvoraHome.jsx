@@ -130,7 +130,7 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
 // Eintraege, direkt auf der Startseite. Nur Anzeige — Klick fuehrt in den
 // Kalender. Erscheint nur, wenn das Modul Kalender aktiv ist.
 const wochentag = () => (new Date().getDay() + 6) % 7; // Mo=0 … So=6
-function HeutePanel({ t, orgaAktiv }) {
+function HeutePanel({ t }) {
   // Ortszeit, nicht UTC: `toISOString()` liefert in +02:00 ab 22 Uhr schon den
   // Folgetag — die Kachel „was ist heute" zeigte abends den morgigen Stundenplan
   // und hielt laufende Ferien fuer beendet.
@@ -215,7 +215,13 @@ function HeutePanel({ t, orgaAktiv }) {
           {slots.map((s) => {
             const e = eintrag(s.period);
             // 1-Klick: mit Klasse + aktivem Orga direkt in die Anwesenheit heute.
-            const to = orgaAktiv && s.class_id ? `/orga?tab=anwesenheit&class=${s.class_id}&date=${heuteYmd}` : "/kalender?view=day";
+            // Ein Klick auf die Stunde zeigt, was in ihr geplant ist — der
+            // Eintrag samt Thema, Verlauf und Material. Vorher fuehrte er in die
+            // Anwesenheit: das ist ein Handgriff waehrend der Stunde, nicht die
+            // Antwort auf „was mache ich da gleich?". Ohne Eintrag bleibt der
+            // Tag das Ziel.
+            const to = e ? `/kalender?view=day&date=${heuteYmd}&entry=${e.id}`
+              : `/kalender?view=day&date=${heuteYmd}`;
             return (
               <Link key={s.id} to={to} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px solid var(--border)", borderLeft: `4px solid ${s.class_id ? ccolor(s.class_id) : "var(--border2)"}`, borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
                 <div style={{ minWidth: 42, textAlign: "center" }}>
@@ -237,7 +243,7 @@ function HeutePanel({ t, orgaAktiv }) {
             const bis = e.end_time || "";
             const zeitTxt = von ? (bis ? `${von}–${bis}` : von) : "";
             return (
-              <Link key={e.id} to="/kalender?view=day" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
+              <Link key={e.id} to={`/kalender?view=day&date=${heuteYmd}&entry=${e.id}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
                 <div style={{ minWidth: 42, textAlign: "center", color: "var(--text3)", fontSize: 12, whiteSpace: "nowrap" }}>{zeitTxt || "—"}</div>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{e.title || (e.class_id && cname(e.class_id)) || t("kalender.planned")}</div>
               </Link>
@@ -450,7 +456,7 @@ export default function NuvoraHome({ user }) {
               Kachel verlinkt. Beides je Modul frei waehlbar; genau deshalb gibt
               es den Kalender nicht mehr zwangslaeufig doppelt. */}
           {!edit && WIDGETS.filter((w) => kacheln.wert.widgets.includes(w.key) && isOn(w.modul)).map((w) => {
-            if (w.key === "heute") return <HeutePanel key={w.key} t={t} orgaAktiv={isOn("orga")} />;
+            if (w.key === "heute") return <HeutePanel key={w.key} t={t} />;
             if (w.key === "schwach") {
               return <SchwacheWoche key={w.key} t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} />;
             }
