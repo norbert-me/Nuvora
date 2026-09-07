@@ -83,7 +83,17 @@ export default function Orga() {
   });
   useEffect(() => { if (frisch.current) { frisch.current = false; e.verwerfen(); } });
   // Kurs-/Klassenwechsel mit offenen Häkchen: nachfragen statt still verwerfen.
-  const wechseln = (fn) => { if (e.geaendert && !window.confirm(t("speichern.verlassen"))) return; fn(); };
+  const wechseln = (fn) => {
+    // Wer den Wechsel bestaetigt, hat die Aenderungen aufgegeben — die
+    // Arbeitskopie muss dann WEG. Ohne das blieb sie „beruehrt": der neue
+    // Stand vom Server wurde nie uebernommen, und beim Zurueckwechseln
+    // fragte die Seite erneut, obwohl niemand etwas getan hatte.
+    if (e.geaendert) {
+      if (!window.confirm(t("speichern.verlassen"))) return;
+      e.verwerfen();
+    }
+    fn();
+  };
 
   const anlegen = async () => {
     const name = neu.trim();

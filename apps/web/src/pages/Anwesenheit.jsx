@@ -140,7 +140,17 @@ export default function Anwesenheit() {
   });
   useEffect(() => { if (frisch.current) { frisch.current = false; eTag.verwerfen(); } });
   // Klassen-/Tageswechsel mit offenen Änderungen: nachfragen statt still verwerfen.
-  const wechseln = (fn) => { if (eTag.geaendert && !window.confirm(t("speichern.verlassen"))) return; fn(); };
+  const wechseln = (fn) => {
+    // Wer den Wechsel bestaetigt, hat die Aenderungen aufgegeben — die
+    // Arbeitskopie muss dann WEG. Ohne das blieb sie „beruehrt": der neue
+    // Stand vom Server wurde nie uebernommen, und beim Zurueckwechseln
+    // fragte die Seite erneut, obwohl niemand etwas getan hatte.
+    if (eTag.geaendert) {
+      if (!window.confirm(t("speichern.verlassen"))) return;
+      eTag.verwerfen();
+    }
+    fn();
+  };
 
   const statusOf = (sid) => eTag.wert[String(sid)] || tag[String(sid)]?.status || "da";
   const setStatus = (sid, status) => eTag.setz({ [String(sid)]: status });

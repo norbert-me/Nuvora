@@ -221,7 +221,17 @@ export default function Klassenarbeit() {
   const persist = (next) => entwurf.setz(next);
   // Andere Arbeit / andere Klasse gewählt: nachfragen, sonst wäre die
   // Arbeitskopie still weg.
-  const wechseln = (fn) => { if (entwurf.geaendert && !window.confirm(t("speichern.verlassen"))) return; fn(); };
+  const wechseln = (fn) => {
+    // Wer den Wechsel bestaetigt, hat die Aenderungen aufgegeben — die
+    // Arbeitskopie muss dann WEG. Ohne das blieb sie „beruehrt": der neue
+    // Stand vom Server wurde nie uebernommen, und beim Zurueckwechseln
+    // fragte die Seite erneut, obwohl niemand etwas getan hatte.
+    if (entwurf.geaendert) {
+      if (!window.confirm(t("speichern.verlassen"))) return;
+      entwurf.verwerfen();
+    }
+    fn();
+  };
 
   const neueArbeit = async () => {
     // Teilkurs: class_id = Referenz-Klasse (FK), kurs_id = Teilkurs (Roster kommt daraus).

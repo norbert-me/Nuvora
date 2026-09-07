@@ -24,7 +24,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import { useEinfuegen } from "../core/ziehsortieren.js";
 import { alsJson, hol } from "../core/melden.js";
-import { ymd } from "../core/datum.js";
+import { parseYmd, ymd } from "../core/datum.js";
 import { median as medianVon, mittel, streuung } from "../core/statistik.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
 
@@ -105,6 +105,9 @@ export default function Noten() {
   // der Weg ins ModuleGate — der Verweis darf dann gar nicht erst dastehen.
   const cvAktiv = aktiv("cardvote");
   const kartenAktiv = aktiv("karten");
+  // Für den Themenvorschlag aus dem Stundenplan (Regel 3: ohne Kalender gibt es
+  // keine Stunde, aus der man ihn lesen könnte).
+  const kalenderAktiv = aktiv("kalender");
   // Wer an dem Tag gefehlt hat oder zu spaet kam, wird in seiner Spalte
   // markiert — eine 5 an einem Tag, an dem das Kind gar nicht da war, ist eine
   // Frage, keine Note. Nur mit dem Modul Orga (Regel 3): ohne es bleibt die
@@ -427,7 +430,17 @@ export default function Noten() {
   // beenden die Arbeitskopie — sonst zeigte die Tabelle die alten Werte weiter.
   useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
   // Wechsel mit offenen Änderungen: nachfragen statt still verwerfen.
-  const wechseln = (fn) => { if (entwurf.geaendert && !window.confirm(t("speichern.verlassen"))) return; fn(); };
+  const wechseln = (fn) => {
+    // Wer den Wechsel bestaetigt, hat die Aenderungen aufgegeben — die
+    // Arbeitskopie muss dann WEG. Ohne das blieb sie „beruehrt": der neue
+    // Stand vom Server wurde nie uebernommen, und beim Zurueckwechseln
+    // fragte die Seite erneut, obwohl niemand etwas getan hatte.
+    if (entwurf.geaendert) {
+      if (!window.confirm(t("speichern.verlassen"))) return;
+      entwurf.verwerfen();
+    }
+    fn();
+  };
   // Anzeige liest den ENTWURF: Reihenfolge, Note, Kommentar, gesetzte Note.
   const secListe = (entwurf.wert.os || sections.map((x) => x.id)).map((id) => sections.find((x) => x.id === id)).filter(Boolean);
   const catsVon = (sec) => (entwurf.wert[`oc:${sec.id}`] || (sec.categories || []).map((c) => c.id))
@@ -762,7 +775,7 @@ export default function Noten() {
                           </span>
                         ) : null}
                         {renameCol === c.id && (
-                          <ColMenu t={t} cat={c} classId={classId} topics={topics} kartenAktiv={kartenAktiv} cvAktiv={cvAktiv} onNachhol={runNachhol} onCompare={setCompareCat} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
+                          <ColMenu t={t} cat={c} classId={classId} kursId={kursId} topics={topics} kartenAktiv={kartenAktiv} cvAktiv={cvAktiv} kalenderAktiv={kalenderAktiv} onNachhol={runNachhol} onCompare={setCompareCat} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
                             onRename={async (name, topicId, datum) => { if (await call(() => fetch(`${API}/categories/${c.id}`, alsJson("PUT", { name, section_id: sec.id, position: c.position ?? i, topic_id: topicId, date: datum })))) setRenameCol(null); }}
                             onDelete={() => {
                               setRenameCol(null);
@@ -1191,10 +1204,33 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol, onOpen }) {
 }
 
 // Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
-function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, topics = [], onNachhol, onCompare, kartenAktiv, cvAktiv }) {
+function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, kursId = null, topics = [], onNachhol, onCompare, kartenAktiv, cvAktiv, kalenderAktiv = false }) {
   const [name, setName] = useState(cat.name);
   const [topicId, setTopicId] = useState(cat.topic_id ?? "");
   const [datum, setDatum] = useState(cat.date || "");
+  // Das Thema der Stunde steht im Kalender — es hier ein zweites Mal
+  // auszuwählen ist Abtippen. Vorgeschlagen wird nur, was noch leer ist: eine
+  // von Hand getroffene Wahl wird nie überschrieben, und ändern lässt sich der
+  // Vorschlag wie jede andere Auswahl.
+  useEffect(() => {
+    if (!kalenderAktiv || !datum || topicId) return;
+    let ab = false;
+    const tag = parseYmd(datum);
+    if (!tag) return;
+    const frm = new Date(tag); frm.setHours(0, 0, 0, 0);
+    const to = new Date(tag); to.setHours(23, 59, 59, 0);
+    hol(`/api/kalender/entries?frm=${frm.toISOString()}&to=${to.toISOString()}`, [])
+      .then((liste) => {
+        if (ab || !Array.isArray(liste)) return;
+        const passt = liste.find((e) => e.topic_id
+          && (kursId ? e.kurs_id === kursId : true)
+          && (e.class_id === classId || e.kurs_id === kursId));
+        if (passt) setTopicId(String(passt.topic_id));
+      })
+      .catch(() => { /* ohne Kalenderdaten bleibt die Auswahl leer */ });
+    return () => { ab = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datum, kalenderAktiv]);
   // Auch der Quartalsstrich wartet auf „Speichern" — er schrieb bisher beim
   // Klick, mitten in einer Maske, die sonst sammelt.
   const [strich, setStrich] = useState(!!dividerOn);

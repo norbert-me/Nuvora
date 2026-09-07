@@ -229,7 +229,17 @@ export default function Sitzplan() {
   const setSeats = (fn) => e.setz((v) => ({ seats: typeof fn === "function" ? fn(v.seats) : fn }));
   const setTafel = (fn) => e.setz((v) => ({ tafel: typeof fn === "function" ? fn(v.tafel) : fn }));
   // Kurswechsel mit offenem Plan: nachfragen statt still verwerfen.
-  const wechseln = (fn) => { if (e.geaendert && !window.confirm(t("speichern.verlassen"))) return; fn(); };
+  const wechseln = (fn) => {
+    // Wer den Wechsel bestaetigt, hat die Aenderungen aufgegeben — die
+    // Arbeitskopie muss dann WEG. Ohne das blieb sie „beruehrt": der neue
+    // Stand vom Server wurde nie uebernommen, und beim Zurueckwechseln
+    // fragte die Seite erneut, obwohl niemand etwas getan hatte.
+    if (e.geaendert) {
+      if (!window.confirm(t("speichern.verlassen"))) return;
+      e.verwerfen();
+    }
+    fn();
+  };
 
   // SEGEL-Stufen je SuS laden (pro Kurs). Toggle in localStorage merken.
   useEffect(() => {
