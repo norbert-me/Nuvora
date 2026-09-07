@@ -656,6 +656,12 @@ class Exercise(Base):
 
     quelle_typ: Mapped[str] = mapped_column(String(50), default="", server_default="")
     quelle_detail: Mapped[str] = mapped_column(String(255), default="", server_default="")
+    # Verweis auf das, woraus die Aufgabe entstand (heute: die Klassenarbeit,
+    # aus der eine Korrektur-/Wiederholungsaufgabe erzeugt wurde). BEWUSST OHNE
+    # Fremdschluessel: der Lernpfad darf nicht am Modul Auswertung haengen
+    # (Regel 3) — er zeigt nur hin, und wer das Ziel nicht hat, sieht keinen
+    # Verweis statt einer kaputten Tabelle.
+    quelle_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     lrs: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     lrs_text: Mapped[str] = mapped_column(Text, default="", server_default="")

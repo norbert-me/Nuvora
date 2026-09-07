@@ -47,3 +47,25 @@ async def test_da_loescht_nur_diese_stunde(s):
     await an.mark(c.id, an.MarkIn(student_id=st.id, date=d, status="da", period=3), user=u, db=s)
     # Nur P3 weg, P1 bleibt.
     assert (await s.execute(select(func.count()).select_from(Attendance))).scalar() == 1
+
+
+@pytest.mark.asyncio
+async def test_verspaetung_wird_uebernommen(s):
+    """„Spät" gilt weiter, bis jemand die Stunde auf „da" stellt."""
+    u, c, st = await _seed(s)
+    d = datetime(2026, 7, 21)
+    await an.mark(c.id, an.MarkIn(student_id=st.id, date=d, status="spaet", period=1), user=u, db=s)
+    m = await an.get_day(c.id, date=d, period=2, user=u, db=s)
+    assert m[str(st.id)]["status"] == "spaet" and m[str(st.id)]["period"] == 2
+
+
+@pytest.mark.asyncio
+async def test_tageseintrag_wird_in_die_stunde_uebernommen(s):
+    """Ohne gewählte Stunde eingetragen (period = NULL) — das ist der Fall, in
+    dem morgens jemand zu spät kam und es am TAG erfasst wurde. Vorher wurde er
+    in keine Folgestunde übernommen: die Übernahme sah nur auf frühere Stunden."""
+    u, c, st = await _seed(s)
+    d = datetime(2026, 7, 22)
+    await an.mark(c.id, an.MarkIn(student_id=st.id, date=d, status="spaet", period=None), user=u, db=s)
+    m = await an.get_day(c.id, date=d, period=4, user=u, db=s)
+    assert m[str(st.id)]["status"] == "spaet" and m[str(st.id)]["period"] == 4

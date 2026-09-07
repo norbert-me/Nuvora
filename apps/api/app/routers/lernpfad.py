@@ -68,6 +68,8 @@ class ExerciseIn(BaseModel):
     unteraufgaben: int = 1
     quelle_typ: str = ""
     quelle_detail: str = ""
+    # Woraus die Aufgabe entstand (Klassenarbeit) — nur ein Verweis, siehe models.
+    quelle_id: Optional[int] = None
     lrs: bool = False
     lrs_text: str = ""
     # Liste von Foerderschwerpunkt-Kuerzeln (Checkboxen im Frontend). War

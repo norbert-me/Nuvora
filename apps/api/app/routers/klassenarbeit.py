@@ -570,7 +570,12 @@ async def remediate(work_id: int, body: RemediateIn, user: User = Depends(requir
                 Exercise.owner_id == user.id, Exercise.topic_id == tid, Exercise.aufgabentext == text))).scalar_one_or_none()
             if exists:
                 continue
-            db.add(Exercise(owner_id=user.id, topic_id=tid, kategorie="Wiederholung", aufgabentext=text))
+            # Die Aufgabe sagt, woraus sie entstand — und zwar so, dass man
+            # hinkommt: der Name allein beantwortet „welche Arbeit war das?"
+            # erst, wenn man sie sucht.
+            db.add(Exercise(owner_id=user.id, topic_id=tid, kategorie="Wiederholung",
+                            aufgabentext=text, quelle_typ="klassenarbeit",
+                            quelle_detail=(w.name or "")[:255], quelle_id=w.id))
             exercises += 1
 
     await db.commit()

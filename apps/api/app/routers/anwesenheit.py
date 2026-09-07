@@ -112,9 +112,18 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
     fehlend = {r.student_id for r in rows if r.student_id not in exact}
     for sid in fehlend:
         vorher = [r for r in rows if r.student_id == sid and r.period is not None and r.period < period]
-        if not vorher:
-            continue
-        quelle = max(vorher, key=lambda r: r.period)
+        if vorher:
+            quelle = max(vorher, key=lambda r: r.period)
+        else:
+            # Kein Eintrag aus einer frueheren STUNDE — dann zaehlt der Eintrag
+            # des ganzen TAGES (period = NULL). Ohne ihn wurde eine Verspaetung,
+            # die ohne gewaehlte Stunde erfasst wurde, in keine Folgestunde
+            # uebernommen: genau der Fall, in dem morgens jemand zu spaet kam und
+            # die Lehrkraft es am Tag statt an der Stunde eingetragen hat.
+            tages = [r for r in rows if r.student_id == sid and r.period is None]
+            if not tages:
+                continue
+            quelle = tages[0]
         if quelle.status == "da":
             continue
         # class_id der kanonischen Zeile behalten (gehört evtl. einer Fach-Klasse

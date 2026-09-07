@@ -117,6 +117,18 @@
         return unter.id;
     }
 
+    // Eine Wiederholungsaufgabe entsteht aus einer Klassenarbeit (Korrektur).
+    // Dann fuehrt die Quelle dorthin — der Name allein beantwortet „welche
+    // Arbeit war das?" erst, wenn man sie sucht. Der Weg fuehrt in die Shell
+    // (nicht in diese App), deshalb ein normaler Link auf /auswertung; ohne das
+    // Modul landet er am ModuleGate, und genau das ist die richtige Antwort.
+    function quelleZelle(a) {
+        if (a.quelleTyp === 'klassenarbeit' && a.quelleId) {
+            return `<a href="/auswertung?tab=klassenarbeit&work=${encodeURIComponent(a.quelleId)}" title="Zur Klassenarbeit">${esc(a.quelle)}</a>`;
+        }
+        return esc(a.quelle);
+    }
+
     // Kern-Aufgabe -> Form, die die Oberflaeche kennt.
     function vonKern(ex) {
         const tp = topicPfad(ex.topic_id);
@@ -129,7 +141,9 @@
             kategorie: ex.kategorie || '',
             quelleTyp: ex.quelle_typ || '',
             quelleDetail: ex.quelle_detail || '',
-            quelle: ex.quelle_detail ? `${ex.quelle_typ === 'schulbuch' ? 'Schulbuch' : (ex.quelle_typ || '')} [${ex.quelle_detail}]`.trim() : '',
+            quelleId: ex.quelle_id || null,
+            quelle: ex.quelle_detail ? `${ex.quelle_typ === 'schulbuch' ? 'Schulbuch'
+                : ex.quelle_typ === 'klassenarbeit' ? 'Klassenarbeit' : (ex.quelle_typ || '')} [${ex.quelle_detail}]`.trim() : '',
             operator: ex.operator || '',
             unteraufgaben: ex.unteraufgaben || 1,
             kompetenz: ex.kompetenz || '',
@@ -172,6 +186,7 @@
             unteraufgaben: parseInt(a.unteraufgaben) || 1,
             quelle_typ: a.quelleTyp || '',
             quelle_detail: a.quelleDetail || '',
+            quelle_id: a.quelleId || null,
             lrs: !!(a.lrs && a.lrs !== '0'),
             lrs_text: a.lrsText || '',
             foerderschwerpunkte: (a.foerderschwerpunkte && a.foerderschwerpunkte.length) ? a.foerderschwerpunkte : null,
@@ -1427,7 +1442,7 @@
                 <td><strong>${esc(fmtId(a.code || a.id))}</strong>${hasDetail ? ' <span class="detail-hint" title="Details">' + ICON.chevron + '</span>' : ''}</td>
                 <td>${esc(a.thema)}${a.unterthema ? '<br><small style="color:var(--text-muted)">' + esc(a.unterthema) + '</small>' : ''}</td>
                 <td><span class="badge badge-${katBadgeClass(kat)}">${esc(kat)}</span></td>
-                <td>${esc(a.quelle)}</td>
+                <td>${quelleZelle(a)}</td>
                 <td>${renderTags(a)}</td>
                 <td style="text-align:center">${a.lrs ? '<span class="lrs-check" title="LRS">✓</span>' : ''}</td>
                 <td>${a.loesung ? '<span class="icon-success" title="Lösung vorhanden">' + ICON.check + '</span>' : '–'}</td>
