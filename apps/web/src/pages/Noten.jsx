@@ -95,7 +95,6 @@ export default function Noten() {
   const [neuSpalteIn, setNeuSpalteIn] = useState(null);
   const [renameCol, setRenameCol] = useState(null);
   const [statsCol, setStatsCol] = useState(null); // Spalte für die zentrale Auswertung
-  const [compareCat, setCompareCat] = useState(null); // Spalte für den Klassen-/Zeit-Vergleich
   const [beobFuer, setBeobFuer] = useState(null);
   const [infoFuer, setInfoFuer] = useState(null);
   const [term, setTerm] = useState("1");
@@ -577,7 +576,6 @@ export default function Noten() {
         </Modal>
       )}
 
-      {compareCat && <CompareModal t={t} cat={compareCat} onClose={() => setCompareCat(null)} />}
 
       {cdDialog && (
         <Modal title={t("noten.fromCd")} onClose={() => setCdDialog(false)}>
@@ -775,7 +773,7 @@ export default function Noten() {
                           </span>
                         ) : null}
                         {renameCol === c.id && (
-                          <ColMenu t={t} cat={c} classId={classId} kursId={kursId} topics={topics} kartenAktiv={kartenAktiv} cvAktiv={cvAktiv} kalenderAktiv={kalenderAktiv} onNachhol={runNachhol} onCompare={setCompareCat} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
+                          <ColMenu t={t} cat={c} classId={classId} kursId={kursId} topics={topics} kartenAktiv={kartenAktiv} cvAktiv={cvAktiv} kalenderAktiv={kalenderAktiv} onNachhol={runNachhol} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
                             onRename={async (name, topicId, datum) => { if (await call(() => fetch(`${API}/categories/${c.id}`, alsJson("PUT", { name, section_id: sec.id, position: c.position ?? i, topic_id: topicId, date: datum })))) setRenameCol(null); }}
                             onDelete={() => {
                               setRenameCol(null);
@@ -872,7 +870,24 @@ export default function Noten() {
                                     setZelle(ziel);
                                   }} />
                               : (<div style={{ position: "relative" }}>
+                                  {/* Der Kommentar hängt nicht mehr allein an der
+                                      kleinen Ecke: die Zelle ist 56 px breit, die
+                                      Ecke 20 — wer den Kommentar wollte, traf die
+                                      Note, und mit dem Finger fast immer. Jetzt
+                                      öffnet ihn auch ein RECHTSKLICK auf der Zelle
+                                      und ein LANGER DRUCK (halbe Sekunde) auf dem
+                                      Handy. Die Ecke bleibt als Anzeige: ein
+                                      vorhandener Kommentar muss sichtbar sein. */}
                                   <button onClick={() => setZelle(id)}
+                                    onContextMenu={(ev) => { ev.preventDefault(); setKommentarFuer({ sid: s.student_id, cid: c.id, text: kommentarVon(s.student_id, c.id) }); }}
+                                    onPointerDown={(ev) => {
+                                      if (ev.pointerType === "mouse") return;
+                                      const uhr = setTimeout(() => setKommentarFuer({ sid: s.student_id, cid: c.id, text: kommentarVon(s.student_id, c.id) }), 500);
+                                      const aus = () => { clearTimeout(uhr); window.removeEventListener("pointerup", aus); window.removeEventListener("pointercancel", aus); window.removeEventListener("pointermove", aus); };
+                                      window.addEventListener("pointerup", aus);
+                                      window.addEventListener("pointercancel", aus);
+                                      window.addEventListener("pointermove", aus);
+                                    }}
                                     style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 14, fontWeight: wert != null ? 600 : 400 }}>
                                     {wert != null ? de(wert) : <span style={{ color: "var(--border2)" }}>·</span>}
                                   </button>
@@ -886,12 +901,15 @@ export default function Noten() {
                                   <button className="komm-ecke" title={kommentarVon(s.student_id, c.id) || t("noten.commentAdd")}
                                     aria-label={t("noten.commentAdd")}
                                     onClick={(ev) => { ev.stopPropagation(); setKommentarFuer({ sid: s.student_id, cid: c.id, text: kommentarVon(s.student_id, c.id) }); }}
-                                    style={{ position: "absolute", top: 0, right: 0, width: 20, height: 20, padding: 0, border: "none", cursor: "pointer",
+                                    style={{ position: "absolute", top: 0, right: 0, width: 24, height: 24, padding: 0, border: "none", cursor: "pointer",
                                       background: "transparent", lineHeight: 0,
-                                      opacity: kommentarVon(s.student_id, c.id) ? 1 : 0 }}>
+                                      // Ohne Kommentar blass statt unsichtbar: ein
+                                      // Weg, den man nur kennt, wenn man ihn schon
+                                      // kennt, ist keiner.
+                                      opacity: kommentarVon(s.student_id, c.id) ? 1 : 0.35 }}>
                                     <span style={{ display: "block", width: 0, height: 0, pointerEvents: "none",
                                       borderTop: `9px solid ${kommentarVon(s.student_id, c.id) ? C.warning : "var(--border2)"}`,
-                                      borderLeft: "9px solid transparent", marginLeft: 12 }} />
+                                      borderLeft: "9px solid transparent", marginLeft: 15 }} />
                                   </button>
                                 </div>)}
                           </td>
@@ -1204,7 +1222,7 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol, onOpen }) {
 }
 
 // Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
-function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, kursId = null, topics = [], onNachhol, onCompare, kartenAktiv, cvAktiv, kalenderAktiv = false }) {
+function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, kursId = null, topics = [], onNachhol, kartenAktiv, cvAktiv, kalenderAktiv = false }) {
   const [name, setName] = useState(cat.name);
   const [topicId, setTopicId] = useState(cat.topic_id ?? "");
   const [datum, setDatum] = useState(cat.date || "");
@@ -1256,9 +1274,13 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
         <button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
           <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
         </button>
-        <button onClick={() => { onCompare(cat); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
-          <Icon d={ICONS.chart} size={14} color={C.info} />{t("noten.compare")}
-        </button>
+        {/* Kein „Vergleichen" mehr an der Spalte. Es war für Klassenarbeiten
+            gedacht („dieselbe Arbeit in den anderen Fach-Klassen") und stand
+            trotzdem an jeder Spalte: für eine mündliche Note am 07.09. gibt es
+            keine gleichnamige Arbeit anderswo, und der Verlauf daneben stellte
+            mündliche Noten neben Arbeiten. Klassenarbeiten haben ihren
+            Vergleich als eigene Seite (/auswertung/vergleich); was diese eine
+            Spalte hergibt, steht unter „Details". */}
         <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 12 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus
             placeholder={datumKurz(datum) || t("noten.colName")}
@@ -1351,58 +1373,6 @@ function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "", initialDat
       <button onClick={nimm} style={toolbarBtnPrimary}>OK</button>
       <button onClick={onCancel} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.abort")} aria-label={t("common.abort")}><Icon d={ICONS.close} size={20} /></button>
     </div>
-  );
-}
-
-// Vergleich einer Klassenarbeit: dieselbe Arbeit in den anderen Fach-Klassen des
-// Kurses + der Notenverlauf dieser Klasse im Halbjahr. Rein deskriptiv.
-const GRADE_COL = [C.success, C.success, C.warning, C.warning, C.danger, C.danger];
-function CompareModal({ t, cat, onClose }) {
-  const [data, setData] = useState(null);
-  const [err, setErr] = useState(false);
-  useEffect(() => {
-    fetch(`/api/noten/categories/${cat.id}/compare`).then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then(setData).catch(() => setErr(true));
-  }, [cat.id]);
-  const de1 = (n) => kommaRund(n, 2, "—");
-  return (
-    <UiModal onClose={onClose} width={520} label={`${t("noten.compare")}: ${cat.name}`}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("noten.compare")}: {cat.name}</h3>
-        {err ? <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("common.notWork")}</p> : !data ? <p style={{ fontSize: 13, color: "var(--text3)" }}>…</p> : (
-          <>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text3)", margin: "12px 0 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{t("noten.compareClasses")}</div>
-            {data.classes.length <= 1 && <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 8 }}>{t("noten.compareNoClasses")}</p>}
-            {data.classes.map((c, i) => {
-              const max = Math.max(...c.dist, 1);
-              return (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
-                  <span style={{ flex: 1, minWidth: 90, fontSize: 13, fontWeight: c.is_self ? 700 : 500, color: c.is_self ? "var(--accent)" : "var(--text)" }}>{c.class_name}{c.is_self ? " ●" : ""}</span>
-                  <span style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 30 }}>
-                    {c.dist.map((n, g) => <span key={g} title={`${g + 1}: ${n}`} style={{ width: 9, height: Math.max(2, (n / max) * 30), background: GRADE_COL[g], borderRadius: 2 /* Saeulen-Kappe: reine Grafik */, opacity: n ? 1 : 0.25 }} />)}
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: 700, minWidth: 54, textAlign: "right" }}>⌀ {de1(c.avg)}</span>
-                  <span style={{ fontSize: 12, color: "var(--text3)", minWidth: 30, textAlign: "right" }}>n={c.n}</span>
-                </div>
-              );
-            })}
-            {data.over_time.length > 1 && (<>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text3)", margin: "18px 0 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{t("noten.compareOverTime")}</div>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 90, paddingTop: 6 }}>
-                {data.over_time.map((o, i) => (
-                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                    {/* Balken: niedrigere (bessere) Note = höher. Skala 1..6 → 6-avg. */}
-                    <div title={`⌀ ${de1(o.avg)}`} style={{ width: "70%", height: `${Math.max(4, ((6 - o.avg) / 5) * 66)}px`, background: o.is_self ? "var(--accent)" : "var(--border3)", borderRadius: 3 /* Saeulen-Kappe: reine Grafik */ }} />
-                    <span style={{ fontSize: 11, fontWeight: 700 }}>{de1(o.avg)}</span>
-                    <span style={{ fontSize: 11, color: "var(--text3)", maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
-                  </div>
-                ))}
-              </div>
-            </>)}
-            <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 16 }}>{t("noten.compareHint")}</p>
-          </>
-        )}
-        <div style={{ marginTop: 16 }}><button onClick={onClose} style={btnSecondary}>{t("common.close")}</button></div>
-    </UiModal>
   );
 }
 

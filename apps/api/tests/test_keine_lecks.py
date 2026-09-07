@@ -505,7 +505,6 @@ def _routen():
 # Zusätzliche Abfrageparameter, ohne die eine Route nur mit 422 antwortet —
 # eine 422 prüft nichts.
 QUERY = {
-    "/api/noten/categories/{category_id}/compare": "other_id={category_id}",
     "/api/kalender/entries": "von=2020-01-01&bis=2030-01-01",
     "/api/kalender/external-events": "von=2020-01-01&bis=2030-01-01",
     "/api/kalender/quiz-session": "set_id={set_id}&class_id={class_id}",

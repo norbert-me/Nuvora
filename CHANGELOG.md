@@ -14,6 +14,20 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+**Notenbuch**
+
+- „Vergleichen" ist aus dem Spaltenmenü verschwunden: es war für Klassenarbeiten
+  gedacht und stand trotzdem an jeder Spalte. Klassenarbeiten haben ihren
+  Vergleich als eigene Seite; was eine einzelne Spalte hergibt, steht unter
+  „Details".
+- Ein Kommentar an einer Note lässt sich per Rechtsklick oder langem Druck auf
+  die Zelle schreiben — nicht mehr nur über die kleine Ecke.
+- Das Thema einer Spalte schlägt sich aus dem Kalendereintrag des Tages vor.
+- Der Wechsel von Halbjahr, Klasse oder Kurs fragt nicht mehr erneut nach
+  Änderungen, die man vorher aufgegeben hat.
+
 ## 4.3.1 — 07.09.2026
 
 **Kalender und Tafel**
