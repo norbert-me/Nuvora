@@ -7,7 +7,7 @@ ausgefallenes Thema spaeter passende Lernpfad-Aufgaben nach sich ziehen.
 Hierarchie ueber parent_id. Lernpfad nutzt heute zwei Ebenen (Thema >
 Unterthema); erzwungen wird das nicht.
 """
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
@@ -42,7 +42,11 @@ class TopicIn(BaseModel):
     # Fehler abgelehnt: die Oberflaeche schickt das ganze Thema zurueck, und ein
     # 422 fuer ein Feld, das dort gar nicht bedienbar ist, waere eine Sackgasse.
     fach: str = ""
-    jahrgang: Optional[str] = None
+    # Zahl ODER Text: „7/8" gibt es wirklich (Kombiklasse, WP-Kurs ueber zwei
+    # Stufen), und aeltere Clients schicken weiter die blanke 7. Beides wird zu
+    # Text — sonst ist ein Feld, das jahrelang eine Zahl war, ueber Nacht ein
+    # 422 (genau so ist der Selbsttest rot geworden).
+    jahrgang: Optional[Union[int, str]] = None
 
     @field_validator("name")
     @classmethod
@@ -81,7 +85,11 @@ class TopicOut(BaseModel):
     # Wirksames Fach/Jahrgang: am Oberthema das eigene, am Unterthema das
     # geerbte. Die Oberflaeche muss die Regel damit nicht ein zweites Mal kennen.
     fach: str = ""
-    jahrgang: Optional[str] = None
+    # Zahl ODER Text: „7/8" gibt es wirklich (Kombiklasse, WP-Kurs ueber zwei
+    # Stufen), und aeltere Clients schicken weiter die blanke 7. Beides wird zu
+    # Text — sonst ist ein Feld, das jahrelang eine Zahl war, ueber Nacht ein
+    # 422 (genau so ist der Selbsttest rot geworden).
+    jahrgang: Optional[Union[int, str]] = None
     # Wie viele CardVote-Fragen haengen an diesem Thema? Macht sichtbar, was
     # ein Loeschen kostet.
     question_count: int = 0

@@ -8,7 +8,7 @@ Mitgliedschaft ist many-to-many (Tabelle kurs_tags): eine Klasse kann in
 mehreren Kursen sein. Alle Mitglieder eines Kurses teilen — es gibt keinen
 Unterschied „Sharing vs. Tag" mehr.
 """
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -50,7 +50,8 @@ class KursIn(BaseModel):
     # frei („Mathe 7.5", „M7b", „Mathe Gruppe rot"), und daraus einen
     # Zusammenhang zu raten waere genau der Fehler, den die Taxonomie vermeidet.
     fach: Optional[str] = None
-    jahrgang: Optional[str] = None
+    # Zahl ODER Text — siehe topics.py: „7/8" muss gehen, die blanke 7 auch.
+    jahrgang: Optional[Union[int, str]] = None
     # Stammraum ("B204"). Der Kalender setzt ihn als Ort der Stunde ein.
     raum: Optional[str] = None
     # „Aus einem anderen Kurs entwickeln": dessen Kinder werden uebernommen.
@@ -80,7 +81,8 @@ class KursOut(BaseModel):
     member_count: int = 0    # einzeln hinzugefügte SuS (Kurs aus Teilen von Klassen)
     schuljahr: str = ""
     fach: str = ""
-    jahrgang: Optional[str] = None
+    # Zahl ODER Text — siehe topics.py: „7/8" muss gehen, die blanke 7 auch.
+    jahrgang: Optional[Union[int, str]] = None
     raum: str = ""
     vorgaenger_id: Optional[int] = None
     vorgaenger_name: str = ""       # damit die Liste nicht je Kurs nachfragen muss
