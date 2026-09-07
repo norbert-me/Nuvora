@@ -538,7 +538,10 @@ export default function Classes() {
             // mit der üblichen Nachfrage.
             { key: "archiv", label: archiv ? t("classes.unarchive") : t("classes.archive"), icon: ICONS.archive,
               onClick: async () => {
-                await fetch(`${API}/classes/${editing.id}/archive`, { method: "POST" }).catch(() => {});
+                // Scheitert es, muss es dastehen: ein stiller Fehlschlag sieht
+                // aus wie „archiviert" und ist es nicht.
+                const r = await fetch(`${API}/classes/${editing.id}/archive`, { method: "POST" }).catch(() => null);
+                if (!r || !r.ok) { showAlert(t("common.notWork")); return; }
                 if (schliessen()) load();
               } },
             { key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true,
