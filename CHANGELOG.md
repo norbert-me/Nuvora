@@ -32,6 +32,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Notenbuch: wer am Tag der Spalte gefehlt hat oder zu spät kam, ist in der
   Spalte farbig markiert.
 
+**Zeitleiste**
+
+- Ohne eingetragenes Schuljahr sagt die Zeitleiste, warum die Halbjahrs-Wahl
+  nichts ändert — mit dem Weg ins Profil.
+
 **Startseite und Sitzplan**
 
 - Ein Klick auf die Stunde öffnet ihren Kalendereintrag statt der Anwesenheit.
