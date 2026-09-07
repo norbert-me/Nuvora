@@ -1738,6 +1738,12 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
   // — also in allem, was auf der Karte steht.
   const [suche, setSuche] = useState("");
   const [filterKurs, setFilterKurs] = useState("");
+  // Findet die Arbeit STATT des Unterrichts statt? Dann entfällt die Stunde aus
+  // dem Stundenplan an diesem Tag — sonst stünde im Kalender „Mathe" und
+  // daneben die Arbeit, und niemand wüsste, ob beides gilt. Nur mit gewählter
+  // Stunde sinnvoll.
+  const [ersetzen, setErsetzen] = useState(true);
+  const [eErsetzen, setEErsetzen] = useState(true);
   const kursListe = [...new Set(overview.map((e) => e.kurs || e.klasse).filter(Boolean))].sort(
     (a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   const q = suche.trim().toLowerCase();
@@ -1752,17 +1758,17 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
     ? [...gefiltert].sort((a, b) => (a.fach || "\uffff").localeCompare(b.fach || "\uffff", undefined, { sensitivity: "base" })
         || new Date(a.date) - new Date(b.date))
     : gefiltert;
-  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); setEPeriod(e.period ? String(e.period) : ""); setENotiz(e.notiz || ""); setEThemen(e.topic_ids || []); };
+  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); setEPeriod(e.period ? String(e.period) : ""); setENotiz(e.notiz || ""); setEThemen(e.topic_ids || []); setEErsetzen(e.ersetzt_stunde !== false); };
   const saveEdit = (e) => {
     if (!eDate || !eClassId) return;
     const [y, m, d] = eDate.split("-").map(Number);
-    onUpd(e.id, { class_id: Number(eClassId), kurs_id: eKursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: eTitle.trim(), period: ePeriod ? Number(ePeriod) : null, notiz: eNotiz, topic_ids: eThemen });
+    onUpd(e.id, { class_id: Number(eClassId), kurs_id: eKursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: eTitle.trim(), period: ePeriod ? Number(ePeriod) : null, notiz: eNotiz, topic_ids: eThemen, ersetzt_stunde: !!ePeriod && eErsetzen });
     setEditId(null);
   };
   const save = () => {
     if (!classId || !date) return;
     const [y, m, d] = date.split("-").map(Number);
-    onAdd({ class_id: Number(classId), kurs_id: kursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: title.trim(), period: period ? Number(period) : null, notiz, topic_ids: themen });
+    onAdd({ class_id: Number(classId), kurs_id: kursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: title.trim(), period: period ? Number(period) : null, notiz, topic_ids: themen, ersetzt_stunde: !!period && ersetzen });
     setDate(""); setTitle(""); setPeriod(""); setNotiz(""); setThemen([]);
   };
   // Eine Höhe, eine Form: Felder aus den gemeinsamen Bausteinen (CONTROL_H /
@@ -1793,6 +1799,13 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
             der Kalender zeigt auf sie, besitzt sie nicht). Freiwillig — ein
             Termin ohne Themen ist ein vollständiger Termin. */}
         <ThemenWahl topics={topics} value={themen} onChange={setThemen} />
+        {period && (
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}
+            title={t("kalender.examErsetztHint")}>
+            <input type="checkbox" checked={ersetzen} onChange={(e) => setErsetzen(e.target.checked)} />
+            {t("kalender.examErsetzt")}
+          </label>
+        )}
         <button onClick={save} disabled={!classId || !date} style={{ ...toolbarBtnPrimary, opacity: (classId && date) ? 1 : 0.5 }}>{t("common.add")}</button>
       </Werkzeugleiste>
 
@@ -1840,6 +1853,13 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
                     Bezeichnung, das Merkenswerte kommt spaeter dazu. */}
                 <input value={eNotiz} onChange={(ev) => setENotiz(ev.target.value)} placeholder={t("kalender.examNotiz")}
                   style={{ ...toolbarInput, flex: 1, minWidth: 160 }} />
+                {ePeriod && (
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}
+                    title={t("kalender.examErsetztHint")}>
+                    <input type="checkbox" checked={eErsetzen} onChange={(ev) => setEErsetzen(ev.target.checked)} />
+                    {t("kalender.examErsetzt")}
+                  </label>
+                )}
               </div>
               <button onClick={() => saveEdit(e)} style={toolbarBtnPrimary}>{t("common.save")}</button>
               <button onClick={() => setEditId(null)} style={toolbarBtn}>{t("common.abort")}</button>
@@ -2294,6 +2314,12 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
     ladderId && (() => { const l = ladders.find((x) => x.id === Number(ladderId)); return l && { to: `/lernpfad?ll=${ladderId}`, label: (topicName(l.topic_id) || l.path || t("kalender.planLernleiter")), kind: t("kalender.planLernleiter"), hideName: true }; })(),
     puzzleId && (() => { const p = puzzles.find((x) => x.client_id === puzzleId); return { to: `/code-detektiv/puzzle/${puzzleId}?mode=solo`, label: (p && p.title) || puzzleId, kind: t("kalender.planDetektiv") }; })(),
     methodId && methName && { to: `/unterrichtsplanung?tab=einstiege&open=${methodId}`, label: methName, kind: t("kalender.method"), hideName: true },
+    // Der Weg in die Orga dieser Klasse: Anwesenheit und Checkliste sind das,
+    // was man WÄHREND der Stunde braucht — und man kommt aus dem Kalender, nicht
+    // aus der Navigation. Regel 3: nur mit dem Modul, sonst führt der Weg ans
+    // ModuleGate.
+    aktiv.orga && classId && { to: `/orga?tab=anwesenheit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`, label: t("kalender.zurAnwesenheit"), kind: t("kalender.zurAnwesenheit") },
+    aktiv.orga && classId && { to: `/orga?tab=checklisten&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`, label: t("kalender.zurCheckliste"), kind: t("kalender.zurCheckliste") },
   ].filter(Boolean);
   const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: 14 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
   return (

@@ -11,7 +11,7 @@ import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { useKlasseMerken, useKlassenListe } from "../core/klassenwahl.js";
+import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import Anwesenheit from "./Anwesenheit.jsx";
 import Ausleihe from "./Ausleihe.jsx";
 import Sitzplan from "./Sitzplan.jsx";
@@ -37,6 +37,9 @@ export default function Orga() {
   // standen auf fuenf Seiten; sie liegen jetzt in core/klassenwahl.js.
   useKlassenListe(setClasses, setClassId);
   useKlasseMerken(classId);
+  // Aus dem Kalender verlinkt (?class=&kurs=): dann diese Klasse zeigen — sonst
+  // landet man in der zuletzt gewaehlten und muss sie von Hand suchen.
+  useUrlClass(setClassId, setKursId);
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = cls?.students || [];

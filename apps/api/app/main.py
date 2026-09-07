@@ -237,6 +237,7 @@ def _ensure_columns(sync_conn):
         ("grade_entries", "term", "VARCHAR(10) DEFAULT '' NOT NULL"),
         ("users", "tours_done", "JSON"),
         ("exercises", "quelle_id", "INTEGER"),
+        ("exam_dates", "ersetzt_stunde", "BOOLEAN DEFAULT true NOT NULL"),
         ("users", "ansichten", "JSON"),
         ("timetable_slots", "raum", "VARCHAR(60) DEFAULT '' NOT NULL"),
         ("todos", "notiz", "TEXT DEFAULT '' NOT NULL"),

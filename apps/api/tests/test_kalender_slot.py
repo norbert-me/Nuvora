@@ -404,3 +404,36 @@ async def test_nullte_stunde_hat_eigene_zeit(s):
     # Abschalten heisst: die Zeit ist weg, die uebrigen bleiben.
     tt = await KAL.set_times(KAL.TimesIn(times=times, zero=None), user=u, db=s)
     assert tt["zero"] is None and tt["times"] == times
+
+
+@pytest.mark.asyncio
+async def test_klassenarbeit_ersetzt_die_stunde(s):
+    """Eine Arbeit in der 1. Stunde lässt den Unterricht dieser Stunde entfallen —
+    und holt ihn zurück, sobald die Arbeit gelöscht oder das Häkchen entfernt
+    wird. „Entfällt" bleibt dabei ein SlotCancellation: eine Bauform, nicht zwei."""
+    from datetime import datetime
+
+    from sqlalchemy import select
+
+    from app.models import SlotCancellation
+    from app.routers import kalender as kal
+
+    u = User(email="ka@d.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    c = SchoolClass(name="7c", owner_id=u.id); s.add(c); await s.commit()
+    tag = datetime(2026, 9, 10, 8, 0)
+    e = await kal.create_exam(kal.ExamIn(date=tag, title="Nr. 1", class_id=c.id, period=1),
+                              user=u, db=s)
+    aus = (await s.execute(select(SlotCancellation))).scalars().all()
+    assert len(aus) == 1 and aus[0].period == 1
+
+    # Häkchen weg: die Stunde findet wieder statt.
+    await kal.update_exam(e.id, kal.ExamIn(date=tag, title="Nr. 1", class_id=c.id, period=1,
+                                           ersetzt_stunde=False), user=u, db=s)
+    assert (await s.execute(select(SlotCancellation))).scalars().all() == []
+
+    # Wieder an, dann löschen: nichts bleibt liegen.
+    await kal.update_exam(e.id, kal.ExamIn(date=tag, title="Nr. 1", class_id=c.id, period=1,
+                                           ersetzt_stunde=True), user=u, db=s)
+    assert len((await s.execute(select(SlotCancellation))).scalars().all()) == 1
+    await kal.delete_exam(e.id, user=u, db=s)
+    assert (await s.execute(select(SlotCancellation))).scalars().all() == []

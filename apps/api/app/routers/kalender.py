@@ -825,6 +825,11 @@ class ExamIn(BaseModel):
     # mehrere Unterthemen, deshalb eine Liste. Leer bleiben darf sie immer —
     # ein Termin ohne Themen ist ein vollständiger Termin.
     topic_ids: Optional[List[int]] = None
+    # Die Arbeit findet STATT des Unterrichts statt: die Stunde aus dem
+    # Stundenplan entfaellt an diesem Tag. Vorgabe an, weil eine Arbeit die
+    # Stunde belegt — sonst stuende im Kalender „Mathe" und daneben die Arbeit,
+    # und niemand wuesste, ob beides gilt. Ohne Stunde (ganztaegig) wirkungslos.
+    ersetzt_stunde: bool = True
 
 
 class ExamOut(ExamIn):
@@ -913,10 +918,47 @@ async def create_exam(body: ExamIn, user: User = Depends(require_module), db: As
     await db.flush()
     e.entry_id = entry.id
     await _ensure_work(db, user, e)
+    await _stunde_ersetzen(db, user, e, body.ersetzt_stunde)
     await _korrektur_todo(db, user, e)
     await db.commit()
     await db.refresh(e)
     return e
+
+
+async def _stunde_ersetzen(db, user, e: ExamDate, an: bool, alt_datum=None, alt_period=None) -> None:
+    """Die Stunde des Stundenplans an diesem Tag entfallen lassen — oder wieder
+    zurueckholen.
+
+    Es gibt keine dritte Bauform: „entfaellt" ist in Nuvora ein
+    `SlotCancellation`, dasselbe, was das Wegwischen einer Stunde im Kalender
+    erzeugt. Eine eigene Marke am Termin waere eine zweite Wahrheit ueber
+    denselben Sachverhalt.
+    """
+    from ..models import SlotCancellation
+
+    async def weg(datum, period):
+        if not datum or period is None:
+            return
+        tag = _tag(datum)
+        vorhandene = (await db.execute(select(SlotCancellation).where(
+            SlotCancellation.owner_id == user.id, SlotCancellation.period == period))).scalars().all()
+        for c in vorhandene:
+            if _tag(c.date) == tag:
+                await db.delete(c)
+
+    # Verschoben oder Stunde gewechselt: den alten Ausfall zuruecknehmen, sonst
+    # bleibt an der alten Stelle eine Luecke ohne Grund.
+    if alt_datum is not None and (alt_datum != e.date or alt_period != e.period):
+        await weg(alt_datum, alt_period)
+    if not an or e.period is None:
+        await weg(e.date, e.period)
+        return
+    tag = _tag(e.date)
+    schon = (await db.execute(select(SlotCancellation).where(
+        SlotCancellation.owner_id == user.id, SlotCancellation.period == e.period))).scalars().all()
+    if any(_tag(c.date) == tag for c in schon):
+        return
+    db.add(SlotCancellation(owner_id=user.id, date=e.date, period=e.period))
 
 
 async def _korrektur_todo(db, user, e: ExamDate, verschieben: bool = False) -> None:
@@ -965,6 +1007,9 @@ async def update_exam(exam_id: int, body: ExamIn, user: User = Depends(require_m
     await _check_kurs(db, user, body.kurs_id)
     daten = body.model_dump()
     daten["topic_ids"] = await _check_topics(db, user, daten.get("topic_ids"))
+    # Wo lag die Arbeit bisher? Wird sie verschoben, muss der Ausfall dort weg.
+    alt_datum, alt_period = e.date, e.period
+    ersetzen = daten.get("ersetzt_stunde", True)
     for k, v in daten.items():
         setattr(e, k, v)
     # Verknüpften Kalendereintrag mitziehen (Datum/Titel/Klasse/Kurs). Fehlt er
@@ -981,6 +1026,7 @@ async def update_exam(exam_id: int, body: ExamIn, user: User = Depends(require_m
         e.entry_id = entry.id
     # Auswertung anlegen (falls Modul inzwischen aktiv) bzw. Namen mitziehen.
     await _ensure_work(db, user, e)
+    await _stunde_ersetzen(db, user, e, ersetzen, alt_datum, alt_period)
     # Verschobener Termin verschiebt die Korrektur mit — ein Zettel mit altem
     # Datum ist schlimmer als keiner. Fehlt er (Modul war aus), entsteht er hier.
     await _korrektur_todo(db, user, e, verschieben=True)
@@ -992,6 +1038,9 @@ async def update_exam(exam_id: int, body: ExamIn, user: User = Depends(require_m
 @router.delete("/klassenarbeiten/{exam_id}", status_code=204)
 async def delete_exam(exam_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     e = await eigenes(db, ExamDate, exam_id, user, "Klassenarbeit nicht gefunden")
+    # Die ersetzte Stunde kommt zurueck: der Ausfall galt der Arbeit, und die
+    # gibt es nicht mehr.
+    await _stunde_ersetzen(db, user, e, False)
     # Auch den automatisch erzeugten Kalendereintrag entfernen.
     if e.entry_id:
         entry = await db.get(CalendarEntry, e.entry_id)

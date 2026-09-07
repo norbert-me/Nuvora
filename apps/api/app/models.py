@@ -1097,6 +1097,10 @@ class ExamDate(Base):
     # Lena"). Der Titel ist die Bezeichnung der Arbeit und bleibt kurz; alles,
     # was man sich zum Termin merkt, hat sonst keinen Ort.
     notiz: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Findet die Arbeit STATT des Unterrichts statt? Der Ausfall selbst ist und
+    # bleibt ein `SlotCancellation` (eine Bauform fuer „entfaellt"); hier steht
+    # nur die ENTSCHEIDUNG, damit die Maske sie beim naechsten Oeffnen zeigt.
+    ersetzt_stunde: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     # Worueber geschrieben wird: Themen aus dem KERN. Eine Arbeit prueft meist
     # mehrere Unterthemen, deshalb eine Liste von topic_id.
     #
