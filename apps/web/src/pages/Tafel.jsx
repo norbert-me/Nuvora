@@ -365,7 +365,7 @@ function TafelVerlauf({ t }) {
               <span style={{ fontSize: 34, fontWeight: an ? 800 : 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {z.p.phase || z.p.text || "—"}
               </span>
-              {rest != null && <span style={{ fontSize: 30, fontWeight: 800, color: "var(--accent)", whiteSpace: "nowrap" }}>{t("tafel.verlaufRest").replace("{min}", String(rest))}</span>}
+              {rest != null && <span style={{ fontSize: 30, fontWeight: 800, color: "var(--accent)", whiteSpace: "nowrap" }}>{t("tafel.verlaufRest", { min: rest })}</span>}
             </div>
           );
         })}

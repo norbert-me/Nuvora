@@ -828,7 +828,7 @@ const gradeDistribution = (() => {
                       );
                       return (
                         <button onClick={() => setGefehltFuer(student)}
-                          title={eigene.length ? t("eval.gefehltCount").replace("{n}", String(eigene.length)) : t("eval.gefehltVorschlag")}
+                          title={eigene.length ? t("eval.gefehltCount", { n: eigene.length }) : t("eval.gefehltVorschlag")}
                           style={{ ...chipStyle, marginLeft: 6, cursor: "pointer", borderStyle: eigene.length ? "solid" : "dashed",
                                    color: eigene.length ? C.warning : "var(--text3)" }}>
                           {eigene.length ? `${t("eval.gefehltShort")} ${eigene.length}` : t("eval.gefehltVorschlagShort")}

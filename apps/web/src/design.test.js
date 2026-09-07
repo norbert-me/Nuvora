@@ -31,8 +31,10 @@ const SCHRIFT = new Set([11, 12, 13, 14, 16, 22]);
 // Stand nach dem grossen Aufraeumen: 252 → 39. Was uebrig ist, ist fachlich
 // richtig und steht je mit Kommentar an seiner Stelle:
 //
-//   fontSize (7) — Projektionsflaechen. Tafel (48/28/30/32) rechnet im
-//     REF-Raum 1600×900 und wird per `transform: scale` heruntergerechnet;
+//   fontSize (13) — Projektionsflaechen. Tafel (48/28/30/32 sowie 26/30/34 im
+//     Verlaufsplan-Feld) rechnet im REF-Raum 1600×900 und wird per
+//     `transform: scale` heruntergerechnet — auf dem Bildschirm bleiben davon
+//     rund 60 %, und aus drei Metern Entfernung muss es lesbar sein;
 //     Session 28 ist der Sitzungscode am Beamer, Scanner 44 der vierstellige
 //     Code, Mathefussball 32 der Ball im Spielfeld. Kein Fliesstext.
 //   borderRadius (33) — reine Grafik, bei der der Radius die halbe Kante ist
@@ -44,7 +46,7 @@ const SCHRIFT = new Set([11, 12, 13, 14, 16, 22]);
 // Sinken erlaubt, steigen nicht. Wer weiter aufraeumt, traegt die kleinere
 // Zahl hier ein — das ist die halbe Minute, die den Rueckfall verhindert.
 const GRENZE = {
-  fontSize: 7,
+  fontSize: 13,
   borderRadius: 33,
 };
 
