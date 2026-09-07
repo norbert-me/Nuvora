@@ -37,11 +37,26 @@ export default function BugAdmin() {
     }).catch(() => {});
   };
 
+  const SEITE = 10;   // so viele auf einmal — der Rest kommt auf Knopfdruck
+  const [mehrDa, setMehrDa] = useState(false);
+
+  const holen = async (ab) => {
+    const d = await fetch(`/api/admin/bugreports?limit=${SEITE}&offset=${ab}`)
+      .then((r) => (r.ok ? r.json() : [])).catch(() => []);
+    const arr = Array.isArray(d) ? d : [];
+    setMehrDa(arr.length === SEITE);
+    return arr;
+  };
+
   const laden = async () => {
     setOffen(true);
     setListe(null);
-    const d = await fetch("/api/admin/bugreports").then((r) => (r.ok ? r.json() : [])).catch(() => []);
-    setListe(Array.isArray(d) ? d : []);
+    setListe(await holen(0));
+  };
+
+  const mehrLaden = async () => {
+    const weiter = await holen((liste || []).length);
+    setListe((l) => [...(l || []), ...weiter]);
   };
 
   const loeschen = async (r) => {
@@ -117,6 +132,13 @@ export default function BugAdmin() {
               )}
             </div>
           ))}
+          {/* Der Rest kommt auf Knopfdruck: fuenfhundert Meldungen samt Bildern
+              sind im Schulnetz ein langer Balken, bevor die erste lesbar ist. */}
+          {liste && mehrDa && (
+            <button onClick={mehrLaden} style={{ ...btnSecondary, ...btnSmall, width: "100%", marginTop: 4 }}>
+              {t("bugadmin.mehrLaden")}
+            </button>
+          )}
         </Modal>
       )}
     </>

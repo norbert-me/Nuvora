@@ -1574,7 +1574,8 @@ async def bugreport_schalten(body: BugSchalter, user=Depends(_require_admin), db
 
 
 @app.get("/api/admin/bugreports")
-async def bugreports(user=Depends(_require_admin), db=Depends(get_db)):
+async def bugreports(limit: int = 10, offset: int = 0,
+                     user=Depends(_require_admin), db=Depends(get_db)):
     """Alle Meldungen, neueste zuerst — von wem, wann, was.
 
     Ohne Anhang-Bytes: die Liste soll schnell sein, und ein Screenshot gehoert
@@ -1584,7 +1585,13 @@ async def bugreports(user=Depends(_require_admin), db=Depends(get_db)):
 
     from .models import BugReport
 
-    rows = (await db.execute(_select(BugReport).order_by(BugReport.created_at.desc()).limit(500))).scalars().all()
+    # Seitenweise: eine Meldung traegt Text, Umgebung und Protokoll, und die
+    # Uebersicht zeigt Bilder — fuenfhundert davon auf einmal sind im Schulnetz
+    # ein langer Balken, bevor man die erste lesen kann.
+    grenze = max(1, min(int(limit or 10), 100))
+    ab = max(0, int(offset or 0))
+    rows = (await db.execute(_select(BugReport).order_by(BugReport.created_at.desc())
+                             .offset(ab).limit(grenze))).scalars().all()
     return [{
         "id": r.id, "email": r.email, "message": r.message, "seite": r.seite,
         "fassung": r.fassung, "browser": r.browser, "umgebung": r.umgebung, "log": r.log,

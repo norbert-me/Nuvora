@@ -37,7 +37,6 @@ export default function Fehlermelder() {
   const [busy, setBusy] = useState(false);
   const [fertig, setFertig] = useState(false);
   const [fehler, setFehler] = useState("");
-  const [anzahl, setAnzahl] = useState(0);
   // „Grosser Bildschirm" statt „Desktop": entscheidend ist der Platz, nicht das
   // Geraet. Ein Tablet im Querformat bekommt denselben Knopf wie der Rechner.
   const [gross, setGross] = useState(() => {
@@ -63,8 +62,7 @@ export default function Fehlermelder() {
   const [problem, setProblem] = useState(false);
   const zuletzt = useRef(0);
 
-  useEffect(() => beobachte((n) => {
-    setAnzahl(n);
+  useEffect(() => beobachte(() => {
     const jetzt = protokoll().filter((e) => e.art === "fehler").length;
     if (jetzt > zuletzt.current) setProblem(true);
     zuletzt.current = jetzt;
@@ -136,13 +134,18 @@ export default function Fehlermelder() {
             <>
               {/* Kein Einleitungssatz: der Platzhalter im Feld sagt dasselbe,
                   und auf dem Handy schob der Satz das Textfeld aus dem Bild. */}
+              {/* Auf dem Handy ist das Feld der ganze Dialog: Fehlerbeschreibungen
+                  sind mehrere Saetze, und in vier sichtbaren Zeilen tippt man
+                  blind. Mindesthoehe statt fester Zeilenzahl, damit es auf dem
+                  kleinen Bildschirm den vorhandenen Platz nimmt. */}
               <textarea value={text} onChange={(e) => setText(e.target.value.slice(0, 3000))} rows={8}
                 placeholder={t("melder.platzhalter")} autoFocus
-                style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical" }} />
+                style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical",
+                  minHeight: "38vh", fontSize: 16 }} />
 
               <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 0", fontSize: 14, color: "var(--text2)" }}>
                 <input type="checkbox" checked={mitLog} onChange={(e) => setMitLog(e.target.checked)} />
-                {t("melder.mitLog", { n: anzahl })}
+                {t("melder.mitLog")}
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "6px 0 4px", fontSize: 14, color: "var(--text2)" }}>
                 <input type="checkbox" checked={mitUmg} onChange={(e) => setMitUmg(e.target.checked)} />

@@ -446,7 +446,6 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           </Zeile>
         ))}
         {apps && !apps.version && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 0" }}>{t("profile.appsKeine")}</p>}
-        {apps?.version && <p style={{ fontSize: 12, color: "var(--text3)", margin: "8px 0 0" }}>{t("profile.appsStand", { version: apps.version })}</p>}
       </Abschnitt>
 
       {isAdmin && (
