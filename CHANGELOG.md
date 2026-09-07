@@ -32,9 +32,22 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Notenbuch: wer am Tag der Spalte gefehlt hat oder zu spät kam, ist in der
   Spalte farbig markiert.
 
+**Startseite und Sitzplan**
+
+- Ein Klick auf die Stunde öffnet ihren Kalendereintrag statt der Anwesenheit.
+- Sitzplan: Ziehen auf dem iPhone reißt nicht mehr mitten in der Bewegung ab.
+
+**Fehler melden**
+
+- Die Kennung des Browsers geht nur noch mit, wenn „Technische Angaben
+  mitschicken" angehakt ist.
+- In der Übersicht der Administration ist zu sehen, welche Meldung einen Anhang
+  hat; Bilder stehen direkt als Bild darin.
+
 **Kleinigkeiten**
 
 - Die Datei-Vorschau hat ein Schließkreuz.
+- Der Erklärtext über den externen Kalendern ist weg.
 
 ## 4.3.0 — 08.09.2026
 
