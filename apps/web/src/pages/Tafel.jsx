@@ -5,6 +5,9 @@ import { useState, useRef, useEffect } from "react";
 import { btnSecondary, cardStyle, CONTROL_R, Icon, ICONS, iconBtn, popoverPanel, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, COLORS as C, pageFull, SHADOW } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { useAktiv } from "../core/modules.js";
+import { hmToMin, minToHm, ymd } from "../core/datum.js";
+import { stundenZeit } from "../core/stunden";
 
 const KEY = "nuvora_tafel_v1";
 // Stiftfarben der Tafel. Bewusst feste Werte wie ANTWORT_COLORS: die Farbe IST
@@ -35,6 +38,8 @@ const load = () => {
 
 export default function Tafel() {
   const { t } = useLanguage();
+  const aktiv = useAktiv();
+  const kalenderAktiv = aktiv("kalender");
   const [items, setItems] = useState(load);
   const [sel, setSel] = useState(null);
   const outerRef = useRef(null);   // misst die verfügbare Breite, Ziel für Vollbild
@@ -69,6 +74,13 @@ export default function Tafel() {
   const addTimer = () => {
     const w = 460, h = 340;
     const it = { id: uid(), type: "timer", x: (REF_W - w) / 2, y: 140, w, h, minutes: 5, _ref: true };
+    setItems((p) => [...p, it]); setSel(it.id);
+  };
+  // Verlaufsplan der laufenden Stunde — nur mit dem Modul Kalender (Regel 3):
+  // ohne es gibt es keine Stunde, aus der man ihn lesen koennte.
+  const addVerlauf = () => {
+    const w = 560, h = 460;
+    const it = { id: uid(), type: "verlauf", x: (REF_W - w) / 2, y: 120, w, h, _ref: true };
     setItems((p) => [...p, it]); setSel(it.id);
   };
   const patch = (id, o) => setItems((p) => p.map((i) => (i.id === id ? { ...i, ...o } : i)));
@@ -115,6 +127,7 @@ export default function Tafel() {
         <span style={{ flex: 1 }} />
         <button onClick={add} style={toolbarBtnPrimary}><Icon d={ICONS.plus} size={15} color="var(--bg)" /> {t("tafel.add")}</button>
         <button onClick={addTimer} style={toolbarBtn}><Icon d={ICONS.plus} size={15} /> {t("tafel.addTimer")}</button>
+        {kalenderAktiv && <button onClick={addVerlauf} style={toolbarBtn}><Icon d={ICONS.plus} size={15} /> {t("tafel.addVerlauf")}</button>}
         <button onClick={() => setFs((v) => !v)} style={toolbarBtn} title={t("tafel.fullscreen")}><Icon d={fs ? ICONS.close : ICONS.fit} size={16} /> {fs ? t("common.close") : t("tafel.fullscreen")}</button>
       </Werkzeugleiste>
 
@@ -144,6 +157,8 @@ export default function Tafel() {
                 borderRadius: CONTROL_R, boxSizing: "border-box", background: sel === it.id ? "rgba(10,132,255,0.04)" : "transparent" }}>
               {it.type === "timer" ? (
                 <TafelTimer item={it} onPatch={(o) => patch(it.id, o)} t={t} />
+              ) : it.type === "verlauf" ? (
+                <TafelVerlauf t={t} />
               ) : (
                 <textarea value={it.text} onChange={(e) => patch(it.id, { text: e.target.value })} placeholder={t("tafel.placeholder")} className="keep-fontsize"
                   style={{ width: "100%", height: "100%", boxSizing: "border-box", border: "none", outline: "none", resize: "none", background: "transparent",
@@ -169,7 +184,7 @@ export default function Tafel() {
               <button onPointerDown={(e) => onDown(e, selItem.id, "move")} className="icon-btn" style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", cursor: "grab", touchAction: "none" }} title={t("tafel.move") || ""} aria-label={t("tafel.move") || ""}>
                 <Icon d={ICONS.moveAll} size={18} color="var(--text2)" />
               </button>
-              {selItem.type !== "timer" && (<>
+              {selItem.type !== "timer" && selItem.type !== "verlauf" && (<>
                 <button onClick={() => setFontPop((v) => !v)} className="icon-btn" style={{ ...toolbarIconBtn, border: fontPop ? "1px solid var(--accent)" : "1px solid var(--border2)" }} title={t("tafel.textSize")} aria-label={t("tafel.textSize")}>
                   <Icon d={ICONS.edit} size={16} color={fontPop ? "var(--accent)" : "var(--text2)"} />
                 </button>
@@ -261,3 +276,100 @@ const miniBtn = {
   border: "2px solid var(--border2)", borderRadius: CONTROL_R, background: "var(--bg)",
   display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700,
 };
+
+// Der Verlaufsplan der Stunde, die GERADE laeuft — aus dem Kalender gelesen,
+// nicht abgetippt. Hervorgehoben ist die Phase, in der man steckt, samt
+// Restzeit; das beantwortet an der Tafel die eine Frage, die im Unterricht
+// zaehlt („wie lange noch?"), und die Kinder sehen sie mit.
+//
+// Welche Stunde gemeint ist, entscheidet die Uhr: der Eintrag von heute, dessen
+// Zeitfenster jetzt enthaelt (eigene Zeit vor der Zeit seiner Stunde — dieselbe
+// Regel wie im Kalender und im ICS-Feed). Gibt es keine, sagt das Feld das,
+// statt eine beliebige Stunde zu zeigen.
+function TafelVerlauf({ t }) {
+  const [data, setData] = useState(null);   // { entries, times, zero }
+  const [jetzt, setJetzt] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
+  useEffect(() => {
+    const id = setInterval(() => { const d = new Date(); setJetzt(d.getHours() * 60 + d.getMinutes()); }, 30000);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    let ab = false;
+    const laden = async () => {
+      const heute = new Date();
+      const frm = new Date(heute); frm.setHours(0, 0, 0, 0);
+      const to = new Date(heute); to.setHours(23, 59, 59, 0);
+      const j = (r) => (r.ok ? r.json() : null);
+      const [tt, entries] = await Promise.all([
+        fetch("/api/kalender/timetable").then(j).catch(() => null),
+        fetch(`/api/kalender/entries?frm=${frm.toISOString()}&to=${to.toISOString()}`).then(j).catch(() => null),
+      ]);
+      if (!ab) setData({ entries: Array.isArray(entries) ? entries : [], times: tt?.times || [], zero: tt?.zero || null });
+    };
+    laden();
+    // Der Plan kann sich waehrend der Stunde aendern (Kalender in einem zweiten
+    // Fenster). Alle fuenf Minuten nachsehen reicht — die Uhr laeuft ohnehin.
+    const id = setInterval(laden, 300000);
+    return () => { ab = true; clearInterval(id); };
+  }, []);
+
+  const fenster = (e) => {
+    const st = stundenZeit(data.times, data.zero, e.period);
+    const von = hmToMin(e.start_time) ?? (st ? hmToMin(st.start) : null);
+    const bis = hmToMin(e.end_time) ?? (st ? hmToMin(st.end) : null);
+    return { von, bis };
+  };
+  const heuteStr = ymd(new Date());
+  const laufend = !data ? null : (data.entries || [])
+    .filter((e) => String(e.date || "").slice(0, 10) === heuteStr)
+    .map((e) => ({ e, ...fenster(e) }))
+    .filter((x) => x.von != null && x.bis != null && jetzt >= x.von && jetzt < x.bis)
+    .sort((a, b) => a.von - b.von)[0];
+
+  const rahmen = { width: "100%", height: "100%", boxSizing: "border-box", padding: "18px 20px", overflow: "hidden" };
+  if (!data) return <div style={rahmen} />;
+  if (!laufend) return <div style={{ ...rahmen, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 28, textAlign: "center" }}>{t("tafel.verlaufKeineStunde")}</div>;
+
+  const plan = Array.isArray(laufend.e.verlaufsplan) ? laufend.e.verlaufsplan : [];
+  if (!plan.length) return <div style={{ ...rahmen, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 28, textAlign: "center" }}>{t("tafel.verlaufKeinPlan")}</div>;
+
+  // Die Phasen liegen ab dem Beginn der Stunde hintereinander — dieselbe
+  // Rechnung wie im Kalender-Dialog.
+  let cur = laufend.von;
+  const zeilen = plan.map((p) => {
+    const d = Number(p.dauer);
+    const von = cur;
+    const bis = Number.isFinite(d) && d > 0 ? von + d : null;
+    if (bis != null) cur = bis;
+    return { p, von, bis };
+  });
+  const aktivI = zeilen.findIndex((z) => jetzt >= z.von && (z.bis == null || jetzt < z.bis));
+
+  return (
+    <div style={rahmen}>
+      <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text3)", marginBottom: 10, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {laufend.e.title || ""} {minToHm(laufend.von)}–{minToHm(laufend.bis)}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {zeilen.map((z, i) => {
+          const an = i === aktivI;
+          const rest = an && z.bis != null ? Math.max(0, z.bis - jetzt) : null;
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "8px 12px", borderRadius: CONTROL_R,
+              background: an ? "rgba(10,132,255,0.12)" : "transparent",
+              border: an ? "3px solid var(--accent)" : "3px solid transparent",
+              opacity: aktivI >= 0 && i < aktivI ? 0.45 : 1 }}>
+              <span style={{ fontSize: 26, color: "var(--text3)", minWidth: 150, fontVariantNumeric: "tabular-nums" }}>
+                {minToHm(z.von)}{z.bis != null ? `–${minToHm(z.bis)}` : ""}
+              </span>
+              <span style={{ fontSize: 34, fontWeight: an ? 800 : 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {z.p.phase || z.p.text || "—"}
+              </span>
+              {rest != null && <span style={{ fontSize: 30, fontWeight: 800, color: "var(--accent)", whiteSpace: "nowrap" }}>{t("tafel.verlaufRest").replace("{min}", String(rest))}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
