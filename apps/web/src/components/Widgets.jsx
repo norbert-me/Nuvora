@@ -193,11 +193,16 @@ function Ausleihe() {
  * bisherigen Ansichten bleiben an, damit sich für niemanden über Nacht die
  * Startseite leert.
  */
+// `option` haengt ein Widget zusaetzlich an einen abschaltbaren TEIL seines
+// Moduls (dieselben Schluessel wie in core/ziele.js). Ohne das stand ein Widget
+// weiter auf der Startseite, obwohl der Teil, aus dem es seine Zahlen holt, im
+// Zahnrad abgeschaltet war — eine Kachel, die auf etwas zeigt, das es fuer
+// dieses Konto nicht gibt.
 export const WIDGETS = [
   { key: "heute", modul: "kalender", labelKey: "widget.heute", an: true },
   { key: "schwach", modul: "cardvote", labelKey: "widget.schwach", an: true },
   { key: "arbeit", modul: "kalender", labelKey: "widget.arbeit", an: false, komponente: NaechsteArbeit },
-  { key: "todo", modul: "orga", labelKey: "widget.todo", an: false, komponente: OffeneTodos },
-  { key: "notiz", modul: "notizbrett", labelKey: "widget.notiz", an: false, komponente: Notizen },
-  { key: "ausleihe", modul: "orga", labelKey: "widget.ausleihe", an: false, komponente: Ausleihe },
+  { key: "todo", modul: "notizbrett", option: "aufgaben", labelKey: "widget.todo", an: false, komponente: OffeneTodos },
+  { key: "notiz", modul: "notizbrett", option: "notizen", labelKey: "widget.notiz", an: false, komponente: Notizen },
+  { key: "ausleihe", modul: "orga", option: "ausleihe", labelKey: "widget.ausleihe", an: false, komponente: Ausleihe },
 ];

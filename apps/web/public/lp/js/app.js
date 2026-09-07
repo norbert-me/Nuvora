@@ -3057,12 +3057,23 @@
             }
 
             // Ankreuzfelder: Lösung geprüft + korrigiert
-            // Bei Erklärungen weglassen (nichts zu prüfen/korrigieren)
+            // Bei Erklärungen weglassen (nichts zu prüfen/korrigieren) — dafür
+            // steht dort, was das Kind stattdessen tun soll. Ohne den Satz war
+            // die Zeile die einzige ohne Kästchen, und die Frage „muss ich hier
+            // etwas abgeben?" beantwortete das Blatt nicht.
             if (!istErklaerung) {
                 doc.setDrawColor(0);
                 doc.setLineWidth(0.4);
                 doc.rect(pruefX + 4, y - cbSize / 2, cbSize, cbSize);
                 doc.rect(korrX + 2, y - cbSize / 2, cbSize, cbSize);
+            } else {
+                doc.setFont('helvetica', 'italic');
+                doc.setFontSize(9);
+                doc.setTextColor(120);
+                doc.text('nur durchlesen', pruefX, y + MITTE_11PT);
+                doc.setTextColor(0);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(11);
             }
 
             y += rowH;

@@ -455,7 +455,10 @@ export default function NuvoraHome({ user }) {
           {/* Widgets in der Reihenfolge des Registers — ein Widget zeigt, eine
               Kachel verlinkt. Beides je Modul frei waehlbar; genau deshalb gibt
               es den Kalender nicht mehr zwangslaeufig doppelt. */}
-          {!edit && WIDGETS.filter((w) => kacheln.wert.widgets.includes(w.key) && isOn(w.modul)).map((w) => {
+          {/* Nicht nur „laeuft das Modul?", sondern auch „ist dieser TEIL an?"
+              — dieselbe Frage wie in Navigation, Suche und Modul-Kachel, und
+              deshalb dieselbe Funktion (useZielFilter). */}
+          {!edit && WIDGETS.filter((w) => kacheln.wert.widgets.includes(w.key) && zielDa({ modul: w.modul, option: w.option })).map((w) => {
             if (w.key === "heute") return <HeutePanel key={w.key} t={t} />;
             if (w.key === "schwach") {
               return <SchwacheWoche key={w.key} t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} />;
@@ -471,7 +474,7 @@ export default function NuvoraHome({ user }) {
             <div style={{ ...card, padding: 16, marginBottom: 16 }}>
               <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("home.widgets")}</div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {WIDGETS.filter((w) => isOn(w.modul)).map((w) => {
+                {WIDGETS.filter((w) => zielDa({ modul: w.modul, option: w.option })).map((w) => {
                   const an = kacheln.wert.widgets.includes(w.key);
                   return (
                     <button key={w.key} data-widget={w.key} aria-pressed={an}
