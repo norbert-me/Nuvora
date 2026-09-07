@@ -105,6 +105,65 @@ async def list_personen(user: User = Depends(get_current_user), db: AsyncSession
                       kurse=je_person.get(p.id, []), has_photo=p.has_photo) for p in leute]
 
 
+class PersonNeu(BaseModel):
+    name: str
+
+
+@router.post("", response_model=PersonOut, status_code=201)
+async def create_person(body: PersonNeu, user: User = Depends(get_current_user),
+                        db: AsyncSession = Depends(get_db)):
+    """Ein Kind anlegen, ohne es zuerst in eine Liste zu schreiben.
+
+    Bisher entstand eine Person nur als Nebenwirkung: man legte eine Zeile in
+    einem Kurs an, und die Uebernahme machte daraus ein Kind. Wer ein neues Kind
+    hat, das noch in keinem Kurs sitzt (Zuzug mitten im Halbjahr), musste sich
+    also erst einen Kurs aussuchen. Die Zugehoerigkeiten kommen danach
+    (POST /api/personen/{id}/kurse/{kurs_id}).
+    """
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(400, "Name darf nicht leer sein")
+    p = Person(owner_id=user.id, name=name[:200])
+    db.add(p)
+    await db.commit()
+    await db.refresh(p)
+    return PersonOut(id=p.id, name=p.name, niveau=p.niveau or "", has_photo=p.has_photo)
+
+
+@router.post("/{person_id}/kurse/{kurs_id}", status_code=204)
+async def in_kurs(person_id: int, kurs_id: int, user: User = Depends(get_current_user),
+                  db: AsyncSession = Depends(get_db)):
+    """Die Person in einen Kurs aufnehmen.
+
+    Traeger bleibt vorerst die KLASSE (students.class_id ist NOT NULL und haengt
+    an Noten, Karten und Scans) — deshalb dieselbe Mechanik wie beim Anlegen im
+    Kurs: `_traegerklasse` holt oder legt sie, und die Zeile bekommt ihre
+    Kartennummer ans Ende. Nachgebaut wird nichts: die Funktionen kommen aus
+    dem Kurs-Router, wie der Papierkorb seine Modul-Funktionen ruft.
+    """
+    from ..kursmitglieder import eigener_kurs
+    from ..models import KursStudent
+    from ..schueler import roster_kurs
+    from .kurse import _traegerklasse
+
+    p = await _eigene(db, person_id, user)
+    kurs = await eigener_kurs(db, user, kurs_id)
+    # Schon drin? Dann ist nichts zu tun — zweimal geklickt heisst nicht zweimal
+    # dasselbe Kind in derselben Liste.
+    bestand = await roster_kurs(db, kurs_id)
+    if any(z.person_id == p.id for z in bestand):
+        return
+    klasse = await _traegerklasse(db, user, kurs)
+    naechste = max([z.card_id for z in bestand] or [0]) + 1
+    z = Student(class_id=klasse.id, kurs_id=kurs.id, name=p.name[:200],
+                card_id=naechste, position=len(bestand), person_id=p.id,
+                niveau=p.niveau or "")
+    db.add(z)
+    await db.flush()
+    db.add(KursStudent(kurs_id=kurs.id, student_id=z.id))
+    await db.commit()
+
+
 @router.get("/{person_id}/photo")
 async def photo(person_id: int, klein: bool = False,
                 user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):

@@ -56,6 +56,29 @@ export default function Personen() {
   const [nameEdit, setNameEdit] = useState(null);   // { id, wert }
   const [fotoVer, setFotoVer] = useState(0);
   const [qr, setQr] = useState(null);               // { token, name }
+  const [kurse, setKurse] = useState([]);
+  const [neuName, setNeuName] = useState("");
+  useEffect(() => { fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => setKurse(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
+
+  // Ein Kind anlegen, ohne zuerst einen Kurs auszusuchen: wer mitten im
+  // Halbjahr zuzieht, sitzt noch in keiner Liste. Die Zugehörigkeiten kommen
+  // danach, im Detail.
+  const personAnlegen = async () => {
+    const name = neuName.trim();
+    if (!name) return;
+    const r = await fetch("/api/personen", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
+    }).catch(() => null);
+    if (!r || !r.ok) return;
+    setNeuName("");
+    const d = await fetch("/api/personen").then((x) => (x.ok ? x.json() : [])).catch(() => []);
+    setListe(Array.isArray(d) ? d : []);
+  };
+
+  const inKurs = async (personId, kursId) => {
+    await fetch(`/api/personen/${personId}/kurse/${kursId}`, { method: "POST" }).catch(() => {});
+    nachladen(personId);
+  };
   const [basis, setBasis] = useState("");
   useEffect(() => { oeffentlicheBasis().then(setBasis).catch(() => {}); }, []);
 
@@ -96,8 +119,16 @@ export default function Personen() {
   return (
     <div style={pageApp}>
       <h1 style={pageTitle}>{t("personen.titel")}</h1>
-      <input value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("personen.suche")}
-        style={{ ...toolbarInput, width: "100%", maxWidth: 320, marginBottom: 16 }} />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        <input value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("personen.suche")}
+          style={{ ...toolbarInput, flex: 1, minWidth: 200, maxWidth: 320 }} />
+        <span style={{ flex: 1 }} />
+        <input value={neuName} onChange={(e) => setNeuName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") personAnlegen(); }}
+          placeholder={t("personen.neuName")} style={{ ...toolbarInput, minWidth: 180 }} />
+        <button onClick={personAnlegen} disabled={!neuName.trim()}
+          style={{ ...btnSecondary, ...btnSmall, opacity: neuName.trim() ? 1 : 0.5 }}>{t("personen.neu")}</button>
+      </div>
 
       {liste.length === 0 && <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("personen.leer")}</p>}
 
@@ -153,6 +184,20 @@ export default function Personen() {
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ ...sectionLabel, margin: "0 0 6px" }}>{t("personen.angaben")}</div>
                       <SchuelerAngaben studentId={stand.teile[0].student_id} t={t} />
+                    </div>
+                  )}
+                  {/* In welchen Kurs gehört das Kind? Hier, beim Kind — der
+                      andere Weg (im Kurs suchen) bleibt: beides führt zur
+                      selben Zugehörigkeit. */}
+                  {kurse.length > 0 && (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("personen.inKurs")}</span>
+                      <select value="" onChange={(ev) => { if (ev.target.value) inKurs(p.id, Number(ev.target.value)); }}
+                        style={{ ...inputStyle, minWidth: 180 }}>
+                        <option value="">{t("personen.kursWaehlen")}</option>
+                        {kurse.filter((k) => !(stand.teile || []).some((teil) => teil.kurs === k.name))
+                          .map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+                      </select>
                     </div>
                   )}
                   {(stand.teile || []).length === 0 && (
