@@ -11,7 +11,7 @@ import { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson, hol } from "../core/melden.js";
 import { WIDGETS } from "../components/Widgets.jsx";
 import { ZIELE } from "../core/ziele.js";
-import { ymd } from "../core/datum.js";
+import { hmToMin, ymd } from "../core/datum.js";
 import { stundenZeit } from "../core/stunden";
 
 // Modul-Kachel: dieselbe Karte wie überall, nur als Link (kein eigener Kasten).
@@ -136,6 +136,15 @@ function HeutePanel({ t, orgaAktiv }) {
   // und hielt laufende Ferien fuer beendet.
   const heuteYmd = ymd(new Date());
   const [data, setData] = useState(null); // { slots, times, entries, classes, frei }
+  // Was vorbei ist, steht nicht mehr da: um 11 Uhr beantwortet die erste Stunde
+  // die Frage „was kommt jetzt?" nicht mehr, sie schiebt sie nur nach unten.
+  // Minutentakt, damit die Kachel von selbst weiterrückt, statt bis zum
+  // Neuladen falsch dazustehen.
+  const [jetztMin, setJetztMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
+  useEffect(() => {
+    const id = setInterval(() => { const d = new Date(); setJetztMin(d.getHours() * 60 + d.getMinutes()); }, 60000);
+    return () => clearInterval(id);
+  }, []);
   useEffect(() => {
     let ab = false;
     (async () => {
@@ -165,10 +174,19 @@ function HeutePanel({ t, orgaAktiv }) {
   // Nur heute gültige Stundenplan-Versionen (valid_from/valid_to grenzen ein).
   // heuteYmd ist oben schon definiert (YYYY-MM-DD).
   const activeToday = (s) => (!s.valid_from || heuteYmd >= s.valid_from) && (!s.valid_to || heuteYmd <= s.valid_to);
+  // Vorbei heisst: das ENDE liegt hinter uns. Ohne Endzeit (Stunde ohne
+  // gepflegte Uhrzeit, ganztägiger Termin) bleibt der Eintrag stehen — geraten
+  // wird nichts, und ein Termin ohne Zeit gilt den ganzen Tag.
+  const vorbei = (ende) => ende != null && ende <= jetztMin;
+  const slotEnde = (p) => { const w = stundenZeit(data.times, data.zero, p); return w ? hmToMin(w.end) : null; };
   const slots = data.slots
     .filter((s) => s.weekday === wochentag() && activeToday(s) && !(data.entfallen || []).includes(s.period))
+    .filter((s) => !vorbei(slotEnde(s.period)))
     .sort((a, b) => a.period - b.period);
-  const extras = data.entries.filter((e) => e.period == null || !slots.some((s) => s.period === e.period));
+  const alleSlots = data.slots.filter((s) => s.weekday === wochentag() && activeToday(s));
+  const extras = data.entries
+    .filter((e) => e.period == null || !alleSlots.some((s) => s.period === e.period))
+    .filter((e) => !vorbei(hmToMin(e.end_time) ?? hmToMin(e.start_time)));
   if (slots.length === 0 && extras.length === 0 && !data.frei) return null;
   const cname = (id) => data.classes.find((c) => c.id === id)?.name || "";
   const ccolor = (id) => data.classes.find((c) => c.id === id)?.color || "var(--border2)";
