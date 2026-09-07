@@ -1368,7 +1368,13 @@ async def zeitleiste(kurs_id: int, term: str = "", user: User = Depends(require_
     # Nach Tag, dann nach Stunde: an einem Tag steht die 1. Stunde ueber der 5.
     punkte.sort(key=lambda p: (p["date"], p.get("period") if p.get("period") is not None else 99))
     return {"kurs": {"id": k.id, "name": k.name, "fach": k.fach or ""},
-            "von": start.isoformat(), "bis": ende.isoformat(), "punkte": punkte}
+            "von": start.isoformat(), "bis": ende.isoformat(),
+            # Ohne gepflegtes Schuljahr gibt es keine Halbjahre, aus denen die
+            # Leiste waehlen koennte — dann laeuft sie fuer JEDE Wahl ab heute
+            # ueber zwanzig Wochen, und der Umschalter sieht kaputt aus. Die
+            # Oberflaeche sagt das nur, wenn sie es erfaehrt.
+            "schuljahr": bool(user.hj1_start and (user.hj2_start or user.jahr_ende)),
+            "punkte": punkte}
 
 
 # ─── Stundenplan (wiederkehrendes Wochenraster, Vorlage fuer Termine) ───

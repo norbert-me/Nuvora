@@ -2339,6 +2339,8 @@ export default {
   "cv.ciText1": "The \"correct\" percentage is only a sample from this one round. The confidence interval shows the range in which the true share of correct answers lies with 95% probability if the round could be repeated indefinitely.",
   "cv.ciText2": "The fewer answers there are, the wider the interval — so be careful interpreting single questions in small classes. A narrow interval means a robust result.",
   "cv.ciText3": "\"95% CI overall\" at the top pools all answers of this test (all questions together) and shows how robust the quiz result is. The per-question CI in the table below is based only on the answers to that one question in this test — the cross-test statistics (all answers ever given) are shown when editing the question in the questions area.",
+  "zeitleiste.ohneSchuljahr": "Without a school year the timeline always shows the next 20 weeks — the term selector only works once the dates are set in your profile.",
+  "zeitleiste.zumProfil": "Set school year",
   "zeitleiste.tab": "Timeline",
   "zeitleiste.kurs": "Choose course",
   "zeitleiste.leer": "Nothing planned in this period.",

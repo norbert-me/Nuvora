@@ -11,6 +11,7 @@
 // Kurs-Zuordnung). Die Seite ordnet nur nach Tagen und malt.
 import { useEffect, useState } from "react";
 import { COLORS as C, CONTROL_R, cardStyle, chipStyle, Empty, Icon, ICONS, pageApp, panelStyle } from "./Icons.jsx";
+import { Link } from "react-router-dom";
 import KursKlasseSelect from "./KursKlasseSelect.jsx";
 import Werkzeugleiste from "./Werkzeugleiste.jsx";
 import { hol } from "../core/melden.js";
@@ -66,6 +67,17 @@ export default function Zeitleiste({ onStunde }) {
         </select>
       </Werkzeugleiste>
 
+      {/* Ohne gepflegtes Schuljahr gibt es keine Halbjahre: die Leiste laeuft
+          dann fuer jede Wahl ab heute ueber zwanzig Wochen, und der Umschalter
+          scheint nichts zu tun. Das steht hier, weil man es dem Bildschirm
+          nicht ansieht — und mit dem Weg dorthin. */}
+      {daten && daten.schuljahr === false && (
+        <div style={{ ...panelStyle, padding: "8px 12px", marginBottom: 12, fontSize: 13,
+          background: C.warning + "1f", color: "var(--text)" }}>
+          {t("zeitleiste.ohneSchuljahr")}{" "}
+          <Link to="/profile" style={{ color: "var(--accent)", fontWeight: 600 }}>{t("zeitleiste.zumProfil")}</Link>
+        </div>
+      )}
       {!kursId ? (
         <Empty title={t("zeitleiste.kurs")} />
       ) : !daten ? null : tage.length === 0 ? (
