@@ -6,8 +6,9 @@ import {
 } from "../components/Icons.jsx";
 import Portrait from "../components/Portrait.jsx";
 import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
+import BildZuschnitt from "../components/BildZuschnitt.jsx";
 import { oeffentlicheBasis } from "../core/basis.js";
-import { dateiWaehlen, btnSecondary, btnSmall, inputStyle, Modal } from "../components/Icons.jsx";
+import { dateiWaehlen, btnSecondary, btnSmall, iconBtn, inputStyle, Modal } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n";
 
 // Ein Kind, nicht eine Zeile in einer Liste.
@@ -99,13 +100,20 @@ export default function Personen() {
     nachladen(nameEdit.id);
   };
 
-  const fotoSetzen = (id) => dateiWaehlen(async (datei) => {
+  // Erst zuschneiden, dann hochladen — dieselbe Maske wie im Kurs
+  // (components/BildZuschnitt.jsx). Ohne sie landete ein Handyfoto im
+  // Hochformat in einem quadratischen Rahmen, und vom Kind war der Pullover zu
+  // sehen.
+  const [zuschnitt, setZuschnitt] = useState(null);   // { personId, datei }
+  const fotoSetzen = (id) => dateiWaehlen((datei) => setZuschnitt({ personId: id, datei }), "image/*");
+
+  const fotoHochladen = async (id, quadrat) => {
     const daten = new FormData();
-    daten.append("file", datei);
+    daten.append("file", quadrat);
     await fetch(`/api/personen/${id}/photo`, { method: "POST", body: daten }).catch(() => {});
     setFotoVer((v) => v + 1);
     nachladen(id);
-  }, "image/*");
+  };
 
   const fotoWeg = async (id) => {
     await fetch(`/api/personen/${id}/photo`, { method: "DELETE" }).catch(() => {});
@@ -176,6 +184,13 @@ export default function Personen() {
                         onKeyDown={(e) => { if (e.key === "Enter") nameSpeichern(); if (e.key === "Escape") setNameEdit(null); }}
                         style={{ ...inputStyle, flex: 1 }} />
                       <button onClick={nameSpeichern} style={{ ...btnSecondary, ...btnSmall }}>{t("common.save")}</button>
+                      {/* Abbrechen sichtbar, nicht nur auf Escape: eine Zeile,
+                          aus der man nur mit einer Taste herauskommt, ist auf
+                          dem Tablet eine Sackgasse. */}
+                      <button onClick={() => setNameEdit(null)} className="icon-btn" style={iconBtn}
+                        title={t("common.abort")} aria-label={t("common.abort")}>
+                        <Icon d={ICONS.close} size={16} />
+                      </button>
                     </div>
                   )}
 
@@ -286,6 +301,12 @@ export default function Personen() {
           )}
         </div>
       ))}
+
+      {zuschnitt && (
+        <BildZuschnitt datei={zuschnitt.datei}
+          onAbbruch={() => setZuschnitt(null)}
+          onFertig={(quadrat) => { const pid = zuschnitt.personId; setZuschnitt(null); fotoHochladen(pid, quadrat); }} />
+      )}
 
       {/* QR groß: der Zettel für den Ordner. Die Adresse kommt aus SITE_URL
           (core/basis.js) — `location.origin` wäre im Schulnetz die LAN-Adresse
