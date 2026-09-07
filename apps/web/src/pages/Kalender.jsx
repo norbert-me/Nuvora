@@ -26,7 +26,7 @@ import ferienDE from "../data/ferien-de.json";
 import { feiertage } from "../data/feiertage.js";
 // ymd/isoDay/hmToMin/startOfDay/addDays/mondayOf/isoWeek standen hier eigens —
 // dieselben Zeilen lagen in Zufall, Sitzplan, Anwesenheit und feiertage.js.
-import { addDays, hmToMin, isoDay, isoWeek, mondayOf, parseYmd, startOfDay, wochentagMo0, ymd } from "../core/datum.js";
+import { addDays, hmToMin, minToHm, isoDay, isoWeek, mondayOf, parseYmd, startOfDay, wochentagMo0, ymd } from "../core/datum.js";
 import { stundenZeit, stundenListe } from "../core/stunden";
 
 // Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
@@ -2152,6 +2152,37 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
   const stunde = entry.period != null ? stundenZeit(zeiten, zeroZeit, entry.period) : null;
   const stundeVon = (stunde && stunde.start) || "";
   const stundeBis = (stunde && stunde.end) || "";
+  // Der Verlaufsplan sagt nicht nur „10 min", sondern WANN: die Dauern liegen
+  // ab dem Beginn der Stunde hintereinander. Ohne Uhrzeit (kein Stundenraster
+  // und kein eigenes Zeitfeld) bleiben die Uhrzeiten weg — geraten wird nichts,
+  // die Dauer allein steht dann wie bisher da.
+  const planVon = hmToMin(startTime || stundeVon);
+  const planBis = hmToMin(endTime || stundeBis);
+  // Je Phase Anfang und Ende in Minuten, kumuliert. Eine Phase ohne Dauer
+  // verschiebt nichts und bekommt nur ihren Anfang.
+  const phasenZeit = (list) => {
+    if (planVon == null) return list.map(() => null);
+    let cur = planVon;
+    return list.map((p) => {
+      const d = Number(p.dauer);
+      const von = cur;
+      if (!Number.isFinite(d) || d <= 0) return { von, bis: null };
+      cur = von + d;
+      return { von, bis: cur };
+    });
+  };
+  // Summe der Dauern gegen die Laenge der Stunde: „35 von 45 min" beantwortet
+  // beim Planen die einzige Frage, die man an einen Verlaufsplan stellt.
+  const dauerSumme = (list) => list.reduce((n, p) => n + (Number(p.dauer) > 0 ? Number(p.dauer) : 0), 0);
+  const stundenLaenge = (planVon != null && planBis != null && planBis > planVon) ? planBis - planVon : null;
+  const summenText = (list) => {
+    const sum = dauerSumme(list);
+    if (!sum) return null;
+    if (stundenLaenge == null) return `${sum} min`;
+    const rest = stundenLaenge - sum;
+    return rest === 0 ? `${sum} / ${stundenLaenge} min`
+      : `${sum} / ${stundenLaenge} min (${rest > 0 ? `${rest} min frei` : `${-rest} min zu viel`})`;
+  };
   // Die Regel im Klartext. „wiederholt sich" stand da und beantwortete die
   // Frage nicht, die man an einen Serientermin stellt: WIE oft, und bis wann.
   // Was der Dialog nicht anbietet (BYDAY-Listen aus Apple), wird nicht
@@ -2354,16 +2385,20 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
             {notes && <div style={{ marginTop: 16, fontSize: 14, whiteSpace: "pre-wrap", color: "var(--text2)" }}>{notes}</div>}
             {verlauf.length > 0 && (
               <div style={{ marginTop: 16 }}>
-                <div style={{ ...sectionLabel, marginBottom: 8 }}>{t("kalender.verlauf")}</div>
-                {verlauf.map((p, i) => (
+                <div style={{ ...sectionLabel, marginBottom: 8, display: "flex", gap: 8 }}>
+                  <span style={{ flex: 1 }}>{t("kalender.verlauf")}</span>
+                  {summenText(verlauf) && <span style={{ fontWeight: 400, color: "var(--text3)" }}>{summenText(verlauf)}</span>}
+                </div>
+                {(() => { const zt = phasenZeit(verlauf); return verlauf.map((p, i) => (
                   <div key={i} style={{ display: "flex", gap: 8, padding: "8px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
                     <div style={{ minWidth: 120, flexShrink: 0, display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                      {zt[i] && <span style={{ fontSize: 12, color: "var(--text3)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{minToHm(zt[i].von)}{zt[i].bis != null ? `–${minToHm(zt[i].bis)}` : ""}</span>}
                       <span style={{ fontSize: 14, fontWeight: 600 }}>{p.phase || "—"}</span>
                       {p.dauer && <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>{p.dauer} min</span>}
                     </div>
                     <div style={{ flex: 1, fontSize: 14, color: "var(--text2)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{p.text}</div>
                   </div>
-                ))}
+                )); })()}
               </div>
             )}
             {!clsName && !topName && !methName && !linkList.length && !notes && !verlauf.length && <p style={{ fontSize: 14, color: "var(--text3)", marginTop: 8 }}>{t("kalender.emptyEntry")}</p>}
@@ -2538,12 +2573,16 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
         {/* Verlaufsplan: einfache Phasenliste (Phase + Dauer + Freitext). */}
         <div style={{ ...lbl, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ flex: 1 }}>{t("kalender.verlauf")}</span>
+          {/* Summe gegen die Stundenlaenge — beim Tippen sichtbar, sonst faellt
+              erst im Unterricht auf, dass der Plan zehn Minuten zu lang ist. */}
+          {summenText(verlauf) && <span style={{ color: (stundenLaenge != null && dauerSumme(verlauf) > stundenLaenge) ? C.danger : "var(--text3)" }}>{summenText(verlauf)}</span>}
           <button onClick={addPhase} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("kalender.verlaufAdd")} aria-label={t("kalender.verlaufAdd")}><Icon d={ICONS.plus} size={15} color="var(--accent)" /></button>
         </div>
         {verlauf.length === 0 && <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("kalender.verlaufEmpty")}</div>}
-        {verlauf.map((p, i) => (
+        {(() => { const zt = phasenZeit(verlauf); return verlauf.map((p, i) => (
           <div key={i} style={{ ...panelStyle, padding: 8, marginBottom: 8, background: "var(--bg)" }}>
             <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
+              {zt[i] && <span style={{ fontSize: 12, color: "var(--text3)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", flexShrink: 0 }}>{minToHm(zt[i].von)}</span>}
               <input value={p.phase} onChange={(e) => setPhase(i, "phase", e.target.value)} placeholder={t("kalender.verlaufPhase")} style={{ ...fld, flex: 1, padding: 8 }} />
               <input type="number" min="0" value={p.dauer} onChange={(e) => setPhase(i, "dauer", e.target.value)} placeholder={t("kalender.verlaufDauer")} style={{ ...fld, width: 56, padding: 8 }} />
               <span style={{ fontSize: 12, color: "var(--text3)", flexShrink: 0 }}>min</span>
@@ -2553,7 +2592,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
             </div>
             <textarea value={p.text} onChange={(e) => setPhase(i, "text", e.target.value)} rows={2} placeholder={t("kalender.verlaufText")} style={{ ...fld, resize: "vertical", padding: 8 }} />
           </div>
-        ))}
+        )); })()}
 
         </>)}
         <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, end_date: mehrtaegig ? (() => { const [y, m, d] = endVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : null, title, notes, start_time: mehrtaegig ? "" : (startTime || ""), end_time: mehrtaegig ? "" : (endTime || ""), location: ort, rrule: rruleBauen(), exdate: Array.isArray(entry.exdate) ? entry.exdate : [], verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>

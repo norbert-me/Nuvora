@@ -57,6 +57,13 @@ export const hmToMin = (hhmm) => {
   return m ? (+m[1]) * 60 + (+m[2]) : null;
 };
 
+/** Minuten seit Mitternacht als "HH:MM" — Gegenstueck zu hmToMin. */
+export const minToHm = (min) => {
+  if (min == null || !Number.isFinite(min)) return "";
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+};
+
 /** Sekunden als "M:SS" (Fragen-Uhr in Session und Auswertung). */
 export const mmss = (sek) => `${Math.floor(sek / 60)}:${String(Math.floor(sek % 60)).padStart(2, "0")}`;
 
