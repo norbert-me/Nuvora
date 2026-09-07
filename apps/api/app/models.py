@@ -306,7 +306,11 @@ class Kurs(Base):
     # Abfrage und kein Namensraten (der Name ist frei, „Mathe 7.5" genauso wie
     # „M7b" oder „Mathe Gruppe rot").
     fach: Mapped[str] = mapped_column(String(60), default="", server_default="")
-    jahrgang: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # TEXT, nicht Zahl: „7/8" ist ein üblicher Jahrgang (Kombiklasse,
+    # WP-Kurs über zwei Stufen), und eine Zahl kann das nicht abbilden.
+    # Sortiert wird ohnehin nach Namen, gefiltert per Vergleich — beides
+    # funktioniert mit Text.
+    jahrgang: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     # Farbe des Kurses (Stundenplan/Kalender). Die Fach-Klassen teilen sie sich —
     # darum am Kurs, nicht je Klasse.
     color: Mapped[str] = mapped_column(String(9), default="", server_default="")
@@ -612,7 +616,11 @@ class Topic(Base):
     # (siehe `_erbt` in routers/topics.py) — sonst stuende dasselbe Fach an
     # fuenfzig Unterthemen und wich beim ersten Tippfehler ab.
     fach: Mapped[str] = mapped_column(String(60), default="", server_default="")
-    jahrgang: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # TEXT, nicht Zahl: „7/8" ist ein üblicher Jahrgang (Kombiklasse,
+    # WP-Kurs über zwei Stufen), und eine Zahl kann das nicht abbilden.
+    # Sortiert wird ohnehin nach Namen, gefiltert per Vergleich — beides
+    # funktioniert mit Text.
+    jahrgang: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     children: Mapped[list["Topic"]] = relationship(

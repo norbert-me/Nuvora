@@ -3,7 +3,7 @@
 Eigenstaendig (Regel 3): Schueler kommen aus dem Kern, hier liegt nur der
 Status je (Schueler, Datum). status: da | fehlt | spaet | entsch.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -158,7 +158,11 @@ async def get_tage(class_id: int, dates: str = "",
         if not teil:
             continue
         try:
-            tage.append(datetime.strptime(teil, "%Y-%m-%d"))
+            # MIT Zeitzone: die Spalte ist `timestamptz`, und Postgres (asyncpg)
+            # vergleicht eine naive Zeitangabe nicht damit — der Aufruf endete
+            # in einem 500, das lokal auf SQLite nie auftrat. Die uebrigen Wege
+            # schicken ohnehin ISO-Zeitpunkte mit „Z".
+            tage.append(datetime.strptime(teil, "%Y-%m-%d").replace(tzinfo=timezone.utc))
         except ValueError:
             continue    # Unlesbares faellt still heraus: eine Spalte ohne Datum ist kein Fehler
         if len(tage) >= 40:

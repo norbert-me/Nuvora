@@ -289,9 +289,9 @@ def _ensure_columns(sync_conn):
         ("user_modules", "optionen", "JSON"),  # Anzeige-Optionen je Modul und Lehrkraft
         ("exam_dates", "topic_ids", "JSON"),   # Themen der geplanten Klassenarbeit
         ("topics", "fach", "VARCHAR(60) DEFAULT '' NOT NULL"),   # Fach und Jahrgang am Thema …
-        ("topics", "jahrgang", "INTEGER"),
+        ("topics", "jahrgang", "VARCHAR(20)"),
         ("kurse", "fach", "VARCHAR(60) DEFAULT '' NOT NULL"),    # … und ihr Gegenstueck am Kurs
-        ("kurse", "jahrgang", "INTEGER"),
+        ("kurse", "jahrgang", "VARCHAR(20)"),
         ("users", "is_admin", "BOOLEAN DEFAULT FALSE NOT NULL"),
         ("users", "hj1_start", "DATE"),        # Schuljahr: Halbjahre + Jahresende
         ("users", "hj2_start", "DATE"),
@@ -456,6 +456,28 @@ def _ensure_columns(sync_conn):
     # Idempotent: DROP NOT NULL auf einer bereits nullable Spalte ist ein
     # No-op. Nur Postgres — SQLite kann eine bestehende Spalte nicht aendern,
     # dort entsteht die Tabelle ohnehin frisch aus dem Modell.
+    # Typwechsel: der Jahrgang ist TEXT geworden. „7/8" ist ein üblicher
+    # Jahrgang (Kombiklasse, WP-Kurs über zwei Stufen), und eine Zahl kann das
+    # nicht abbilden. Bestehende Werte bleiben erhalten (7 wird "7"); erneutes
+    # Ausführen ist ein No-op, weil die Spalte dann schon Text ist. Nur
+    # Postgres — SQLite baut die Tabelle ohnehin frisch aus dem Modell.
+    if sync_conn.dialect.name == "postgresql":
+        for table in ("kurse", "topics"):
+            if table not in existing_tables:
+                continue
+            typ = next((c["type"] for c in inspector.get_columns(table) if c["name"] == "jahrgang"), None)
+            if typ is None or "INT" not in str(typ).upper():
+                continue
+            try:
+                with sync_conn.begin_nested():
+                    sync_conn.execute(text(
+                        f"ALTER TABLE {table} ALTER COLUMN jahrgang TYPE VARCHAR(20) "
+                        f"USING jahrgang::varchar"))
+            except Exception as e:  # noqa: BLE001 — darf den Start nicht kosten
+                print(f"[STARTUP-WARN] {table}.jahrgang bleibt eine Zahl: {type(e).__name__}: {e} "
+                      "— zusammengesetzte Jahrgaenge (7/8) lassen sich dann nicht speichern.",
+                      flush=True)
+
     if sync_conn.dialect.name == "postgresql":
         for table, column in (("card_decks", "class_id"), ("card_folders", "class_id"),
                               ("grade_entries", "category_id")):

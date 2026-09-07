@@ -14,6 +14,7 @@ import { useAktiv } from "../core/modules.js";
 import { swr , lastClass } from "../core/cache.js";
 import { useUrlClass } from "../core/klassenwahl.js";
 import { parseYmd, wochentagMo0, ymd } from "../core/datum.js";
+import { slotGiltAm } from "../core/stunden";
 import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api/anwesenheit";
@@ -62,7 +63,18 @@ export default function Anwesenheit() {
   const tagStunden = useMemo(() => [...new Set(slots.filter((s) => s.weekday === weekday && s.class_id === classId).map((s) => s.period))].sort((a, b) => a - b), [slots, weekday, classId]);
   // Alle Stunden des Tages (Stunde → Klasse): in der Tag-Ansicht wählt man die
   // Stunde, das öffnet automatisch den zugehörigen Kurs/die Klasse.
-  const tagSlots = useMemo(() => slots.filter((s) => s.weekday === weekday && s.class_id).sort((a, b) => a.period - b.period), [slots, weekday]);
+  // Nur die am gewaehlten Tag gueltige Fassung je Stunde: der Stundenplan wird
+  // je Halbjahr fortgeschrieben, dieselbe Stunde liegt also mehrfach in der
+  // Antwort — ungefiltert stand „0. Stunde — 7.5" zweimal in der Auswahl.
+  // Danach noch je (Stunde, Klasse) einmal, falls zwei Fassungen denselben Tag
+  // ueberlappen.
+  const tagSlots = useMemo(() => {
+    const gueltig = slots.filter((s) => s.weekday === weekday && s.class_id && slotGiltAm(s, datum));
+    const gesehen = new Set();
+    return gueltig
+      .sort((a, b) => a.period - b.period || (b.valid_from || "").localeCompare(a.valid_from || ""))
+      .filter((s) => { const k = `${s.period}:${s.class_id}`; if (gesehen.has(k)) return false; gesehen.add(k); return true; });
+  }, [slots, weekday, datum]);
   const stundenWahl = kalenderAktiv && view === "tag" && tagSlots.length > 0;
   // Tag-Ansicht: nur Klassen, die am gewählten Tag Unterricht haben (Stundenplan).
   // Übersicht: alle Klassen. Ohne Kalender/Stundenplan: alle.

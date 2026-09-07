@@ -85,7 +85,7 @@ export default function Kurse() {
     if (kurs.geaendert && !window.confirm(t("speichern.verlassen"))) return;
     setEditKurs(k.id);
     kursUebernehmen({
-      name: k.name, jahr: k.schuljahr || "", fach: k.fach || "", jahrgang: k.jahrgang ? String(k.jahrgang) : "", raum: k.raum || "",
+      name: k.name, jahr: k.schuljahr || "", fach: k.fach || "", jahrgang: k.jahrgang || "", raum: k.raum || "",
       vorgaenger: k.vorgaenger_id ? String(k.vorgaenger_id) : "",
       niveauAktiv: !!k.niveau_aktiv, archiviert: archiv, klassen: k.classes.map((c) => c.id),
     });
@@ -106,7 +106,7 @@ export default function Kurse() {
     const name = w.name.trim();
     if (!name) return false;
     const koerper = { name, schuljahr: w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv,
-                      fach: (w.fach || "").trim(), jahrgang: w.jahrgang ? Number(w.jahrgang) : 0,
+                      fach: (w.fach || "").trim(), jahrgang: (w.jahrgang || "").trim(),
                       raum: (w.raum || "").trim() };
     if (!(await sende(`${API}/kurse/${k.id}`, alsJson("PUT", koerper), t("kurse.editName")))) return false;
     setKursBasis(w);
@@ -247,8 +247,11 @@ export default function Kurse() {
                         fuer einen, den es hier noch nicht gibt — ohne ihn waere
                         die Auswahl eine Sackgasse. */}
                     {kurs.wert.jahrgang && !jahrgaenge.includes(String(kurs.wert.jahrgang)) ? (
-                      <input type="number" min="1" max="13" autoFocus value={kurs.wert.jahrgang === "0" ? "" : kurs.wert.jahrgang}
-                        onChange={(e) => kurs.setz({ jahrgang: e.target.value })} placeholder={t("topics.jahrgang")}
+                      // Freitext, keine Zahl: „7/8" ist ein üblicher Jahrgang
+                      // (Kombiklasse, WP-Kurs über zwei Stufen) — ein Zahlenfeld
+                      // nahm ihn gar nicht erst an.
+                      <input autoFocus value={kurs.wert.jahrgang === "0" ? "" : kurs.wert.jahrgang}
+                        onChange={(e) => kurs.setz({ jahrgang: e.target.value.slice(0, 20) })} placeholder={t("topics.jahrgang")}
                         style={{ ...inputStyle, width: 110 }} />
                     ) : (
                       <select value={kurs.wert.jahrgang || ""} style={{ ...selectStyle, width: 130 }}
@@ -316,7 +319,10 @@ export default function Kurse() {
                     <Toggle checked={kurs.wert.niveauAktiv} onChange={(v) => kurs.setz({ niveauAktiv: v })} label={t("kurse.niveauToggle")} />
                     {/* Teilnehmerliste immer sichtbar; der E/G-Selektor je Person nur,
                         wenn der E/G-Regler an ist. */}
-                    <NiveauPanel kursId={k.id} niveauAktiv={kurs.wert.niveauAktiv} t={t} />
+                    {/* Ist E/G aus, hat die Liste darunter nichts zu sagen: sie
+                        zeigte dann dreißig Namen ohne eine einzige Angabe. Sie
+                        erscheint mit dem Schalter. */}
+                    {kurs.wert.niveauAktiv && <NiveauPanel kursId={k.id} niveauAktiv t={t} />}
                 </div>
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
                   <button onClick={() => delKurs(k)} className="icon-btn" style={{ ...iconBtn }} title={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")} aria-label={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")}>

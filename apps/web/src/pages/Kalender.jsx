@@ -27,7 +27,7 @@ import { feiertage } from "../data/feiertage.js";
 // ymd/isoDay/hmToMin/startOfDay/addDays/mondayOf/isoWeek standen hier eigens —
 // dieselben Zeilen lagen in Zufall, Sitzplan, Anwesenheit und feiertage.js.
 import { addDays, hmToMin, minToHm, isoDay, isoWeek, mondayOf, parseYmd, startOfDay, wochentagMo0, ymd } from "../core/datum.js";
-import { stundenZeit, stundenListe } from "../core/stunden";
+import { stundenZeit, stundenListe, slotGiltAm } from "../core/stunden";
 
 // Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
 const BUNDESLAENDER = [
@@ -49,15 +49,10 @@ const EXT_FARBE = "#8e8e93";
 const EXT_PALETTE = ["#ff9f0a", "#30d158", "#bf5af2", "#64d2ff", "#ff375f", "#ffd60a"];
 
 
-// Gilt die (versionierte) Stundenplan-Stunde am Tag d? valid_from/valid_to sind
-// "YYYY-MM-DD" oder null (offen). Änderungen am Plan wirken ab heute, ältere Tage
-// zeigen weiter die damalige Stunde.
-const slotActiveOn = (s, d) => {
-  const dd = ymd(d);
-  if (s.valid_from && dd < s.valid_from) return false;
-  if (s.valid_to && dd > s.valid_to) return false;
-  return true;
-};
+// Gilt die (versionierte) Stundenplan-Stunde am Tag d? Die Regel steht in
+// core/stunden.js — sie wird auch von der Startseite und der Anwesenheit
+// gebraucht, und drei Fassungen liefen unweigerlich auseinander.
+const slotActiveOn = (s, d) => slotGiltAm(s, ymd(d));
 // Auswahl-Dropdowns alphabetisch aufsteigend (A→Z / 1→2→3, zahlenbewusst) sortieren.
 const byLabel = (label) => (a, b) => String(label(a)).localeCompare(String(label(b)), "de", { numeric: true });
 // Ein Eintrag ist ganztägig, wenn er weder an einer Stunde noch an einer freien Uhrzeit hängt.

@@ -12,7 +12,7 @@ import { alsJson, hol } from "../core/melden.js";
 import { WIDGETS } from "../components/Widgets.jsx";
 import { ZIELE } from "../core/ziele.js";
 import { hmToMin, ymd } from "../core/datum.js";
-import { stundenZeit } from "../core/stunden";
+import { stundenZeit, slotGiltAm } from "../core/stunden";
 
 // Modul-Kachel: dieselbe Karte wie überall, nur als Link (kein eigener Kasten).
 // Die frühere Eigenbau-Fassung stand auf `var(--surface)` — die Variable gibt es
@@ -173,7 +173,7 @@ function HeutePanel({ t }) {
   if (!data) return null;
   // Nur heute gültige Stundenplan-Versionen (valid_from/valid_to grenzen ein).
   // heuteYmd ist oben schon definiert (YYYY-MM-DD).
-  const activeToday = (s) => (!s.valid_from || heuteYmd >= s.valid_from) && (!s.valid_to || heuteYmd <= s.valid_to);
+  const activeToday = (s) => slotGiltAm(s, heuteYmd);
   // Vorbei heisst: das ENDE liegt hinter uns. Ohne Endzeit (Stunde ohne
   // gepflegte Uhrzeit, ganztägiger Termin) bleibt der Eintrag stehen — geraten
   // wird nichts, und ein Termin ohne Zeit gilt den ganzen Tag.

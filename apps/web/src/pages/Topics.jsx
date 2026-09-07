@@ -286,7 +286,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   const entwurfRef = useRef(null);
   const ent = useEntwurf(gespeichert, async (w) => {
     const name = (w.name || "").trim() || gespeichert.name;
-    if (await onSaveTopic(tp, name, w.notes, w.zielG, w.zielE, w.voraus, w.fach, w.jahrgang ? Number(w.jahrgang) : null) === false) return false;
+    if (await onSaveTopic(tp, name, w.notes, w.zielG, w.zielE, w.voraus, w.fach, (w.jahrgang || "").trim() || null) === false) return false;
     entwurfRef.current?.setz({ name });
     setGespeichert({ ...w, name });
     setEditNote(false);
@@ -363,8 +363,9 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
                 </div>
                 <div style={{ flex: "1 1 100px" }}>
                   <div style={secTitle}>{t("topics.jahrgang")}</div>
-                  <input type="number" min="1" max="13" value={ent.wert.jahrgang}
-                    onChange={(ev) => ent.setz({ jahrgang: ev.target.value })}
+                  {/* Freitext wie am Kurs: „7/8" gibt es wirklich. */}
+                  <input value={ent.wert.jahrgang}
+                    onChange={(ev) => ent.setz({ jahrgang: ev.target.value.slice(0, 20) })}
                     placeholder="—" style={{ ...inputStyle, width: "100%" }} />
                 </div>
               </div>

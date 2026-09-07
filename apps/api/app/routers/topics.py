@@ -42,7 +42,7 @@ class TopicIn(BaseModel):
     # Fehler abgelehnt: die Oberflaeche schickt das ganze Thema zurueck, und ein
     # 422 fuer ein Feld, das dort gar nicht bedienbar ist, waere eine Sackgasse.
     fach: str = ""
-    jahrgang: Optional[int] = None
+    jahrgang: Optional[str] = None
 
     @field_validator("name")
     @classmethod
@@ -81,7 +81,7 @@ class TopicOut(BaseModel):
     # Wirksames Fach/Jahrgang: am Oberthema das eigene, am Unterthema das
     # geerbte. Die Oberflaeche muss die Regel damit nicht ein zweites Mal kennen.
     fach: str = ""
-    jahrgang: Optional[int] = None
+    jahrgang: Optional[str] = None
     # Wie viele CardVote-Fragen haengen an diesem Thema? Macht sichtbar, was
     # ein Loeschen kostet.
     question_count: int = 0
@@ -228,7 +228,7 @@ async def create_topic(
         voraussetzungen=data.voraussetzungen or "",
         # Nur am Oberthema: ein Unterthema erbt (siehe `_erbt`).
         fach=("" if data.parent_id else (data.fach or "").strip()[:60]),
-        jahrgang=(None if data.parent_id else data.jahrgang),
+        jahrgang=(None if data.parent_id else ((str(data.jahrgang).strip()[:20] or None) if data.jahrgang else None)),
     )
     db.add(topic)
     await db.commit()
@@ -354,7 +354,7 @@ async def update_topic(
     topic.ziel_e = data.ziel_e or ""
     if data.parent_id is None:
         topic.fach = (data.fach or "").strip()[:60]
-        topic.jahrgang = data.jahrgang
+        topic.jahrgang = (str(data.jahrgang).strip()[:20] or None) if data.jahrgang else None
     else:
         # Unter ein Oberthema gezogen: eigene Angaben loeschen, sonst bliebe ein
         # unsichtbarer Wert stehen, der beim Herausziehen wieder auftaucht.

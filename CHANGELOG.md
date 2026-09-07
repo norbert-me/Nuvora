@@ -14,7 +14,7 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.3.1 — 07.09.2026
 
 **Kalender und Tafel**
 
@@ -54,12 +54,27 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 **Personen und Kurse**
 
-- Die Personenseite zeigt Angaben, Förderbedarf, Noten beider Halbjahre je Kurs
-  und den QR-Zugang; Foto und Name sind dort änderbar.
+- Die Personenseite zeigt Angaben, Förderbedarf, Noten beider Halbjahre je Kurs,
+  Fehlzeiten und Verspätungen sowie den QR-Zugang; Foto und Name sind dort
+  änderbar, Kinder lassen sich anlegen und Kursen zuweisen, und die
+  Nachteilsausgleiche eines Kurses sind dort einstellbar.
 - Kurse haben kein Klassen-Feld mehr; Kinder werden über eine Personensuche
-  hinzugefügt.
+  hinzugefügt. Der Jahrgang darf jetzt „7/8" heißen.
+- Die Liste der E/G-Zuordnungen erscheint nur noch, wenn E/G im Kurs an ist.
 - Archivieren wirkt sofort und wartet nicht mehr auf „Speichern".
 - Die Begrüßung auf der Startseite ist weg.
+
+**Kalender und Orga**
+
+- Eine Klassenarbeit kann die Stunde im Stundenplan ersetzen — der Unterricht
+  entfällt an dem Tag.
+- Aus dem Kalendereintrag führen zwei Wege in die Orga der Klasse (Anwesenheit,
+  Checkliste).
+- In der Checkliste löscht ein Klick auf den Spaltenkopf die Spalte; der
+  Mülleimer je Spalte ist weg.
+- Die Stundenwahl der Anwesenheit zeigt jede Stunde nur noch einmal.
+- Die CalDAV-Angaben stehen mit der Beschriftung über dem Feld — „Serveradresse"
+  passte daneben nicht mehr hin.
 
 **Zeitleiste**
 

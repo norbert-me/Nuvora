@@ -79,6 +79,12 @@ ERLAUBT = {
         "vereinbarten Nachteilsausgleiche. Angemeldet, eigene Klasse.",
     "/api/kurse/{kurs_id}/massnahmen":
         "dito für den Kurs.",
+    "/api/personen/{person_id}/auswertung":
+        "Die Einzelsicht auf EIN Kind — dieselbe Entscheidung wie bei "
+        "/api/classes/students/{student_id}: dort werden die Angaben gezeigt "
+        "und gepflegt, und genau dafuer gibt es die Personenseite. Die "
+        "Personen-LISTE (/api/personen) bleibt bewusst ohne sie: dreissig Namen "
+        "brauchen keine Foerderangaben.",
     "/api/me/export":
         "Auskunft nach DSGVO Art. 15 — sie MUSS vollständig sein. Dass die "
         "Felder hier drinstehen, prüft test_auskunft_enthaelt_die_felder "
@@ -316,6 +322,12 @@ async def _daten_anlegen(Sitzung, user_id: int) -> dict:
     ids["kurs_id"] = klasse["kurs_id"]
     ids["student_id"] = klasse["students"][0]["id"]
     ids["card_id"] = 1
+    # Die Person zur Zeile: die Personenseite ist eine eigene Sicht auf dasselbe
+    # Kind, und der Rundlauf muss sie aufrufen koennen — sonst bliebe genau der
+    # Endpunkt ungeprueft, der die Art-9-Angaben ausdruecklich herausgibt.
+    r = await _ruf("GET", "/api/personen")
+    if r.status == 200 and r.json():
+        ids["person_id"] = r.json()[0]["id"]
 
     # Kern: Thema (hängen Aufgaben, Karten und Notenspalten dran).
     r = await _ruf("POST", "/api/topics", {"name": "ZZ-Leck Bruchrechnung"})

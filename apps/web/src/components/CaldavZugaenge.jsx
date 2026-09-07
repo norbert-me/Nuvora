@@ -203,15 +203,21 @@ export default function CaldavZugaenge() {
 
 function Zeile({ label, wert, t }) {
   return (
-    <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
-      <span style={{ width: 74, flexShrink: 0, fontSize: 12, color: "var(--text3)" }}>{label}</span>
-      {/* minWidth: 0 ist Pflicht: ein Flex-Kind ist sonst mindestens so breit
-          wie sein Inhalt, und ein Eingabefeld rechnet das aus seiner size —
-          auf dem Handy schob das die ganze Zeile aus dem Dialog. */}
-      <input readOnly value={wert || ""} onFocus={(e) => e.target.select()} size={1}
-        style={{ ...inputStyle, flex: 1, minWidth: 0, fontSize: 12 }} />
+    // Beschriftung ÜBER dem Feld, nicht daneben: nebeneinander bekam sie eine
+    // feste Breite (74 px), und „Serveradresse" passte nicht hinein — das Feld
+    // schob sich darüber. Eine Breite, die für jedes Wort reicht, gibt es
+    // nicht: die Beschriftungen sind übersetzt.
+    <div style={{ display: "flex", gap: 6, alignItems: "flex-end", marginBottom: 8 }}>
+      <label style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 12, color: "var(--text3)" }}>{label}</span>
+        {/* minWidth: 0 ist Pflicht: ein Flex-Kind ist sonst mindestens so breit
+            wie sein Inhalt, und ein Eingabefeld rechnet das aus seiner size —
+            auf dem Handy schob das die ganze Zeile aus dem Dialog. */}
+        <input readOnly value={wert || ""} onFocus={(e) => e.target.select()} size={1}
+          style={{ ...inputStyle, width: "100%", minWidth: 0, fontSize: 12, boxSizing: "border-box" }} />
+      </label>
       <button onClick={() => navigator.clipboard?.writeText(wert || "")} className="icon-btn"
-        style={toolbarIconBtn} title={t("common.copy")} aria-label={t("common.copy")}>
+        style={{ ...toolbarIconBtn, flexShrink: 0 }} title={t("common.copy")} aria-label={t("common.copy")}>
         <Icon d={ICONS.duplicate} size={15} />
       </button>
     </div>

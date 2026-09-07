@@ -50,7 +50,7 @@ class KursIn(BaseModel):
     # frei („Mathe 7.5", „M7b", „Mathe Gruppe rot"), und daraus einen
     # Zusammenhang zu raten waere genau der Fehler, den die Taxonomie vermeidet.
     fach: Optional[str] = None
-    jahrgang: Optional[int] = None
+    jahrgang: Optional[str] = None
     # Stammraum ("B204"). Der Kalender setzt ihn als Ort der Stunde ein.
     raum: Optional[str] = None
     # „Aus einem anderen Kurs entwickeln": dessen Kinder werden uebernommen.
@@ -80,7 +80,7 @@ class KursOut(BaseModel):
     member_count: int = 0    # einzeln hinzugefügte SuS (Kurs aus Teilen von Klassen)
     schuljahr: str = ""
     fach: str = ""
-    jahrgang: Optional[int] = None
+    jahrgang: Optional[str] = None
     raum: str = ""
     vorgaenger_id: Optional[int] = None
     vorgaenger_name: str = ""       # damit die Liste nicht je Kurs nachfragen muss
@@ -274,9 +274,9 @@ async def rename_kurs(kurs_id: int, body: KursIn, user: User = Depends(get_curre
     if body.fach is not None:
         k.fach = (body.fach or "").strip()[:60]
     if body.jahrgang is not None:
-        # 0 heisst „keine Angabe" — die Oberflaeche schickt bei geleertem Feld
-        # keine Null, sondern nichts; beides muss hier dasselbe bedeuten.
-        k.jahrgang = body.jahrgang or None
+        # Leer heisst „keine Angabe" — die Oberflaeche schickt bei geleertem
+        # Feld einen leeren Text, und beides muss hier dasselbe bedeuten.
+        k.jahrgang = (str(body.jahrgang).strip()[:20] or None)
     if body.raum is not None:
         k.raum = (body.raum or "").strip()[:60]
     await db.commit()

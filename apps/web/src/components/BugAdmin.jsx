@@ -87,14 +87,9 @@ export default function BugAdmin() {
                 </span>
                 {/* Von wem — die Rückfrage geht sonst ins Leere. */}
                 <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{r.email || "—"}</span>
-                {/* Dass etwas anhaengt, muss man sehen, ohne jede Meldung
-                    aufzuklappen — meistens ist es ein Bildschirmfoto, und das
-                    ist der halbe Bericht. */}
-                {r.anhang_name && (
-                  <span title={r.anhang_name} style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--text3)" }}>
-                    <Icon d={ICONS.image} size={15} color="var(--text3)" />
-                  </span>
-                )}
+                {/* Kein Anhang-Symbol mehr in der Kopfzeile: das Bild steht
+                    seit dem Einbetten darunter, und ein Zeichen daneben sagt
+                    dasselbe ein zweites Mal. */}
                 <button onClick={() => setGross(gross === r.id ? null : r.id)} style={{ ...btnSecondary, ...btnSmall }}>
                   {gross === r.id ? t("bugadmin.zu") : t("bugadmin.mehr")}
                 </button>

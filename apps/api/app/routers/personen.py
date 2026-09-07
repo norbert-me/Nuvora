@@ -306,6 +306,11 @@ async def auswertung(person_id: int, user: User = Depends(get_current_user),
     for z in zeilen:
         kurs = kurse.get(z.kurs_id) or kurse.get(getattr(klassen.get(z.class_id), "kurs_id", None))
         teil = {"student_id": z.id, "class_id": z.class_id,
+                # Die Kurs-ID gehoert dazu: an ihr haengen die
+                # Nachteilsausgleiche (mehr Zeit in Mathe heisst nicht dasselbe
+                # wie in Sport), und ohne sie koennte die Personenseite sie
+                # zeigen, aber nicht schreiben.
+                "kurs_id": kurs.id if kurs else None,
                 "kurs": kurs.name if kurs else (getattr(klassen.get(z.class_id), "name", "") or ""),
                 "themen": [], "verlauf": []}
         if cardvote or auswertung_an or karten:
@@ -326,16 +331,19 @@ async def auswertung(person_id: int, user: User = Depends(get_current_user),
                                                      kurs_id=z.kurs_id or getattr(klassen.get(z.class_id), "kurs_id", None))
                 except Exception:
                     continue          # eine stumme Quelle darf die Sicht nicht kippen
-                treffer = next((r for r in zeilen_ if r["student_id"] == z.id), None)
+                # `_summarize` liefert StudentSummary-Objekte, keine Dicts —
+                # ein Zugriff mit [] wirft dort TypeError, und der landete
+                # unbemerkt im `except` daneben.
+                treffer = next((r for r in zeilen_ if r.student_id == z.id), None)
                 if not treffer:
                     continue
-                note = treffer.get("total_override")
+                note = treffer.total_override
                 if note is None:
-                    note = treffer.get("weighted")
+                    note = treffer.weighted
                 if note is not None:
                     teil.setdefault("noten", {})[hj] = round(float(note), 2)
-                if treffer.get("observations"):
-                    teil["beobachtungen"] = treffer["observations"]
+                if treffer.observations:
+                    teil["beobachtungen"] = treffer.observations
         # Fehlzeiten und Verspaetungen dieses Kurses — geholt, nicht gezaehlt:
         # `anwesenheit.summary` kennt die Regeln, die man beim Nachbauen
         # verliert (Ferien zaehlen nicht, mehrere Stunden am selben Tag sind
