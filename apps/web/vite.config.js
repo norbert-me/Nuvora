@@ -18,7 +18,11 @@ function precacheListe() {
     apply: "build",
     generateBundle(_optionen, bundle) {
       const dateien = Object.keys(bundle)
-        .filter((name) => /\.(js|css|woff2?|png|svg|jpe?g|webp)$/i.test(name))
+        // woff2 ja, .woff NEIN: die alte Fassung steht nur als Rueckfall in der
+        // CSS-Regel und wird von keinem Browser der letzten Jahre geholt — im
+        // Vorladen waere sie rund ein Megabyte, das niemand je benutzt. Im
+        // Schulnetz ist das die Haelfte der Wartezeit beim ersten Oeffnen.
+        .filter((name) => /\.(js|css|woff2|png|svg|jpe?g|webp)$/i.test(name))
         .map((name) => "/" + name);
       this.emitFile({ type: "asset", fileName: "precache.json", source: JSON.stringify(dateien) });
     },

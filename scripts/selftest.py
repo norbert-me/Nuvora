@@ -546,12 +546,19 @@ def teste_web_dateien(api, b):
         if not isinstance(liste, list) or len(liste) < 10:
             raise AssertionError(f"nur {len(liste) if isinstance(liste, list) else '?'} Eintraege — "
                                  "das kann nicht das ganze Bundle sein")
+        # Alte Schriftfassungen gehoeren nicht hinein: `.woff` steht nur als
+        # Rueckfall in der CSS-Regel und wird von keinem aktuellen Browser
+        # geholt — vorgeladen waere es rund ein Megabyte, das niemand benutzt.
+        alt_schriften = [p for p in liste if isinstance(p, str) and p.endswith(".woff")]
+        if alt_schriften:
+            raise AssertionError(f"{len(alt_schriften)} .woff-Dateien in der Vorladeliste — "
+                                 "das laedt jedes Geraet umsonst (vite.config.js: precacheListe)")
         # Stichprobe: erste, mittlere, letzte Datei muessen wirklich da sein.
         for pfad in (liste[0], liste[len(liste) // 2], liste[-1]):
             st, _ = api.call("GET", pfad, roh=True)
             if st != 200:
                 raise AssertionError(f"{pfad} gibt HTTP {st} — die Liste zeigt auf einen alten Build")
-        return f"{len(liste)} Dateien, Stichprobe erreichbar"
+        return f"{len(liste)} Dateien, keine Alt-Schriften, Stichprobe erreichbar"
 
     b.pruefe("Web-Dateien", "robots.txt", robots)
     b.pruefe("Web-Dateien", "security.txt (RFC 9116)", security_txt)

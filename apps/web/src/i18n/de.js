@@ -379,6 +379,8 @@ export default {
   "profile.linkSent": "Bestätigungslink an die neue Adresse gesendet.",
   "profile.username": "Name im Marktplatz",
   "profile.settings": "Unterricht",
+  "profile.sparsam": "Datensparen",
+  "profile.sparsamHint": "Lädt nur, was gerade gebraucht wird — kein Vorrat für den Offline-Betrieb. Offline steht danach weniger zur Verfügung.",
   "profile.sofort": "Nuvora",
   "profile.apps": "App laden",
   "profile.modulTeile": "Teile der Module",

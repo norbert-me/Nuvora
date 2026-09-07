@@ -377,6 +377,8 @@ export default {
   "profile.linkSent": "Confirmation link sent to the new address.",
   "profile.username": "Marketplace name",
   "profile.settings": "Teaching",
+  "profile.sparsam": "Data saver",
+  "profile.sparsamHint": "Loads only what is needed right now — no offline stock. Less will be available offline.",
   "profile.sofort": "Nuvora",
   "profile.apps": "Get the app",
   "profile.modulTeile": "Module parts",

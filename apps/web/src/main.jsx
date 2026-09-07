@@ -137,6 +137,11 @@ window.fetch = function(input, init) {
 // aus der letzten Sitzung) und beim Übergang offline→online, der über die
 // API-Aufrufe erkannt wird. flush nutzt den Original-fetch (keine Endlosschleife).
 let _wasOffline = false;
+// Den Datensparen-Schalter beim Start in den Worker-Cache schreiben: der
+// Service-Worker liest ihn beim Installieren von dort (core/sparsam.js), und
+// nach einem Wechsel der Cache-Fassung waere er sonst verloren.
+setzeSparsam(sparsamAn());
+
 const _flush = () => flushOutbox(_origFetch);
 window.addEventListener("online", _flush);
 window.addEventListener("cardvote:offline", () => { _wasOffline = true; });
@@ -158,6 +163,7 @@ import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";
 import Fehlermelder from "./components/Fehlermelder.jsx";
+import { sparsamAn, setzeSparsam } from "./core/sparsam.js";
 import AppUpdate from "./components/AppUpdate.jsx";
 import WasIstNeu from "./components/WasIstNeu.jsx";
 import { notiereAufruf, notiereSeite, protokollStarten } from "./core/protokoll.js";

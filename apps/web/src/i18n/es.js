@@ -378,6 +378,8 @@ export default {
   "profile.linkSent": "Enlace de confirmación enviado a la nueva dirección.",
   "profile.username": "Nombre en el mercado",
   "profile.settings": "Docencia",
+  "profile.sparsam": "Ahorro de datos",
+  "profile.sparsamHint": "Carga solo lo necesario — sin reservas para el modo sin conexión. Habrá menos disponible sin conexión.",
   "profile.sofort": "Nuvora",
   "profile.apps": "Descargar la app",
   "profile.modulTeile": "Partes de los módulos",

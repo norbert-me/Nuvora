@@ -15,6 +15,8 @@
 //   Schwall von zwanzig Anfragen beim Anmelden verdraengt die Aufrufe der
 //   Seite, die die Lehrkraft gerade sehen will.
 
+import { sparsamesNetz } from "./sparsam.js";
+
 const KERN = ["/api/auth/me", "/api/modules", "/api/classes", "/api/kurse", "/api/topics"];
 
 // Je Modul die Listen, die seine Startseite braucht. Neues Modul: hier eintragen —
@@ -56,6 +58,12 @@ export async function vorladen() {
   if (gelaufen) return;
   gelaufen = true;
   if (typeof navigator !== "undefined" && navigator.onLine === false) { gelaufen = false; return; }
+  // Auf einer langsamen oder ausdruecklich sparsamen Verbindung faellt der
+  // Vorrat aus. Er ist ein paar Dutzend Anfragen, die niemand angefordert hat —
+  // im Schulnetz sind das genau die, die der gerade geoeffneten Seite fehlen.
+  // Offline geht danach weniger; das ist der ehrlichere Tausch als eine App,
+  // die zehn Minuten laedt, bevor die erste Klassenliste steht.
+  if (sparsamesNetz()) { gelaufen = false; return; }
   // Nicht bei jedem Neuladen: das waeren je Mal ein paar Dutzend Anfragen, nur
   // um denselben Vorrat noch einmal abzulegen. Einmal am Tag reicht — im
   // laufenden Betrieb fuellt der Worker den Cache ohnehin bei jedem Aufruf.

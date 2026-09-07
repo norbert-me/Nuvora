@@ -14,6 +14,27 @@ const STATIC_ASSETS = ["/", "/index.html", "/manifest.json", "/favicon.svg", "/i
 // precache.json nicht drin.
 const LERNPFAD_ASSETS = ["/lp/index.html", "/lp/style.scoped.css", "/lp/js/app.js"];
 
+// Wie gut ist die Leitung? Im Schulnetz haengen dreissig Geraete an einem
+// DSL-Anschluss, und dann ist „alle Seiten sofort holen" kein Dienst mehr,
+// sondern der Grund, warum die erste Seite zwei Minuten braucht. Auf einer
+// langsamen oder ausdruecklich sparsamen Verbindung wird deshalb nur die
+// Huelle vorgeladen; alles andere kommt beim Aufrufen und landet dabei
+// genauso im Cache. Das Offline-Versprechen bleibt — es erfuellt sich dann
+// eben nach und nach statt in einem Zug.
+async function langsameLeitung(cache) {
+  // Der Schalter von Hand (Profil) liegt im Cache — an den localStorage kommt
+  // ein Worker nicht heran, und beim Installieren nach einem Update ist oft
+  // noch kein Client da, der ihn schicken koennte (core/sparsam.js).
+  try {
+    const marke = await cache.match("/__sparsam");
+    if (marke && (await marke.text()) === "1") return true;
+  } catch { /* kein Cache-Eintrag: dann entscheidet die Messung */ }
+  const v = self.navigator && self.navigator.connection;
+  if (!v) return false;                       // Safari kennt das nicht: wie bisher
+  if (v.saveData) return true;                // „Datensparmodus" ist eine Ansage
+  return ["slow-2g", "2g", "3g"].includes(v.effectiveType || "");
+}
+
 // Alle Seiten beim ERSTEN Oeffnen holen, nicht erst beim ersten Besuch.
 //
 // Jede Route liegt in einem eigenen Chunk (React.lazy). Wer die App einmal
@@ -102,7 +123,7 @@ self.addEventListener("install", (event) => {
     // Die Huelle muss da sein, sonst ist die App offline gar nicht da —
     // deshalb hier addAll (scheitert eine, ist die Installation zu Recht rot).
     await cache.addAll(STATIC_ASSETS);
-    await alleSeitenVorladen(cache);
+    if (!(await langsameLeitung(cache))) await alleSeitenVorladen(cache);
   })());
   // Bewusst KEIN skipWaiting: die offene Seite laeuft mit ihren alten, jetzt
   // vom Server geloeschten Chunk-Dateien weiter. Wuerde der neue Worker sofort
