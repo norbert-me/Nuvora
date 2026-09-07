@@ -171,6 +171,22 @@ export default function Personen() {
                             {hj}. HJ: {String((teil.noten || {})[hj]).replace(".", ",")}
                           </span>
                         ) : null))}
+                        {/* Fehlzeiten und Verspätungen dieses Kurses. Sie
+                            gehören neben die Noten: „drei Verspätungen" erklärt
+                            oft mehr als die Zahl daneben. */}
+                        {teil.anwesenheit && (
+                          <>
+                            {teil.anwesenheit.fehlt > 0 && (
+                              <span style={badge(C.danger)} title={t("anwesenheit.fehlt")}>{teil.anwesenheit.fehlt}× {t("anwesenheit.fehltShort")}</span>
+                            )}
+                            {teil.anwesenheit.spaet > 0 && (
+                              <span style={badge(C.warning)} title={t("anwesenheit.spaet")}>{teil.anwesenheit.spaet}× {t("anwesenheit.spaetShort")}</span>
+                            )}
+                            {teil.anwesenheit.entsch > 0 && (
+                              <span style={badge(C.info)} title={t("anwesenheit.entsch")}>{teil.anwesenheit.entsch}× {t("anwesenheit.entschShort")}</span>
+                            )}
+                          </>
+                        )}
                         <span style={{ flex: 1 }} />
                         {/* Der ausgeteilte Zugang: derselbe QR, den das Kind im
                             Ordner hat — hier zum Nachdrucken, ohne den Umweg

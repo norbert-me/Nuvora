@@ -237,6 +237,7 @@ async def auswertung(person_id: int, user: User = Depends(get_current_user),
     cardvote = await is_active(db, user.id, "cardvote")
     auswertung_an = await is_active(db, user.id, "auswertung")
     karten = await is_active(db, user.id, "karten")
+    orga = await is_active(db, user.id, "orga")
 
     # Der Themenstand wird nicht nachgebaut, sondern geholt: dieselbe Rechnung
     # wie auf der Schuelerseite (results.themenprofil, Kern-Router). Eine
@@ -276,6 +277,19 @@ async def auswertung(person_id: int, user: User = Depends(get_current_user),
                     teil.setdefault("noten", {})[hj] = round(float(note), 2)
                 if treffer.get("observations"):
                     teil["beobachtungen"] = treffer["observations"]
+        # Fehlzeiten und Verspaetungen dieses Kurses — geholt, nicht gezaehlt:
+        # `anwesenheit.summary` kennt die Regeln, die man beim Nachbauen
+        # verliert (Ferien zaehlen nicht, mehrere Stunden am selben Tag sind
+        # EINE Abwesenheit, und die Zeilen liegen kursweit am kanonischen Kind).
+        if orga:
+            from .anwesenheit import summary as _anwesenheit
+            try:
+                alle = await _anwesenheit(z.class_id, user=user, db=db)
+            except Exception:
+                alle = {}
+            zahlen = (alle or {}).get(str(z.id)) or {}
+            if any(zahlen.get(k) for k in ("fehlt", "spaet", "entsch")):
+                teil["anwesenheit"] = zahlen
         # Der ausgeteilte Zugang (QR): derselbe Zettel, den das Kind im Ordner
         # hat. Er stirbt mit seinen Modulen — ohne sie gibt es hier auch keinen
         # Code zu zeigen (Regel 3, und `_student_by_token` prueft ohnehin).
