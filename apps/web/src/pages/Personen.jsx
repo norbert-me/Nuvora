@@ -5,6 +5,9 @@ import {
   COLORS as C, sectionLabel, toolbarInput,
 } from "../components/Icons.jsx";
 import Portrait from "../components/Portrait.jsx";
+import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
+import { oeffentlicheBasis } from "../core/basis.js";
+import { dateiWaehlen, btnSecondary, btnSmall, inputStyle, Modal } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n";
 
 // Ein Kind, nicht eine Zeile in einer Liste.
@@ -47,6 +50,45 @@ export default function Personen() {
     setStand(d);
   };
 
+  // Foto und Name gehoeren der PERSON (nicht ihrer Zeile in einer Liste) —
+  // deshalb gehen sie an /api/personen, und der Name wandert von dort auf alle
+  // Listenzeilen.
+  const [nameEdit, setNameEdit] = useState(null);   // { id, wert }
+  const [fotoVer, setFotoVer] = useState(0);
+  const [qr, setQr] = useState(null);               // { token, name }
+  const [basis, setBasis] = useState("");
+  useEffect(() => { oeffentlicheBasis().then(setBasis).catch(() => {}); }, []);
+
+  const nachladen = async (id) => {
+    const d = await fetch(`/api/personen/${id}/auswertung`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (d) setStand(d);
+    fetch("/api/personen").then((r) => (r.ok ? r.json() : [])).then((d2) => setListe(Array.isArray(d2) ? d2 : []));
+  };
+
+  const nameSpeichern = async () => {
+    if (!nameEdit || !nameEdit.wert.trim()) { setNameEdit(null); return; }
+    await fetch(`/api/personen/${nameEdit.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: nameEdit.wert.trim() }),
+    }).catch(() => {});
+    setNameEdit(null);
+    nachladen(nameEdit.id);
+  };
+
+  const fotoSetzen = (id) => dateiWaehlen(async (datei) => {
+    const daten = new FormData();
+    daten.append("file", datei);
+    await fetch(`/api/personen/${id}/photo`, { method: "POST", body: daten }).catch(() => {});
+    setFotoVer((v) => v + 1);
+    nachladen(id);
+  }, "image/*");
+
+  const fotoWeg = async (id) => {
+    await fetch(`/api/personen/${id}/photo`, { method: "DELETE" }).catch(() => {});
+    setFotoVer((v) => v + 1);
+    nachladen(id);
+  };
+
   const gefiltert = liste.filter((p) => !suche.trim()
     || p.name.toLowerCase().includes(suche.trim().toLowerCase())
     || (p.kurse || []).some((k) => k.toLowerCase().includes(suche.trim().toLowerCase())));
@@ -85,14 +127,59 @@ export default function Personen() {
                       jeder Zeile der Liste. */}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
                     {stand.niveau && <span style={badge(stand.niveau === "E" ? C.info : C.success)}>{stand.niveau}</span>}
-                    <span style={{ fontSize: 12, color: "var(--text3)" }}>{(p.kurse || []).join(" · ")}</span>
+                    <span style={{ fontSize: 12, color: "var(--text3)", flex: 1 }}>{(p.kurse || []).join(" · ")}</span>
+                    {/* Bild und Name gehören der Person — hier sind sie
+                        änderbar, statt dass man dafür in eine Liste geht, in
+                        der dasselbe Kind noch einmal steht. */}
+                    <button onClick={() => fotoSetzen(p.id)} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.fotoSetzen")}</button>
+                    {p.has_photo && <button onClick={() => fotoWeg(p.id)} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.fotoWeg")}</button>}
+                    <button onClick={() => setNameEdit({ id: p.id, wert: p.name })} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.nameAendern")}</button>
                   </div>
+                  {nameEdit && nameEdit.id === p.id && (
+                    <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                      <input value={nameEdit.wert} autoFocus
+                        onChange={(e) => setNameEdit({ ...nameEdit, wert: e.target.value })}
+                        onKeyDown={(e) => { if (e.key === "Enter") nameSpeichern(); if (e.key === "Escape") setNameEdit(null); }}
+                        style={{ ...inputStyle, flex: 1 }} />
+                      <button onClick={nameSpeichern} style={{ ...btnSecondary, ...btnSmall }}>{t("common.save")}</button>
+                    </div>
+                  )}
+
+                  {/* Förderbedarf, Niveau, Notiz — dieselbe Maske wie überall
+                      (components/SchuelerAngaben.jsx). Sie schreibt auf ALLE
+                      Zeilen der Person; die Kurs-Maßnahmen bleiben am Kurs und
+                      werden deshalb hier nicht angeboten. */}
+                  {(stand.teile || [])[0] && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ ...sectionLabel, margin: "0 0 6px" }}>{t("personen.angaben")}</div>
+                      <SchuelerAngaben studentId={stand.teile[0].student_id} t={t} />
+                    </div>
+                  )}
                   {(stand.teile || []).length === 0 && (
                     <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("personen.nochNichts")}</p>
                   )}
                   {(stand.teile || []).map((teil) => (
                     <div key={teil.student_id} style={{ marginBottom: 12 }}>
-                      <div style={{ ...sectionLabel, margin: "0 0 6px" }}>{teil.kurs || "—"}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "0 0 6px" }}>
+                        <span style={{ ...sectionLabel, margin: 0 }}>{teil.kurs || "—"}</span>
+                        {/* Die Noten dieses Kurses, beide Halbjahre — geholt
+                            aus derselben Rechnung wie das Notenbuch. Ein
+                            früheres Halbjahr steht damit neben dem laufenden:
+                            das ist der Verlauf, nach dem man ein Kind ansieht. */}
+                        {["1", "2"].map((hj) => ((teil.noten || {})[hj] != null ? (
+                          <span key={hj} style={{ ...badge(C.info) }} title={t(`noten.term${hj}`)}>
+                            {hj}. HJ: {String((teil.noten || {})[hj]).replace(".", ",")}
+                          </span>
+                        ) : null))}
+                        <span style={{ flex: 1 }} />
+                        {/* Der ausgeteilte Zugang: derselbe QR, den das Kind im
+                            Ordner hat — hier zum Nachdrucken, ohne den Umweg
+                            über die Klassenliste. */}
+                        {teil.token && (
+                          <button onClick={() => setQr({ token: teil.token, name: p.name })}
+                            style={{ ...btnSecondary, ...btnSmall }}>{t("personen.qr")}</button>
+                        )}
+                      </div>
                       {(teil.themen || []).length === 0 ? (
                         <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("personen.keineThemen")}</p>
                       ) : (
@@ -119,6 +206,21 @@ export default function Personen() {
           )}
         </div>
       ))}
+
+      {/* QR groß: der Zettel für den Ordner. Die Adresse kommt aus SITE_URL
+          (core/basis.js) — `location.origin` wäre im Schulnetz die LAN-Adresse
+          und außerhalb tot. */}
+      {qr && (
+        <Modal onClose={() => setQr(null)} width={360} label={qr.name}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{qr.name}</h3>
+          <img src={`/api/karten/qr/${qr.token}.png${basis ? `?base=${encodeURIComponent(basis)}` : ""}`}
+            alt={qr.name} style={{ width: "100%", maxWidth: 260, display: "block", margin: "0 auto" }} />
+          <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+            <span style={{ flex: 1 }} />
+            <button onClick={() => setQr(null)} style={btnSecondary}>{t("common.close")}</button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

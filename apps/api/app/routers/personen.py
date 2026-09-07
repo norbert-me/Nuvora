@@ -222,7 +222,17 @@ async def auswertung(person_id: int, user: User = Depends(get_current_user),
     kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id))).scalars().all()}
 
-    aus = {"id": person.id, "name": person.name, "niveau": person.niveau or "", "teile": []}
+    aus = {"id": person.id, "name": person.name, "niveau": person.niveau or "",
+           # Art. 9 — nur hier, bei EINEM Kind, nie in einer Liste (dieselbe
+           # Regel wie bei GET /api/classes/students/{id}).
+           "foerder": list(person.foerder or []),
+           "massnahmen": list(person.massnahmen or []),
+           "notizen": person.notizen or "",
+           "klassenlehrer": person.klassenlehrer or "",
+           # `photo` ist deferred — `has_photo` ist die Spalte, die es ohne
+           # Nachladen beantwortet (async duerfte hier gar nicht nachladen).
+           "has_photo": bool(person.has_photo),
+           "teile": []}
     # Die Module werden EINMAL gefragt, nicht je Zeile.
     cardvote = await is_active(db, user.id, "cardvote")
     auswertung_an = await is_active(db, user.id, "auswertung")
@@ -244,5 +254,32 @@ async def auswertung(person_id: int, user: User = Depends(get_current_user),
                 teil["themen"] = (stand or {}).get("themen") or (stand or {}).get("schueler") or []
             except Exception:
                 teil["themen"] = []       # eine stumme Quelle darf die Sicht nicht kippen
+        # Noten je Halbjahr — geholt, nicht nachgerechnet: `_summarize` ist
+        # dieselbe Funktion, aus der das Notenbuch seine Zahlen nimmt. Zwei
+        # Rechnungen waeren zwei Wahrheiten, und die Endnote ist die Zahl, um
+        # die es beim Blick auf ein Kind geht.
+        if auswertung_an:
+            from .noten import _summarize
+            for hj in ("1", "2"):
+                try:
+                    _sec, zeilen_ = await _summarize(db, user, z.class_id, hj,
+                                                     kurs_id=z.kurs_id or getattr(klassen.get(z.class_id), "kurs_id", None))
+                except Exception:
+                    continue          # eine stumme Quelle darf die Sicht nicht kippen
+                treffer = next((r for r in zeilen_ if r["student_id"] == z.id), None)
+                if not treffer:
+                    continue
+                note = treffer.get("total_override")
+                if note is None:
+                    note = treffer.get("weighted")
+                if note is not None:
+                    teil.setdefault("noten", {})[hj] = round(float(note), 2)
+                if treffer.get("observations"):
+                    teil["beobachtungen"] = treffer["observations"]
+        # Der ausgeteilte Zugang (QR): derselbe Zettel, den das Kind im Ordner
+        # hat. Er stirbt mit seinen Modulen — ohne sie gibt es hier auch keinen
+        # Code zu zeigen (Regel 3, und `_student_by_token` prueft ohnehin).
+        if (karten or cardvote) and getattr(z, "karten_token", ""):
+            teil["token"] = z.karten_token
         aus["teile"].append(teil)
     return aus
