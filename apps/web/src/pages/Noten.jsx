@@ -105,6 +105,12 @@ export default function Noten() {
   // der Weg ins ModuleGate — der Verweis darf dann gar nicht erst dastehen.
   const cvAktiv = aktiv("cardvote");
   const kartenAktiv = aktiv("karten");
+  // Wer an dem Tag gefehlt hat oder zu spaet kam, wird in seiner Spalte
+  // markiert — eine 5 an einem Tag, an dem das Kind gar nicht da war, ist eine
+  // Frage, keine Note. Nur mit dem Modul Orga (Regel 3): ohne es bleibt die
+  // Tabelle wie bisher, kein 403.
+  const orgaAktiv = aktiv("orga");
+  const [fehlzeiten, setFehlzeiten] = useState({});   // { "YYYY-MM-DD": { student_id: status } }
   const [cdDialog, setCdDialog] = useState(false);
   // Kern-Themen aus core/topics.js — dieselbe Zeile stand auf sechs Seiten.
   const topics = useThemen();
@@ -193,6 +199,25 @@ export default function Noten() {
     setSections(sec); setEntries(ent); setSummary(sum); setLoading(false);
     loadedOnce.current = true; // ab jetzt kein Skeleton mehr (Reloads z.B. bei Median/Mittel nicht flackern lassen)
     hol(`${API}/classes/${id}/dividers?term=${term}${kp}`).then((d) => setDividers(Array.isArray(d) ? d : []));
+  };
+  // Fehlzeiten zu den Datumsangaben der Spalten — ein Aufruf fuer alle Tage.
+  useEffect(() => {
+    if (!classId || !orgaAktiv) { setFehlzeiten({}); return; }
+    const tage = [...new Set(sections.flatMap((sec) => (sec.categories || [])
+      .map((c) => c.date || (c.created_at ? String(c.created_at).slice(0, 10) : ""))
+      .filter(Boolean)))];
+    if (!tage.length) { setFehlzeiten({}); return; }
+    let ab = false;
+    hol(`/api/anwesenheit/${classId}/tage?dates=${encodeURIComponent(tage.join(","))}`)
+      .then((d) => { if (!ab) setFehlzeiten(d && typeof d === "object" ? d : {}); })
+      .catch(() => { /* ohne Anwesenheit bleibt die Tabelle wie bisher */ });
+    return () => { ab = true; };
+  }, [classId, sections, orgaAktiv]);
+  // Status eines Kindes an dem Tag, den die Spalte traegt ("" = war da / unbekannt).
+  const statusVon = (studentId, cat) => {
+    const tag = cat.date || (cat.created_at ? String(cat.created_at).slice(0, 10) : "");
+    if (!tag) return "";
+    return (fehlzeiten[tag] || {})[String(studentId)] || "";
   };
   const toggleDivider = async (catId) => {
     const r = await fetch(`${API}/classes/${classId}/dividers/toggle?term=${term}${kp}`, alsJson("POST", { after_category_id: catId })).catch(() => null);
@@ -799,8 +824,16 @@ export default function Noten() {
                       ...cols.map((c, i) => {
                         const id = `${s.student_id}:${c.id}`;
                         const wert = noteVon(s.student_id, c.id);
+                        // Fehlend/verspaetet am Tag der Spalte: Toenung plus
+                        // Balken links. Eine Toenung allein sieht nach
+                        // Zebrastreifen aus, sobald zwei Spalten nebeneinander
+                        // markiert sind.
+                        const stat = statusVon(s.student_id, c);
+                        const statFarbe = stat === "spaet" ? C.warning : (stat === "fehlt" || stat === "entsch") ? C.danger : null;
                         return (
-                          <td key={c.id} style={{ ...td, padding: 0, width: 56, minWidth: 56, maxWidth: 56, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined }}>
+                          <td key={c.id} title={stat ? t(`anwesenheit.${stat}`) : undefined}
+                            style={{ ...td, padding: 0, width: 56, minWidth: 56, maxWidth: 56, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
+                                     ...(statFarbe ? { background: `${statFarbe}1f`, boxShadow: `inset 3px 0 0 ${statFarbe}` } : null) }}>
                             {zelle === id
                               ? <Zelle initial={wert != null ? de(wert) : ""}
                                   onSave={(txt) => noteSetzen(s.student_id, c.id, txt)}

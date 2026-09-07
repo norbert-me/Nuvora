@@ -129,6 +129,56 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
     return {str(back(sid)): out(r) for sid, r in exact.items()}
 
 
+@router.get("/{class_id}/tage")
+async def get_tage(class_id: int, dates: str = "",
+                   user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Tages-Status je Schueler fuer MEHRERE Tage auf einmal.
+
+    Fuer das Notenbuch: jede Spalte traegt ein Datum, und wer an dem Tag
+    gefehlt hat oder zu spaet kam, wird in der Tabelle markiert. Ein Aufruf je
+    Spalte waere ein Dutzend Aufrufe fuer eine Ansicht — und der Proxy laesst
+    30 je Sekunde durch.
+
+    `dates`: "YYYY-MM-DD,YYYY-MM-DD,..." (hoechstens 40 — mehr Spalten zeigt
+    keine Tabelle auf einmal, und die Grenze haelt die Abfrage klein).
+    """
+    await _owned_class(db, user, class_id)
+    tage = []
+    for teil in (dates or "").split(","):
+        teil = teil.strip()[:10]
+        if not teil:
+            continue
+        try:
+            tage.append(datetime.strptime(teil, "%Y-%m-%d"))
+        except ValueError:
+            continue    # Unlesbares faellt still heraus: eine Spalte ohne Datum ist kein Fehler
+        if len(tage) >= 40:
+            break
+    if not tage:
+        return {}
+    canon_ids, _to_canon, canon_back = await _kurs_maps(db, user, class_id)
+    lo = min(tage).replace(hour=0, minute=0, second=0, microsecond=0)
+    hi = max(tage).replace(hour=23, minute=59, second=59, microsecond=0)
+    rows = (await db.execute(select(Attendance).where(
+        Attendance.owner_id == user.id, Attendance.student_id.in_(canon_ids or [-1]),
+        Attendance.date >= lo, Attendance.date <= hi,
+    ))).scalars().all()
+    gewuenscht = {d.strftime("%Y-%m-%d") for d in tage}
+    je_tag = {}
+    for r in rows:
+        tag = r.date.strftime("%Y-%m-%d")
+        if tag in gewuenscht:
+            je_tag.setdefault(tag, []).append(r)
+    out = {}
+    for tag, tagrows in je_tag.items():
+        best = _tages_status(tagrows)
+        # „da" ist die Normallage und braucht keine Zeile in der Antwort.
+        eintraege = {str(canon_back.get(sid, sid)): r.status for sid, r in best.items() if r.status != "da"}
+        if eintraege:
+            out[tag] = eintraege
+    return out
+
+
 class MarkIn(BaseModel):
     student_id: int
     date: datetime
