@@ -32,6 +32,18 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Notenbuch: wer am Tag der Spalte gefehlt hat oder zu spät kam, ist in der
   Spalte farbig markiert.
 
+**Lernpfad und Unterricht**
+
+- Im automatischen Entwurf bekommen E- und G-Kinder dieselben Aufgaben; E-Kinder
+  zusätzlich die E-Aufgaben.
+- Die Zahl der vorangestellten Wiederholungsaufgaben ist einstellbar (0 = keine).
+- Eine aus einer Klassenarbeit erzeugte Wiederholungsaufgabe verlinkt die Arbeit.
+- Anwesenheit: eine ohne Stunde erfasste Verspätung gilt jetzt auch in den
+  Folgestunden.
+- Kalender: das Plus des Verlaufsplans steht unter der Liste; Fehlermeldungen
+  nennen, welche Verknüpfung klemmt.
+- PAP: „Hinzufügen" sagt, was fehlt, statt nichts zu tun.
+
 **Schulnetz und Apps**
 
 - Weniger Datenverkehr: alte Schriftfassungen werden nicht mehr vorgeladen
