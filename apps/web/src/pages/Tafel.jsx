@@ -49,6 +49,9 @@ export default function Tafel() {
   const [scale, setScale] = useState(1); // REF-Koordinaten -> Bildschirm
   const scaleRef = useRef(1);
   const drag = useRef(null); // { id, mode, sx, sy, ox, oy, ow, oh }
+  // Steht weit oben, weil die Messung der Flaeche (gleich darunter) davon
+  // abhaengt: erst im Vollbild zaehlt die Hoehe mit.
+  const [fs, setFs] = useState(false); // Pseudo-Vollbild (iOS kennt kein requestFullscreen für divs)
 
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch { /* voll — egal */ } }, [items]);
 
@@ -57,12 +60,18 @@ export default function Tafel() {
   // Fläche stehen und verschwinden nie unten/rechts, egal wie breit der Bildschirm.
   useEffect(() => {
     const el = outerRef.current; if (!el) return;
-    // Im Vollbild zaehlt auch die HOEHE: sonst wird die Flaeche auf die
-    // Bildschirmbreite gerechnet, ist damit hoeher als das Fenster, und die
-    // untere Reihe der Tafel steht ausserhalb.
+    // NUR im Vollbild zaehlt die Hoehe mit — dort gibt `inset: 0` sie vor.
+    //
+    // Im normalen Fall waere das eine Rueckkopplung: die Hoehe des Rahmens IST
+    // `scale * REF_H`, also wuerde eine Messung der Hoehe das Ergebnis
+    // beeinflussen, das sie gerade erzeugt hat. Der ResizeObserver feuert dann
+    // endlos, `scale` faellt in kleinen Schritten gegen null und springt
+    // zurueck; sichtbar ist eine Flaeche, die nie still steht (der
+    // Browser-Systemtest brach daran mit „element is not stable" ab). Also:
+    // aussen die Breite, im Vollbild beides.
     const measure = () => {
       const w = el.clientWidth || REF_W;
-      const h = el.clientHeight || 0;
+      const h = fs ? el.clientHeight || 0 : 0;
       const s = h ? Math.min(w / REF_W, h / REF_H) : w / REF_W;
       scaleRef.current = s; setScale(s);
     };
@@ -71,7 +80,7 @@ export default function Tafel() {
     ro.observe(el);
     document.addEventListener("fullscreenchange", measure);
     return () => { ro.disconnect(); document.removeEventListener("fullscreenchange", measure); };
-  }, []);
+  }, [fs]);
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const clampX = (x, w) => Math.max(0, Math.min(REF_W - w, x));
@@ -119,7 +128,6 @@ export default function Tafel() {
 
   const selItem = items.find((i) => i.id === sel);
   const [fontPop, setFontPop] = useState(false);
-  const [fs, setFs] = useState(false); // Pseudo-Vollbild (iOS kennt kein requestFullscreen für divs)
   const setFont = (v) => { if (selItem) patch(selItem.id, { fontSize: Math.max(16, Math.min(280, Math.round(v))) }); };
   const bumpFont = (delta) => { if (selItem) setFont((selItem.fontSize || 48) + delta); };
   // Wählt ein Element und holt es nach vorn — so lässt sich bei Überlappung das

@@ -343,7 +343,17 @@ const bedienung = (td) => [
     pfad: "/orga",
     async anlegen(seite) {
       await seite.locator("input[placeholder]").first().fill(MARKE_UI, { timeout: 8000 });
-      await seite.locator("[title='Anlegen'], [title='Add'], [title='Añadir']").first().click({ timeout: 8000 });
+      // Die Adresse des Anlegens ist zugleich die der LISTE (`POST /api/orga/
+      // {class}?kurs_id=…`, Orga.jsx). Sie wird hier mitgeschrieben, weil das
+      // Loeschen unten am Server nachsehen muss und der Kurs zum Schluessel
+      // gehoert (`kurs_oder_klasse`): mit dem falschen kurs_id fragte die Probe
+      // eine andere Checkliste ab und haette jedes Ergebnis geglaubt.
+      const [antwort] = await Promise.all([
+        seite.waitForResponse((r) => r.request().method() === "POST" && /\/api\/orga\/\d+/.test(r.url()), { timeout: 8000 }),
+        seite.locator("[title='Anlegen'], [title='Add'], [title='Añadir']").first().click({ timeout: 8000 }),
+      ]);
+      const u = new URL(antwort.url());
+      this.listeUrl = u.pathname + u.search;
       await seite.waitForTimeout(900);
     },
     async loeschen(seite) {
@@ -353,9 +363,26 @@ const bedienung = (td) => [
       // gefolgt von der Nachfrage.
       await seite.locator("th", { hasText: MARKE_UI }).first().click({ timeout: 8000 });
       await seite.getByRole("button", { name: /^(Löschen|Delete|Eliminar)$/i }).first().click({ timeout: 8000 });
-      await seite.waitForTimeout(900);
+      // Geloescht wird ueber `undoDelete` (core/undo.jsx): die Spalte
+      // verschwindet SOFORT aus der Anzeige, zum Server geht der Auftrag erst,
+      // wenn der Rueckgaengig-Toast nach fuenf Sekunden abgelaufen ist. Wer
+      // vorher neu laedt, verwirft ihn — der Punkt stand danach wieder da, und
+      // es sah aus wie ein Fehler der Anwendung. Also auf das VERSCHWINDEN des
+      // Toasts warten (nicht blind schlafen) und danach den Server fragen.
+      const toast = seite.getByRole("button", { name: /^(Rückgängig|Undo|Deshacer)$/ }).first();
+      await toast.waitFor({ state: "visible", timeout: 8000 }).catch(() => {});
+      await toast.waitFor({ state: "detached", timeout: 20000 });
       if (await seite.locator("th", { hasText: MARKE_UI }).count()) return "Spalte steht nach dem Löschen weiter da";
-      return "";
+      // Der Toast verschwindet im selben Augenblick, in dem das DELETE
+      // losgeschickt wird — die Antwort ist also noch unterwegs. Deshalb ein
+      // paar Mal nachfragen statt einmal.
+      if (!this.listeUrl) return "";
+      for (let i = 0; i < 10; i++) {
+        const liste = await apiJson(this.listeUrl);
+        if (!(liste || []).some((x) => x.name === MARKE_UI)) return "";
+        await seite.waitForTimeout(400);
+      }
+      return "der Punkt steht nach dem Löschen weiter in der Liste des Servers";
     },
   },
   {
@@ -650,12 +677,28 @@ const bedienung = (td) => [
       await feld.fill(MARKE_UI, { timeout: 8000 });
     },
     async loeschen(seite) {
-      // Erst das Feld anwaehlen — die Leiste mit dem Papierkorb schwebt am
-      // gewaehlten Element und existiert vorher gar nicht.
-      await seite.locator("textarea").first().click({ timeout: 8000 });
-      await seite.locator("[title='Löschen'], [title='Delete'], [title='Eliminar']").first().click({ timeout: 8000 });
-      await seite.locator("textarea").first().waitFor({ state: "detached", timeout: 8000 });
-      return "";
+      // Der Papierkorb schwebt am GEWAEHLTEN Element. Direkt nach dem Tippen ist
+      // das Feld gewaehlt, nach dem Neuladen (das der Ablauf dazwischen macht)
+      // nicht mehr — dann wird es an einer ECKE angewaehlt, wo die schwebende
+      // Leiste nicht liegt. Ein zweiter Klick auf die MITTE des Feldes, wie er
+      // hier stand, lief in einen Timeout: dort liegt die Leiste und faengt die
+      // Zeigerereignisse ab.
+      //
+      // `force: true` und mehrere Anlaeufe, weil die Tafelflaeche fortwaehrend
+      // in Bewegung ist: ihre Hoehe kommt aus `scale`, und `scale` wird aus eben
+      // dieser Hoehe gemessen (Tafel.jsx) — die Flaeche schrumpft dadurch Bild
+      // fuer Bild. Playwright wartet sonst vergeblich darauf, dass das Ziel
+      // „stabil" steht („element is not stable"), und ein einzelner Klick kann
+      // daneben gehen, weil der Knopf zwischen Messen und Treffen weiterwandert.
+      const papierkorb = seite.locator("[title='Löschen'], [title='Delete'], [title='Eliminar']").first();
+      const feld = seite.locator("textarea").first();
+      for (const _ of [0, 1, 2]) {
+        if (!(await papierkorb.isVisible().catch(() => false)))
+          await feld.click({ position: { x: 12, y: 12 }, force: true, timeout: 8000 }).catch(() => {});
+        await papierkorb.click({ timeout: 4000, force: true }).catch(() => {});
+        if (!(await seite.locator("textarea").count())) return "";
+      }
+      return "das Textfeld liess sich über den Papierkorb nicht löschen";
     },
   },
   {
