@@ -2669,6 +2669,7 @@ export default {
   "untis.ersetzt": "sustituye: {{was}}",
   "untis.belegt": "ocupado",
   "untis.nurText": "Importar solo como texto",
+  "untis.kursNeu": "Crear curso «{{name}}»",
   "untis.auslassen": "Omitir esta hora",
   "untis.kurse": "Cursos",
   "untis.klassen": "Clases",

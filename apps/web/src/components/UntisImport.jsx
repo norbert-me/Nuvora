@@ -28,6 +28,23 @@ import KalenderAdresseHilfe from "./KalenderAdresseHilfe.jsx";
 // muessen dieselbe Liste kennen — ein Grund ohne Text waere eine leere Meldung.
 const GRUENDE = ["zugangsdaten", "schule", "server", "gesperrt", "kein_zugriff", "sso", "unbekannt"];
 
+// Wie ein Kurs heissen wuerde, den es zu dieser Untis-Stunde noch nicht gibt:
+// „Mathe 7.5" — Fach zuerst, wie ueberall in Nuvora (core/kurslabel.js). Der
+// Untis-Titel selbst („M, 7.5") taugt als Kursname nicht: er ist eine
+// Aufzaehlung mit Komma und traegt Kuerzel statt Namen.
+export function kursName(v) {
+  const fach = (v.faecher || [])[0] || "";
+  const klasse = (v.klassen || [])[0] || "";
+  const name = [fach, klasse].filter(Boolean).join(" ").trim();
+  return name || (v.titel || "").trim();
+}
+
+// Der Jahrgang steckt vorn im Klassennamen („7.5" → „7", „10b" → „10").
+export function jahrgangAus(v) {
+  const m = /^(\d{1,2})/.exec(((v.klassen || [])[0] || "").trim());
+  return m ? m[1] : "";
+}
+
 export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [], periods = 6 }) {
   const [hilfe, setHilfe] = useState(false);
   const { t } = useLanguage();
@@ -68,7 +85,13 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
     for (const [k, v] of Object.entries(d.raster || {})) {
       const titel = (v.titel || "").toLowerCase();
       const treffer = kurse.find((x) => x.name && titel.includes(x.name.toLowerCase()));
-      vor[k] = treffer ? `k${treffer.id}` : "";
+      // Kein passender Kurs? Dann steht der VORSCHLAG „anlegen" im Feld —
+      // beim ersten Import gibt es noch gar keine Kurse, und ein Dialog, der
+      // dann nur „nur Text" anbietet, laesst die Lehrkraft fuenfzehn Kurse von
+      // Hand anlegen und hier wieder heraussuchen. Angehakt ist es damit noch
+      // nicht geschrieben: erst „Uebernehmen" legt an.
+      const name = kursName(v);
+      vor[k] = treffer ? `k${treffer.id}` : (name ? `n${name}` : "");
     }
     setWahl(vor);
   };
@@ -89,6 +112,12 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
         weekday: f.wd, period: f.p,
         kurs_id: w.startsWith("k") ? Number(w.slice(1)) : null,
         class_id: w.startsWith("c") ? Number(w.slice(1)) : null,
+        // „n<Name>" heisst: diesen Kurs gibt es noch nicht, leg ihn an. Fach
+        // und Jahrgang kommen aus Untis mit — sie verbinden den Kurs mit den
+        // Themen desselben Fachs.
+        kurs_neu: w.startsWith("n") ? w.slice(1) : "",
+        fach: w.startsWith("n") ? ((f.faecher || [])[0] || "") : "",
+        jahrgang: w.startsWith("n") ? jahrgangAus(f) : "",
         // Der Untis-Titel bleibt als Beschriftung stehen, auch wenn ein Kurs
         // zugeordnet ist: „M 7a" sagt im Raster mehr als der Kursname allein.
         title: f.titel || "",
@@ -238,6 +267,9 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
                             style={{ ...selectStyle, minWidth: 200 }}>
                             <option value="">{t("untis.nurText")}</option>
                             <option value="-">{t("untis.auslassen")}</option>
+                            {kursName(f) && !kurse.some((x) => (x.name || "").toLowerCase() === kursName(f).toLowerCase()) && (
+                              <option value={`n${kursName(f)}`}>{t("untis.kursNeu", { name: kursName(f) })}</option>
+                            )}
                             {kurse.length > 0 && (
                               <optgroup label={t("untis.kurse")}>
                                 {kurse.map((k) => <option key={k.id} value={`k${k.id}`}>{k.name}</option>)}

@@ -107,7 +107,7 @@ def test_wochenraster_haeufigster_titel_gewinnt():
                _stunde("2026-09-14", "08:00", "Vertretung 9c"),
                _stunde("2026-09-21", "08:00", "M 7a")]
     raster = zu_wochenraster(stunden, ZEITEN)
-    assert raster == {"0,1": {"titel": "M 7a", "raum": "", "anzahl": 3, "klassen": []}}
+    assert raster == {"0,1": {"titel": "M 7a", "raum": "", "anzahl": 3, "klassen": [], "faecher": []}}
 
 
 def test_wochenraster_ausfall_zaehlt_nicht_mit():
@@ -164,3 +164,66 @@ def test_ics_zeit_in_utc_wird_umgerechnet():
     assert _zeitpunkt("20261207T070000Z") == ("20261207", "08:00")   # Winterzeit
     assert _zeitpunkt("20260907T080000") == ("20260907", "08:00")    # Ortszeit bleibt
     assert _zeitpunkt("20260907") == ("20260907", "")                # ganztaegig
+
+
+# ─── Der Import legt Kurse an, wenn es sie noch nicht gibt ───
+#
+# Untis kennt Fach und Klasse, Nuvora beim ersten Import nichts davon. Ohne
+# diesen Weg muesste die Lehrkraft fuenfzehn Kurse von Hand anlegen und sie im
+# Dialog wieder heraussuchen. Zwei Dinge duerfen dabei nie kippen: je NAME
+# genau ein Kurs (das Wochenraster nennt Mathe 7.5 viermal), und ein
+# vorhandener wird benutzt statt verdoppelt — sonst liegen die Noten nach dem
+# zweiten Import in zwei Kursen.
+
+@pytest.mark.asyncio
+async def test_import_legt_jeden_kurs_genau_einmal_an(s):
+    from sqlalchemy import select
+
+    from app.models import Kurs, User, UserModule
+    from app.routers import kalender as K
+
+    u = User(email="untis@b.de", password_hash="x", name="L")
+    s.add(u)
+    await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    s.add(Kurs(owner_id=u.id, name="Lernzeit 7.5"))
+    await s.commit()
+
+    slot = lambda wd, p, name: K.UntisSlotIn(weekday=wd, period=p, title="M 7.5",
+                                             kurs_neu=name, fach="Mathe", jahrgang="7")
+    d = await K.untis_uebernehmen(K.UntisUebernahmeIn(slots=[
+        slot(0, 1, "Mathe 7.5"), slot(2, 3, "Mathe 7.5"),   # derselbe Kurs, zwei Stunden
+        slot(1, 2, "Lernzeit 7.5"),                          # den gibt es schon
+    ]), user=u, db=s)
+    assert d["kurse"] == 1, "nur Mathe 7.5 ist neu"
+    assert d["slots"] == 3
+
+    kurse = (await s.execute(select(Kurs).where(Kurs.owner_id == u.id))).scalars().all()
+    assert sorted(k.name for k in kurse) == ["Lernzeit 7.5", "Mathe 7.5"]
+    mathe = [k for k in kurse if k.name == "Mathe 7.5"][0]
+    assert (mathe.fach, mathe.jahrgang) == ("Mathe", "7"), "Fach und Jahrgang kommen aus Untis mit"
+
+    slots = (await s.execute(select(K.TimetableSlot).where(K.TimetableSlot.owner_id == u.id))).scalars().all()
+    assert {sl.kurs_id for sl in slots} == {mathe.id, [k for k in kurse if k.name == "Lernzeit 7.5"][0].id}
+
+
+@pytest.mark.asyncio
+async def test_zweiter_import_legt_nichts_doppelt_an(s):
+    from sqlalchemy import select
+
+    from app.models import Kurs, User, UserModule
+    from app.routers import kalender as K
+
+    u = User(email="untis2@b.de", password_hash="x", name="L")
+    s.add(u)
+    await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    await s.commit()
+
+    eingabe = K.UntisUebernahmeIn(slots=[K.UntisSlotIn(weekday=0, period=1, title="M 7.5",
+                                                       kurs_neu="Mathe 7.5", fach="Mathe")])
+    await K.untis_uebernehmen(eingabe, user=u, db=s)
+    d = await K.untis_uebernehmen(eingabe, user=u, db=s)
+    assert d["kurse"] == 0
+    kurse = (await s.execute(select(Kurs).where(Kurs.owner_id == u.id))).scalars().all()
+    assert len(kurse) == 1

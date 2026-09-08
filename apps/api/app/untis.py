@@ -371,7 +371,7 @@ def zu_wochenraster(stunden: list, zeiten: list) -> dict:
     Zuordnung waere „3. Stunde" bei uns und in Untis nicht dieselbe: viele
     Schulen zaehlen Pausen als eigene Einheit mit.
 
-    Rueckgabe: {"(wochentag, stunde)": {"titel", "raum", "anzahl", "klassen"}}
+    Rueckgabe: {"(wochentag, stunde)": {"titel", "raum", "anzahl", "klassen", "faecher"}}
     — Schluessel als Text, damit es sich unveraendert als JSON senden laesst.
     """
     zaehler = {}
@@ -389,14 +389,20 @@ def zu_wochenraster(stunden: list, zeiten: list) -> dict:
         eintrag = zaehler.setdefault(schluessel, {})
         titel = s["titel"]
         treffer = eintrag.setdefault(titel, {"anzahl": 0, "raum": s.get("raum", ""),
-                                             "klassen": s.get("klassen") or []})
+                                             "klassen": s.get("klassen") or [],
+                                             # Fach und Klasse getrennt, nicht nur der
+                                             # zusammengesetzte Titel: daraus schlaegt der
+                                             # Dialog einen Kursnamen vor („Mathe 7.5"),
+                                             # und „M, 7.5" ist als Kursname keiner.
+                                             "faecher": s.get("faecher") or []})
         treffer["anzahl"] += 1
 
     out = {}
     for schluessel, titel_map in zaehler.items():
         titel, info = max(titel_map.items(), key=lambda kv: kv[1]["anzahl"])
         out[schluessel] = {"titel": titel, "raum": info["raum"],
-                           "anzahl": info["anzahl"], "klassen": info["klassen"]}
+                           "anzahl": info["anzahl"], "klassen": info["klassen"],
+                           "faecher": info.get("faecher") or []}
     return out
 
 

@@ -2505,6 +2505,15 @@ class UntisSlotIn(BaseModel):
     title: str = ""
     kurs_id: Optional[int] = None
     class_id: Optional[int] = None
+    # „Diesen Kurs gibt es noch nicht — leg ihn an." Untis kennt Fach und
+    # Klasse; Nuvora hat davon beim ersten Import nichts. Ohne diesen Weg
+    # muesste die Lehrkraft vor dem Import fuenfzehn Kurse von Hand anlegen und
+    # sie danach im Dialog wieder heraussuchen. Angelegt wird trotzdem nur, was
+    # im Dialog angehakt ist — geraten wird nichts (dieselbe Regel wie bei
+    # jedem anderen Import).
+    kurs_neu: str = ""
+    fach: str = ""
+    jahrgang: str = ""
 
 
 class UntisAusfallIn(BaseModel):
@@ -2534,12 +2543,36 @@ async def untis_uebernehmen(body: UntisUebernahmeIn, user: User = Depends(requir
     Fassung bis gestern, neue ab heute). Ein eigener Schreibpfad haette diese
     Regel ein zweites Mal enthalten, und die zweite Fassung waere die falsche.
     """
+    # Neue Kurse zuerst, und je Name genau einmal: „Mathe 7.5" steht im
+    # Wochenraster viermal, ist aber EIN Kurs. Ein vorhandener gleichen Namens
+    # wird benutzt statt verdoppelt — sonst legt der zweite Import eine zweite
+    # Fassung an, und die Noten liegen danach in zwei Kursen.
+    neue_kurse = 0
+    nach_name: dict[str, int] = {}
+    vorhanden = {(k.name or "").strip().lower(): k.id for k in (await db.execute(
+        select(Kurs).where(Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)))).scalars().all()}
+    for s in body.slots[:200]:
+        name = (s.kurs_neu or "").strip()[:100]
+        if not name or s.kurs_id or name.lower() in nach_name:
+            continue
+        treffer = vorhanden.get(name.lower())
+        if treffer:
+            nach_name[name.lower()] = treffer
+            continue
+        k = Kurs(owner_id=user.id, name=name, fach=(s.fach or "").strip()[:60],
+                 jahrgang=((s.jahrgang or "").strip()[:20] or None))
+        db.add(k)
+        await db.flush()
+        nach_name[name.lower()] = k.id
+        neue_kurse += 1
+
     gesetzt = 0
     for s in body.slots[:200]:
         if not 0 <= s.weekday <= 6 or s.period < 0:
             continue
+        kurs_id = s.kurs_id or nach_name.get((s.kurs_neu or "").strip().lower())
         await upsert_slot(SlotIn(weekday=s.weekday, period=s.period, title=(s.title or "")[:200],
-                                 kurs_id=s.kurs_id, class_id=s.class_id, topic_id=None), user, db)
+                                 kurs_id=kurs_id, class_id=s.class_id, topic_id=None), user, db)
         gesetzt += 1
 
     entfallen = 0
@@ -2569,4 +2602,4 @@ async def untis_uebernehmen(body: UntisUebernahmeIn, user: User = Depends(requir
         frei += 1
 
     await db.commit()
-    return {"slots": gesetzt, "ausfaelle": entfallen, "ferien": frei}
+    return {"slots": gesetzt, "ausfaelle": entfallen, "ferien": frei, "kurse": neue_kurse}

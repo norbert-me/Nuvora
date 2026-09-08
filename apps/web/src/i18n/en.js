@@ -2668,6 +2668,7 @@ export default {
   "untis.ersetzt": "replaces: {{was}}",
   "untis.belegt": "occupied",
   "untis.nurText": "Import as plain text",
+  "untis.kursNeu": "Create course “{{name}}”",
   "untis.auslassen": "Skip this period",
   "untis.kurse": "Courses",
   "untis.klassen": "Classes",

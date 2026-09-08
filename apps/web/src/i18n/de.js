@@ -2656,6 +2656,7 @@ export default {
   "untis.ersetzt": "ersetzt: {{was}}",
   "untis.belegt": "belegt",
   "untis.nurText": "Nur als Text übernehmen",
+  "untis.kursNeu": "Kurs „{{name}}“ anlegen",
   "untis.auslassen": "Diese Stunde auslassen",
   "untis.kurse": "Kurse",
   "untis.klassen": "Klassen",
