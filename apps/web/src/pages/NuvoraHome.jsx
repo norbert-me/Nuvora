@@ -13,6 +13,7 @@ import { WIDGETS } from "../components/Widgets.jsx";
 import { ZIELE } from "../core/ziele.js";
 import { hmToMin, ymd } from "../core/datum.js";
 import { stundenZeit, slotGiltAm } from "../core/stunden";
+import { kursLabel } from "../core/kurslabel.js";
 
 // Modul-Kachel: dieselbe Karte wie überall, nur als Link (kein eigener Kasten).
 // Die frühere Eigenbau-Fassung stand auf `var(--surface)` — die Variable gibt es
@@ -150,9 +151,13 @@ function HeutePanel({ t }) {
     (async () => {
       const heute = new Date();
       const j = (r) => (r.ok ? r.json() : null);
-      const [tt, classes, breaks, cancels] = await Promise.all([
+      const [tt, classes, kurse, breaks, cancels] = await Promise.all([
         fetch("/api/kalender/timetable").then(j).catch(() => null),
         fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        // Die Stunde traegt ihren KURS, und der heisst „Mathe · 7.5" — die
+        // Klasse allein heisst „7.5" und beantwortet nicht, welches Fach
+        // gleich ansteht.
+        fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).catch(() => []),
         fetch("/api/kalender/breaks").then((r) => (r.ok ? r.json() : [])).catch(() => []),
         // Entfallene Stunden: im Kalender sind sie weggewischt, auf der
         // Startseite standen sie trotzdem — dieselbe Frage, zwei Antworten.
@@ -163,7 +168,7 @@ function HeutePanel({ t }) {
       const entries = await fetch(`/api/kalender/entries?frm=${frm.toISOString()}&to=${to.toISOString()}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
       const freiHeute = (Array.isArray(breaks) ? breaks : []).find((b) => ymd(heute) >= b.start_date.slice(0, 10) && ymd(heute) <= b.end_date.slice(0, 10));
       if (!ab) setData({ slots: (tt?.slots || []), times: (tt?.times || []), zero: (tt?.zero || null), entries: Array.isArray(entries) ? entries : [],
-                        classes, frei: freiHeute,
+                        classes, kurse: Array.isArray(kurse) ? kurse : [], frei: freiHeute,
                         entfallen: (Array.isArray(cancels) ? cancels : [])
                           .filter((c) => (c.date || "").slice(0, 10) === ymd(heute)).map((c) => c.period) });
     })();
@@ -189,6 +194,10 @@ function HeutePanel({ t }) {
     .filter((e) => !vorbei(hmToMin(e.end_time) ?? hmToMin(e.start_time)));
   if (slots.length === 0 && extras.length === 0 && !data.frei) return null;
   const cname = (id) => data.classes.find((c) => c.id === id)?.name || "";
+  // Dieselbe Regel wie im Kalender (`slotName` dort): erst der Kurs, dann die
+  // Klasse. core/kurslabel.js ist die eine Quelle dafuer.
+  const kname = (id) => kursLabel((data.kurse || []).find((k) => k.id === id));
+  const stundenName = (s) => (s.kurs_id && kname(s.kurs_id)) || cname(s.class_id) || s.title || "—";
   const ccolor = (id) => data.classes.find((c) => c.id === id)?.color || "var(--border2)";
   // Die Stundenzeiten heissen {start, end} (so liefert sie /api/kalender/
   // timetable). Hier stand `from`/`to` — beides undefined, und deshalb blieb
@@ -233,7 +242,7 @@ function HeutePanel({ t }) {
               return (
                 <Link key={`e${e.id}`} to={`/kalender?view=day&date=${heuteYmd}&entry=${e.id}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
                   <div style={{ minWidth: 42, textAlign: "center", color: "var(--text3)", fontSize: 12, whiteSpace: "nowrap" }}>{zeitTxt || "—"}</div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{e.title || (e.class_id && cname(e.class_id)) || t("kalender.planned")}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{e.title || (e.kurs_id && kname(e.kurs_id)) || (e.class_id && cname(e.class_id)) || t("kalender.planned")}</div>
                 </Link>
               );
             }
@@ -254,7 +263,7 @@ function HeutePanel({ t }) {
                   <div style={{ fontSize: 11, color: "var(--text3)" }}>{zeit(s.period)}</div>
                 </div>
                 <div style={{ flex: 1, minWidth: 100 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{cname(s.class_id) || s.title || "—"}</div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{stundenName(s)}</div>
                   {e && <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 4 }}>{e.title || t("kalender.planned")}</div>}
                 </div>
               </Link>

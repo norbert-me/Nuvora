@@ -28,7 +28,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 **Bedienung**
 
 - Startseite „Heute": Stunden und Termine stehen in EINER Liste nach Uhrzeit —
-  der Termin um 8 Uhr stand vorher hinter der sechsten Stunde.
+  der Termin um 8 Uhr stand vorher hinter der sechsten Stunde. Und eine Stunde
+  heißt dort „Mathe · 7.5" wie im Kalender, nicht nur „7.5".
 - Kalender: beim Öffnen einer Stundenplan-Stunde stehen deren Uhrzeiten in den
   Feldern statt „--:--".
 - Verlaufsplan: das Feld „Dauer" ist breit genug für seine Beschriftung.
