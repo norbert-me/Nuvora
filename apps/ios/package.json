@@ -4,6 +4,7 @@
   "private": true,
   "description": "Nuvora als iPhone-/iPad-App (Hülle um die eigene Installation, wie apps/desktop).",
   "scripts": {
+    "build": "../../scripts/ios-bauen.sh",
     "ios:add": "cap add ios",
     "ios:sync": "cap sync ios",
     "ios:open": "cap open ios"

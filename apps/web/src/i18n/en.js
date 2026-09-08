@@ -454,6 +454,7 @@ export default {
   "profile.appsLaden": "Download",
   "profile.appsBald": "Coming soon",
   "profile.appsKeine": "No app is available for download right now.",
+  "profile.appsIos": "Unsigned — install via sideloading (AltStore, Sideloadly) or with your own developer account.",
   "profile.appsStand": "Version {{version}} — the same interface as in the browser, in its own window.",
   "profile.account": "Account",
   "profile.usernameHint": "Shown in the marketplace on your published question sets.",

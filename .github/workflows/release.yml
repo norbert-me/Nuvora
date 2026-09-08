@@ -59,11 +59,189 @@ jobs:
           path: apps/desktop/dist/*.dmg
           if-no-files-found: error
 
+  # Die iPhone-/iPad-Huelle (apps/ios, Capacitor) gehoert aus demselben Grund
+  # ans Release wie die Mac-App. Sie braucht ebenfalls einen macOS-Runner
+  # (xcodebuild gibt es nur dort), deshalb ein eigener Job. Das Xcode-Projekt
+  # ist NICHT eingecheckt — es entsteht hier bei jedem Lauf frisch aus
+  # `npx cap add ios`; eine eingecheckte Kopie liefe nach jedem
+  # Capacitor-Update auseinander.
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Kein Cache und `npm install` statt `npm ci`: apps/ios hat bewusst kein
+      # package-lock.json (das Geruest ist eine Handvoll Capacitor-Pakete, und
+      # ein Lockfile fuer ein Projekt, das nur im Lauf existiert, pflegt
+      # niemand nach).
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26"
+
+      - name: Abhaengigkeiten
+        working-directory: apps/ios
+        run: npm install
+
+      # `cap add ios` ruft CocoaPods auf. Auf macos-latest ist es in aller
+      # Regel vorhanden — nachinstalliert wird nur, wenn nicht.
+      - name: CocoaPods sicherstellen
+        run: command -v pod >/dev/null || brew install cocoapods
+
+      - name: Xcode-Projekt erzeugen
+        working-directory: apps/ios
+        run: |
+          npx cap add ios
+          npx cap sync ios
+
+      # Zwei Wege, und welcher gilt, entscheiden die Secrets — nicht ein
+      # Schalter, den jemand pflegen muesste. Liegt ein Zertifikat im
+      # Repository (IOS_CERT_P12), wird SIGNIERT und die .ipa laesst sich
+      # regulaer installieren bzw. nach TestFlight laden. Liegt keins da,
+      # laeuft es wie bisher unsigniert weiter — ein fehlendes Apple-Konto
+      # darf das Release nicht aufhalten. Welche Secrets es dafuer braucht,
+      # steht in apps/ios/README.md.
+      - name: Signierung vorbereiten (nur wenn Secrets gesetzt)
+        id: sign
+        env:
+          IOS_CERT_P12: ${{ secrets.IOS_CERT_P12 }}
+          IOS_CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+          IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          if [ -z "$IOS_CERT_P12" ] || [ -z "$IOS_PROVISIONING_PROFILE" ]; then
+            echo "signiert=0" >> "$GITHUB_OUTPUT"
+            echo "Kein Zertifikat hinterlegt — es entsteht eine unsignierte .ipa."
+            exit 0
+          fi
+          # Eigener Schluesselbund mit Zufallspasswort, der mit dem Runner
+          # stirbt: das Zertifikat gehoert nicht in den Standard-Schluesselbund.
+          KEYCHAIN="$RUNNER_TEMP/signierung.keychain-db"
+          PW="$(openssl rand -hex 20)"
+          security create-keychain -p "$PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$PW" "$KEYCHAIN"
+          echo "$IOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$IOS_CERT_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$PW" "$KEYCHAIN" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$IOS_PROVISIONING_PROFILE" | base64 --decode \
+            > ~/Library/MobileDevice/Provisioning\ Profiles/nuvora.mobileprovision
+          rm -f "$RUNNER_TEMP/cert.p12"
+          echo "signiert=1" >> "$GITHUB_OUTPUT"
+
+      - name: Archivieren (signiert)
+        if: steps.sign.outputs.signiert == '1'
+        working-directory: apps/ios
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          xcodebuild archive \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$PWD/build/App.xcarchive" \
+            -destination "generic/platform=iOS" \
+            DEVELOPMENT_TEAM="$IOS_TEAM_ID"
+
+      # Mit Signatur macht `-exportArchive` die .ipa — hier ist das der
+      # richtige Weg, denn nur er legt die Signatur der App bei.
+      - name: Exportieren (signiert)
+        if: steps.sign.outputs.signiert == '1'
+        working-directory: apps/ios
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_EXPORT_METHOD: ${{ secrets.IOS_EXPORT_METHOD }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          method="${IOS_EXPORT_METHOD:-app-store}"
+          cat > export.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>${method}</string>
+            <key>teamID</key><string>${IOS_TEAM_ID}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>uploadSymbols</key><true/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$PWD/build/App.xcarchive" \
+            -exportOptionsPlist export.plist \
+            -exportPath "$PWD/dist"
+          mv dist/*.ipa "dist/Nuvora-${version}.ipa"
+
+      # Ohne Zertifikat: unsigniert archivieren, sonst sucht der Build eins und
+      # scheitert daran. Was das bei der Installation bedeutet, steht in
+      # apps/ios/README.md und im Release-Text.
+      - name: Archivieren (unsigniert)
+        if: steps.sign.outputs.signiert != '1'
+        working-directory: apps/ios
+        run: |
+          xcodebuild archive \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$PWD/build/App.xcarchive" \
+            -destination "generic/platform=iOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            DEVELOPMENT_TEAM=""
+
+      # Eine .ipa ist ein Zip mit einem Ordner `Payload/`, darin die .app —
+      # mehr nicht. `-exportArchive` waere der uebliche Weg, will aber ein
+      # Signierprofil; von Hand gepackt kommt dieselbe Datei heraus. Der Name
+      # traegt die Fassung aus dem Tag, wie beim Mac-Job: sonst hiesse die
+      # Datei an jedem Release gleich.
+      - name: IPA packen (unsigniert)
+        if: steps.sign.outputs.signiert != '1'
+        working-directory: apps/ios
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p dist/Payload
+          cp -R build/App.xcarchive/Products/Applications/App.app dist/Payload/
+          (cd dist && zip -qry "Nuvora-${version}.ipa" Payload)
+          rm -rf dist/Payload
+          ls -l dist
+
+      # Nur mit App-Store-Connect-Schluessel: dann landet der Build in
+      # TestFlight und die Installation auf dem Geraet passiert von selbst.
+      # Fehlt der Schluessel, faellt der Schritt weg — die Datei am Release
+      # bleibt der Weg.
+      - name: Nach TestFlight laden (nur mit App-Store-Connect-Schluessel)
+        if: steps.sign.outputs.signiert == '1'
+        working-directory: apps/ios
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_PRIVATE_KEY" ]; then
+            echo "Kein App-Store-Connect-Schluessel — kein TestFlight-Upload."
+            exit 0
+          fi
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$ASC_PRIVATE_KEY" | base64 --decode \
+            > ~/".appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          xcrun altool --upload-app -f dist/*.ipa -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios-ipa
+          path: apps/ios/dist/*.ipa
+          if-no-files-found: error
+
   release:
     runs-on: ubuntu-latest
-    needs: mac
-    # Auch dann veroeffentlichen, wenn der Mac-Job gescheitert ist: das Release
-    # ist der Stand des Servers, die App ist eine Beigabe.
+    needs: [mac, ios]
+    # Auch dann veroeffentlichen, wenn ein App-Job gescheitert ist: das Release
+    # ist der Stand des Servers, die Apps sind eine Beigabe. `always()` gilt fuer
+    # beide — Mac und iOS blockieren es nicht.
     if: always()
     steps:
       - uses: actions/checkout@v7
@@ -109,6 +287,13 @@ jobs:
         with:
           name: mac-dmg
           path: mac
+
+      - name: iOS-App holen
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: ios-ipa
+          path: ios
 
       # Die Release-Notiz ist der Changelog-Abschnitt dieser Fassung — nicht
       # die automatische PR-Liste. Die zeigte zuletzt zwei Dependabot-Bumps und
@@ -161,9 +346,13 @@ jobs:
           das nicht möchte, benutzt Nuvora im Browser: die App ist nur ein
           Fenster auf denselben Server.
 
-          **iOS/iPadOS:** es gibt keine App. Auf dem iPad in Safari öffnen,
-          *Teilen* → *Zum Home-Bildschirm* — dann liegt Nuvora als Symbol
-          dort und startet ohne Browserleiste.
+          **iPhone / iPad:** `Nuvora-<Fassung>.ipa` — **unsigniert**. Sie
+          lässt sich nicht einfach antippen: Apple verlangt eine Signatur.
+          Installieren mit AltStore oder Sideloadly (die signieren mit der
+          eigenen Apple-ID, Laufzeit dann 7 Tage) oder mit einem eigenen
+          Entwicklerkonto in Xcode. Wer das nicht möchte, öffnet Nuvora in
+          Safari und legt es über *Teilen* → *Zum Home-Bildschirm* ab — dann
+          liegt es als Symbol dort und startet ohne Browserleiste.
           ENDE
 
       - name: Release anlegen
@@ -172,6 +361,7 @@ jobs:
           files: |
             nuvora-sbom.cyclonedx.json
             mac/*.dmg
+            ios/*.ipa
           fail_on_unmatched_files: false
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}

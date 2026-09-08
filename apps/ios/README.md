@@ -16,20 +16,71 @@ Eintrag im App Store (Verteilung an ein Kollegium), und ein Fenster ohne
 Adressleiste hat keinen Zurück-Weg. Das erste ist der eigentliche Grund: eine
 App, die ihre Offline-Daten über Nacht verliert, ist keine.
 
-## Einmal einrichten (auf einem Mac mit Xcode)
+## Bauen: ein Befehl
 
 ```bash
-cd apps/ios
-npm install
-npx cap add ios       # erzeugt das Xcode-Projekt unter apps/ios/ios
-npx cap sync ios
-npx cap open ios      # Xcode: Signierung auswählen, auf Gerät starten
+./scripts/ios-bauen.sh          # oder: cd apps/ios && npm run build
 ```
 
-`npx cap add ios` braucht **CocoaPods** (`brew install cocoapods`) und lädt
-beim ersten Mal die iOS-Abhängigkeiten. Das erzeugte Verzeichnis `ios/` ist
-Teil des Projekts und darf eingecheckt werden; hier liegt es bewusst noch
-nicht, weil es ohne Xcode auf dem Rechner nicht entsteht.
+Das Skript richtet alles ein, was fehlt (`npm install`, beim ersten Mal
+`npx cap add ios`, sonst `npx cap sync ios`), archiviert mit `xcodebuild`
+**ohne Signierung** und legt `apps/ios/dist/Nuvora-<Fassung>.ipa` ab. Fehlt
+macOS, Xcode oder CocoaPods, bricht es mit dem Handgriff ab, der fehlt.
+
+**Xcode braucht man nur zum Debuggen** auf einem angeschlossenen Gerät:
+
+```bash
+cd apps/ios && npx cap open ios   # dort Signierung waehlen, auf Geraet starten
+```
+
+Das Verzeichnis `apps/ios/ios` ist **nicht eingecheckt** — es entsteht beim
+ersten Lauf und würde nach jedem Capacitor-Update auseinanderlaufen.
+`npx cap add ios` braucht **CocoaPods** (`brew install cocoapods`).
+
+## Die .ipa am Release ist **unsigniert**
+
+`.github/workflows/release.yml` (Job `ios`) baut sie bei jedem Tag-Push mit
+denselben Schritten wie das Skript — ohne Signierung, weil kein
+Apple-Entwicklerzertifikat hinterlegt ist. Die Datei heißt
+`Nuvora-<Fassung>.ipa` und hängt am Release; im Profil unter „Apps" steht sie
+damit als ladbare Datei statt als „In Vorbereitung".
+
+**Antippen genügt nicht.** iOS installiert nur signierte Apps. Drei Wege:
+
+* **AltStore** oder **Sideloadly** — signieren mit der eigenen Apple-ID. Die
+  Signatur hält 7 Tage und wird von der Software erneuert, solange das Gerät
+  den Rechner erreicht.
+* **Eigenes Entwicklerkonto**: die `.ipa` in Xcode neu signieren oder gleich
+  aus dem Quellcode bauen (oben).
+* **Gar nicht**: Nuvora in Safari öffnen, *Teilen* → *Zum Home-Bildschirm*.
+  Das ist die PWA mit den oben genannten Grenzen — für viele reicht sie.
+
+## Mit Apple-Entwicklerkonto: der Workflow signiert selbst
+
+Der Job `ios` prüft, ob ein Zertifikat hinterlegt ist, und **signiert dann**,
+sonst läuft er unsigniert weiter. Ein fehlendes Apple-Konto darf das Release
+nicht aufhalten — deshalb ein Zweig und kein Schalter, den jemand pflegen
+müsste. Diese Secrets liest er (Repository → *Settings* → *Secrets and
+variables* → *Actions*):
+
+| Secret | Inhalt |
+| ------ | ------ |
+| `IOS_CERT_P12` | Verteilungszertifikat als `.p12`, **base64** (`base64 -i cert.p12 \| pbcopy`) |
+| `IOS_CERT_PASSWORD` | Passwort des `.p12` |
+| `IOS_PROVISIONING_PROFILE` | Provisioning-Profil (`.mobileprovision`), base64 |
+| `IOS_TEAM_ID` | Team-ID aus dem Entwicklerkonto (10 Zeichen) |
+| `IOS_EXPORT_METHOD` | optional, Vorgabe `app-store`; `ad-hoc` für eine Datei, die auf registrierten Geräten läuft |
+| `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY` | App-Store-Connect-Schlüssel (`.p8` base64) — **nur** damit lädt der Workflow direkt nach TestFlight |
+
+Sind die drei `ASC_*` gesetzt, landet jeder Tag-Push in TestFlight: die
+Installation auf dem Gerät passiert dann von selbst, und niemand muss mehr
+etwas sideloaden. Ohne sie entsteht eine signierte Datei am Release; ohne
+Zertifikat bleibt es bei der unsignierten plus Sideloading.
+
+Signiert ausliefern ginge nur mit einem hinterlegten Zertifikat — das ist
+bewusst nichts, was hier im öffentlichen Repository liegt: es wäre der
+Schlüssel eines einzelnen Entwicklerkontos, und jede daraus entstandene
+Installation hinge an dessen Laufzeit.
 
 ## Was in der Hülle steckt
 
