@@ -9,7 +9,7 @@ import re
 from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator, field_validator
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +28,8 @@ from ..kursmitglieder import class_kurs_ids, eigener_kurs
 from ..database import get_db
 from ..importe import geprueft
 from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, WorkAnalysis, Session as TestSession
+# Optimistisches Sperren (siehe app/versionierung.py).
+from ..versionierung import VersionOut, pruefe, stand
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
 
@@ -147,7 +149,7 @@ class EntryIn(BaseModel):
     codedetektiv_puzzle: Optional[str] = None
 
 
-class EntryOut(EntryIn):
+class EntryOut(EntryIn, VersionOut):
     id: int
     # Gehoert der Eintrag zu einem Klassenarbeitstermin? Dann kann die Ansicht
     # die Nachteilsausgleiche und (bei aktivem Modul) die Auswertung anbieten,
@@ -428,8 +430,9 @@ async def create_entry(body: EntryIn, user: User = Depends(require_module), db: 
 
 
 @router.put("/entries/{entry_id}", response_model=EntryOut)
-async def update_entry(entry_id: int, body: EntryIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def update_entry(entry_id: int, body: EntryIn, request: Request = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     e = await eigenes(db, CalendarEntry, entry_id, user, "Eintrag nicht gefunden")
+    pruefe(request, e)
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
     await _check_topic(db, user, body.topic_id)

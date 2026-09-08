@@ -7,7 +7,10 @@ import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import "@fontsource/inter/800.css";
 import { LanguageProvider, useLanguage } from "./i18n/index.jsx";
-import { enqueue, classify, newTmp, flush as flushOutbox } from "./core/outbox.js";
+import { enqueue, classify, newTmp, flush as flushOutbox, setKonfliktFrage } from "./core/outbox.js";
+// Optimistisches Sperren: gelesene Staende merken, beim Schreiben mitschicken
+// (Gegenstueck: app/versionierung.py).
+import { KOPF as VERSION_KOPF, merke as merkeVersion, fuer as versionFuer, vergiss as vergissVersion } from "./core/versionen.js";
 import { vorladen } from "./core/vorladen.js";
 // Jeder Speicherzugriff im Rahmen laeuft ueber core/speicher.js: in Safaris
 // privatem Modus wirft `localStorage` schon beim Zugriff, und ein Wurf HIER
@@ -28,6 +31,17 @@ window.fetch = function(input, init) {
     }
   }
   const isApi = url && url.startsWith("/api/");
+  // Schreibender Aufruf auf eine Einzelressource: die zuletzt GELESENE Version
+  // mitschicken. Der Server lehnt dann ab, wenn die Zeile inzwischen eine
+  // andere ist (409) — und nur dann. Kennen wir keine, bleibt alles wie bisher.
+  const schreibt = isApi && ["PUT", "PATCH"].includes(((init && init.method) || "GET").toUpperCase());
+  const basisVersion = schreibt ? versionFuer(url) : null;
+  if (basisVersion != null) {
+    init = init || {};
+    const hv = new Headers(init.headers || {});
+    if (!hv.has(VERSION_KOPF)) hv.set(VERSION_KOPF, String(basisVersion));
+    init = { ...init, headers: hv };
+  }
   // Mit WELCHEM Token ist dieser Aufruf losgelaufen? Wird unten beim 401
   // gebraucht: eine Absage auf einen Aufruf von VOR der Anmeldung darf die
   // frische Anmeldung nicht wieder wegwerfen.
@@ -59,6 +73,13 @@ window.fetch = function(input, init) {
       const gecacht = res.headers.get("X-Nuvora-Cache");
       window.dispatchEvent(new CustomEvent(gecacht ? "cardvote:offline" : "cardvote:online"));
     }
+    // Was gelesen wurde, merkt sich core/versionen.js — daraus entsteht die
+    // Kopfzeile beim naechsten Schreiben. Nebenlaeufig: der Rumpf wird nur
+    // geklont und geparst, der Aufrufer wartet darauf nicht.
+    if (isApi && res.ok && (res.headers.get("Content-Type") || "").includes("json")) {
+      try { res.clone().json().then((d) => merkeVersion(url, d)).catch(() => {}); } catch { /* egal */ }
+    }
+    if (isApi && ((init && init.method) || "GET").toUpperCase() === "DELETE" && res.ok) vergissVersion(url);
     // Sliding-Renewal: schickt der Server einen frischen Token, uebernehmen.
     // So bleibt ein aktiver Nutzer angemeldet, statt nach fester Frist rauszufliegen.
     if (isApi) { try { const rt = res.headers.get("X-Refresh-Token"); if (rt) schreib("token", rt); } catch { /* egal */ } }
@@ -83,6 +104,14 @@ window.fetch = function(input, init) {
     // ausdruecklich mit Basic an, nicht mit dem Token der Oberflaeche — ohne
     // diese Ausnahme wirft die Verbindungspruefung im Teilen-Dialog die
     // Lehrkraft aus ihrem eigenen Konto und laedt die Seite neu.
+    // Konflikt: jemand anderes (zweites Geraet, zweite Sitzung) hat dieselbe
+    // Zeile geaendert, seit diese Seite sie gelesen hat. Online ist das der
+    // seltene Fall — deshalb wird hier gefragt und nicht geraten. Sagt die
+    // Lehrkraft „meine Fassung", geht derselbe Aufruf noch einmal hinaus, mit
+    // „*" statt einer Nummer.
+    if (res.status === 409 && isApi && basisVersion != null) {
+      return konfliktKlaeren(res, input, init, url);
+    }
     if (res.status === 401 && isApi && !url.includes("/auth/")
         && !url.includes("/api/caldav/") && tokenBeimStart) {
       const tokenJetzt = lies("token") || "";
@@ -126,12 +155,48 @@ window.fetch = function(input, init) {
         await enqueue(method, url, bodyObj, { kind: "create", tmp });
         return new Response(JSON.stringify({ ...echo, id: tmp }), { status: 200, headers: hdr });
       }
-      await enqueue(method, url, bodyObj, { kind });
+      // Der zuletzt gelesene Stand geht mit in die Warteschlange: beim
+      // Nachspielen ist er die Grundlage fuer die Konfliktfrage.
+      await enqueue(method, url, bodyObj, { kind, version: versionFuer(url) });
       return new Response(JSON.stringify(echo), { status: 200, headers: hdr });
     }
     throw err;
   });
 };
+
+// Ein 409 klaeren: den Serverstand lesen, fragen, und bei „meine Fassung"
+// denselben Aufruf mit `*` wiederholen. Sagt die Lehrkraft „Serverstand
+// behalten", bekommt die Seite die 409 zurueck und laedt neu — sonst stuende
+// die verworfene Eingabe weiter auf dem Bildschirm.
+async function konfliktKlaeren(res, input, init, url) {
+  let stand = {};
+  try { const d = await res.clone().json(); stand = (d && d.detail) || d || {}; } catch { /* dann eben ohne Details */ }
+  if (stand.fehler !== "konflikt") return res;
+  const { askChoice } = await import("./core/dialog.jsx");
+  const wahl = await askChoice(
+    "Diese Daten wurden inzwischen an anderer Stelle geändert (anderes Gerät oder zweites Fenster). Was gilt?",
+    [{ key: "meine", label: "Meine Änderung übernehmen" }, { key: "server", label: "Anderen Stand behalten" }],
+  );
+  if (wahl !== "meine") {
+    window.dispatchEvent(new CustomEvent("nuvora:konflikt-verworfen"));
+    return res;
+  }
+  const h = new Headers((init && init.headers) || {});
+  h.set(VERSION_KOPF, "*");
+  return _origFetch.call(window, input, { ...(init || {}), headers: h });
+}
+
+// Dieselbe Frage fuer die Warteschlange — dort aber nur, wenn der Serverstand
+// wirklich NEUER ist als die eigene Offline-Aenderung (siehe outbox.js).
+setKonfliktFrage(async (eintrag, stand) => {
+  const { askChoice } = await import("./core/dialog.jsx");
+  const wann = stand.geaendert_at ? new Date(stand.geaendert_at).toLocaleString() : "";
+  const wahl = await askChoice(
+    `Eine Änderung aus dem Offline-Betrieb trifft auf einen neueren Stand${wann ? ` (geändert am ${wann})` : ""}. Was gilt?`,
+    [{ key: "server", label: "Neueren Stand behalten" }, { key: "meine", label: "Meine Änderung übernehmen", danger: true }],
+  );
+  return wahl === "meine";
+});
 
 // Auto-Sync der Outbox: bei echtem Reconnect (window online), beim Start (Reste
 // aus der letzten Sitzung) und beim Übergang offline→online, der über die

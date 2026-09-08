@@ -6,7 +6,7 @@
 // faellt niemandem auf — bis eine Anmeldung offline "gelingt" oder eine
 // Sitzung ohne Server startet. Deshalb dieser Test.
 import { describe, expect, it } from "vitest";
-import { classify, gesperrt } from "./outbox.js";
+import { classify, eigeneIstNeuer, gesperrt } from "./outbox.js";
 
 // classify baut Pfade ueber new URL(url, location.origin) — in der
 // Node-Umgebung gibt es kein location.
@@ -75,5 +75,28 @@ describe("Grenzen", () => {
     // Datei-Upload (FormData): laesst sich nicht ablegen und beim Nachspielen
     // nicht wiederherstellen — lieber der ehrliche Netzwerkfehler.
     expect(classify("POST", "/api/karten/decks", null, false)).toBeNull();
+  });
+});
+
+// ─── Konflikt beim Nachspielen ───
+//
+// Gefragt wird nur im Ausnahmefall. Die Regel dahinter: hat der Server seit
+// dem Offline-Zeitpunkt NICHTS gesehen, ist die eigene Aenderung die neuere
+// und gilt — sonst waere jede Rueckkehr ins Netz eine Reihe von Dialogen.
+describe("Konflikt: fragen oder selbst entscheiden", () => {
+  const jetzt = Date.parse("2026-09-08T12:00:00Z");
+
+  it("Serverstand aelter als die eigene Aenderung → eigene gilt, keine Frage", () => {
+    expect(eigeneIstNeuer(jetzt, "2026-09-08T11:00:00Z")).toBe(true);
+  });
+
+  it("Serverstand neuer → fragen", () => {
+    expect(eigeneIstNeuer(jetzt, "2026-09-08T13:00:00Z")).toBe(false);
+  });
+
+  it("ohne Zeitangabe wird nicht geraten, sondern gefragt", () => {
+    expect(eigeneIstNeuer(jetzt, null)).toBe(false);
+    expect(eigeneIstNeuer(jetzt, "Unsinn")).toBe(false);
+    expect(eigeneIstNeuer(0, "2026-09-08T11:00:00Z")).toBe(false);
   });
 });

@@ -34,6 +34,16 @@ const JE_MODUL = {
   pap: ["/api/pap/aufgaben"],
 };
 
+// Und je KURS — die Bedienebene, auf der die meisten Seiten stehen. {id} wird
+// ersetzt. In der Desktop-Huelle ist das der Unterschied zwischen „die App ist
+// da" und „die App zeigt meinen Unterricht": wer sie im Zug oeffnet, waehlt
+// seinen Kurs und erwartet die Aufgaben, nicht eine leere Liste.
+const JE_KURS = {
+  karten: ["/api/karten/decks?kurs_id={id}"],
+  auswertung: ["/api/noten/kurse/{id}/students"],
+  kalender: ["/api/kalender/zeitleiste?kurs_id={id}"],
+};
+
 // Dasselbe je Klasse: die meisten Seiten zeigen nichts ohne eine gewaehlte
 // Klasse, und genau diese Antworten fehlten offline. {id} wird ersetzt.
 const JE_KLASSE = {
@@ -79,17 +89,36 @@ export async function vorladen() {
     aktiv = (await res.json()).filter((m) => m.active).map((m) => m.key);
   } catch { return; }
 
+  // Die Huelle (Desktop) ist der Fall, fuer den der Vorrat gemacht ist: sie
+  // wird gezielt geoeffnet, um offline zu arbeiten, und liegt auf einem
+  // Rechner mit Platz. Dort wird auch je KURS vorgeladen, im Browser nicht —
+  // dort ist der Vorrat ein Nebeneffekt des Besuchs.
+  const huelle = typeof window !== "undefined" && !!(window.nuvora || window.nuvoraDesktop);
+
   let klassen = [];
   try {
     const res = await fetch("/api/classes", { headers: { Accept: "application/json" } });
     if (res.ok) klassen = await res.json();
   } catch { /* dann eben nur die globalen Listen */ }
 
+  let kurse = [];
+  if (huelle) {
+    try {
+      const res = await fetch("/api/kurse", { headers: { Accept: "application/json" } });
+      if (res.ok) kurse = await res.json();
+    } catch { /* dann eben ohne die Kurs-Listen */ }
+  }
+
   const pfade = [...KERN];
   for (const key of aktiv) for (const p of JE_MODUL[key] || []) pfade.push(p);
   for (const k of klassen) {
     if (k.archived || k.deleted_at) continue;   // stillgelegte Klassen braucht offline niemand
     for (const key of aktiv) for (const p of JE_KLASSE[key] || []) pfade.push(p.replace("{id}", k.id));
+  }
+
+  for (const k of kurse) {
+    if (k.archiviert || k.deleted_at) continue;
+    for (const key of aktiv) for (const p of JE_KURS[key] || []) pfade.push(p.replace("{id}", k.id));
   }
 
   for (const p of pfade) {

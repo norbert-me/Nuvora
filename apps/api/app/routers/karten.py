@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 import qrcode
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy import (select, func as sa_func, and_, or_, exists as sa_exists,
@@ -35,6 +35,8 @@ from .. import rueckmeldung
 from ..database import get_db
 from ..schueler import roster_kurs, sortiert
 from ..uploads import bildtyp
+# Optimistisches Sperren (siehe app/versionierung.py).
+from ..versionierung import VersionOut, pruefe, stand
 from sqlalchemy.orm import selectinload
 from ..models import (Card, CardDeck, CardDeckKurs, CardFolder, CardReview, Kurs,
                       SchoolClass, Student, User, Session)
@@ -314,7 +316,7 @@ class DeckIn(BaseModel):
     kurs_ids: Optional[List[int]] = None
 
 
-class CardOut(BaseModel):
+class CardOut(VersionOut):
     id: int
     front: str
     back: str
@@ -325,7 +327,7 @@ class CardOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class DeckOut(BaseModel):
+class DeckOut(VersionOut):
     id: int
     class_id: Optional[int] = None  # nur noch Herkunft; Stapel der Sammlung haben keine
     kurs_id: Optional[int] = None   # Herkunfts-Kurs (Bestand) — für Deep-Link aus dem Kalender
@@ -350,6 +352,7 @@ def _deck_out(deck, kurs_ids=()) -> "DeckOut":
         folder_id=deck.folder_id,
         released_at=deck.released_at,
         cards=[CardOut.model_validate(c) for c in deck.cards if c.deleted_at is None],
+        **stand(deck),
     )
 
 
@@ -731,9 +734,10 @@ async def reorder_decks(class_id: int, body: DeckReorderIn, user: User = Depends
 
 
 @router.put("/decks/{deck_id}", response_model=DeckOut)
-async def update_deck(deck_id: int, body: DeckIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def update_deck(deck_id: int, body: DeckIn, request: Request = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Name und/oder Thema des Stapels aendern."""
     deck = await _owned_deck(db, user, deck_id)
+    pruefe(request, deck)
     deck.name = body.name.strip()
     deck.topic_id = body.topic_id
     deck.niveau = body.niveau if body.niveau in ("E", "G") else ""
@@ -893,11 +897,12 @@ async def import_cards(deck_id: int, body: ImportIn, user: User = Depends(requir
 
 
 @router.put("/cards/{card_id}", response_model=CardOut)
-async def update_card(card_id: int, body: CardIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def update_card(card_id: int, body: CardIn, request: Request = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     card = await db.get(Card, card_id)
     if not card:
         raise HTTPException(404, "Karte nicht gefunden")
     await _owned_deck(db, user, card.deck_id)
+    pruefe(request, card)
     card.front = body.front.strip()
     card.back = body.back.strip()
     card.niveau = body.niveau

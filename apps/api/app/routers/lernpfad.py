@@ -12,7 +12,7 @@ antwortet nicht, auch wenn jemand die Adresse kennt.
 """
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,8 @@ from ..besitz import eigenes
 from ..database import get_db
 from ..kursmitglieder import kurs_der_klasse
 from ..models import Exercise, LearningLadder, LearningPath, SchoolClass, Topic, User
+# Optimistisches Sperren (siehe app/versionierung.py).
+from ..versionierung import VersionOut, pruefe, stand
 from .auth import rate_limit
 from .modules import modul_pflicht
 
@@ -86,7 +88,7 @@ class ExerciseIn(BaseModel):
         return v
 
 
-class ExerciseOut(ExerciseIn):
+class ExerciseOut(ExerciseIn, VersionOut):
     id: int
     model_config = {"from_attributes": True}
 
@@ -123,10 +125,12 @@ async def create_exercise(
 async def update_exercise(
     exercise_id: int,
     body: ExerciseIn,
+    request: Request = None,
     user: User = Depends(require_module),
     db: AsyncSession = Depends(get_db),
 ):
     ex = await eigenes(db, Exercise, exercise_id, user, "Aufgabe nicht gefunden")
+    pruefe(request, ex)
     await _check_topic(db, user, body.topic_id)
     for k, v in body.model_dump().items():
         setattr(ex, k, v)

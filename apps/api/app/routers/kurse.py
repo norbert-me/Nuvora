@@ -10,7 +10,7 @@ Unterschied „Sharing vs. Tag" mehr.
 """
 from typing import List, Optional, Union
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select, delete, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +30,8 @@ from ..schueler import roster_kurs, sortiert
 from ..database import get_db
 from ..models import Kurs, KursTag, KursStudent, Person, SchoolClass, Student, User
 from ..personen import sichere_personen
+# Optimistisches Sperren (siehe app/versionierung.py).
+from ..versionierung import VersionOut, pruefe, stand
 from .auth import get_current_user
 from .classes import MASSNAHMEN_VALUES
 
@@ -72,7 +74,7 @@ class ClassRef(BaseModel):
     name: str
 
 
-class KursOut(BaseModel):
+class KursOut(VersionOut):
     id: int
     name: str
     classes: List[ClassRef] = []
@@ -192,6 +194,7 @@ async def list_kurse(archiviert: bool = False, user: User = Depends(get_current_
                     schuljahr=k.schuljahr, fach=k.fach or "", jahrgang=k.jahrgang,
                     raum=k.raum or "", vorgaenger_id=k.vorgaenger_id,
                     vorgaenger_name=alle.get(k.vorgaenger_id, "") if k.vorgaenger_id else "",
+                    **stand(k),
                     nachfolger_id=(nachfolger.get(k.id) or (None, ""))[0],
                     nachfolger_name=(nachfolger.get(k.id) or (None, ""))[1]) for k in kurse]
 
@@ -259,8 +262,9 @@ async def create_kurs(body: KursIn, user: User = Depends(get_current_user), db: 
 
 
 @router.put("/{kurs_id}", response_model=KursOut)
-async def rename_kurs(kurs_id: int, body: KursIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def rename_kurs(kurs_id: int, body: KursIn, request: Request = None, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     k = await _owned_kurs(db, user, kurs_id)
+    pruefe(request, k)
     name = (body.name or "").strip()
     if name:
         k.name = name[:100]
@@ -284,7 +288,7 @@ async def rename_kurs(kurs_id: int, body: KursIn, user: User = Depends(get_curre
     await db.commit()
     return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color,
                    schuljahr=k.schuljahr, fach=k.fach or "", jahrgang=k.jahrgang,
-                   raum=k.raum or "", vorgaenger_id=k.vorgaenger_id)
+                   raum=k.raum or "", vorgaenger_id=k.vorgaenger_id, **stand(k))
 
 
 class ColorIn(BaseModel):

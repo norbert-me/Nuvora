@@ -18,9 +18,10 @@
 // her. Solange etwas offen ist, warnt die Anwendung beim Verlassen der Seite
 // und beim Schließen des Fensters.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useBlocker } from "react-router-dom";
 
-import { btnPrimary, btnSecondary, btnSmall, COLORS as C } from "./Icons.jsx";
+import { btnPrimary, btnSecondary, btnSmall, CONTROL_R, SHADOW, COLORS as C } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 /** Flacher Vergleich reicht: die Entwürfe sind einfache Objekte aus Feldwerten. */
@@ -117,13 +118,30 @@ export function useVerlassenWarnung(offen, frage) {
  * ausgegrauter Knopf ist Möblierung, kein Hinweis. `immer` zeigt sie trotzdem
  * (für Formulare, in denen der Knopf am festen Platz stehen soll).
  */
-export default function Speicherleiste({ entwurf, immer = false, style, klein = false }) {
+export default function Speicherleiste({ entwurf, immer = false, style, klein = false, angeheftet = true }) {
   const { t } = useLanguage();
   useVerlassenWarnung(entwurf.geaendert, t("speichern.verlassen"));
+  // Steht die Leiste noch im Bild? Sonst wandert sie an den unteren
+  // Bildschirmrand — der Grund kommt aus dem Gebrauch: „den Speichern-Knopf
+  // uebersieht man gerne und muss suchen". Auf einer langen Seite (Kursmaske,
+  // Sitzplan, Notenbuch) liegt er weit oben oder weit unten, waehrend getippt
+  // wird. Angeheftet wird NUR, wenn wirklich etwas offen ist und die
+  // eigentliche Leiste nicht zu sehen ist — zwei sichtbare Speichern-Knoepfe
+  // nebeneinander waeren die Frage, welcher der richtige ist.
+  const anker = useRef(null);
+  const [imBild, setImBild] = useState(true);
+  useEffect(() => {
+    const el = anker.current;
+    if (!el || typeof IntersectionObserver === "undefined") return undefined;
+    const beobachter = new IntersectionObserver(([e]) => setImBild(e.isIntersecting), { threshold: 0.1 });
+    beobachter.observe(el);
+    return () => beobachter.disconnect();
+  }, [entwurf.geaendert]);
+
   if (!entwurf.geaendert && !immer) return null;
   const grund = klein ? { ...btnSmall } : null;
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, ...style }}>
+  const knoepfe = (
+    <>
       {entwurf.geaendert && (
         <span style={{ fontSize: 12, color: C.warning, whiteSpace: "nowrap" }}>{t("speichern.offen")}</span>
       )}
@@ -135,7 +153,30 @@ export default function Speicherleiste({ entwurf, immer = false, style, klein = 
         style={{ ...btnSecondary, ...grund, opacity: entwurf.geaendert && !entwurf.laeuft ? 1 : 0.5 }}>
         {t("common.abort")}
       </button>
-    </span>
+    </>
+  );
+  const schwebt = angeheftet && entwurf.geaendert && !imBild;
+  return (
+    <>
+      <span ref={anker} style={{ display: "inline-flex", alignItems: "center", gap: 8, ...style }}>
+        {knoepfe}
+      </span>
+      {schwebt && typeof document !== "undefined" && createPortal(
+        // Am body und nicht in der Seite: eine Karte mit `overflow` oder
+        // `transform` darueber wuerde ein `position: fixed` darin einsperren,
+        // und die Leiste stuende wieder irgendwo statt am Bildschirmrand.
+        <div style={{
+          position: "fixed", left: "50%", transform: "translateX(-50%)",
+          bottom: "max(16px, env(safe-area-inset-bottom))", zIndex: 60,
+          display: "flex", alignItems: "center", gap: 8,
+          padding: "8px 12px", borderRadius: CONTROL_R + 4,
+          background: "var(--card)", border: "1px solid var(--border2)", boxShadow: SHADOW.schwebend,
+        }}>
+          {knoepfe}
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
 

@@ -405,6 +405,27 @@ def _ensure_columns(sync_conn):
         ("learning_ladders", "kurs_id", "INTEGER"),
         ("notepad_notes", "width", "INTEGER DEFAULT 0 NOT NULL"),
         ("notepad_notes", "height", "INTEGER DEFAULT 0 NOT NULL"),
+        # Optimistisches Sperren (app/versionierung.py): jede Zeile, die offline
+        # bearbeitet werden kann, zaehlt ihre Aenderungen. Bestandszeilen starten
+        # bei 1 — der Zaehler sagt nur, ob sich seit dem Lesen etwas getan hat,
+        # nicht wie oft insgesamt. Ausgeschrieben statt als Schleife: die Liste
+        # wird vom Regressionstest mit ast.literal_eval gelesen (test_ensure_columns).
+        ("kurse", "version", "INTEGER DEFAULT 1 NOT NULL"),
+        ("kurse", "geaendert_at", "TIMESTAMP"),
+        ("topics", "version", "INTEGER DEFAULT 1 NOT NULL"),
+        ("topics", "geaendert_at", "TIMESTAMP"),
+        ("exercises", "version", "INTEGER DEFAULT 1 NOT NULL"),
+        ("exercises", "geaendert_at", "TIMESTAMP"),
+        ("calendar_entries", "version", "INTEGER DEFAULT 1 NOT NULL"),
+        ("calendar_entries", "geaendert_at", "TIMESTAMP"),
+        ("card_decks", "version", "INTEGER DEFAULT 1 NOT NULL"),
+        ("card_decks", "geaendert_at", "TIMESTAMP"),
+        ("cards", "version", "INTEGER DEFAULT 1 NOT NULL"),
+        ("cards", "geaendert_at", "TIMESTAMP"),
+        ("todos", "version", "INTEGER DEFAULT 1 NOT NULL"),
+        ("todos", "geaendert_at", "TIMESTAMP"),
+        ("notepad_notes", "version", "INTEGER DEFAULT 1 NOT NULL"),
+        ("notepad_notes", "geaendert_at", "TIMESTAMP"),
     ]
     # Fremdschluessel, die das Modell zu diesen Spalten kennt.
     #

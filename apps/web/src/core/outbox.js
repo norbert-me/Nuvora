@@ -1,4 +1,5 @@
 import { lies } from "./speicher.js";
+import { KOPF as VERSION_KOPF } from "./versionen.js";
 // Offline-Outbox (Phase 1 + 2): puffert Schreibvorgaenge offline und spielt sie
 // bei Verbindung automatisch nach. Kern-Garantie: keine verlorene Aenderung an
 // BESTEHENDEN Daten.
@@ -130,7 +131,12 @@ export async function count() {
 export async function enqueue(method, url, bodyObj, opts = {}) {
   const store = await tx("readwrite");
   await new Promise((resolve, reject) => {
-    const r = store.add({ method, url, body: bodyObj || null, kind: opts.kind || "write", tmp: opts.tmp || null, ts: Date.now() });
+    const r = store.add({ method, url, body: bodyObj || null, kind: opts.kind || "write", tmp: opts.tmp || null,
+                          // Auf WELCHEN Stand sich diese Aenderung bezieht. Der
+                          // Server vergleicht ihn beim Nachspielen; ohne ihn
+                          // waere „nachspielen" schlicht ueberschreiben.
+                          version: opts.version != null ? opts.version : null,
+                          ts: Date.now() });
     r.onsuccess = resolve; r.onerror = () => reject(r.error);
   });
   notify();
@@ -193,6 +199,38 @@ function remapBody(obj, map) {
   return [out, rest];
 }
 
+// ─── Konflikte ───
+//
+// Ein Konflikt heisst: waehrend diese Aenderung in der Warteschlange lag, hat
+// jemand dieselbe Zeile geaendert (zweites Geraet, zweite Sitzung). Der Server
+// sagt das mit 409 und nennt seinen Stand.
+//
+// Entschieden wird OHNE Rueckfrage, wo es eine richtige Antwort gibt: ist der
+// Serverstand AELTER als die eigene Offline-Aenderung, dann ist die eigene die
+// neuere und gilt. Das ist der Normalfall (der Server hat inzwischen nur die
+// vorherige Fassung derselben Sitzung gesehen). Gefragt wird nur, wenn drueben
+// wirklich SPAETER etwas passiert ist — sonst waere jede Rueckkehr ins Netz
+// eine Reihe von Dialogen, und wer sie zehnmal weggeklickt hat, klickt sie beim
+// elften Mal auch weg.
+//
+// Die Frage selbst haengt die Oberflaeche ein (main.jsx). Ohne sie wird NICHT
+// ueberschrieben: der Eintrag landet sichtbar in der Fehlerliste.
+let _frage = null;
+export function setKonfliktFrage(fn) { _frage = fn; }
+
+/**
+ * Laesst sich der Konflikt ohne Rueckfrage entscheiden?
+ * true  = die eigene Aenderung ist die neuere und gilt,
+ * false = drueben ist wirklich spaeter etwas passiert → fragen.
+ * Eigene Funktion, damit die Regel geprueft werden kann, ohne eine
+ * Warteschlange in IndexedDB aufzubauen.
+ */
+export function eigeneIstNeuer(eintragTs, geaendertAt) {
+  const server = Date.parse(geaendertAt || "");
+  if (!server || !eintragTs) return false;   // ohne Zeitangabe wird nicht geraten
+  return server < eintragTs;
+}
+
 let _flushing = false;
 
 export async function flush(rawFetch) {
@@ -211,14 +249,33 @@ export async function flush(rawFetch) {
         fehlerMerken(it, "verwaiste Behelfs-ID (das Anlegen davor ist gescheitert)");
         await remove(it.id); notify(); continue;
       }
-      let res;
-      try {
+      const senden = async (version) => {
         const headers = { "Content-Type": "application/json" };
         const token = lies("token");   // ueber speicher.js, siehe dort
         if (token) headers["Authorization"] = `Bearer ${token}`;
-        res = await doFetch(url, { method: it.method, headers, body: body != null ? JSON.stringify(body) : undefined });
+        if (version != null) headers[VERSION_KOPF] = String(version);
+        return doFetch(url, { method: it.method, headers, body: body != null ? JSON.stringify(body) : undefined });
+      };
+      let res;
+      try {
+        res = await senden(it.version);
       } catch {
         break; // weiter offline → Reihenfolge wahren, spaeter erneut
+      }
+      if (res.status === 409) {
+        const d = await res.json().catch(() => ({}));
+        const stand = (d && d.detail) || d || {};
+        if (stand.fehler === "konflikt") {
+          // Serverstand aelter als die eigene Aenderung → die eigene ist die
+          // neuere und gilt. „*" heisst dem Server: meine Fassung.
+          let ueberschreiben = eigeneIstNeuer(it.ts, stand.geaendert_at);
+          if (!ueberschreiben) ueberschreiben = _frage ? await _frage(it, stand) : false;
+          if (!ueberschreiben) {
+            fehlerMerken(it, "Konflikt: der Serverstand ist neuer und wurde behalten");
+            await remove(it.id); notify(); continue;
+          }
+          try { res = await senden("*"); } catch { break; }
+        }
       }
       if (res.ok) {
         if (it.kind === "create" && it.tmp) {

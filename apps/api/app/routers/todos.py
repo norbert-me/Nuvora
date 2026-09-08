@@ -9,7 +9,7 @@ import re
 from datetime import date as _date
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..besitz import eigenes
 from ..database import get_db
 from ..models import Todo, User
+# Optimistisches Sperren (siehe app/versionierung.py).
+from ..versionierung import VersionOut, pruefe, stand
 from .modules import modul_pflicht
 
 router = APIRouter(prefix="/api/todo", tags=["todo"])
@@ -43,7 +45,7 @@ class TodoPatch(BaseModel):
     due_time: Optional[str] = None
 
 
-class TodoOut(BaseModel):
+class TodoOut(VersionOut):
     id: int
     text: str
     notiz: str = ""
@@ -75,7 +77,7 @@ def _clean_time(v):
 def _out(t: Todo) -> dict:
     return {"id": t.id, "text": t.text, "notiz": t.notiz or "", "done": t.done,
             "due_date": t.due_date.isoformat() if t.due_date else None,
-            "due_time": t.due_time or "", "position": t.position}
+            "due_time": t.due_time or "", "position": t.position, **stand(t)}
 
 
 @router.get("", response_model=List[TodoOut])
@@ -122,8 +124,9 @@ async def reorder_todos(body: ReorderIn, user: User = Depends(require_module), d
 
 
 @router.put("/{todo_id}", response_model=TodoOut)
-async def update_todo(todo_id: int, body: TodoPatch, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def update_todo(todo_id: int, body: TodoPatch, request: Request = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     t = await eigenes(db, Todo, todo_id, user, "To-do nicht gefunden")
+    pruefe(request, t)
     if body.text is not None:
         t.text = body.text.strip()[:500] or t.text
     if body.notiz is not None:

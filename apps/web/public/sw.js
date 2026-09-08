@@ -117,6 +117,45 @@ async function pruneOldAssets() {
     .map((req) => cache.delete(req)));
 }
 
+// Wie lange auf den Server gewartet wird, bevor der Zwischenspeicher antwortet.
+//
+// Der Anlass ist nicht „offline", sondern SCHLECHTES Netz: im Schulnetz
+// antwortet der Server manchmal erst nach zehn Sekunden oder gar nicht, ohne
+// dass der Browser einen Fehler wirft. Network-first hiess dann: die Seite
+// wartet, die Liste bleibt leer, und die Lehrkraft sieht „keine Aufgaben" statt
+// der Aufgaben, die sie vor zwei Minuten noch hatte. Nach dem Zeitlimit
+// antwortet der Cache (als solcher gekennzeichnet, siehe ausCache) — die echte
+// Antwort laeuft weiter und aktualisiert den Cache im Hintergrund fuer den
+// naechsten Aufruf.
+//
+// 3,5 Sekunden: lang genug, dass eine normale Antwort (ein paar Dutzend
+// Millisekunden) nie in die Naehe kommt, kurz genug, dass niemand davor sitzt
+// und wartet. Ohne Cache-Eintrag wird weiter regulaer gewartet — eine leere
+// Antwort waere schlechter als eine langsame.
+const API_WARTEN_MS = 3500;
+
+async function apiAntwort(request) {
+  const cache = await caches.open(API_CACHE);
+  const gecacht = await cache.match(request);
+  const netz = fetch(request).then((res) => {
+    if (res.ok) cache.put(request, res.clone());
+    return res;
+  });
+  if (!gecacht) {
+    // Nichts im Vorrat: warten, bis der Server antwortet — und wenn er gar
+    // nicht antwortet, den ehrlichen Fehler durchreichen.
+    return netz.catch(() => Response.error());
+  }
+  // Wettlauf: der Server, oder nach dem Zeitlimit der Vorrat. `netz` laeuft in
+  // beiden Faellen zu Ende und schreibt den Cache fort (die Ablehnung wird
+  // abgefangen, sonst meldet der Browser einen unbehandelten Fehler).
+  netz.catch(() => {});
+  const bremse = new Promise((fertig) => setTimeout(() => fertig(null), API_WARTEN_MS));
+  const zuerst = await Promise.race([netz.catch(() => null), bremse]);
+  if (zuerst) return zuerst;
+  return ausCache(gecacht);
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
@@ -164,20 +203,10 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // API: network-first (Server bleibt autoritativ), Cache nur als Offline-Fallback.
+  // API: network-first (Server bleibt autoritativ), Cache als Rueckfall.
   if (url.pathname.startsWith("/api/")) {
     if (apiCacheable(url, event.request.method)) {
-      event.respondWith(
-        fetch(event.request)
-          .then((res) => {
-            if (res.ok) {
-              const clone = res.clone();
-              caches.open(API_CACHE).then((c) => c.put(event.request, clone));
-            }
-            return res;
-          })
-          .catch(() => caches.match(event.request).then((c) => (c ? ausCache(c) : Response.error())))
-      );
+      event.respondWith(apiAntwort(event.request));
       return;
     }
     // Schreiben/Diagnose/Downloads: netzwerk-only.

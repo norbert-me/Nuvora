@@ -5,7 +5,7 @@ das Modul Beobachtungen). Reine private Ablage — kein Export, kein Marktplatz.
 """
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..besitz import eigenes
 from ..database import get_db
 from ..models import NotepadNote, User
+# Optimistisches Sperren: der Zettel sagt, ob er sich seit dem Lesen geaendert hat.
+from ..versionierung import pruefe, stand
 from .modules import modul_pflicht
 
 router = APIRouter(prefix="/api/notizblock", tags=["notizblock"])
@@ -45,7 +47,8 @@ class ReorderIn(BaseModel):
 def _out(n: NotepadNote) -> dict:
     return {"id": n.id, "title": n.title or "", "content": n.content or "", "position": n.position,
             "width": n.width or 0, "height": n.height or 0,
-            "updated_at": n.updated_at.isoformat() if n.updated_at else None}
+            "updated_at": n.updated_at.isoformat() if n.updated_at else None,
+            **stand(n)}
 
 
 @router.get("")
@@ -79,8 +82,9 @@ async def reorder_notes(body: ReorderIn, user: User = Depends(require_module), d
 
 
 @router.put("/{note_id}")
-async def update_note(note_id: int, body: NotePatch, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def update_note(note_id: int, body: NotePatch, request: Request = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     n = await eigenes(db, NotepadNote, note_id, user, "Notiz nicht gefunden")
+    pruefe(request, n)
     if body.title is not None:
         n.title = body.title.strip()[:200]
     if body.content is not None:

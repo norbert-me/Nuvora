@@ -9,12 +9,14 @@ Unterthema); erzwungen wird das nicht.
 """
 from typing import List, Optional, Union
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import eigenes
+# Optimistisches Sperren (siehe app/versionierung.py).
+from ..versionierung import VersionOut, pruefe, stand
 from ..database import get_db
 from ..models import (
     Question, Topic, User, CardDeck, Exercise, CalendarEntry, CodePuzzle,
@@ -73,7 +75,7 @@ class TopicIn(BaseModel):
         return v
 
 
-class TopicOut(BaseModel):
+class TopicOut(VersionOut):
     id: int
     name: str
     parent_id: Optional[int]
@@ -198,7 +200,7 @@ async def list_topics(
             notes=t.notes or "", ziel_g=t.ziel_g or "", ziel_e=t.ziel_e or "",
             voraussetzungen=t.voraussetzungen or "",
             fach=fach, jahrgang=jahrgang,
-            question_count=counts.get(t.id, 0),
+            question_count=counts.get(t.id, 0), **stand(t),
         ))
     return out
 
@@ -244,7 +246,7 @@ async def create_topic(
     fach, jahrgang = await _erbt_geladen(db, user, topic)
     return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position,
                     notes=topic.notes or "", ziel_g=topic.ziel_g or "", ziel_e=topic.ziel_e or "",
-                    voraussetzungen=topic.voraussetzungen or "", fach=fach, jahrgang=jahrgang)
+                    voraussetzungen=topic.voraussetzungen or "", fach=fach, jahrgang=jahrgang, **stand(topic))
 
 
 class ReorderIn(BaseModel):
@@ -342,10 +344,12 @@ async def reorder_topics(body: ReorderIn, user: User = Depends(get_current_user)
 async def update_topic(
     topic_id: int,
     data: TopicIn,
+    request: Request = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     topic = await _owned(db, user, topic_id)
+    pruefe(request, topic)
 
     if data.parent_id is not None:
         if data.parent_id == topic_id:
@@ -373,7 +377,7 @@ async def update_topic(
     fach, jahrgang = await _erbt_geladen(db, user, topic)
     return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position,
                     notes=topic.notes or "", ziel_g=topic.ziel_g or "", ziel_e=topic.ziel_e or "",
-                    voraussetzungen=topic.voraussetzungen or "", fach=fach, jahrgang=jahrgang)
+                    voraussetzungen=topic.voraussetzungen or "", fach=fach, jahrgang=jahrgang, **stand(topic))
 
 
 @router.delete("/{topic_id}", status_code=204)

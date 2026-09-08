@@ -8,6 +8,10 @@ from typing import Optional
 from sqlalchemy import ForeignKey, String, Text, DateTime, Date, Integer, JSON, Boolean, LargeBinary, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+# Optimistisches Sperren fuer die Tabellen, die offline bearbeitet werden
+# (siehe app/versionierung.py). Ein Blatt — es importiert nichts von hier.
+from .versionierung import Versioniert
+
 
 class Base(DeclarativeBase):
     pass
@@ -281,7 +285,7 @@ class Scan(Base):
 # ─── Nuvora-Kern: Klassen und Schueler ───
 # Kerndaten, kein Modulbesitz: beide Module arbeiten darauf. Ein Modul, das
 # eigene Klassen oder Schueler anlegt, hat den Sinn der Plattform gebrochen.
-class Kurs(Base):
+class Kurs(Versioniert, Base):
     """Eine Lerngruppe (die echten SuS). Mehrere Fach-Klassen (Mathe 7.5,
     Lernzeit 7.5) hängen am selben Kurs und teilen sich dessen Schüler und
     Anwesenheit — Karten/Noten/Orga bleiben pro Fach-Klasse. Phase 1: jede
@@ -570,7 +574,7 @@ class UserModule(Base):
 # Hierarchie ueber parent_id (Lernpfad nutzt heute genau zwei Ebenen:
 # Thema > Unterthema). Die Tiefe ist bewusst nicht erzwungen — der Kern gibt
 # den Wortschatz vor, nicht die Fachdidaktik eines Moduls.
-class Topic(Base):
+class Topic(Versioniert, Base):
     __tablename__ = "topics"
     __table_args__ = (
         UniqueConstraint("owner_id", "parent_id", "name", name="uq_topic_name_per_parent"),
@@ -633,7 +637,7 @@ class Topic(Base):
 # Fachdaten des Moduls. Sie zeigen auf den Kern (owner_id, topic_id, class_id),
 # besitzen aber nichts davon. Was hier NICHT steht, ist Absicht: Klassen,
 # Schueler und Themen gehoeren dem Kern — Lernpfad brachte frueher eigene mit.
-class Exercise(Base):
+class Exercise(Versioniert, Base):
     """Eine Aufgabe. Frueher `aufgaben` in Lernpfads eigener SQLite-Datei."""
     __tablename__ = "exercises"
 
@@ -879,7 +883,7 @@ class GradeOverride(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class CalendarEntry(Base):
+class CalendarEntry(Versioniert, Base):
     """Unterrichtsplanung: ein Eintrag an einem Datum. Optional an eine Klasse
     und ein Thema geknuepft (Thema ON DELETE SET NULL — Regel 3)."""
     __tablename__ = "calendar_entries"
@@ -1306,7 +1310,7 @@ class PlanBlock(Base):
 # Eigenstaendig (Regel 3). Kein Schueler-Login: Zugriff ueber einen
 # einzigartigen Token pro Schueler (wie die gedruckte CardVote-Karte). Der
 # Token IST die Identitaet — Bearer-Secret, muss unratbar sein.
-class CardDeck(Base):
+class CardDeck(Versioniert, Base):
     """Ein Kartenstapel in der Sammlung der Lehrkraft.
 
     Umgedrehte Zuordnung: der Stapel gehoert nicht mehr EINER Klasse, sondern
@@ -1384,7 +1388,7 @@ class CardFolder(Base):
     name: Mapped[str] = mapped_column(String(120), default="", server_default="")
 
 
-class Card(Base):
+class Card(Versioniert, Base):
     __tablename__ = "cards"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -1538,7 +1542,7 @@ class Material(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class Todo(Base):
+class Todo(Versioniert, Base):
     """Modul To-do: einfache Aufgabenliste der Lehrkraft. Eigenstaendig (Regel 3).
     Optional mit Datum (und Uhrzeit) — dann erscheint der Eintrag auch im Kalender,
     sofern das Kalender-Modul aktiv ist (reine Zusatz-Bruecke, keine Abhaengigkeit).
@@ -1590,7 +1594,7 @@ class ParentContact(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class NotepadNote(Base):
+class NotepadNote(Versioniert, Base):
     """Modul Notizblock: freie Notizzettel der Lehrkraft (Titel + Text). Nicht an
     Schüler oder Klasse gebunden (das ist Beobachtungen), reine private Ablage —
     kein Export, kein Marktplatz."""

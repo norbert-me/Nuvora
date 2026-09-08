@@ -16,6 +16,24 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+**Offline und schlechtes Netz**
+
+- Bei langsamer Verbindung zeigen Listen nach kurzer Wartezeit den zuletzt
+  geladenen Stand, statt leer zu bleiben; die frische Antwort kommt nach.
+- Die Desktop-App lädt zusätzlich die Daten je Kurs vor.
+- Änderungen aus dem Offline-Betrieb überschreiben keinen neueren Stand mehr
+  still: passt beides nicht zusammen, entscheidet Nuvora zugunsten der neueren
+  Änderung — und fragt nur, wenn inzwischen wirklich woanders gearbeitet wurde.
+
+**Bedienung**
+
+- Der Speichern-Knopf bleibt am Bildschirm: scrollt er aus dem Bild, während
+  etwas offen ist, erscheint er unten.
+- Kurs: das Schuljahr wird ausgewählt, „andere …" legt ein neues an.
+- Kurs und Thema: das Feld „Jahrgang" ist weg — das Schuljahr sagt es bereits.
+- Profil: die Schalter unter „Teile der Module" stehen in einer Spalte.
+- Fördermaßnahmen: der Knopf heißt wieder „+ Maßnahme" statt „+ + Maßnahme".
+
 **Notenbuch**
 
 - „Vergleichen" ist aus dem Spaltenmenü verschwunden: es war für Klassenarbeiten
