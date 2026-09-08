@@ -342,9 +342,20 @@ const bedienung = (td) => [
     name: "Checklisten-Punkt anlegen (/orga)",
     pfad: "/orga",
     async anlegen(seite) {
-      await seite.locator("input[placeholder^='Neuer Punkt']").first().fill(MARKE_UI, { timeout: 8000 });
-      await seite.locator("[title='Anlegen']").first().click({ timeout: 8000 });
+      await seite.locator("input[placeholder]").first().fill(MARKE_UI, { timeout: 8000 });
+      await seite.locator("[title='Anlegen'], [title='Add'], [title='Añadir']").first().click({ timeout: 8000 });
       await seite.waitForTimeout(900);
+    },
+    async loeschen(seite) {
+      // Der SPALTENKOPF ist der Loeschknopf (Orga.jsx: „ein Muelleimer je
+      // Spalte stand dreissigmal in einer Zeile"). Der Standardweg sucht einen
+      // Knopf in der Zeile und findet deshalb nichts — hier also der Kopf,
+      // gefolgt von der Nachfrage.
+      await seite.locator("th", { hasText: MARKE_UI }).first().click({ timeout: 8000 });
+      await seite.getByRole("button", { name: /^(Löschen|Delete|Eliminar)$/i }).first().click({ timeout: 8000 });
+      await seite.waitForTimeout(900);
+      if (await seite.locator("th", { hasText: MARKE_UI }).count()) return "Spalte steht nach dem Löschen weiter da";
+      return "";
     },
   },
   {
@@ -629,8 +640,12 @@ const bedienung = (td) => [
     // holt ihn wieder" — genau das, was dieses Modul verspricht. Ein Textfeld,
     // das den Reload nicht uebersteht, waere fuer den Beamer wertlos.
     async anlegen(seite) {
-      await seite.getByRole("button", { name: "Textfeld", exact: true }).first().click({ timeout: 8000 });
-      const feld = seite.locator("textarea[placeholder^='Text']").first();
+      // Die Beschriftung haengt an der Sprache des KONTOS (das Testkonto laeuft
+      // auf Englisch) — deshalb ein Muster ueber alle drei Sprachen statt des
+      // deutschen Wortes. Genau daran ist die Probe rot geworden, ohne dass an
+      // der Tafel etwas kaputt war.
+      await seite.getByRole("button", { name: /^(Textfeld|Text box|Campo de texto)$/i }).first().click({ timeout: 8000 });
+      const feld = seite.locator("textarea").first();
       await feld.waitFor({ state: "visible", timeout: 8000 });
       await feld.fill(MARKE_UI, { timeout: 8000 });
     },
@@ -638,7 +653,7 @@ const bedienung = (td) => [
       // Erst das Feld anwaehlen — die Leiste mit dem Papierkorb schwebt am
       // gewaehlten Element und existiert vorher gar nicht.
       await seite.locator("textarea").first().click({ timeout: 8000 });
-      await seite.locator("[title='Löschen']").first().click({ timeout: 8000 });
+      await seite.locator("[title='Löschen'], [title='Delete'], [title='Eliminar']").first().click({ timeout: 8000 });
       await seite.locator("textarea").first().waitFor({ state: "detached", timeout: 8000 });
       return "";
     },

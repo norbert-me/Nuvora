@@ -740,8 +740,8 @@ const BEDIENUNG = [
     name: "Tafel speichern (/tafel)",
     pfad: "/tafel",
     async schritte(seite, api) {
-      const vorher = await (await api("/api/tafel")).json();
-      if (!Array.isArray(vorher)) return;   // Modul nicht aktiv: nichts zu pruefen
+      const r = await api("/api/tafel");
+      if (!r.ok()) return;   // Modul nicht aktiv: nichts zu pruefen
       // Ein Textfeld anlegen, damit die Tafel nicht leer gespeichert wird.
       await seite.getByRole("button", { name: /textfeld|text box|campo de texto/i }).first().click({ timeout: 8000 });
       await seite.getByRole("button", { name: /^(Speichern|Save|Guardar)$/ }).first().click({ timeout: 8000 });
@@ -753,11 +753,15 @@ const BEDIENUNG = [
       await seite.waitForTimeout(800);
     },
     async pruefe(seite, api) {
-      const liste = await (await api("/api/tafel")).json();
+      const r = await api("/api/tafel");
+      if (!r.ok()) return { ok: true, detail: "Modul Tafel nicht aktiv" };
+      const liste = await r.json();
       if (!Array.isArray(liste)) return { ok: true, detail: "Modul Tafel nicht aktiv" };
       const meine = liste.filter((x) => (x.name || "").includes(MARKE));
       if (!meine.length) return { ok: false, detail: "gespeicherte Tafel fehlt nach dem Neuladen" };
-      for (const x of meine) await api(`/api/tafel/${x.id}`, { method: "DELETE" });
+      // `api` nimmt den Verb-Namen klein als ZWEITES Argument
+      // (macheKontextApi in browser-gemeinsam.mjs), nicht ein Options-Objekt.
+      for (const x of meine) await api(`/api/tafel/${x.id}`, "delete");
       return { ok: true, detail: "gespeichert, ueberlebt das Neuladen, wieder abgeraeumt" };
     },
   },

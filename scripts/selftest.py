@@ -723,9 +723,13 @@ def teste_kern(api, b, u):
             liste = api.call("GET", "/api/topics", erwartet=(200,))
             oben = next((x for x in liste if x["id"] == u.topic_id), None)
             kind = next((x for x in liste if x["id"] == unter["id"]), None)
-            if not oben or oben.get("fach") != "Mathematik" or oben.get("jahrgang") != 7:
+            # Der Jahrgang ist TEXT geworden („7/8" gibt es wirklich): die
+            # blanke 7 geht weiter hinein, kommt aber als "7" zurueck. Deshalb
+            # wird als Text verglichen — sonst meldet die Probe einen Fehler,
+            # den es nicht gibt.
+            if not oben or oben.get("fach") != "Mathematik" or str(oben.get("jahrgang")) != "7":
                 raise AssertionError(f"Fach/Jahrgang am Oberthema nicht gespeichert: {oben}")
-            if not kind or kind.get("fach") != "Mathematik" or kind.get("jahrgang") != 7:
+            if not kind or kind.get("fach") != "Mathematik" or str(kind.get("jahrgang")) != "7":
                 raise AssertionError(f"Unterthema erbt nicht: {kind}")
         finally:
             api.call("DELETE", f"/api/topics/{unter['id']}", erwartet=(204, 404))
