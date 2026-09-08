@@ -1240,6 +1240,15 @@ def probe_unterrichtsplanung(api, u):
     return "Methodensammlung mit Ordner, Eintrag und Thema"
 
 
+def probe_tafel(api, u):
+    tafel = api.call("POST", "/api/tafel",
+                     {"name": f"{PRAEFIX} Tafel", "items": []}, erwartet=(201,))
+    api.call("PUT", f"/api/tafel/{tafel['id']}", {"name": f"{PRAEFIX} Tafel 2"}, erwartet=(200,))
+    api.call("GET", "/api/tafel", erwartet=(200,))
+    api.call("DELETE", f"/api/tafel/{tafel['id']}", erwartet=(204,))
+    return "Tafel gespeichert"
+
+
 def probe_notizbrett(api, u):
     notiz = api.call("POST", "/api/notizblock",
                      {"title": f"{PRAEFIX} Notiz", "content": "Text"}, erwartet=(201,))
@@ -1280,7 +1289,7 @@ PROBEN = {
     "notizbrett": probe_notizbrett,
     "code-detektiv": probe_code_detektiv,
     "pap": probe_pap,
-    "tafel": None,
+    "tafel": probe_tafel,
     "mathespiele": None,
 }
 

@@ -139,7 +139,7 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
 
 
 @router.get("/{class_id}/tage")
-async def get_tage(class_id: int, dates: str = "",
+async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
                    user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Tages-Status je Schueler fuer MEHRERE Tage auf einmal.
 
@@ -186,7 +186,17 @@ async def get_tage(class_id: int, dates: str = "",
     for tag, tagrows in je_tag.items():
         best = _tages_status(tagrows)
         # „da" ist die Normallage und braucht keine Zeile in der Antwort.
-        eintraege = {str(canon_back.get(sid, sid)): r.status for sid, r in best.items() if r.status != "da"}
+        # `kanonisch`: die Schluessel bleiben die KANONISCHEN ids.
+        #
+        # Das Notenbuch listet seine Zeilen kanonisch (kleinste id je Name im
+        # Kurs, `roster_kurs`), die Anwesenheits-Ansicht dagegen mit den Zeilen
+        # DIESER Klasse. Zurueckgebildet passte die Antwort deshalb genau dann
+        # nicht zum Notenbuch, wenn die kanonische Zeile in einer anderen
+        # Fach-Klasse liegt — und dann blieb die Faerbung dort einfach aus,
+        # ohne Fehler und ohne Hinweis. Zwei Leser, zwei Sichten auf dieselbe
+        # Person: der Aufrufer sagt, welche er braucht.
+        eintraege = {str(sid if kanonisch else canon_back.get(sid, sid)): r.status
+                     for sid, r in best.items() if r.status != "da"}
         if eintraege:
             out[tag] = eintraege
     return out

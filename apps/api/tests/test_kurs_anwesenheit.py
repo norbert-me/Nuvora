@@ -45,3 +45,26 @@ async def test_da_ueber_geschwisterklasse_loescht(s):
     await an.mark(A.id, an.MarkIn(student_id=a.id, date=d, status="fehlt", period=1), user=u, db=s)
     await an.mark(B.id, an.MarkIn(student_id=b.id, date=d, status="da", period=1), user=u, db=s)
     assert (await s.execute(select(func.count()).select_from(Attendance))).scalar() == 0
+
+
+# ─── Das Notenbuch liest kanonisch ───
+#
+# Seine Zeilen sind die kanonischen SuS des Kurses (kleinste id je Name), die
+# Anwesenheits-Ansicht dagegen fuehrt die Zeilen DIESER Klasse. Bildet `/tage`
+# stur zurueck, passt in der zweiten Fach-Klasse kein einziger Schluessel — und
+# die Faerbung im Notenbuch blieb aus, ohne Fehler und ohne Hinweis.
+
+@pytest.mark.asyncio
+async def test_tage_liefert_auf_wunsch_die_kanonischen_ids(s):
+    u, A, B, a, b = await _kurs_zwei_klassen(s)
+    d = datetime(2026, 7, 20)
+    await an.mark(A.id, an.MarkIn(student_id=a.id, date=d, status="fehlt", period=1), user=u, db=s)
+
+    # Wie bisher: Schluessel ist die Zeile DIESER Klasse.
+    normal = await an.get_tage(B.id, dates="2026-07-20", user=u, db=s)
+    assert normal["2026-07-20"] == {str(b.id): "fehlt"}
+
+    # Fuer das Notenbuch: die kanonische Zeile (die aus der ersten Fach-Klasse).
+    kanon = await an.get_tage(B.id, dates="2026-07-20", kanonisch=True, user=u, db=s)
+    assert kanon["2026-07-20"] == {str(a.id): "fehlt"}
+    assert a.id != b.id, "sonst pruefte der Test nichts"

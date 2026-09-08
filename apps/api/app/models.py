@@ -1657,6 +1657,32 @@ class PapAbgabe(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class TafelBoard(Base):
+    """Modul Tafel: eine gespeicherte Tafel (Name + ihre Elemente).
+
+    Die Tafel arbeitete nur im localStorage — gut fuer „ueberlebt das
+    Neuladen", schlecht fuer alles andere: eine Tafel, die man fuer die
+    naechste Stunde vorbereitet, war am Rechner im Klassenraum nicht da, und
+    zwei Tafeln nebeneinander gab es gar nicht (die zweite ueberschrieb die
+    erste). Der Inhalt haengt deshalb am KONTO, wie die Einrichtung der
+    Startseite; die Arbeitsfassung bleibt daneben lokal, damit nichts
+    verlorengeht, bevor jemand speichert.
+
+    `items` ist die Liste der Elemente, so wie die Oberflaeche sie fuehrt
+    (Position, Groesse, Schrift, Farbe im REF-Raum 1600x900). Bewusst JSON und
+    keine Tabelle je Element: es gibt keine einzige Abfrage, die nach einem
+    Textfeld sucht — gelesen und geschrieben wird immer die ganze Tafel.
+    """
+    __tablename__ = "tafel_boards"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    items: Mapped[Optional[dict]] = mapped_column(JSON, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class BugReport(Base):
     """Eine Fehlermeldung aus der Oberflaeche — in der Datenbank, nicht als Mail.
 

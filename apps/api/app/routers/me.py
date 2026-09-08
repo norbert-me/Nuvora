@@ -143,6 +143,7 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
         "beobachtungen": await _rows(db, m.Observation, m.Observation.owner_id == uid),
         "elternkontakte": await _rows(db, m.ParentContact, m.ParentContact.owner_id == uid),
         "notizzettel": await _rows(db, m.NotepadNote, m.NotepadNote.owner_id == uid),
+        "tafeln": await _rows(db, m.TafelBoard, m.TafelBoard.owner_id == uid),
         "karten_fortschritt": await _rows(db, m.CardReview, in_(m.CardReview, "student_id", student_ids)),
         "karten_ordner": await _rows(db, m.CardFolder, m.CardFolder.owner_id == uid),
         "kurse": await _rows(db, m.Kurs, m.Kurs.owner_id == uid),

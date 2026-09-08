@@ -208,8 +208,9 @@ def endpunkte(u):
         "pap": [
             ("GET", "/api/pap/aufgaben"),
         ],
-        # Reines Frontend, kein Backend — im Browser-Test geprueft.
-        "tafel": [],
+        "tafel": [
+            ("GET", "/api/tafel"),
+        ],
         "mathespiele": [],
     }
 
@@ -239,7 +240,7 @@ def tore(u):
         "notizbrett": [("GET", "/api/notizblock"), ("GET", "/api/todo")],
         "code-detektiv": [("GET", "/api/codedetektiv/puzzles")],
         "pap": [("GET", "/api/pap/aufgaben")],
-        "tafel": [],
+        "tafel": [("GET", "/api/tafel")],
         "mathespiele": [],
     }
 
@@ -1058,6 +1059,28 @@ def inhalt_unterrichtsplanung(api, u, spuren):
     return "Methode mit 6 Feldern im Ordner wiedergefunden"
 
 
+def inhalt_tafel(api, u, spuren):
+    """Eine Tafel speichern, wiederfinden, aendern, loeschen.
+
+    Der Inhalt liegt als Ganzes am Datensatz (JSON): geprueft wird deshalb,
+    dass die Elemente unveraendert zurueckkommen — eine Tafel, die beim
+    Speichern die Haelfte ihrer Felder verliert, faellt sonst erst am Beamer
+    auf.
+    """
+    felder = [{"id": "a1", "type": "text", "text": "Arbeitsauftrag", "x": 100, "y": 80,
+               "w": 400, "h": 120, "fontSize": 48, "color": "#111827"}]
+    tafel = api.call("POST", "/api/tafel", {"name": f"{PRAEFIX} Tafel", "items": felder}, erwartet=(201,))
+    spuren.append(("Tafel", lambda: api.call("DELETE", f"/api/tafel/{tafel['id']}", erwartet=(204, 404))))
+    if not _finde(api.call("GET", "/api/tafel", erwartet=(200,)), id=tafel["id"]):
+        raise AssertionError("gespeicherte Tafel fehlt in der Liste")
+    wieder = api.call("GET", f"/api/tafel/{tafel['id']}", erwartet=(200,))
+    if len(wieder.get("items") or []) != 1 or wieder["items"][0].get("text") != "Arbeitsauftrag":
+        raise AssertionError(f"Tafel kam anders zurueck: {wieder}")
+    api.call("PUT", f"/api/tafel/{tafel['id']}", {"items": []}, erwartet=(200,))
+    if api.call("GET", f"/api/tafel/{tafel['id']}", erwartet=(200,)).get("items"):
+        raise AssertionError("geleerte Tafel kam nicht leer zurueck")
+
+
 def inhalt_notizbrett(api, u, spuren):
     notiz = api.call("POST", "/api/notizblock",
                      {"title": f"{PRAEFIX} Notiz", "content": "Zeile 1\nZeile 2"}, erwartet=(201,))
@@ -1219,7 +1242,7 @@ INHALT = {
     "notizbrett": inhalt_notizbrett,
     "code-detektiv": inhalt_code_detektiv,
     "pap": inhalt_pap,
-    "tafel": None,
+    "tafel": inhalt_tafel,
     "mathespiele": None,
 }
 

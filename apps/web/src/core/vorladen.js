@@ -32,6 +32,7 @@ const JE_MODUL = {
   notizbrett: ["/api/notizblock"],
   "code-detektiv": ["/api/codedetektiv/puzzles"],
   pap: ["/api/pap/aufgaben"],
+  tafel: ["/api/tafel"],
 };
 
 // Und je KURS — die Bedienebene, auf der die meisten Seiten stehen. {id} wird

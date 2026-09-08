@@ -210,7 +210,11 @@ export default function Noten() {
       .filter(Boolean)))];
     if (!tage.length) { setFehlzeiten({}); return; }
     let ab = false;
-    hol(`/api/anwesenheit/${classId}/tage?dates=${encodeURIComponent(tage.join(","))}`)
+    // `kanonisch`: die Notenzeilen sind die kanonischen SuS des Kurses
+    // (kleinste id je Name). Ohne das antwortet die Anwesenheit mit den Zeilen
+    // DIESER Klasse, und liegt die kanonische Zeile in einer anderen
+    // Fach-Klasse, passt kein einziger Schluessel — die Faerbung blieb aus.
+    hol(`/api/anwesenheit/${classId}/tage?kanonisch=true&dates=${encodeURIComponent(tage.join(","))}`)
       .then((d) => { if (!ab) setFehlzeiten(d && typeof d === "object" ? d : {}); })
       .catch(() => { /* ohne Anwesenheit bleibt die Tabelle wie bisher */ });
     return () => { ab = true; };

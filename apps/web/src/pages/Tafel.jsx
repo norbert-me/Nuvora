@@ -6,6 +6,9 @@ import { btnSecondary, cardStyle, CONTROL_R, Icon, ICONS, iconBtn, popoverPanel,
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
+import { alsJson, hol, sende } from "../core/melden.js";
+import { askConfirm, askPrompt } from "../core/dialog.jsx";
+import SuchSelect from "../components/SuchSelect.jsx";
 import { hmToMin, minToHm, ymd } from "../core/datum.js";
 import { stundenZeit } from "../core/stunden";
 
@@ -54,7 +57,15 @@ export default function Tafel() {
   // Fläche stehen und verschwinden nie unten/rechts, egal wie breit der Bildschirm.
   useEffect(() => {
     const el = outerRef.current; if (!el) return;
-    const measure = () => { const w = el.clientWidth || REF_W; const s = w / REF_W; scaleRef.current = s; setScale(s); };
+    // Im Vollbild zaehlt auch die HOEHE: sonst wird die Flaeche auf die
+    // Bildschirmbreite gerechnet, ist damit hoeher als das Fenster, und die
+    // untere Reihe der Tafel steht ausserhalb.
+    const measure = () => {
+      const w = el.clientWidth || REF_W;
+      const h = el.clientHeight || 0;
+      const s = h ? Math.min(w / REF_W, h / REF_H) : w / REF_W;
+      scaleRef.current = s; setScale(s);
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -117,13 +128,77 @@ export default function Tafel() {
     setSel(id);
     setItems((p) => { const i = p.findIndex((x) => x.id === id); if (i < 0 || i === p.length - 1) return p; const n = [...p]; const [it] = n.splice(i, 1); n.push(it); return n; });
   };
+  // Solange das Vollbild steht, scrollt die Seite dahinter nicht: sonst
+  // bewegt eine Wischgeste auf der Tafel den Rahmen darunter, und beim
+  // Verlassen steht die Seite woanders.
+  useEffect(() => {
+    if (!fs) return undefined;
+    const vorher = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = vorher; };
+  }, [fs]);
+
+  // ── Gespeicherte Tafeln ──
+  //
+  // Die Flaeche auf dem Bildschirm bleibt die Arbeitsfassung im localStorage
+  // (sie ueberlebt das Neuladen, auch ohne dass jemand speichert). Wer eine
+  // Tafel behalten will, gibt ihr einen Namen — dann liegt sie am KONTO und
+  // ist am Rechner im Klassenraum da. Gespeichert wird auf Knopfdruck, wie
+  // ueberall sonst; „automatisch" waere hier besonders falsch, weil die Tafel
+  // im Unterricht laufend umgeraeumt wird.
+  const [tafeln, setTafeln] = useState([]);
+  const [offene, setOffene] = useState("");     // id der geladenen Tafel ("" = Arbeitsfassung)
+  const [gespeichert, setGespeichert] = useState(true);
+  const tafelnLaden = () => hol("/api/tafel", []).then((d) => setTafeln(Array.isArray(d) ? d : []));
+  useEffect(() => { tafelnLaden(); }, []);
+  useEffect(() => { setGespeichert(false); }, [items]);
+
+  const tafelOeffnen = async (id) => {
+    if (!id) { setOffene(""); return; }
+    if (!gespeichert && !(await askConfirm(t("speichern.verlassen")))) return;
+    const d = await hol(`/api/tafel/${id}`, null);
+    if (!d) return;
+    setItems(Array.isArray(d.items) ? d.items : []);
+    setSel(null);
+    setOffene(String(id));
+    setGespeichert(true);
+  };
+  const tafelSpeichern = async () => {
+    if (offene) {
+      if (!(await sende(`/api/tafel/${offene}`, alsJson("PUT", { items }), t("tafel.speichern")))) return;
+    } else {
+      const name = await askPrompt(t("tafel.nameFrage"));
+      if (!name || !name.trim()) return;
+      const d = await sende("/api/tafel", alsJson("POST", { name: name.trim(), items }), t("tafel.speichern"));
+      if (!d) return;
+      setOffene(String(d.id));
+    }
+    setGespeichert(true);
+    tafelnLaden();
+  };
+  const tafelLoeschen = async () => {
+    const t2 = tafeln.find((x) => String(x.id) === offene);
+    if (!t2 || !(await askConfirm(t("tafel.loeschenFrage", { name: t2.name })))) return;
+    if (!(await sende(`/api/tafel/${offene}`, { method: "DELETE" }, t("common.delete")))) return;
+    setOffene("");
+    tafelnLaden();
+  };
+
   // Beim Auswählen die Farb-/Größen-Optik eingeklappt lassen (erst Stift zeigen).
   useEffect(() => { setFontPop(false); }, [sel]);
 
   return (
     <div style={{ ...pageFull }}>
       <style>{`@keyframes tafelFlash{0%,100%{background:transparent}50%{background:rgba(220,38,38,0.55)}}.tafel-flash{animation:tafelFlash .5s steps(1) 6}`}</style>
-      <Werkzeugleiste>
+      <Werkzeugleiste
+        links={<SuchSelect value={offene} onChange={tafelOeffnen} leerLabel={t("tafel.arbeitsfassung")}
+          optionen={tafeln.map((x) => ({ wert: String(x.id), label: x.name }))} style={{ minWidth: 180 }} />}
+        mehr={[
+          offene && { key: "loeschen", label: t("tafel.loeschen"), icon: ICONS.trash, gefahr: true, onClick: tafelLoeschen },
+        ]}>
+        <button onClick={tafelSpeichern} style={toolbarBtn} title={t("tafel.speichern")}>
+          <Icon d={ICONS.check} size={15} /> {gespeichert && offene ? t("tafel.gespeichert") : t("tafel.speichern")}
+        </button>
         <span style={{ flex: 1 }} />
         <button onClick={add} style={toolbarBtnPrimary}><Icon d={ICONS.plus} size={15} color="var(--bg)" /> {t("tafel.add")}</button>
         <button onClick={addTimer} style={toolbarBtn}><Icon d={ICONS.plus} size={15} /> {t("tafel.addTimer")}</button>
@@ -135,10 +210,23 @@ export default function Tafel() {
           Referenzgröße und wird per transform:scale eingepasst. Die Steuerleiste
           schwebt am gewählten Element (kein fester Balken oben). */}
       <div ref={outerRef} onPointerDown={() => setSel(null)}
-        style={{ position: "relative", width: "100%", height: scale * REF_H, border: "1px solid var(--border)", borderRadius: fs ? 0 : cardStyle.borderRadius, background: "var(--card)", overflow: "hidden",
-          ...(fs ? { position: "fixed", inset: 0, width: "100vw", height: "100vh", zIndex: 9999 } : {}) }}>
+        style={{ position: "relative", width: "100%",
+          // Im Vollbild bestimmt `inset: 0` die Groesse; eine gesetzte Hoehe
+          // schluege sie und die Flaeche ragte unten aus dem Bild.
+          height: fs ? "auto" : scale * REF_H, border: "1px solid var(--border)", borderRadius: fs ? 0 : cardStyle.borderRadius, background: "var(--card)", overflow: "hidden",
+          // `inset: 0` allein — NICHT 100vw/100vh: `100vw` zaehlt die
+          // Bildlaufleiste mit, die Flaeche steht dann um deren Breite zu weit
+          // rechts, und der Schliessen-Knopf in der Ecke haengt halb
+          // ausserhalb. Mit dem Fenster kleiner zu ziehen half nur, weil die
+          // Leiste dabei verschwand.
+          ...(fs ? { position: "fixed", inset: 0, zIndex: 9999 } : {}) }}>
         {fs && (
-          <button onClick={() => setFs(false)} style={{ ...toolbarBtn, position: "absolute", top: 12, right: 12, zIndex: 20 }}>
+          <button onClick={() => setFs(false)}
+            style={{ ...toolbarBtn, position: "absolute", zIndex: 20,
+              // Am iPad liegt oben rechts die Kamera-Insel bzw. die abgerundete
+              // Ecke; `env()` haelt den Knopf davon frei.
+              top: "max(12px, env(safe-area-inset-top))",
+              right: "max(12px, env(safe-area-inset-right))" }}>
             <Icon d={ICONS.close} size={16} /> {t("common.close")}
           </button>
         )}

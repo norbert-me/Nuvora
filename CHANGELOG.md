@@ -36,6 +36,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   Ein Klick auf ein Kind schreibt eine Bemerkung ins Notenbuch. Gelöscht wird
   ein Platz, indem man ihn auf den Mülleimer zieht, der beim Ziehen erscheint.
 - Fehler melden: ein angehängtes Bild wird im Dialog gezeigt.
+- Tafel: mehrere Tafeln lassen sich unter einem Namen speichern und wieder
+  öffnen — sie hängen am Konto, nicht am Browser.
+- Tafel im Vollbild: der Schließen-Knopf steht wieder vollständig im Bild.
+- Notenbuch: fehlende Kinder werden auch dann an der Spalte markiert, wenn der
+  Kurs aus mehreren Fach-Klassen besteht.
 
 - Der Speichern-Knopf bleibt am Bildschirm: scrollt er aus dem Bild, während
   etwas offen ist, erscheint er unten.
