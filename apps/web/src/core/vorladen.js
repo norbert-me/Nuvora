@@ -65,8 +65,8 @@ async function hole(pfad) {
  * Einmal je Sitzung alle Listen holen, damit die App danach offline benutzbar ist.
  * Laeuft im Hintergrund; der Aufrufer wartet nicht darauf.
  */
-export async function vorladen() {
-  if (gelaufen) return;
+export async function vorladen({ erzwingen = false } = {}) {
+  if (gelaufen && !erzwingen) return;
   gelaufen = true;
   if (typeof navigator !== "undefined" && navigator.onLine === false) { gelaufen = false; return; }
   // Auf einer langsamen oder ausdruecklich sparsamen Verbindung faellt der
@@ -74,13 +74,16 @@ export async function vorladen() {
   // im Schulnetz sind das genau die, die der gerade geoeffneten Seite fehlen.
   // Offline geht danach weniger; das ist der ehrlichere Tausch als eine App,
   // die zehn Minuten laedt, bevor die erste Klassenliste steht.
-  if (sparsamesNetz()) { gelaufen = false; return; }
+  // „Erzwingen" kommt aus der Offline-Diagnose im Profil: dort hat jemand
+  // ausdruecklich „jetzt vorbereiten" gedrueckt — dann gilt weder der
+  // Sparsam-Schalter noch der Tagesabstand.
+  if (!erzwingen && sparsamesNetz()) { gelaufen = false; return; }
   // Nicht bei jedem Neuladen: das waeren je Mal ein paar Dutzend Anfragen, nur
   // um denselben Vorrat noch einmal abzulegen. Einmal am Tag reicht — im
   // laufenden Betrieb fuellt der Worker den Cache ohnehin bei jedem Aufruf.
   try {
     const zuletzt = Number(localStorage.getItem("nuvora:vorgeladen") || 0);
-    if (zuletzt && Date.now() - zuletzt < 12 * 60 * 60 * 1000) return;
+    if (!erzwingen && zuletzt && Date.now() - zuletzt < 12 * 60 * 60 * 1000) return;
   } catch { /* kein Speicher: dann eben jedes Mal */ }
 
   let aktiv = [];

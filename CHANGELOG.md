@@ -14,6 +14,14 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- Profil: „Offline-Bereitschaft" sagt auf dem Gerät, woran es hängt — sichere
+  Verbindung, Service Worker, Zwischenspeicher, Datenvorrat, dauerhafte Ablage
+  und wartende Änderungen. Ein Knopf holt den Vorrat sofort.
+- Die iPhone-App entsteht in der Release-Pipeline; lokal baut sie
+  `scripts/ios-bauen.sh` mit einem Befehl, ohne Xcode zu öffnen.
+
 ## 4.3.2 — 08.09.2026
 
 **Offline und schlechtes Netz**
