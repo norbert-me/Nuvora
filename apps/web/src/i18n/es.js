@@ -389,6 +389,8 @@ export default {
   "profile.sparsamHint": "Carga solo lo necesario — sin reservas para el modo sin conexión. Habrá menos disponible sin conexión.",
   "profile.sofort": "Nuvora",
   "profile.apps": "Descargar la app",
+  "profile.appServer": "Servidor",
+  "profile.appServerAendern": "Conectar otra dirección",
   "profile.modulTeile": "Partes de los módulos",
   "pap.titel": "Editor de diagramas de flujo",
   "pap.freiHinweis": "Esta página no es de nadie: lo que dibujas se queda en tu navegador y no se guarda en ningún sitio.",

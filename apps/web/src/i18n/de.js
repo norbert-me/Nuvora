@@ -390,6 +390,8 @@ export default {
   "profile.sparsamHint": "Lädt nur, was gerade gebraucht wird — kein Vorrat für den Offline-Betrieb. Offline steht danach weniger zur Verfügung.",
   "profile.sofort": "Nuvora",
   "profile.apps": "App laden",
+  "profile.appServer": "Server",
+  "profile.appServerAendern": "Andere Adresse verbinden",
   "profile.modulTeile": "Teile der Module",
   "pap.titel": "PAP-Editor",
   "pap.freiHinweis": "Diese Seite gehört niemandem: Was du zeichnest, bleibt in deinem Browser und wird nirgends gespeichert.",

@@ -446,8 +446,19 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           Datei bleiben SICHTBAR und sagen „in Vorbereitung" — die Frage „gibt
           es das fuer Windows?" beantwortet die Seite sonst gar nicht. */}
       <Abschnitt id="apps" titel={t("profile.apps")}>
+        {/* Nur in der iPhone-/iPad-Huelle: sie merkt sich die Serveradresse in
+            ihrer EIGENEN Herkunft (capacitor://localhost) — von hier aus ist
+            das die einzige Tuer zurueck zur Einrichtungsseite. Im Browser und
+            in der Desktop-App gibt es den Eintrag nicht: dort steht die
+            Adresse in der Adresszeile bzw. im Menue der App. */}
+        {typeof window !== "undefined" && window.Capacitor && (
+          <Zeile label={t("profile.appServer")} erste>
+            <button type="button" onClick={() => { window.location.href = "capacitor://localhost/index.html?setup=1"; }}
+              style={btnSecondary}>{t("profile.appServerAendern")}</button>
+          </Zeile>
+        )}
         {(apps?.plattformen || []).map((p, i) => (
-          <Zeile key={p.key} label={p.label} erste={i === 0}
+          <Zeile key={p.key} label={p.label} erste={i === 0 && !(typeof window !== "undefined" && window.Capacitor)}
             hint={p.datei ? `${p.datei.name} · ${Math.round((p.datei.size || 0) / 1048576)} MB` : t("profile.appsBald")}>
             {p.datei ? (
               <a href={p.datei.url} style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>

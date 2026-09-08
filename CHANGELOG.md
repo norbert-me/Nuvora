@@ -43,6 +43,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   Vorwärts stehen im Menü (Cmd+[ / Cmd+]).
 - In der App und in der installierten Web-App steht ein Zurück-Pfeil in der
   Navigationsleiste — dort gibt es keinen des Browsers.
+- Neu: das Gerüst der iPhone-/iPad-App (`apps/ios`) — dieselbe Hülle wie am
+  Mac, mit Einrichtungsseite für die Serveradresse.
 - Kalender: der Weg zur Anwesenheit stand im Stunden-Dialog zweimal; er steht
   jetzt einmal unter „Öffnen" und springt auf den Tag des Termins.
 - Notenbuch: fehlende Kinder werden auch dann an der Spalte markiert, wenn der

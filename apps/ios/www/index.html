@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Nuvora einrichten</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0;
+         display: flex; align-items: center; justify-content: center; min-height: 100vh;
+         padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+         box-sizing: border-box; background: #f5f6f8; color: #1b1d22; }
+  @media (prefers-color-scheme: dark) { body { background: #16171b; color: #e8e9ec; } }
+  .card { width: 420px; max-width: 100%; padding: 28px; border-radius: 16px;
+          background: #fff; box-shadow: 0 8px 40px rgba(0,0,0,0.12); box-sizing: border-box; }
+  @media (prefers-color-scheme: dark) { .card { background: #202227; box-shadow: 0 8px 40px rgba(0,0,0,0.5); } }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p { font-size: 13.5px; color: #6b7280; margin: 0 0 18px; line-height: 1.6; }
+  label { font-size: 12.5px; color: #6b7280; display: block; margin-bottom: 6px; }
+  input { width: 100%; padding: 12px 13px; font-size: 16px; border-radius: 10px;
+          border: 1px solid #cbd0d8; box-sizing: border-box; background: transparent; color: inherit; }
+  input:focus { outline: none; border-color: #2563eb; }
+  button { width: 100%; margin-top: 16px; padding: 13px; font-size: 16px; font-weight: 600;
+           border: none; border-radius: 999px; background: #1b1d22; color: #fff; }
+  @media (prefers-color-scheme: dark) { button { background: #e8e9ec; color: #16171b; } }
+  .err { color: #d1350f; font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Nuvora verbinden</h1>
+    <p>Adresse deines Nuvora-Servers eingeben — dieselbe, die du im Browser aufrufst.
+       Beispiel: <code>https://nuvora.deine-domain.de</code>.</p>
+    <label for="url">Server-Adresse</label>
+    <input id="url" type="url" inputmode="url" autocapitalize="off" autocorrect="off"
+           placeholder="https://…" autofocus />
+    <button id="go">Verbinden</button>
+    <div class="err" id="err"></div>
+  </div>
+<script>
+  // Die Adresse liegt im localStorage DIESER Herkunft (capacitor://localhost).
+  // Die Weboberflaeche laeuft danach auf der Herkunft des Servers und kommt an
+  // diesen Speicher nicht heran — genau so ist es gemeint: die Hueller-Seite
+  // ist der einzige Ort, an dem die Serveradresse steht.
+  const KEY = "nuvora_server_url";
+  const feld = document.getElementById("url");
+  const fehler = document.getElementById("err");
+  const vorhanden = (() => { try { return localStorage.getItem(KEY) || ""; } catch { return ""; } })();
+
+  // Schon eingerichtet? Dann sofort weiter — ausser die Seite wurde
+  // ausdruecklich zum Aendern geoeffnet (?setup=1, siehe Profil in Nuvora).
+  const aendern = new URLSearchParams(location.search).get("setup") === "1";
+  if (vorhanden && !aendern) location.replace(vorhanden);
+  if (vorhanden) feld.value = vorhanden;
+
+  document.getElementById("go").addEventListener("click", () => {
+    const u = feld.value.trim().replace(/\/+$/, "");
+    if (!/^https?:\/\//i.test(u)) { fehler.textContent = "Bitte mit http:// oder https:// beginnen."; return; }
+    try { localStorage.setItem(KEY, u); } catch { /* privater Modus: dann eben nur diese Sitzung */ }
+    location.replace(u);
+  });
+  feld.addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("go").click(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "nuvora-ios",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Nuvora als iPhone-/iPad-App (Hülle um die eigene Installation, wie apps/desktop).",
+  "scripts": {
+    "ios:add": "cap add ios",
+    "ios:sync": "cap sync ios",
+    "ios:open": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/ios": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  }
+}

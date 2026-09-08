@@ -388,6 +388,8 @@ export default {
   "profile.sparsamHint": "Loads only what is needed right now — no offline stock. Less will be available offline.",
   "profile.sofort": "Nuvora",
   "profile.apps": "Get the app",
+  "profile.appServer": "Server",
+  "profile.appServerAendern": "Connect a different address",
   "profile.modulTeile": "Module parts",
   "pap.titel": "Flowchart editor",
   "pap.freiHinweis": "This page belongs to nobody: what you draw stays in your browser and is never stored.",

@@ -1,0 +1,13 @@
+{
+  "appId": "de.nuvora.app",
+  "appName": "Nuvora",
+  "webDir": "www",
+  "server": {
+    "iosScheme": "capacitor",
+    "allowNavigation": ["*"]
+  },
+  "ios": {
+    "contentInset": "always",
+    "limitsNavigationsToAppBoundDomains": false
+  }
+}
