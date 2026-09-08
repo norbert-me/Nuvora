@@ -95,6 +95,35 @@ Installation hinge an dessen Laufzeit.
 * **Server wechseln**: in Nuvora unter „Profil“ (der Eintrag erscheint nur in
   der App) — er ruft `capacitor://localhost/index.html?setup=1` auf.
 
+## Auf das iPhone bekommen — was ein Sideloader kann und was nicht
+
+Anders als bei Android ist eine `.ipa` **kein fertiges Paket zum Installieren**.
+Android prüft beim Installieren nur, dass eine APK überhaupt signiert ist —
+von wem, ist egal. iOS prüft bei **jedem Start**, ob die Signatur von einem
+Zertifikat stammt, das Apple ausgestellt hat, und ob das Provisioning-Profil
+dieses Gerät nennt. Eine unsignierte Datei startet deshalb nicht, egal wie sie
+auf das Gerät kommt.
+
+Ein Sideloader (**AltStore**, **Sideloadly**) installiert die Datei deshalb
+nicht einfach, sondern **signiert sie im Moment der Installation mit deiner
+eigenen Apple-ID neu**. Das funktioniert — mit zwei Fristen:
+
+| Apple-ID | Gültigkeit | Grenzen |
+| -------- | ---------- | ------- |
+| kostenlos | **7 Tage**, danach startet die App nicht mehr | höchstens 3 selbst signierte Apps, Rechner im selben Netz zum Erneuern (AltStore macht das von allein, solange AltServer läuft) |
+| Developer Program (99 €/Jahr) | **1 Jahr** | keine praktische Grenze; zusätzlich TestFlight möglich (Installation und Updates ohne Rechner) |
+
+Die Datei, die beide Werkzeuge erwarten, ist genau die, die
+`scripts/ios-bauen.sh` und die Release-Pipeline erzeugen — dort ist also nichts
+weiter zu tun. Was der Sideloader danach macht, kann kein Skript abnehmen: die
+Signatur gehört zur Apple-ID des Geräts.
+
+**Und die Alternative ohne all das:** Nuvora im Safari öffnen, *Teilen* → *Zum
+Home-Bildschirm*. Offline lesen und schreiben kommen vom Service Worker und der
+Outbox, also aus derselben Quelle wie in der App — Bedingung ist eine
+**https**-Adresse. Ob das auf einem Gerät wirklich steht, sagt in Nuvora das
+Profil unter „Offline-Bereitschaft".
+
 ## Was hier NICHT hineingehört
 
 Kein Modul im `REGISTRY`, keine eigene Anmeldung, keine eigenen Daten. Alles,
