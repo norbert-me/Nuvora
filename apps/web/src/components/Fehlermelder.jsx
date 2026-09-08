@@ -190,6 +190,17 @@ export default function Fehlermelder() {
                 )}
               </div>
 
+              {/* Das gewaehlte Bild direkt zeigen: aus dem Dateinamen allein
+                  sieht niemand, ob der richtige Screenshot drinhaengt — und
+                  „screenshot 12.png" gibt es dreimal im Ordner. Die Daten
+                  liegen ohnehin schon als base64 im Zustand, es geht also kein
+                  zweiter Ladeweg auf. */}
+              {datei && /^image\//.test(datei.typ || "") && (
+                <img src={`data:${datei.typ};base64,${datei.daten}`} alt={datei.name}
+                  style={{ display: "block", maxWidth: "100%", maxHeight: 180, borderRadius: CONTROL_R,
+                    border: "1px solid var(--border)", margin: "0 0 12px" }} />
+              )}
+
               {logOffen && (
                 <pre style={{ ...cardStyle, padding: 10, maxHeight: 240, overflow: "auto", fontSize: 11,
                   lineHeight: 1.5, color: "var(--text2)", whiteSpace: "pre-wrap", margin: "0 0 12px" }}>

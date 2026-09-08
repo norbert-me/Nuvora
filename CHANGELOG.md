@@ -32,6 +32,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Die Teile eines Moduls stehen nur noch im Profil — im Zahnrad der Modulseite
   standen dieselben Schalter ein zweites Mal.
 - Der Kurs verlinkt auf „Karteikarten" statt auf „Karten".
+- Sitzplan: wer heute fehlt, verspätet oder entschuldigt ist, steht am Platz.
+  Ein Klick auf ein Kind schreibt eine Bemerkung ins Notenbuch. Gelöscht wird
+  ein Platz, indem man ihn auf den Mülleimer zieht, der beim Ziehen erscheint.
+- Fehler melden: ein angehängtes Bild wird im Dialog gezeigt.
 
 - Der Speichern-Knopf bleibt am Bildschirm: scrollt er aus dem Bild, während
   etwas offen ist, erscheint er unten.

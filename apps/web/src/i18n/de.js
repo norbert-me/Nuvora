@@ -1856,6 +1856,12 @@ export default {
   "sitzplan.hintFree": "Schüler aus dem Pool auf die Fläche ziehen. Tische frei verschieben, mit ↻ drehen (schräge Tische), mit × zurück in den Pool. Wird automatisch gespeichert.",
   "sitzplan.rotate": "Drehen",
   "sitzplan.removeSeat": "Entfernen",
+  "sitzplan.bemerkung": "Bemerkung",
+  "sitzplan.bemerkungFrage": "Bemerkung zu {{name}}",
+  "sitzplan.bemerkungPlatzhalter": "z. B. hat heute geholfen",
+  "sitzplan.anw.fehlt": "Fehlt heute",
+  "sitzplan.anw.spaet": "Verspätet",
+  "sitzplan.anw.entsch": "Entschuldigt",
 
   // Seite nicht gefunden (404)
   "notfound.title": "Diese Seite gibt es nicht",

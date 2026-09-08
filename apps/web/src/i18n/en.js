@@ -1870,6 +1870,12 @@ export default {
   "sitzplan.hintFree": "Drag students from the pool onto the area. Move tables freely, rotate with ↻ (angled tables), remove with × back to the pool. Saved automatically.",
   "sitzplan.rotate": "Rotate",
   "sitzplan.removeSeat": "Remove",
+  "sitzplan.bemerkung": "Note",
+  "sitzplan.bemerkungFrage": "Note about {{name}}",
+  "sitzplan.bemerkungPlatzhalter": "e.g. helped out today",
+  "sitzplan.anw.fehlt": "Absent today",
+  "sitzplan.anw.spaet": "Late",
+  "sitzplan.anw.entsch": "Excused",
 
   // Page not found (404)
   "notfound.title": "This page does not exist",

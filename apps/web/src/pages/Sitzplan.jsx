@@ -10,9 +10,11 @@ import ViewMenu from "../components/ViewMenu.jsx";
 import Portrait from "../components/Portrait.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { useModulOption } from "../core/modules.js";
+import { useAktiv, useModulOption } from "../core/modules.js";
+import { askPrompt } from "../core/dialog.jsx";
+import { heuteYmd } from "../core/datum.js";
 import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
-import { alsJson, hol } from "../core/melden.js";
+import { alsJson, hol, sende } from "../core/melden.js";
 
 const API = "/api/sitzplan";
 // Der Platz traegt zwei Zeilen: oben Bild und Knoepfe, darunter den Namen.
@@ -64,6 +66,25 @@ export default function Sitzplan() {
   // Schalter und ein Kuerzel am Platz, die ihm nichts sagen. Eingetragene
   // Stufen bleiben dabei erhalten — abgeschaltet ist die ANZEIGE.
   const segelTeil = useModulOption("orga", "segel");
+  // Anwesenheit ist eine ZWEITE Anzeige neben dem Hervorheben und laeuft
+  // deshalb nicht ueber `farbeFuer`: die drei Hervorhebungs-Arten beantworten
+  // „wer gehoert zu welcher Gruppe?", die Anwesenheit „wer ist heute da?".
+  // Beides gleichzeitig zu brauchen ist der Normalfall („markiere die
+  // Vierergruppe — und wer fehlt davon?"), also darf das eine das andere nicht
+  // verdraengen: die Gruppenfarbe bleibt an Rahmen und Kante, der abwesende
+  // Platz wird blass und traegt sein Kuerzel.
+  const anwesenheitTeil = useModulOption("orga", "anwesenheit");
+  const notenTeil = useModulOption("auswertung", "noten");
+  const aktiv = useAktiv();
+  const [anwesenheit, setAnwesenheit] = useState({});   // { student_id: {status} }
+  // Waehrend ein Platz gezogen wird, erscheint unten ein Muelleimer; wer dort
+  // loslaesst, entfernt den Platz. Das ersetzt das × an jedem Platz: vier
+  // Knoepfe auf 108 px Breite, davon zwei mit sehr verschiedenen Folgen.
+  // Bewusst ein FELD und kein „nach aussen ziehen" — die Flaeche waechst nach
+  // unten und rechts, „draussen" ist dort also ein gueltiger Platz.
+  const [ziehtPlatz, setZiehtPlatz] = useState(false);
+  const [ueberMuell, setUeberMuell] = useState(false);
+  const muellRef = useRef(null);
   // Anwesenheit lebt im Modul „Orga" (Aufruf-Ansicht nutzt sie).
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
@@ -153,6 +174,16 @@ export default function Sitzplan() {
     return null;
   };
 
+  // Anwesenheit eines Platzes: Kuerzel und Farbe. „da" gibt nichts zurueck —
+  // der Normalfall braucht keine Markierung, sonst traegt die ganze Klasse ein
+  // Zeichen und das eine, auf das es ankommt, faellt nicht mehr auf.
+  const ANW = {
+    fehlt: { ab: "F", farbe: C.danger },
+    spaet: { ab: "V", farbe: C.warning },
+    entsch: { ab: "E", farbe: C.info },
+  };
+  const anwFuer = (st) => (st && anwesenheitTeil ? ANW[anwesenheit[String(st.id)]?.status] || null : null);
+
   // Legende: ohne sie ist ein farbiger Balken nur Dekoration. Zeigt genau die
   // Gruppen, die gerade vorkommen.
   const legende = useMemo(() => {
@@ -200,6 +231,16 @@ export default function Sitzplan() {
     });
   }, [kursId]);
   useEffect(() => { load(classId); }, [classId, kursId, load]);
+
+  // Die Anwesenheit von HEUTE dazu. Sie gehoert dem Modul Orga (Teil
+  // „Anwesenheit"); ist der Teil aus, wird gar nicht erst gefragt — eine
+  // Anzeige, die niemand eingeschaltet hat, soll auch keine Anfrage kosten.
+  useEffect(() => {
+    if (!classId || !anwesenheitTeil) { setAnwesenheit({}); return; }
+    hol(`/api/anwesenheit/${classId}?date=${heuteYmd()}`, null).then((d) => {
+      setAnwesenheit(d && typeof d === "object" ? d : {});
+    });
+  }, [classId, anwesenheitTeil]);
 
   // ── Ein Entwurf für den ganzen Plan ──
   // Plätze, Tafel und SEGEL-Stufen liegen in EINER Arbeitskopie mit EINER
@@ -463,8 +504,16 @@ export default function Sitzplan() {
     if (!d.gezogen) {
       if (Math.abs(e.clientX - d.sx) < 4 && Math.abs(e.clientY - d.sy) < 4) return;
       d.gezogen = true;
+      setZiehtPlatz(true);
       snapshot();
     }
+    // Liegt der Zeiger ueber dem Muelleimer? Wird beim Loslassen gebraucht und
+    // faerbt ihn schon vorher ein — sonst laesst man ueber einem Feld los,
+    // von dem man nicht weiss, ob es getroffen ist.
+    const mrect = muellRef.current && muellRef.current.getBoundingClientRect();
+    const drin = !!mrect && e.clientX >= mrect.left && e.clientX <= mrect.right && e.clientY >= mrect.top && e.clientY <= mrect.bottom;
+    d.imMuell = drin;
+    setUeberMuell(drin);
     const rect = canvasRef.current.getBoundingClientRect();
     const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx - versatzX, rect.width / zoom - SEAT_W + RAND_ZUG));
     const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy - versatzY, rect.height / zoom - SEAT_H + RAND_ZUG));
@@ -480,6 +529,17 @@ export default function Sitzplan() {
     // Wurde ueber den linken/oberen Rand hinaus gezogen, wandert die ganze
     // Anordnung zurueck ins Positive — die Flaeche ist damit nach links
     // gewachsen, ohne dass jemand Koordinaten von Hand aufraeumen muss.
+    setZiehtPlatz(false);
+    setUeberMuell(false);
+    if (d?.gezogen && d.imMuell) {
+      // Der Schnappschuss steht schon (erster Zug) — „Rueckgaengig" holt den
+      // Platz mitsamt seiner Position zurueck.
+      // Funktional filtern: `seats` in dieser Funktion ist der Stand von vor
+      // dem Zug (die Ereignis-Horcher haengen an dem Render, in dem der Zug
+      // begann) — sonst faende der naechste Zug einen alten Plan vor.
+      setSeats((prev) => prev.filter((x) => x.sid !== d.sid));
+      return;
+    }
     if (d?.gezogen) {
       const norm = normalisieren(seats, tafel);
       // `persist` schreibt Plaetze UND Tafel in den Entwurf — ein zweiter
@@ -491,10 +551,34 @@ export default function Sitzplan() {
     }
     // Im Markier-Modus ist der Klick auf den Platz der Handgriff: eine Ecke
     // mehr waere die fuenfte an einem Tisch von 108 px Breite.
-    if (d && !d.gezogen && !d.empty && hervor === "mark") markSchalten(d.sid);
+    if (d && !d.gezogen && !d.empty) {
+      // Im Markier-Modus ist der Klick der Handgriff (eine Ecke mehr waere die
+      // fuenfte an einem Tisch von 108 px); sonst oeffnet er die Bemerkung.
+      if (hervor === "mark") markSchalten(d.sid);
+      else if (notenAn) bemerken(d.sid);
+    }
   };
 
   const entfernen = (sid) => { snapshot(); persist(seats.filter((s) => s.sid !== sid)); };
+
+  // Ein Klick auf ein Kind schreibt eine Bemerkung ins Notenbuch.
+  //
+  // Der Sitzplan ist die Ansicht, die waehrend des Unterrichts offen ist —
+  // „hat heute geholfen" faellt genau dort an und nicht in einer Notentabelle,
+  // die man danach aufmacht. Es ist eine BEOBACHTUNG, keine Note: sie zaehlt
+  // in keinen Schnitt und braucht deshalb auch keine Spalte (siehe noten.py).
+  // Ohne das Modul Auswertung passiert nichts (Regel 3) — dann bleibt der
+  // Klick, was er war.
+  const notenAn = aktiv("auswertung") && notenTeil;
+  const bemerken = async (sid) => {
+    const st = byId(sid);
+    if (!st) return;
+    const text = await askPrompt(t("sitzplan.bemerkungFrage", { name: st.name }), { placeholder: t("sitzplan.bemerkungPlatzhalter") });
+    if (!text || !text.trim()) return;
+    await sende("/api/noten/entries", alsJson("POST", {
+      student_id: sid, kind: "observation", class_id: classId, kurs_id: kursId ?? null, note: text.trim(),
+    }), t("sitzplan.bemerkung"));
+  };
 
   // ── Freie Drehung per Eck-Griff (oben rechts). Winkel = Richtung vom
   // Tisch-Mittelpunkt zum Zeiger. ──
@@ -753,6 +837,8 @@ export default function Sitzplan() {
               const s = byId(seat.sid);
               if (!seat.empty && !s) return null;   // verwaister Platz (Schüler gelöscht) bleibt versteckt
               const hf = seat.empty ? null : farbeFuer(s);
+              const anw = seat.empty ? null : anwFuer(s);
+              const anwKey = anw ? anwesenheit[String(s.id)]?.status : "";
               const mitFoto = !seat.empty && fotosOn && !!s?.has_photo;
               return (
                 <div key={seat.sid} draggable={false}
@@ -769,6 +855,9 @@ export default function Sitzplan() {
                     borderRadius: CONTROL_R,
                     border: `1px solid ${hf || "var(--border2)"}`,
                     background: hf ? `${hf}1f` : "var(--bg)", color: "var(--text)", fontSize: 13, fontWeight: 600,
+                    // Wer nicht da ist, tritt zurueck — aber bleibt lesbar:
+                    // der Platz gehoert ihm weiter, und morgen sitzt er da.
+                    opacity: anwKey === "fehlt" ? 0.45 : 1,
                     cursor: hervor === "mark" && !seat.empty ? "pointer" : "grab",
                     boxShadow: SHADOW.ruhig, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none" }}>
                   <div style={{ display: "flex", alignItems: "stretch", height: BILD, flexShrink: 0 }}>
@@ -805,8 +894,17 @@ export default function Sitzplan() {
                           </button>
                         );
                       })()}
-                      <button onPointerDown={(e) => e.stopPropagation()} onClick={() => entfernen(seat.sid)} title={t("sitzplan.removeSeat")}
-                        style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 9, border: "1px solid var(--border2)", background: "var(--card)", cursor: "pointer", color: C.danger, fontSize: 12, fontWeight: 700, padding: 0, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+                      {/* Geloescht wird durch Ziehen auf den Muelleimer, der
+                          waehrend des Zugs unten erscheint — ein × an jedem
+                          Platz war der vierte Knopf auf 108 px Breite und lag
+                          neben dem Drehgriff. */}
+                      {anw && (
+                        <span title={t(`sitzplan.anw.${anwKey}`)}
+                          style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center",
+                            background: anw.farbe, color: C.aufAkzent, fontSize: 11, fontWeight: 700, lineHeight: 1 }}>
+                          {anw.ab}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {/* Der Name ueber die ganze Breite — er ist die Angabe, auf
@@ -855,6 +953,23 @@ export default function Sitzplan() {
           </div>
           )}
         </>
+      )}
+      {/* Der Muelleimer erscheint nur waehrend eines Zugs — sonst waere er
+          eine Flaeche, die die ganze Zeit auf einen Fehlgriff wartet. Fest am
+          Bildschirm, weil die Zeichenflaeche scrollt und der Zug sie sonst
+          verlassen muesste. */}
+      {ziehtPlatz && (
+        <div ref={muellRef} aria-hidden
+          style={{ position: "fixed", left: "50%", transform: "translateX(-50%)",
+            bottom: "max(24px, env(safe-area-inset-bottom))", zIndex: 40,
+            display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: CONTROL_R + 4,
+            border: `2px ${ueberMuell ? "solid" : "dashed"} ${C.danger}`,
+            background: ueberMuell ? C.danger : "var(--card)",
+            color: ueberMuell ? C.aufAkzent : C.danger, fontSize: 13, fontWeight: 600,
+            boxShadow: SHADOW.schwebend, pointerEvents: "none" }}>
+          <Icon d={ICONS.trash} size={16} color={ueberMuell ? C.aufAkzent : C.danger} />
+          {t("sitzplan.removeSeat")}
+        </div>
       )}
       <SpeicherBalken entwurf={e} />
     </div>

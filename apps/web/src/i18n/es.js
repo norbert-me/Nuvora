@@ -1871,6 +1871,12 @@ export default {
   "sitzplan.hintFree": "Arrastra alumnos del grupo a la zona. Mueve las mesas libremente, gíralas con ↻ (mesas inclinadas), quítalas con × al grupo. Se guarda automáticamente.",
   "sitzplan.rotate": "Girar",
   "sitzplan.removeSeat": "Quitar",
+  "sitzplan.bemerkung": "Observación",
+  "sitzplan.bemerkungFrage": "Observación sobre {{name}}",
+  "sitzplan.bemerkungPlatzhalter": "p. ej. hoy ayudó",
+  "sitzplan.anw.fehlt": "Ausente hoy",
+  "sitzplan.anw.spaet": "Tarde",
+  "sitzplan.anw.entsch": "Justificado",
 
   // Página no encontrada (404)
   "notfound.title": "Esta página no existe",
