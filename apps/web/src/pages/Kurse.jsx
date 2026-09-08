@@ -27,12 +27,14 @@ const FACH_VORSCHLAEGE = [
   "Kunst", "Musik", "Sport", "Wirtschaft", "Sachunterricht", "Lernzeit",
 ];
 
+// Platzhalter fuer „andere …" in den Auswahlfeldern: er steht nur im Entwurf
+// und wird beim Speichern zu einem leeren Wert — sonst stuende er als Jahr in
+// der Datenbank.
+const NEU = "\u0000neu";
+
 export default function Kurse() {
   const { t } = useLanguage();
   const [kurse, setKurse] = useState([]);
-  // Welche Jahrgaenge es schon gibt — die Auswahl unten fuellt sich daraus.
-  const jahrgaenge = [...new Set(kurse.map((k) => k.jahrgang).filter(Boolean).map(String))]
-    .sort((a, b) => Number(a) - Number(b));
   const [allClasses, setAllClasses] = useState([]);
   // Gelöschte Kurse liegen im gemeinsamen Papierkorb des Kerns (/papierkorb).
   const [neu, setNeu] = useState("");
@@ -51,6 +53,11 @@ export default function Kurse() {
   const kurs = useEntwurf(kursBasis, (w) => kursSpeichern(w));
   const kursUebernehmen = (stand) => { setKursBasis(stand); kurs.setz(stand); };
   const [alleKurse, setAlleKurse] = useState([]);   // inkl. Archiv — das Vorjahr liegt meist dort
+  // Und welche Schuljahre — dieselbe Ueberlegung wie beim Jahrgang: „2025/26"
+  // tippt niemand jedes Mal neu, und ein Tippfehler macht aus einem Jahr zwei.
+  // Aus den eigenen Kursen, Archiv eingeschlossen (das Vorjahr liegt dort).
+  const schuljahre = [...new Set([...kurse, ...alleKurse].map((k) => k.schuljahr).filter(Boolean))]
+    .sort(nachJahrAbsteigend);
 
   // Ein Serverfehler sah hier aus wie „noch kein Kurs angelegt" — mitsamt der
   // freundlichen Empty-Kachel. Wer seine Kurse vermisste, suchte den Fehler bei
@@ -105,7 +112,7 @@ export default function Kurse() {
     if (!k) return false;
     const name = w.name.trim();
     if (!name) return false;
-    const koerper = { name, schuljahr: w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv,
+    const koerper = { name, schuljahr: w.jahr === NEU ? "" : w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv,
                       fach: (w.fach || "").trim(), jahrgang: (w.jahrgang || "").trim(),
                       raum: (w.raum || "").trim() };
     if (!(await sende(`${API}/kurse/${k.id}`, alsJson("PUT", koerper), t("kurse.editName")))) return false;
@@ -169,7 +176,6 @@ export default function Kurse() {
               {k.schuljahr && <span style={chipStyle}>{k.schuljahr}</span>}
               {k.fach && <span style={chipStyle}>{k.fach}</span>}
               {k.raum && <span style={chipStyle}>{k.raum}</span>}
-              {k.jahrgang ? <span style={chipStyle}>{t("topics.jahrgangN", { n: k.jahrgang })}</span> : null}
               <span style={{ flex: 1 }} />
               {/* Archivieren steht jetzt IM Bearbeiten-Bereich und wartet dort
                   auf „Speichern" — es ist ein Umschalten wie der E/G-Regler,
@@ -240,27 +246,11 @@ export default function Kurse() {
                     <datalist id="nuvora-faecher-kurs">
                       {FACH_VORSCHLAEGE.map((f) => <option key={f} value={f} />)}
                     </datalist>
-                    {/* Auswahl statt Zahlenfeld: an einer Schule gibt es eine
-                        Handvoll Jahrgaenge, und man tippt sie nicht jedes Mal
-                        neu. Die Liste kommt aus dem, was schon da ist (eigene
-                        Kurse); „andere …" bleibt der Weg fuer den ersten und
-                        fuer einen, den es hier noch nicht gibt — ohne ihn waere
-                        die Auswahl eine Sackgasse. */}
-                    {kurs.wert.jahrgang && !jahrgaenge.includes(String(kurs.wert.jahrgang)) ? (
-                      // Freitext, keine Zahl: „7/8" ist ein üblicher Jahrgang
-                      // (Kombiklasse, WP-Kurs über zwei Stufen) — ein Zahlenfeld
-                      // nahm ihn gar nicht erst an.
-                      <input autoFocus value={kurs.wert.jahrgang === "0" ? "" : kurs.wert.jahrgang}
-                        onChange={(e) => kurs.setz({ jahrgang: e.target.value.slice(0, 20) })} placeholder={t("topics.jahrgang")}
-                        style={{ ...inputStyle, width: 110 }} />
-                    ) : (
-                      <select value={kurs.wert.jahrgang || ""} style={{ ...selectStyle, width: 130 }}
-                        onChange={(e) => kurs.setz({ jahrgang: e.target.value === "neu" ? "0" : e.target.value })}>
-                        <option value="">– {t("topics.jahrgang")} –</option>
-                        {jahrgaenge.map((j) => <option key={j} value={j}>{t("topics.jahrgangN", { n: j })}</option>)}
-                        <option value="neu">{t("kurse.jahrgangNeu")}</option>
-                      </select>
-                    )}
+                    {/* Der Jahrgang stand hier und ist entfernt (08.09.2026):
+                        das Schuljahr sagt bereits, um welchen Jahrgang es geht.
+                        Spalte und API bleiben, damit Bestandswerte nicht
+                        verschwinden — der Entwurf traegt sie unveraendert
+                        zurueck. */}
                     {/* Der Stammraum. Am Kurs und nicht je Stundenplan-Stunde:
                         derselbe Kurs hat vier Stunden in der Woche und meist
                         denselben Raum. Der Kalender setzt ihn als Ort ein. */}
@@ -274,8 +264,24 @@ export default function Kurse() {
                 <div>
                   <div style={editLabel}>{t("kurse.editYear")}</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <input value={kurs.wert.jahr} onChange={(e) => kurs.setz({ jahr: e.target.value })} placeholder="2025/26"
-                      style={{ ...inputStyle, width: 120 }} />
+                    {/* Auswahl statt Freitext, wie beim Jahrgang: die Liste
+                        kommt aus den eigenen Kursen (Archiv eingeschlossen).
+                        „andere …" bleibt der Weg fuer das erste Jahr und fuer
+                        eins, das es hier noch nicht gibt — getippt wird ein
+                        Schuljahr sonst jedes Mal neu, und „2025/26" neben
+                        „2025/2026" sind zwei Jahre, die nie zusammenfinden. */}
+                    {kurs.wert.jahr === NEU || (kurs.wert.jahr && !schuljahre.includes(kurs.wert.jahr)) ? (
+                      <input autoFocus value={kurs.wert.jahr === NEU ? "" : kurs.wert.jahr} maxLength={20}
+                        onChange={(e) => kurs.setz({ jahr: e.target.value })} placeholder="2025/26"
+                        style={{ ...inputStyle, width: 120 }} />
+                    ) : (
+                      <select value={kurs.wert.jahr || ""} style={{ ...selectStyle, width: 140 }}
+                        onChange={(e) => kurs.setz({ jahr: e.target.value })}>
+                        <option value="">– {t("kurse.editYear")} –</option>
+                        {schuljahre.map((j) => <option key={j} value={j}>{j}</option>)}
+                        <option value={NEU}>{t("kurse.andere")}</option>
+                      </select>
+                    )}
                     <select value={kurs.wert.vorgaenger} onChange={(e) => kurs.setz({ vorgaenger: e.target.value })} style={{ ...selectStyle, flex: 1, minWidth: 200 }}>
                       <option value="">{t("kurse.noPrevious")}</option>
                       {/* Nur FRUEHERE Jahrgaenge: ein Kurs aus demselben

@@ -292,7 +292,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
     setEditNote(false);
   });
   entwurfRef.current = ent;
-  const { notes, zielG, zielE, voraus, fach, jahrgang } = gespeichert;
+  const { notes, zielG, zielE, voraus, fach } = gespeichert;
   const name = gespeichert.name;                  // Anzeige-Titel (nach Umbenennen)
   const [open, setOpen] = useState(false); // Inhalte-Bereich ausgeklappt?
   const [usage, setUsage] = useState(null);
@@ -343,10 +343,13 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
             <div style={secTitle}>{t("common.rename")}</div>
             <input value={ent.wert.name} onChange={(ev) => ent.setz({ name: ev.target.value })} autoFocus maxLength={120}
               style={{ ...inputStyle, width: "100%", fontSize: 16, fontWeight: 600 }} />
-            {/* Fach und Jahrgang stehen am OBERTHEMA — Unterthemen erben sie
-                (der Server pflegt die Regel, siehe _erbt in topics.py). Ein
-                zweites Eingabefeld am Unterthema hiesse: dasselbe Fach an
-                fuenfzig Stellen, und beim ersten Tippfehler weichen sie ab. */}
+            {/* Das Fach steht am OBERTHEMA — Unterthemen erben es (der Server
+                pflegt die Regel, siehe _erbt in topics.py). Ein zweites
+                Eingabefeld am Unterthema hiesse: dasselbe Fach an fuenfzig
+                Stellen, und beim ersten Tippfehler weichen sie ab.
+                Der Jahrgang stand hier daneben und ist entfernt (08.09.2026):
+                das Schuljahr sagt bereits, um welchen Jahrgang es geht. Spalte
+                und API bleiben, damit Bestandswerte nicht verschwinden. */}
             {!tp.parent_id && (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <div style={{ flex: "2 1 180px" }}>
@@ -360,13 +363,6 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
                   <datalist id="nuvora-faecher">
                     {FACH_VORSCHLAEGE.map((f) => <option key={f} value={f} />)}
                   </datalist>
-                </div>
-                <div style={{ flex: "1 1 100px" }}>
-                  <div style={secTitle}>{t("topics.jahrgang")}</div>
-                  {/* Freitext wie am Kurs: „7/8" gibt es wirklich. */}
-                  <input value={ent.wert.jahrgang}
-                    onChange={(ev) => ent.setz({ jahrgang: ev.target.value.slice(0, 20) })}
-                    placeholder="—" style={{ ...inputStyle, width: "100%" }} />
                 </div>
               </div>
             )}
@@ -391,10 +387,9 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
             </div>
           </div>
         ) : (<>
-          {(fach || jahrgang) && (
+          {fach && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
-              {fach && <span style={chipStyle}>{fach}</span>}
-              {jahrgang ? <span style={chipStyle}>{t("topics.jahrgangN", { n: jahrgang })}</span> : null}
+              <span style={chipStyle}>{fach}</span>
             </div>
           )}
           <div style={secTitle}>{t("topics.notes")}</div>

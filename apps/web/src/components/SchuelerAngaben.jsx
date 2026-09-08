@@ -121,7 +121,7 @@ export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau =
           ))}
           <button onClick={() => e.setz((v) => ({ massnahmen: [...v.massnahmen, { art: MASSNAHMEN[0][0], detail: "", arbeit: true }] }))}
             style={{ ...chipStyle, alignSelf: "flex-start", cursor: "pointer", border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text2)", fontSize: 13 }}>
-            + {t("classes.measureAdd")}
+            {t("classes.measureAdd")}
           </button>
         </div>
       </>) : null}

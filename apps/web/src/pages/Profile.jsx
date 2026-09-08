@@ -425,7 +425,11 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         <Abschnitt id="modulteile" titel={t("profile.modulTeile")}>
           {modulTeile.map((m, i) => (
             <Zeile key={m.key} label={m.name} erste={i === 0}>
-              <div style={{ display: "grid", gap: 8 }}>
+              {/* Die Schalter aller Module stehen in EINER Spalte: der
+                  Kasten nimmt den Rest der Zeile (flex 1), sonst richtet
+                  sich seine Breite nach dem laengsten Wort und jedes Modul
+                  faengt an einer anderen Stelle an. */}
+              <div style={{ flex: 1, display: "grid", gap: 8, justifyItems: "start" }}>
                 {m.optionen.map((o) => (
                   <Toggle key={o.key} checked={(m.optionen_an || {})[o.key] !== false}
                     onChange={(v) => setOption(m.key, o.key, v)} label={o.name} />
