@@ -138,7 +138,8 @@ export default function KursKinder({ kursId, t: tProp }) {
       {reihenfolge().map((idx, platz) => {
         const k = liste[idx];
         return (
-          <div key={k.student_id}
+          <div key={k.student_id}>
+          <div
             onDragOver={(e) => { e.preventDefault(); if (zieht != null) setUeber(platz); }}
             onDrop={ablegen}
             style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", marginBottom: 4,
@@ -154,23 +155,42 @@ export default function KursKinder({ kursId, t: tProp }) {
             <span style={{ width: 26, textAlign: "right", fontSize: 13, color: "var(--text3)" }}>{platz + 1}.</span>
             <Portrait student={{ id: k.person_id || k.student_id, name: k.name, has_photo: k.has_photo }}
               size={28} form="eckig" quelle={k.person_id ? "person" : "schueler"} />
-            {/* Der Name IST der Knopf zum Umbenennen — kein Stift daneben,
-                der einen zweiten Zustand aufmacht. */}
-            <button onClick={() => umbenennen(k)} title={text("kurse.kindName")}
+            {/* Der Name oeffnet die Angaben des Kindes — das ist die Frage,
+                die man an einen Namen in einer Kursliste stellt („was gilt bei
+                dem?"), und dort stehen Niveau, Foerderschwerpunkt und der
+                Nachteilsausgleich FUER DIESEN KURS beieinander. Umbenannt wird
+                mit dem Stift daneben: das ist der seltenere Handgriff, und als
+                Klick auf den Namen verdeckte er den haeufigen. */}
+            <button onClick={() => setOffen(offen === k.student_id ? null : k.student_id)}
+              title={text("kurse.kindAngaben")}
               style={{ flex: 1, fontSize: 14, textAlign: "left", border: "none", background: "none", cursor: "pointer", color: "var(--text)", padding: 0 }}>
               {k.name}
             </button>
             {k.niveau && <span style={badge(k.niveau === "E" ? C.info : C.success)}>{k.niveau}</span>}
+            {/* Nur DASS etwas vereinbart ist. Was genau, steht im Dialog des
+                Kindes — eine Kursliste ist kein Ort fuer Art-9-Angaben. */}
+            {k.nta && <span style={badge(C.warning)} title={text("kurse.ntaHint")}>{text("kurse.nta")}</span>}
+            <button onClick={() => umbenennen(k)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
+              title={text("kurse.kindName")} aria-label={text("kurse.kindName")}>
+              <Icon d={ICONS.edit} size={15} />
+            </button>
             <button onClick={() => fotoWaehlen(k)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
               title={text("kurse.kindFoto")} aria-label={text("kurse.kindFoto")}>
               <Icon d={ICONS.camera} size={15} />
             </button>
-            <button onClick={() => setOffen(offen === k.student_id ? null : k.student_id)}
-              style={{ ...btnSecondary, ...btnSmall }}>{text("kurse.kindAngaben")}</button>
             <button onClick={() => entfernen(k)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
               title={text("common.delete")} aria-label={text("common.delete")}>
               <Icon d={ICONS.trash} size={15} color={C.danger} />
             </button>
+            </div>
+            {/* Die Angaben stehen UNTER ihrer Zeile, nicht am Listenende: bei
+                dreissig Kindern stand die geoeffnete Maske sonst weit weg von
+                dem Namen, auf den geklickt wurde. */}
+            {offen === k.student_id && (
+              <div style={{ margin: "0 0 8px 34px", paddingLeft: 12, borderLeft: "2px solid var(--border2)" }}>
+                <SchuelerAngaben studentId={k.student_id} kursId={kursId} t={text} />
+              </div>
+            )}
           </div>
         );
       })}
@@ -181,11 +201,7 @@ export default function KursKinder({ kursId, t: tProp }) {
           onFertig={(quadrat) => { const pid = zuschnitt.personId; setZuschnitt(null); fotoHochladen(pid, quadrat); }} />
       )}
 
-      {offen != null && (
-        <div style={{ marginTop: 12 }}>
-          <SchuelerAngaben studentId={offen} kursId={kursId} t={text} />
-        </div>
-      )}
+
     </div>
   );
 }

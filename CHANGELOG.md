@@ -32,6 +32,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Kurs: das Schuljahr wird ausgewählt, „andere …" legt ein neues an.
 - Kurs und Thema: das Feld „Jahrgang" ist weg — das Schuljahr sagt es bereits.
 - Profil: die Schalter unter „Teile der Module" stehen in einer Spalte.
+- Kurs bearbeiten: ein Klick auf ein Kind öffnet seine Angaben — Niveau,
+  Förderschwerpunkt und der Nachteilsausgleich für diesen Kurs an einer Stelle.
+  Die beiden eigenen Listen darunter sind weg; die Kinderliste zeigt „NTA" und
+  E/G als Merkzeichen. Umbenannt wird mit dem Stift.
 - WebUntis-Import: fehlende Kurse schlägt der Dialog zum Anlegen vor („Mathe 7.5"),
   Fach und Jahrgang kommen mit.
 - Fördermaßnahmen: der Knopf heißt wieder „+ Maßnahme" statt „+ + Maßnahme".

@@ -79,3 +79,32 @@ async def test_fremdes_kind_bleibt_unerreichbar(s):
     assert e.value.status_code == 404
     with pytest.raises(HTTPException):
         await CL.get_student(a1.id, user=fremd, db=s)
+
+
+# ─── Die Kursliste sagt nur, DASS etwas vereinbart ist ───
+#
+# „Bei wem muss ich etwas beachten?" ist die Frage an eine Kursliste; „was
+# genau" gehoert in den Dialog des einzelnen Kindes (Art. 9). Deshalb traegt
+# `KindOut` ein blosses Ja/Nein — und nur fuer DIESEN Kurs: ein Zeitzuschlag in
+# Mathe ist keiner in Sport.
+
+@pytest.mark.asyncio
+async def test_kursliste_zeigt_nur_dass_ein_nachteilsausgleich_gilt(s):
+    from app.routers import kurse as KU
+
+    from sqlalchemy import select
+
+    from app.models import Kurs
+
+    u, kind, _ = await _welt(s)
+    kurs = (await s.execute(select(Kurs).where(Kurs.owner_id == u.id))).scalars().first()
+    liste = await KU.list_kinder(kurs.id, user=u, db=s)
+    assert liste[0].nta is False
+
+    await KU.set_kurs_massnahmen(kurs.id, KU.MassnahmenIn(
+        name=kind.name, massnahmen=[{"art": "Zeitzuschlag", "detail": "20 %", "arbeit": True}],
+    ), user=u, db=s)
+    liste = await KU.list_kinder(kurs.id, user=u, db=s)
+    assert liste[0].nta is True
+    roh = liste[0].model_dump()
+    assert "20 %" not in str(roh) and "Zeitzuschlag" not in str(roh), "der Inhalt bleibt im Einzeldialog"

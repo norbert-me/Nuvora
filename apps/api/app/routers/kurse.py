@@ -356,6 +356,11 @@ class KindOut(BaseModel):
     position: int = 0
     niveau: str = ""
     has_photo: bool = False
+    # Nur DASS ein Nachteilsausgleich vereinbart ist, nie welcher. Die Liste
+    # beantwortet damit die Frage, die man an sie stellt („bei wem muss ich
+    # etwas beachten?"), ohne Art-9-Inhalte in eine Uebersicht zu ziehen — der
+    # Text steht weiter nur im Dialog des einzelnen Kindes.
+    nta: bool = False
 
 
 async def _traegerklasse(db: AsyncSession, user: User, kurs: Kurs) -> SchoolClass:
@@ -386,10 +391,14 @@ async def list_kinder(kurs_id: int, user: User = Depends(get_current_user), db: 
     out = []
     for z in zeilen:
         p = personen.get(z.person_id)
+        # Gilt fuer DIESEN Kurs: fachbezogene Massnahmen tragen ihre kurs_id,
+        # aeltere ohne gelten ueberall.
+        nta = any(m.get("kurs_id") in (None, kurs_id) for m in (z.massnahmen or []))
         out.append(KindOut(student_id=z.id, person_id=z.person_id, name=z.name,
                            card_id=z.card_id, position=z.position or 0,
                            niveau=(p.niveau if p else z.niveau) or "",
-                           has_photo=bool((p and p.has_photo) or z.has_photo)))
+                           has_photo=bool((p and p.has_photo) or z.has_photo),
+                           nta=nta))
     return out
 
 

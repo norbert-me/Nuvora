@@ -3,13 +3,12 @@
 // Kursen sein.
 import { useState, useEffect, useRef } from "react";
 import { liegtDavor, nachJahrAbsteigend } from "../core/schuljahr.js";
-import { MASSNAHMEN } from "../core/foerderung.js";
 import KursKinder from "../components/KursKinder.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { alsJson, hol, sende } from "../core/melden.js";
-import { NiveauToggle, AddButton, pageTitle, pageIntro, btnSecondary, btnSmall, selectStyle, chipStyle,
+import { AddButton, pageTitle, pageIntro, btnSecondary, btnSmall, selectStyle, chipStyle,
   Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, toolbarInput, sectionLabel, Toggle, Tabs, Empty, pageApp, LoadError } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
@@ -314,21 +313,17 @@ export default function Kurse() {
                   <StudentMembers kursId={k.id} allClasses={allClasses} t={t} />
                 </div>
 
-                <div>
-                  <div style={editLabel}>{t("kurse.editMeasures")}</div>
-                  <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 8px" }}>{t("kurse.measuresHint")}</p>
-                  <MassnahmenPanel kursId={k.id} t={t} />
-                </div>
-
+                {/* Fördermaßnahmen und E/G je Person standen hier als zwei
+                    eigene Listen — dieselben dreißig Namen ein zweites und
+                    drittes Mal, direkt unter der Kinderliste, in der sie schon
+                    stehen. Beides gehört zu EINEM Kind und steht jetzt in
+                    seinen Angaben (Klick auf den Namen oben); die Liste zeigt
+                    nur noch, WER ein E/G-Niveau und wer einen
+                    Nachteilsausgleich hat. Der Schalter bleibt hier: er gilt
+                    dem ganzen Kurs, nicht einem Kind. */}
                 <div>
                     <div style={editLabel}>{t("kurse.editLevels")}</div>
                     <Toggle checked={kurs.wert.niveauAktiv} onChange={(v) => kurs.setz({ niveauAktiv: v })} label={t("kurse.niveauToggle")} />
-                    {/* Teilnehmerliste immer sichtbar; der E/G-Selektor je Person nur,
-                        wenn der E/G-Regler an ist. */}
-                    {/* Ist E/G aus, hat die Liste darunter nichts zu sagen: sie
-                        zeigte dann dreißig Namen ohne eine einzige Angabe. Sie
-                        erscheint mit dem Schalter. */}
-                    {kurs.wert.niveauAktiv && <NiveauPanel kursId={k.id} niveauAktiv t={t} />}
                 </div>
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
                   <button onClick={() => delKurs(k)} className="icon-btn" style={{ ...iconBtn }} title={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")} aria-label={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")}>
@@ -413,147 +408,3 @@ function StudentMembers({ kursId, allClasses, t }) {
   );
 }
 
-// Fördermaßnahmen je Person IN DIESEM Kurs — Nachteilsausgleiche wirken
-// fachbezogen (mehr Zeit in Mathe heißt nicht dasselbe wie in Sport). Sie
-// hängen deshalb am Kurs; gespeichert werden sie an der Person, mit kurs_id.
-//
-// Vokabular wortgleich zum Backend (MASSNAHMEN_VALUES in classes.py).
-
-function MassnahmenPanel({ kursId, t }) {
-  const [studs, setStuds] = useState(null);
-  const [offen, setOffen] = useState(null); // Name der aufgeklappten Person
-  // Vorher ging JEDER Tastendruck im Detailfeld als eigener PUT hinaus. Jetzt
-  // sammelt der Entwurf die Maßnahmen aller Personen dieses Kurses; gespeichert
-  // wird, was sich wirklich geändert hat.
-  const [basis, setBasis] = useState({ liste: {} });
-  const e = useEntwurf(basis, async (w) => {
-    for (const [name, m] of Object.entries(w.liste)) {
-      if (m === basis.liste[name]) continue;
-      if (!(await sende(`${API}/kurse/${kursId}/massnahmen`, alsJson("PUT", { name, massnahmen: m }), t("kurse.editMeasures")))) return false;
-    }
-    setBasis(w);
-  });
-  const entwurfRef = useRef(null);
-  entwurfRef.current = e;
-  useEffect(() => {
-    fetch(`${API}/kurse/${kursId}/massnahmen`).then((r) => (r.ok ? r.json() : [])).then((d) => {
-      const liste = Array.isArray(d) ? d : [];
-      setStuds(liste);
-      const stand = { liste: Object.fromEntries(liste.map((s) => [s.name, s.massnahmen || []])) };
-      setBasis(stand); entwurfRef.current?.setz(stand);
-    }).catch(() => setStuds([]));
-  }, [kursId]); // eslint-disable-line
-
-  const massnahmen = (s) => e.wert.liste[s.name] || [];
-  const setzen = (s, liste) => e.setz((w) => ({ liste: { ...w.liste, [s.name]: liste } }));
-  const setFeld = (s, i, feld, wert) => {
-    const liste = [...massnahmen(s)];
-    liste[i] = { ...liste[i], [feld]: wert };
-    setzen(s, liste);
-  };
-  const hinzu = (s) => setzen(s, [...massnahmen(s), { art: MASSNAHMEN[0][0], detail: "", arbeit: true }]);
-  const weg = (s, i) => setzen(s, massnahmen(s).filter((_, x) => x !== i));
-
-  if (!studs) return null;
-  if (studs.length === 0) return <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("kurse.niveauNoStudents")}</p>;
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <Speicherleiste entwurf={e} style={{ marginBottom: 4 }} klein />
-      {studs.map((s) => {
-        const n = massnahmen(s).length;
-        const auf = offen === s.name;
-        return (
-          <div key={s.name} style={{ borderTop: "1px solid var(--border)", paddingTop: 6 }}>
-            <button onClick={() => setOffen(auf ? null : s.name)}
-              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", padding: "2px 0", cursor: "pointer", textAlign: "left", fontSize: 13, color: "var(--text)" }}>
-              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
-              <span style={{ fontSize: 12, color: n ? "var(--accent)" : "var(--text3)" }}>{n ? t("kurse.measuresCount", { n }) : t("kurse.measuresNone")}</span>
-              <span style={{ color: "var(--text3)", display: "inline-flex" }}>
-                <Icon d={auf ? ICONS.chevronUp : ICONS.chevronDown} size={13} />
-              </span>
-            </button>
-            {auf && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "8px 0 12px" }}>
-                {massnahmen(s).map((m, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <select value={m.art} onChange={(e) => setFeld(s, i, "art", e.target.value)}
-                      title={(MASSNAHMEN.find(([w]) => w === m.art) || [])[1] || ""}
-                      style={{ ...selectStyle, minWidth: 170 }}>
-                      {MASSNAHMEN.map(([wert]) => <option key={wert} value={wert}>{wert}</option>)}
-                    </select>
-                    <input value={m.detail || ""} onChange={(e) => setFeld(s, i, "detail", e.target.value)}
-                      placeholder={t("classes.measureDetail")} maxLength={300}
-                      style={{ ...toolbarInput, flex: 1, minWidth: 140 }} />
-                    <label style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text2)", cursor: "pointer" }}
-                      title={t("classes.measureExamHint")}>
-                      <input type="checkbox" checked={!!m.arbeit} onChange={(e) => setFeld(s, i, "arbeit", e.target.checked)} style={{ margin: 0 }} />
-                      {t("classes.measureExam")}
-                    </label>
-                    <button onClick={() => weg(s, i)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}>
-                      <Icon d={ICONS.trash} size={14} color={C.danger} />
-                    </button>
-                  </div>
-                ))}
-                <div>
-                  <button onClick={() => hinzu(s)} style={{ ...btnSecondary, ...btnSmall }}>{t("classes.measureAdd")}</button>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// E/G je Person im Kurs. Setzt das Niveau kursweit (alle Fach-Klassen-Zeilen der
-// Person), damit z.B. die Karteikarten-Niveaustapel überall greifen.
-function NiveauPanel({ kursId, niveauAktiv = false, t }) {
-  const [studs, setStuds] = useState(null);
-  // E/G steuert die Wertung — ein still verlorenes E hieße: die Auswertung
-  // rechnet weiter mit G, und niemand merkt es bis zur Notenkonferenz. Deshalb
-  // sammelt der Entwurf die Umschaltungen und zeigt „nicht gespeichert", bis
-  // sie wirklich draußen sind.
-  const [basis, setBasis] = useState({});
-  const e = useEntwurf(basis, async (w) => {
-    for (const [name, niveau] of Object.entries(w)) {
-      if (niveau === basis[name]) continue;
-      if (!(await sende(`${API}/kurse/${kursId}/niveau`, alsJson("PUT", { name, niveau }), t("kurse.editLevels")))) return false;
-    }
-    setBasis(w);
-  });
-  const entwurfRef = useRef(null);
-  entwurfRef.current = e;
-  useEffect(() => {
-    fetch(`${API}/kurse/${kursId}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => {
-      const liste = Array.isArray(d) ? d : [];
-      setStuds(liste);
-      const stand = Object.fromEntries(liste.map((s) => [s.name, s.niveau || ""]));
-      setBasis(stand); entwurfRef.current?.setz(stand);
-    }).catch(() => setStuds([]));
-  }, [kursId]); // eslint-disable-line
-  if (!studs) return null;
-  if (studs.length === 0) return <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 8 }}>{t("kurse.niveauNoStudents")}</p>;
-  return (
-    <>
-      {/* Spalten mit Trennlinie statt Raster: `columns` bringt die Linie von
-          selbst mit (column-rule) — im Raster stand das E/G-Kaestchen am
-          rechten Rand seiner Zelle, also direkt VOR dem naechsten Namen, und
-          las sich wie dessen Niveau. Das Kaestchen steht deshalb jetzt VOR dem
-          Namen: bündige Spalte, und die Zuordnung ist auf einen Blick klar. */}
-      <div style={{ marginTop: 12, columnWidth: 210, columnGap: 20, columnRule: "1px solid var(--border)" }}>
-        {studs.map((s) => (
-          <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "3px 0", breakInside: "avoid" }}>
-            {/* E/G-Selektor nur bei aktivem Regler; sonst nur der Name (Teilnehmer sichtbar). */}
-            {niveauAktiv && (
-              <NiveauToggle wert={e.wert[s.name] || ""} onChange={(v) => e.setz({ [s.name]: v })}
-                size={24} title={t("kurse.niveauToggle")} />
-            )}
-            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
-          </div>
-        ))}
-      </div>
-      <Speicherleiste entwurf={e} style={{ marginTop: 8 }} klein />
-    </>
-  );
-}
