@@ -734,6 +734,34 @@ const BEDIENUNG = [
     },
   },
   {
+    // Die Tafel speichert am KONTO (Modul Tafel). Der Beweis ist derselbe wie
+    // beim Notizzettel: nach dem Neuladen muss sie in der Liste stehen — der
+    // localStorage der Arbeitsfassung wuerde das sonst vortaeuschen.
+    name: "Tafel speichern (/tafel)",
+    pfad: "/tafel",
+    async schritte(seite, api) {
+      const vorher = await (await api("/api/tafel")).json();
+      if (!Array.isArray(vorher)) return;   // Modul nicht aktiv: nichts zu pruefen
+      // Ein Textfeld anlegen, damit die Tafel nicht leer gespeichert wird.
+      await seite.getByRole("button", { name: /textfeld|text box|campo de texto/i }).first().click({ timeout: 8000 });
+      await seite.getByRole("button", { name: /^(Speichern|Save|Guardar)$/ }).first().click({ timeout: 8000 });
+      // Der Name kommt aus Nuvoras eigenem Dialog (core/dialog.jsx), nicht aus
+      // window.prompt — also ein Eingabefeld im Modal und der OK-Knopf.
+      const feld = seite.locator("[role='dialog'] input:visible").first();
+      await feld.fill(MARKE, { timeout: 8000 });
+      await seite.getByRole("button", { name: /^OK$/ }).first().click({ timeout: 8000 });
+      await seite.waitForTimeout(800);
+    },
+    async pruefe(seite, api) {
+      const liste = await (await api("/api/tafel")).json();
+      if (!Array.isArray(liste)) return { ok: true, detail: "Modul Tafel nicht aktiv" };
+      const meine = liste.filter((x) => (x.name || "").includes(MARKE));
+      if (!meine.length) return { ok: false, detail: "gespeicherte Tafel fehlt nach dem Neuladen" };
+      for (const x of meine) await api(`/api/tafel/${x.id}`, { method: "DELETE" });
+      return { ok: true, detail: "gespeichert, ueberlebt das Neuladen, wieder abgeraeumt" };
+    },
+  },
+  {
     name: "Thema anlegen (/topics)",
     pfad: "/topics",
     async schritte(seite) {
@@ -761,7 +789,7 @@ async function bediene(kontext, flow, api) {
     await seite.reload({ waitUntil: "networkidle" });
     // Ein Handgriff, der nichts ANLEGT (die Startseite einrichten), bringt
     // seine eigene Pruefung mit — die Marke gaebe es dort nicht.
-    if (flow.pruefe) return await flow.pruefe(seite);
+    if (flow.pruefe) return await flow.pruefe(seite, api);
     const text = await seite.locator("body").innerText();
     const drin = text.includes(MARKE) || (await seite.locator(`input[value='${MARKE}']`).count()) > 0;
     if (!drin) return { ok: false, detail: "nach dem Neuladen verschwunden — wird nicht gespeichert" };

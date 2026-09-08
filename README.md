@@ -537,8 +537,17 @@ verworfen. Sie ist bewusst kein Modul. Details in `apps/desktop/README.md`.
 
 Fertig gebaut hängt sie an jedem [Release](https://github.com/norbert-me/Nuvora/releases)
 (`.dmg` für Apple Silicon und Intel), unsigniert — beim ersten Start Rechtsklick
-→ *Öffnen*. **Für iPhone/iPad gibt es keine App**; dort führt der Weg über
-Safari: *Teilen* → *Zum Home-Bildschirm*.
+→ *Öffnen*. Mehrere Fenster liegen als native Tabs zusammen (⌘T); Zurück und
+Vorwärts stehen im Menü *Verlauf*.
+
+### iPhone und iPad
+
+`apps/ios` — dieselbe Hülle mit Capacitor statt Electron: Serveradresse beim
+ersten Start eintragen, danach die gewohnte Oberfläche. Das Xcode-Projekt
+entsteht auf einem Mac (`npm install`, `npx cap add ios`); die Schritte stehen
+in `apps/ios/README.md`. Ohne eigene App bleibt der Weg über Safari: *Teilen* →
+*Zum Home-Bildschirm* — dort räumt Safari den Offline-Speicher allerdings nach
+einigen Tagen ohne Besuch auf.
 
 ### Fehler melden
 
@@ -637,7 +646,8 @@ mit dem Web-Build und einem `docker compose build` in der CI.
 | `apps/api/app` | FastAPI · SQLAlchemy 2 (async) · Postgres 16 — Kern-Router und Modul-Router in `routers/` |
 | `apps/web/src` | React 18 · Vite · react-router · i18n (de vollständig, en/es weitgehend) |
 | `apps/web/public/lp` | Lernpfad-Statik (Vanilla JS), in-page gemountet |
-| `apps/desktop` | Electron-Hülle |
+| `apps/desktop` | Electron-Hülle (macOS) |
+| `apps/ios` | Capacitor-Hülle (iPhone/iPad) |
 | `scripts/` | Selbsttest, Systemtest, Aufräumen, Backup-Cron, Lasttest |
 | `docs/` | Architektur, neues Modul, Selbsttest, Datenschutz, Entwicklung |
 | `nginx.conf`, `docker-compose.yml` | Proxy und Stack — eine Domain, alle Teile |

@@ -153,6 +153,7 @@ function OrgaHilfe({ t }) {
       <Section title={t("help.orga.lendT")}>{t("help.orga.lend")}</Section>
       <Section title={t("help.si.whatT")}>{t("help.si.what")}</Section>
       <Section title={t("help.orga.segelT")}>{t("help.orga.segel")}</Section>
+      <Section title={t("help.si.anwT")}>{t("help.si.anw")}</Section>
       <Section title={t("help.si.foerderT")}>{t("help.si.foerder")}</Section>
     </>
   );
@@ -182,6 +183,7 @@ function TafelHilfe({ t }) {
     <>
       <Section title={t("help.tf.whatT")}>{t("help.tf.what")}</Section>
       <Section title={t("help.tf.useT")}>{t("help.tf.use")}</Section>
+      <Section title={t("help.tf.saveT")}>{t("help.tf.save")}</Section>
     </>
   );
 }

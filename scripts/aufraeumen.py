@@ -224,6 +224,7 @@ class Sammler:
         self._orga()
         self._unterrichtsplanung()
         self._notizbrett()
+        self._tafel()
         self._code_detektiv()
         self._kern(klassen)
         self._papierkorb()
@@ -342,6 +343,11 @@ class Sammler:
                   lambda o: [f"/api/notizblock/{o['id']}"])
         self.nimm(g, "To-do", self._get("/api/todo"), lambda o: [f"/api/todo/{o['id']}"])
 
+
+    def _tafel(self):
+        # Gespeicherte Tafeln (Modul Tafel) — der Browser-Selbsttest legt eine an.
+        self.nimm("Tafel", "Tafel", self._get("/api/tafel"),
+                  lambda o: [f"/api/tafel/{o['id']}"])
 
     def _code_detektiv(self):
         # Geloescht wird ueber die client_id, nicht ueber die Datenbank-ID.
