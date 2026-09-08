@@ -1699,7 +1699,6 @@ export default {
   "thema.openCardvote": "Zu den Fragen",
   "thema.openLernpfad": "Zum Lernpfad",
   "thema.draft": "Entwurf",
-  "kalender.toAttendance": "Anwesenheit für diese Stunde",
   "kalender.classColor": "Farbe",
   "kalender.toClass": "Zur Klasse",
   "kalender.breaksTab": "Freie Tage",

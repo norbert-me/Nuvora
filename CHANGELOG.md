@@ -39,6 +39,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Tafel: mehrere Tafeln lassen sich unter einem Namen speichern und wieder
   öffnen — sie hängen am Konto, nicht am Browser.
 - Tafel im Vollbild: der Schließen-Knopf steht wieder vollständig im Bild.
+- Kalender: der Weg zur Anwesenheit stand im Stunden-Dialog zweimal; er steht
+  jetzt einmal unter „Öffnen" und springt auf den Tag des Termins.
 - Notenbuch: fehlende Kinder werden auch dann an der Spalte markiert, wenn der
   Kurs aus mehreren Fach-Klassen besteht.
 

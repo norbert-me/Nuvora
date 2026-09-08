@@ -2348,7 +2348,11 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
     // was man WÄHREND der Stunde braucht — und man kommt aus dem Kalender, nicht
     // aus der Navigation. Regel 3: nur mit dem Modul, sonst führt der Weg ans
     // ModuleGate.
-    aktiv.orga && classId && { to: `/orga?tab=anwesenheit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`, label: t("kalender.zurAnwesenheit"), kind: t("kalender.zurAnwesenheit") },
+    // Mit DATUM: der Weg aus einem Termin meint dessen Tag, nicht den heutigen.
+    // Er stand eine Zeit lang zweimal im Dialog — einmal hier in der Liste
+    // „Öffnen", einmal als eigener Knopf darunter; derselbe Weg zweimal
+    // untereinander sieht aus wie zwei verschiedene.
+    aktiv.orga && classId && { to: `/orga?tab=anwesenheit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}&date=${ymd(new Date(entry.date))}`, label: t("kalender.zurAnwesenheit"), kind: t("kalender.zurAnwesenheit") },
     aktiv.orga && classId && { to: `/orga?tab=checklisten&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`, label: t("kalender.zurCheckliste"), kind: t("kalender.zurCheckliste") },
   ].filter(Boolean);
   const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: 14 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
@@ -2403,13 +2407,6 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
                 {zeile(t("kalender.place"), ort)}
                 {zeile(t("kalender.repeat"), rrText)}
               </div>
-            )}
-            {aktiv.orga && classId && (
-              <Link to={`/orga?tab=anwesenheit&class=${classId}&date=${ymd(new Date(entry.date))}`} onClick={onClose}
-                style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 14, fontWeight: 600 }}>
-                <Icon d={ICONS.open} size={15} color="var(--accent)" />
-                {t("kalender.toAttendance")}
-              </Link>
             )}
             {/* Klassenarbeitstermin: die Auswertung dazu ist ein Klick entfernt
                 (nur bei aktivem Modul — Regel 3). */}

@@ -1739,7 +1739,6 @@ export default {
   "thema.openCardvote": "Go to questions",
   "thema.openLernpfad": "Go to Lernpfad",
   "thema.draft": "Draft",
-  "kalender.toAttendance": "Attendance for this lesson",
   "kalender.classColor": "Colour",
   "kalender.toClass": "To the class",
   "kalender.breaksTab": "Days off",
