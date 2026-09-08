@@ -72,7 +72,7 @@ export const ZIELE = [
   { pfad: "/kalender?view=zeitleiste", key: "zeitleiste.tab", modul: "kalender", option: "zeitleiste", worte: ["zeitleiste", "zeitstrahl", "verlauf", "was steht an", "kursverlauf"] },
 
   // ── Orga ──
-  { pfad: "/orga?tab=checklisten", key: "orga.tabChecklists", modul: "orga", worte: ["checkliste", "haken", "eingesammelt", "zettel"] },
+  { pfad: "/orga?tab=checklisten", key: "orga.tabChecklists", modul: "orga", option: "checklisten", worte: ["checkliste", "haken", "eingesammelt", "zettel"] },
   { pfad: "/orga?tab=anwesenheit", key: "anwesenheit.title", modul: "orga", option: "anwesenheit", worte: ["fehlzeiten", "krank", "entschuldigt", "fehlt", "abwesend"] },
   { pfad: "/orga?tab=ausleihe", key: "ausleihe.title", modul: "orga", option: "ausleihe", worte: ["ausleihe", "buch", "material", "zurückgeben"] },
   { pfad: "/orga?tab=sitzplan", key: "sitzplan.title", modul: "orga", option: "sitzplan", worte: ["sitzplan", "plätze", "tische", "aufruf"] },

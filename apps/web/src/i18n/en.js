@@ -173,6 +173,7 @@ export default {
   "kurse.title": "Courses",
   "personen.fotoSetzen": "Photo",
   "personen.fotoWeg": "Remove photo",
+  "personen.fotoZuschnitt": "Crop",
   "personen.nameAendern": "Name",
   "personen.angaben": "Details",
   "personen.qr": "QR access",

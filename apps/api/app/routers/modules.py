@@ -226,6 +226,14 @@ REGISTRY: List[ModuleDef] = [
         stage="stable",
         optionen=[
             ModulOption(
+                key="checklisten",
+                name="Checklisten",
+                description=(
+                    "Sammel-Listen je Kurs („Unterschrift gesehen“), pro Kind "
+                    "abhaken. Eingetragene Haken bleiben erhalten."
+                ),
+            ),
+            ModulOption(
                 key="sitzplan",
                 name="Sitzplan",
                 description=(

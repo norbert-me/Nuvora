@@ -31,7 +31,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   etwas offen ist, erscheint er unten.
 - Kurs: das Schuljahr wird ausgewählt, „andere …" legt ein neues an.
 - Kurs und Thema: das Feld „Jahrgang" ist weg — das Schuljahr sagt es bereits.
-- Profil: die Schalter unter „Teile der Module" stehen in einer Spalte.
+- Profil: die Schalter unter „Teile der Module" stehen in einer Spalte; die
+  Checklisten in Orga lassen sich jetzt ebenfalls ausblenden.
+- Person: ein vorhandenes Foto lässt sich neu zuschneiden, ohne es noch einmal
+  auszuwählen.
 - Kurs bearbeiten: ein Klick auf ein Kind öffnet seine Angaben — Niveau,
   Förderschwerpunkt und der Nachteilsausgleich für diesen Kurs an einer Stelle.
   Die beiden eigenen Listen darunter sind weg; die Kinderliste zeigt „NTA" und

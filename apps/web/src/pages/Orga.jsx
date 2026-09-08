@@ -16,6 +16,7 @@ import Anwesenheit from "./Anwesenheit.jsx";
 import Ausleihe from "./Ausleihe.jsx";
 import Sitzplan from "./Sitzplan.jsx";
 import { alsJson, hol } from "../core/melden.js";
+import { useModulOption } from "../core/modules.js";
 
 const API = "/api/orga";
 
@@ -32,6 +33,17 @@ export default function Orga() {
   const [tab, setTab] = useState(["anwesenheit", "ausleihe", "sitzplan"].includes(params.get("tab")) ? params.get("tab") : "checklisten");
   // Auf ?tab-Wechsel aus der Navbar reagieren (nicht nur beim ersten Laden).
   useEffect(() => { setTab(["anwesenheit", "ausleihe", "sitzplan"].includes(params.get("tab")) ? params.get("tab") : "checklisten"); }, [params]);
+  // Dieselbe Regel wie im Notizbrett und in der Auswertung: ist der
+  // voreingestellte Teil im Modul-Zahnrad abgeschaltet, zeigt der Aufruf ohne
+  // ?tab den naechsten, den es noch gibt. Ohne das landet man auf einer Seite,
+  // die die Navigation gar nicht mehr anbietet.
+  const checklistenAn = useModulOption("orga", "checklisten");
+  const sitzplanAn = useModulOption("orga", "sitzplan");
+  const anwesenheitAn = useModulOption("orga", "anwesenheit");
+  const ausleiheAn = useModulOption("orga", "ausleihe");
+  const sichtbar = tab === "checklisten" && !checklistenAn
+    ? (sitzplanAn ? "sitzplan" : anwesenheitAn ? "anwesenheit" : ausleiheAn ? "ausleihe" : "checklisten")
+    : tab;
 
   // Klassenliste, Vorwahl und „zuletzt gewaehlt" — dieselben sechs Zeilen
   // standen auf fuenf Seiten; sie liegen jetzt in core/klassenwahl.js.
@@ -123,7 +135,7 @@ export default function Orga() {
           frueher regelte das ein eigener Reiter „Optionen" mit einer Liste im
           localStorage. Das war dieselbe Sache zweimal und stand ausserdem als
           vermeintlicher INHALT des Moduls in Suche und Startseiten-Kachel. */}
-      {tab === "anwesenheit" ? <Anwesenheit /> : tab === "ausleihe" ? <Ausleihe /> : tab === "sitzplan" ? <Sitzplan /> : (<>
+      {sichtbar === "anwesenheit" ? <Anwesenheit /> : sichtbar === "ausleihe" ? <Ausleihe /> : sichtbar === "sitzplan" ? <Sitzplan /> : (<>
       {/* Eine Leiste statt zweier Zeilen: links die Auswahl, daneben der eine
           Handgriff (neuer Punkt). Das Feld hatte `inputStyle` Zeile fuer Zeile
           nachgebaut und stand dadurch hoeher als der Plus-Knopf daneben. */}

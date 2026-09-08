@@ -107,6 +107,17 @@ export default function Personen() {
   const [zuschnitt, setZuschnitt] = useState(null);   // { personId, datei }
   const fotoSetzen = (id) => dateiWaehlen((datei) => setZuschnitt({ personId: id, datei }), "image/*");
 
+  // Und das BESTEHENDE Foto noch einmal zuschneiden, ohne es neu zu suchen:
+  // beim ersten Mal sitzt der Ausschnitt selten, und wer dafuer das Bild vom
+  // Handy noch einmal heraussuchen muss, laesst es. Geholt wird das
+  // gespeicherte Bild und als Datei in dieselbe Maske gegeben.
+  const fotoZuschneiden = async (id) => {
+    const r = await fetch(`/api/personen/${id}/photo`).catch(() => null);
+    if (!r || !r.ok) return;
+    const blob = await r.blob();
+    setZuschnitt({ personId: id, datei: new File([blob], "foto.jpg", { type: blob.type || "image/jpeg" }) });
+  };
+
   const fotoHochladen = async (id, quadrat) => {
     const daten = new FormData();
     daten.append("file", quadrat);
@@ -174,6 +185,7 @@ export default function Personen() {
                         änderbar, statt dass man dafür in eine Liste geht, in
                         der dasselbe Kind noch einmal steht. */}
                     <button onClick={() => fotoSetzen(p.id)} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.fotoSetzen")}</button>
+                    {p.has_photo && <button onClick={() => fotoZuschneiden(p.id)} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.fotoZuschnitt")}</button>}
                     {p.has_photo && <button onClick={() => fotoWeg(p.id)} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.fotoWeg")}</button>}
                     <button onClick={() => setNameEdit({ id: p.id, wert: p.name })} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.nameAendern")}</button>
                   </div>
