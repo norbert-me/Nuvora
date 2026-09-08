@@ -43,6 +43,18 @@ export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau =
   });
   entwurfRef.current = e;
 
+  // Fuehrt dieser Kurs ueberhaupt E und G? Steht der Schalter am Kurs auf aus,
+  // sagt „kein Niveau gesetzt" nichts ueber das Kind, sondern nur, dass es die
+  // Unterscheidung hier nicht gibt — die Zeile faellt dann weg.
+  const [niveauImKurs, setNiveauImKurs] = useState(true);
+  useEffect(() => {
+    if (!kursId) { setNiveauImKurs(true); return; }
+    hol("/api/kurse", []).then((d) => {
+      const k = (Array.isArray(d) ? d : []).find((x) => x.id === Number(kursId));
+      setNiveauImKurs(k ? !!k.niveau_aktiv : true);
+    });
+  }, [kursId]);
+
   useEffect(() => {
     if (!studentId) return;
     hol(`/api/classes/students/${studentId}`, null).then((d) => {
@@ -68,8 +80,9 @@ export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau =
       {/* E/G gilt je KURS (in Mathe E, in Deutsch G) — auf der Personenseite,
           die alle Kurse eines Kindes nebeneinander zeigt, wäre ein einzelnes „G"
           eine Aussage, die so nicht stimmt. Dort wird die Zeile deshalb
-          ausgelassen (`ohneNiveau`); gepflegt wird sie im Kurs. */}
-      {!ohneNiveau && (
+          ausgelassen (`ohneNiveau`); gepflegt wird sie im Kurs. Und in einem
+          Kurs OHNE E/G-Einteilung faellt sie ebenfalls weg. */}
+      {!ohneNiveau && niveauImKurs && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
           <NiveauToggle wert={w.niveau} onChange={(v) => e.setz({ niveau: v })} size={26} title={t("noten.course")} />
           <span style={{ fontSize: 13, color: "var(--text2)" }}>

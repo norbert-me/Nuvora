@@ -195,6 +195,18 @@ function HeutePanel({ t }) {
   // die Zeile unter der Stundennummer immer leer.
   const zeit = (p) => { const w = stundenZeit(data.times, data.zero, p); return w && (w.start || w.end) ? `${w.start || ""}–${w.end || ""}` : ""; };
   const eintrag = (p) => data.entries.find((e) => e.period === p);
+  // EINE Liste, nach der Uhr sortiert. Vorher standen erst alle Stunden und
+  // darunter die Termine mit eigener Uhrzeit — der Elternabend um 8 Uhr kam
+  // hinter der sechsten Stunde, und die Kachel beantwortete „was kommt als
+  // naechstes?" damit falsch herum. Ohne Uhrzeit (Stunde ohne gepflegte Zeit,
+  // Termin ohne Zeit) ans Ende: geraten wird nichts.
+  const OHNE_ZEIT = 24 * 60 + 1;
+  const slotStart = (p) => { const w = stundenZeit(data.times, data.zero, p); return w ? hmToMin(w.start) : null; };
+  const zeilen = [
+    ...slots.map((s) => ({ art: "stunde", s, min: slotStart(s.period) })),
+    ...extras.map((e) => ({ art: "termin", e, min: hmToMin(e.start_time) })),
+  ].sort((a, b) => (a.min ?? OHNE_ZEIT) - (b.min ?? OHNE_ZEIT)
+                   || (a.art === "stunde" && b.art === "stunde" ? a.s.period - b.s.period : 0));
   const dateStr = new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" });
 
   return (
@@ -212,7 +224,20 @@ function HeutePanel({ t }) {
       )}
       {!data.frei && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {slots.map((s) => {
+          {zeilen.map((z) => {
+            if (z.art === "termin") {
+              const e = z.e;
+              const von = e.start_time || "";
+              const bis = e.end_time || "";
+              const zeitTxt = von ? (bis ? `${von}–${bis}` : von) : "";
+              return (
+                <Link key={`e${e.id}`} to={`/kalender?view=day&date=${heuteYmd}&entry=${e.id}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
+                  <div style={{ minWidth: 42, textAlign: "center", color: "var(--text3)", fontSize: 12, whiteSpace: "nowrap" }}>{zeitTxt || "—"}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{e.title || (e.class_id && cname(e.class_id)) || t("kalender.planned")}</div>
+                </Link>
+              );
+            }
+            const s = z.s;
             const e = eintrag(s.period);
             // 1-Klick: mit Klasse + aktivem Orga direkt in die Anwesenheit heute.
             // Ein Klick auf die Stunde zeigt, was in ihr geplant ist — der
@@ -232,20 +257,6 @@ function HeutePanel({ t }) {
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{cname(s.class_id) || s.title || "—"}</div>
                   {e && <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 4 }}>{e.title || t("kalender.planned")}</div>}
                 </div>
-              </Link>
-            );
-          })}
-          {/* Termine ohne Stundenplan-Stunde: die eigene Uhrzeit gehoert
-              dazu. Sie stand am Eintrag und wurde hier verschwiegen — dann
-              sieht ein Termin um 8 Uhr aus wie einer um 18 Uhr. */}
-          {extras.map((e) => {
-            const von = e.start_time || "";
-            const bis = e.end_time || "";
-            const zeitTxt = von ? (bis ? `${von}–${bis}` : von) : "";
-            return (
-              <Link key={e.id} to={`/kalender?view=day&date=${heuteYmd}&entry=${e.id}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
-                <div style={{ minWidth: 42, textAlign: "center", color: "var(--text3)", fontSize: 12, whiteSpace: "nowrap" }}>{zeitTxt || "—"}</div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{e.title || (e.class_id && cname(e.class_id)) || t("kalender.planned")}</div>
               </Link>
             );
           })}

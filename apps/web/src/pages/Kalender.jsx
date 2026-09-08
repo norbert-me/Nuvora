@@ -2182,8 +2182,15 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
   const [ladderId, setLadderId] = useState(entry.lernpfad_ladder_id || "");
   const [puzzleId, setPuzzleId] = useState(entry.codedetektiv_puzzle || "");
   const [deckId, setDeckId] = useState(entry.karten_deck_id || "");
-  const [startTime, setStartTime] = useState(entry.start_time || "");
-  const [endTime, setEndTime] = useState(entry.end_time || "");
+  // Bei einer Stunde stehen die Uhrzeiten der Stunde in den Feldern, wenn der
+  // Eintrag keine eigenen hat. Vorher waren sie leer („--:--") — die Zeit stand
+  // nur als Text im Kopf des Dialogs, und wer sie im Feld suchte, hielt sie fuer
+  // nicht gesetzt. Der Preis ist bewusst in Kauf genommen: der Eintrag traegt
+  // sie danach selbst und folgt einer spaeteren Aenderung der Stundenzeiten
+  // nicht mehr — sichtbar falsch ist besser als unsichtbar leer.
+  const stundeZeit = entry.period != null ? stundenZeit(zeiten, zeroZeit, entry.period) : null;
+  const [startTime, setStartTime] = useState(entry.start_time || (stundeZeit && stundeZeit.start) || "");
+  const [endTime, setEndTime] = useState(entry.end_time || (stundeZeit && stundeZeit.end) || "");
   const [ort, setOrt] = useState(entry.location || "");
   // Wiederholung: aus der Regel nur das lesen, was der Dialog anbietet — Rest
   // (etwa eine von Apple gesetzte BYDAY-Liste) bleibt unangetastet, solange
@@ -2204,7 +2211,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
   // rechnet es auch der Tagesplan und der ICS-Feed); leer heisst „die der
   // Stunde" — genau so laesst sich eine einzelne Stunde verlegen, ohne den
   // Stundenplan anzufassen.
-  const stunde = entry.period != null ? stundenZeit(zeiten, zeroZeit, entry.period) : null;
+  const stunde = stundeZeit;
   const stundeVon = (stunde && stunde.start) || "";
   const stundeBis = (stunde && stunde.end) || "";
   // Der Verlaufsplan sagt nicht nur „10 min", sondern WANN: die Dauern liegen
@@ -2641,7 +2648,10 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
             <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
               {zt[i] && <span style={{ fontSize: 12, color: "var(--text3)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", flexShrink: 0 }}>{minToHm(zt[i].von)}</span>}
               <input value={p.phase} onChange={(e) => setPhase(i, "phase", e.target.value)} placeholder={t("kalender.verlaufPhase")} style={{ ...fld, flex: 1, padding: 8 }} />
-              <input type="number" min="0" value={p.dauer} onChange={(e) => setPhase(i, "dauer", e.target.value)} placeholder={t("kalender.verlaufDauer")} style={{ ...fld, width: 56, padding: 8 }} />
+              {/* 56 px reichten fuer die Zahl, nicht fuer den Platzhalter:
+                  aus „Dauer" wurde „Dau…", und daneben stand „min" — das las
+                  sich wie ein abgeschnittenes Wort, nicht wie ein Feld. */}
+              <input type="number" min="0" value={p.dauer} onChange={(e) => setPhase(i, "dauer", e.target.value)} placeholder={t("kalender.verlaufDauer")} style={{ ...fld, width: 84, minWidth: 84, padding: 8 }} />
               <span style={{ fontSize: 12, color: "var(--text3)", flexShrink: 0 }}>min</span>
               <button onClick={() => movePhase(i, -1)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title="↑" disabled={i === 0}><Icon d={ICONS.arrowUp} size={14} color={i === 0 ? "var(--text3)" : "var(--text2)"} /></button>
               <button onClick={() => movePhase(i, 1)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title="↓" disabled={i === verlauf.length - 1}><Icon d={ICONS.arrowDown} size={14} color={i === verlauf.length - 1 ? "var(--text3)" : "var(--text2)"} /></button>

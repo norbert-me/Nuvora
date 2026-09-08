@@ -27,6 +27,13 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 **Bedienung**
 
+- Startseite „Heute": Stunden und Termine stehen in EINER Liste nach Uhrzeit —
+  der Termin um 8 Uhr stand vorher hinter der sechsten Stunde.
+- Kalender: beim Öffnen einer Stundenplan-Stunde stehen deren Uhrzeiten in den
+  Feldern statt „--:--".
+- Verlaufsplan: das Feld „Dauer" ist breit genug für seine Beschriftung.
+- Schülerdialog: die E/G-Zeile erscheint nur in Kursen mit E/G-Einteilung.
+
 - Kalender, Tagesansicht: eine Linie zeigt die aktuelle Uhrzeit (im
   Viertelstundentakt).
 - Die Teile eines Moduls stehen nur noch im Profil — im Zahnrad der Modulseite
