@@ -20,8 +20,6 @@ import { useState } from "react";
 
 import { COLORS as C, CONTROL_H, Icon, ICONS, menuRow, Popover, toolbarIconBtn } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import ViewMenu from "./ViewMenu.jsx";
-import { useModulTeile } from "../core/modules.js";
 
 /**
  * @param links     Auswahl-Elemente (Klasse, Datum …) — stehen ganz vorn
@@ -29,15 +27,14 @@ import { useModulTeile } from "../core/modules.js";
  * @param ansicht   optional das ViewMenu der Seite
  * @param mehr      [{ key, label, onClick, icon, gefahr }] — Seltenes/Gefährliches
  */
-export default function Werkzeugleiste({ links, children, ansicht, mehr = [], style, modul = null }) {
+// Die abschaltbaren Teile eines Moduls standen hier einmal als eigenes
+// Zahnrad und zusaetzlich im ViewMenu der Seite. Sie stehen jetzt an EINER
+// Stelle — im Profil unter „Teile der Module": im Zahnrad der Seite lagen sie
+// neben den Ansichts-Schaltern, die je Kurs gelten, waehrend sie selbst fuer
+// das ganze Konto gelten; und wer sie im Profil umlegte, fand sie hier ein
+// zweites Mal.
+export default function Werkzeugleiste({ links, children, ansicht, mehr = [], style }) {
   const eintraege = mehr.filter(Boolean);
-  // Die abschaltbaren Teile des Moduls als eigenes Zahnrad — eine Zeile je
-  // Seite statt einer Einstellungsseite je Modul. Seiten mit eigenem ViewMenu
-  // haengen sie stattdessen dort ein (`useModulTeile` mit Titel), damit nicht
-  // zwei Zahnraeder nebeneinander stehen.
-  const { t } = useLanguage();
-  const teileTitel = t("modules.parts");
-  const teile = useModulTeile(modul || "", { mitTitel: false });
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12, ...style }}>
       {links}
@@ -45,7 +42,6 @@ export default function Werkzeugleiste({ links, children, ansicht, mehr = [], st
       {/* Alles Weitere rechts — dort greift niemand versehentlich hin. */}
       <span style={{ flex: 1, minWidth: 0 }} />
       {ansicht}
-      {modul && !ansicht && teile.length > 0 && <ViewMenu items={teile} title={teileTitel} />}
       {eintraege.length > 0 && <MehrMenu eintraege={eintraege} />}
     </div>
   );

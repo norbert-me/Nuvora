@@ -27,6 +27,12 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 **Bedienung**
 
+- Kalender, Tagesansicht: eine Linie zeigt die aktuelle Uhrzeit (im
+  Viertelstundentakt).
+- Die Teile eines Moduls stehen nur noch im Profil — im Zahnrad der Modulseite
+  standen dieselben Schalter ein zweites Mal.
+- Der Kurs verlinkt auf „Karteikarten" statt auf „Karten".
+
 - Der Speichern-Knopf bleibt am Bildschirm: scrollt er aus dem Bild, während
   etwas offen ist, erscheint er unten.
 - Kurs: das Schuljahr wird ausgewählt, „andere …" legt ein neues an.

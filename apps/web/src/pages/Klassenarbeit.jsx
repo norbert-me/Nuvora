@@ -595,7 +595,7 @@ export default function Klassenarbeit() {
            standen vorher als 34 / ~38 / ~30 nebeneinander, jedes mit eigenem
            Radius. Das Loeschen sass ungeschuetzt neben dem Kopieren — es gehoert
            ins Mehr-Menue, wo Gefaehrliches selbst nach unten sortiert. */
-        <Werkzeugleiste modul="auswertung" style={{ marginBottom: 16 }}
+        <Werkzeugleiste style={{ marginBottom: 16 }}
           links={(
             <select value={work?.id || ""} onChange={(e) => { const w = works.find((x) => String(x.id) === e.target.value) || null; wechseln(() => zeigeArbeit(w)); }} style={{ ...selectStyle, minWidth: 180 }}>
               {works.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}

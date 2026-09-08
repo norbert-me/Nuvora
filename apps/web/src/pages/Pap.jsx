@@ -53,7 +53,7 @@ function FreiesBlatt() {
   };
   return (
     <div style={{ ...cardStyle, padding: 16 }}>
-      <Werkzeugleiste modul="pap" style={{ marginBottom: 12 }}>
+      <Werkzeugleiste style={{ marginBottom: 12 }}>
         <button onClick={() => setDrucken(true)} style={toolbarBtn}>{t("pap.drucken")}</button>
         {/* „Neues Blatt" hiess es zuerst — und beschrieb, was danach da ist,
             statt dessen, was passiert: das Gezeichnete ist weg. */}

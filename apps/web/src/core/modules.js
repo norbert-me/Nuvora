@@ -174,40 +174,6 @@ export function useZielFilter() {
   };
 }
 
-/**
- * Die abschaltbaren TEILE eines Moduls als fertige ViewMenu-Eintraege.
- *
- *   <ViewMenu items={[ ...eigene, ...useModulTeile("orga") ]} />
- *
- * Sie standen bis dahin in der Modulauswahl (/modules) — an der falschen
- * Stelle: dort entscheidet man EINMAL, ob es ein Modul gibt, und geht wieder
- * weg. Der Schalter „SEGEL-Stufen" gehoert dorthin, wo man ihn wirkt sieht:
- * ins Zahnrad des Moduls, neben die uebrigen Ansichts-Schalter.
- *
- * Wichtig: die Modul-Teile gelten fuer das ganze KONTO, nicht je Kurs wie die
- * uebrigen ViewMenu-Schalter — deshalb bekommen sie ihre eigene Ueberschrift.
- */
-export function useModulTeile(modulKey, { mitTitel = true } = {}) {
-  const { t } = useLanguage();
-  const { modules, setOption } = useModules();
-  const mod = modules.find((m) => m.key === modulKey);
-  const teile = (mod && mod.active && mod.optionen) || [];
-  if (!teile.length) return [];
-  return [
-    // Ohne Titel, wenn das Menue NUR die Teile zeigt (eigenes Zahnrad in der
-    // Werkzeugleiste) — dann sagt schon die Ueberschrift des Menues, worum es
-    // geht, und eine zweite darunter waere dieselbe Zeile zweimal.
-    ...(mitTitel ? [{ key: `${modulKey}-teile`, art: "titel", label: t("modules.parts") }] : []),
-    ...teile.map((o) => ({
-      key: `${modulKey}:${o.key}`,
-      label: o.name,
-      hint: o.description || "",
-      value: (mod.optionen_an || {})[o.key] !== false,
-      onChange: (v) => setOption(modulKey, o.key, v),
-    })),
-  ];
-}
-
 export function useModules(enabled = true) {
   const [modules, setModules] = useState(_cache || []);
   const [loading, setLoading] = useState(!_cache);

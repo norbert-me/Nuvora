@@ -658,7 +658,7 @@ export default function Kalender() {
           Bauform wie überall: [ Auswahl ] [ Alltag ] … [ Ansicht ] [ ⋯ ]
           (components/Werkzeugleiste.jsx) statt einer von Hand gebauten Reihe. */}
       {kalAnsicht && (
-        <Werkzeugleiste modul="kalender"
+        <Werkzeugleiste
           links={(
             <span data-tour="kal-views" style={{ display: "inline-flex" }}>
               {/* Kein eigener Reiter „Heute" mehr: er zeigte dasselbe wie der
@@ -1315,6 +1315,12 @@ function FreiMarker({ label, t }) {
   );
 }
 
+// Die aktuelle Uhrzeit in Minuten seit Mitternacht, abgerundet auf die
+// Viertelstunde — der Takt der Jetzt-Linie in der Tagesansicht.
+export function viertelstunde(d) {
+  return Math.floor((d.getHours() * 60 + d.getMinutes()) / 15) * 15;
+}
+
 function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDay, todoByDay, onTodo, slotsFor, onCancelSlot, frei, className, slotName, eintragName = () => "", slotColor, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
   const list = byDay(day);
   const f = frei && frei(day);
@@ -1413,6 +1419,25 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
     for (let k = cStart; k < items.length; k++) items[k].lanes = cMax + 1;
   }
 
+  // Wo steht die Uhr gerade? Eine Linie quer durch die Tagesspur — ohne sie
+  // muss man die Uhrzeit links suchen und mit dem Kasten daneben vergleichen,
+  // um zu sehen, was JETZT ist.
+  //
+  // Im Viertelstundentakt und nicht minutengenau: die Linie ist eine
+  // Orientierung, kein Zeitmesser, und ein Neuzeichnen je Minute waere
+  // sechzigmal so oft fuer einen Sprung von 0,7 Pixeln. Der Zeitgeber laeuft
+  // trotzdem jede Minute — sonst haengt die Linie nach dem Aufwachen des
+  // Rechners bis zu einer Viertelstunde hinterher; gesetzt wird der Zustand
+  // nur, wenn sich die Viertelstunde wirklich geaendert hat.
+  const [jetztMin, setJetztMin] = useState(() => viertelstunde(new Date()));
+  useEffect(() => {
+    const tick = () => setJetztMin((alt) => { const neu = viertelstunde(new Date()); return neu === alt ? alt : neu; });
+    tick();
+    const id = setInterval(tick, 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+  const istHeute = ymd(day) === ymd(new Date());
+
   // Erste belegte Minute des Tages (halbe Stunde Vorlauf), sonst 6 Uhr.
   const ersteMinute = timed.length ? Math.max(0, Math.min(...timed.map((x) => x.start)) - 30) : 6 * 60;
   const scrollRef = useCallback((el) => { if (el) el.scrollTop = (ersteMinute / 60) * HOUR; }, [ersteMinute]);
@@ -1476,6 +1501,16 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
               {h < 24 && <span style={{ position: "absolute", top: -1, left: -44, fontSize: 11, color: "var(--text3)" }}>{String(h).padStart(2, "0")}:00</span>}
             </div>
           ))}
+          {/* Die Jetzt-Linie liegt UEBER dem Raster und unter den Kaesten:
+              sie soll die Stunde markieren, nicht ihren Text verdecken. */}
+          {istHeute && (
+            <div aria-hidden style={{ position: "absolute", top: yOf(jetztMin), left: 46, right: 0, height: 0,
+              borderTop: `2px solid ${C.danger}`, pointerEvents: "none", zIndex: 1 }}>
+              <span style={{ position: "absolute", top: -8, left: -44, fontSize: 11, fontWeight: 700, color: C.danger, background: "var(--card)" }}>
+                {`${String(Math.floor(jetztMin / 60)).padStart(2, "0")}:${String(jetztMin % 60).padStart(2, "0")}`}
+              </span>
+            </div>
+          )}
           {timed.map((it) => (
             <div key={it.key} style={{ position: "absolute", top: yOf(it.start) + 1, height: Math.max(BLOCK_MIN_H, yOf(it.end) - yOf(it.start) - 2),
               left: `calc(50px + ${it.lane || 0} * (100% - 58px) / ${it.lanes || 1})`,

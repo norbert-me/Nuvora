@@ -10,7 +10,7 @@ import ViewMenu from "../components/ViewMenu.jsx";
 import Portrait from "../components/Portrait.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { useModulOption, useModulTeile } from "../core/modules.js";
+import { useModulOption } from "../core/modules.js";
 import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import { alsJson, hol } from "../core/melden.js";
 
@@ -59,13 +59,11 @@ const zoomBtnStyle = { ...segmentBtn, padding: "0 10px", color: "var(--text2)" }
 
 export default function Sitzplan() {
   const { t } = useLanguage();
-  // SEGEL laesst sich am Modul Orga abschalten (Modulseite → „Teile"). Nicht
+  // SEGEL laesst sich im Profil abschalten („Teile der Module"). Nicht
   // jede Schule kennt das Konzept; wer es nicht nutzt, hat sonst einen
   // Schalter und ein Kuerzel am Platz, die ihm nichts sagen. Eingetragene
   // Stufen bleiben dabei erhalten — abgeschaltet ist die ANZEIGE.
   const segelTeil = useModulOption("orga", "segel");
-  // Die abschaltbaren Teile des Moduls stehen hier und nicht mehr in /modules.
-  const modulTeile = useModulTeile("orga");
   // Anwesenheit lebt im Modul „Orga" (Aufruf-Ansicht nutzt sie).
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
@@ -664,7 +662,6 @@ export default function Sitzplan() {
               value: foerderArt, onChange: (v) => { setFoerderArt(v); saveView({ foerderArt: v }); },
               optionen: [{ wert: "", label: t("sitzplan.hervorFoerderAlle") }, ...vorhandeneFoerder.map((f) => ({ wert: f, label: f }))],
             }] : []),
-            ...modulTeile,
           ]} />
         )}
         mehr={[

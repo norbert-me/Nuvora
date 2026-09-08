@@ -162,7 +162,7 @@ export default {
   "kursLinks.title": "Dieser Kurs in …",
   "kursLinks.noten": "Notenbuch",
   "kursLinks.klassenarbeit": "Klassenarbeit",
-  "kursLinks.karten": "Karten",
+  "kursLinks.karten": "Karteikarten",
   "kursLinks.cardvote": "CardVote-Auswertung",
   "kursLinks.klassenleitung": "Klassenleitung",
   "kursLinks.lernpfad": "Lernpfad",

@@ -161,7 +161,7 @@ export default {
   "kursLinks.title": "Este curso en …",
   "kursLinks.noten": "Cuaderno de notas",
   "kursLinks.klassenarbeit": "Análisis de examen",
-  "kursLinks.karten": "Tarjetas",
+  "kursLinks.karten": "Tarjetas de memoria",
   "kursLinks.cardvote": "Resultados CardVote",
   "kursLinks.klassenleitung": "Tutoría",
   "kursLinks.lernpfad": "Itinerario",

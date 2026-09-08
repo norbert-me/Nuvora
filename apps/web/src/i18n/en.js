@@ -160,7 +160,7 @@ export default {
   "kursLinks.title": "This course in …",
   "kursLinks.noten": "Gradebook",
   "kursLinks.klassenarbeit": "Exam analysis",
-  "kursLinks.karten": "Cards",
+  "kursLinks.karten": "Flashcards",
   "kursLinks.cardvote": "CardVote results",
   "kursLinks.klassenleitung": "Class teacher log",
   "kursLinks.lernpfad": "Learning path",
