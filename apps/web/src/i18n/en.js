@@ -401,7 +401,7 @@ export default {
   "offline.vorratWann": "Last fetched: {{wann}}",
   "offline.vorratNie": "Never fetched.",
   "offline.dauerhaft": "Persistent storage",
-  "offline.dauerhaftNein": "The browser may clear storage if the app is unused for weeks.",
+  "offline.dauerhaftNein": "The browser does not guarantee it — it may clear the cache if nobody opens the app for weeks. Offline still works; daily use and a home screen icon keep the data.",
   "offline.dauerhaftUnbekannt": "This browser does not say.",
   "offline.platz": "Storage used",
   "offline.warteschlange": "Pending changes",

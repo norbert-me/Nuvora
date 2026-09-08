@@ -403,7 +403,7 @@ export default {
   "offline.vorratWann": "Zuletzt geholt: {{wann}}",
   "offline.vorratNie": "Noch nie geholt.",
   "offline.dauerhaft": "Dauerhafte Ablage",
-  "offline.dauerhaftNein": "Der Browser darf den Speicher aufräumen, wenn die App wochenlang nicht geöffnet wird.",
+  "offline.dauerhaftNein": "Der Browser sagt sie nicht zu — er darf den Vorrat wegräumen, wenn die App wochenlang niemand öffnet. Offline funktioniert trotzdem; wer täglich damit arbeitet und sie auf dem Home-Bildschirm hat, verliert nichts.",
   "offline.dauerhaftUnbekannt": "Sagt dieser Browser nicht.",
   "offline.platz": "Belegter Speicher",
   "offline.warteschlange": "Wartende Änderungen",

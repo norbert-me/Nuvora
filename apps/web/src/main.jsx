@@ -12,6 +12,7 @@ import { enqueue, classify, newTmp, flush as flushOutbox, setKonfliktFrage } fro
 // (Gegenstueck: app/versionierung.py).
 import { KOPF as VERSION_KOPF, merke as merkeVersion, fuer as versionFuer, vergiss as vergissVersion } from "./core/versionen.js";
 import { vorladen } from "./core/vorladen.js";
+import { dauerhaftAnfragen } from "./core/ablage.js";
 // Jeder Speicherzugriff im Rahmen laeuft ueber core/speicher.js: in Safaris
 // privatem Modus wirft `localStorage` schon beim Zugriff, und ein Wurf HIER
 // (im globalen fetch) haette jeden einzelnen API-Aufruf mitgerissen.
@@ -1288,7 +1289,14 @@ function App() {
   // verzoegert: die Seite, die gerade geoeffnet wird, hat Vorrang.
   useEffect(() => {
     if (!user) return;
-    const timer = setTimeout(() => { vorladen(); }, 4000);
+    const timer = setTimeout(() => {
+      // Zusammen mit dem Vorrat: die Bitte um dauerhafte Ablage. Sie kostet
+      // nichts, zeigt keinen Dialog und wird vom Browser aus Heuristiken
+      // beantwortet (Home-Bildschirm, regelmaessige Benutzung) — ein „nein"
+      // heute kann morgen ein „ja" sein, deshalb bei jedem Start einmal.
+      dauerhaftAnfragen();
+      vorladen();
+    }, 4000);
     return () => clearTimeout(timer);
   }, [user]);
 

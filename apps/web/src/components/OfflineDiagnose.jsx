@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { btnSecondary, COLORS as C, CONTROL_R, Icon, ICONS } from "./Icons.jsx";
+import { dauerhaftAnfragen } from "../core/ablage.js";
 import { count as outboxCount, fehler as outboxFehler } from "../core/outbox.js";
 import { vorladen } from "../core/vorladen.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -66,7 +67,7 @@ export default function OfflineDiagnose() {
     // Dauerhafte Ablage anfragen: iOS raeumt den Speicher einer Seite auf, die
     // wochenlang niemand oeffnet. Der Browser darf ablehnen — dann steht es in
     // der Zeile darueber, statt still zu scheitern.
-    try { await navigator.storage.persist(); } catch { /* nicht ueberall vorhanden */ }
+    await dauerhaftAnfragen();
     await vorladen({ erzwingen: true });
     await messen();
     setLaeuft(false);

@@ -402,7 +402,7 @@ export default {
   "offline.vorratWann": "Última descarga: {{wann}}",
   "offline.vorratNie": "Nunca descargada.",
   "offline.dauerhaft": "Almacenamiento persistente",
-  "offline.dauerhaftNein": "El navegador puede vaciar el almacenamiento si la app no se usa durante semanas.",
+  "offline.dauerhaftNein": "El navegador no lo garantiza — puede vaciar la reserva si nadie abre la app durante semanas. Sin conexión sigue funcionando; con uso diario y el icono en la pantalla de inicio no se pierde nada.",
   "offline.dauerhaftUnbekannt": "Este navegador no lo indica.",
   "offline.platz": "Espacio usado",
   "offline.warteschlange": "Cambios pendientes",
