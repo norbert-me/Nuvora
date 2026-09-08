@@ -14,7 +14,7 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.3.2 — 08.09.2026
 
 **Offline und schlechtes Netz**
 
@@ -25,59 +25,45 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   still: passt beides nicht zusammen, entscheidet Nuvora zugunsten der neueren
   Änderung — und fragt nur, wenn inzwischen wirklich woanders gearbeitet wurde.
 
-**Bedienung**
+**Kalender und Startseite**
 
-- Startseite „Heute": Stunden und Termine stehen in EINER Liste nach Uhrzeit —
-  der Termin um 8 Uhr stand vorher hinter der sechsten Stunde. Und eine Stunde
+- Startseite „Heute": Stunden und Termine stehen in einer Liste nach Uhrzeit —
+  der Termin um 8 Uhr stand vorher hinter der sechsten Stunde. Eine Stunde
   heißt dort „Mathe · 7.5" wie im Kalender, nicht nur „7.5".
-- Kalender: beim Öffnen einer Stundenplan-Stunde stehen deren Uhrzeiten in den
-  Feldern statt „--:--".
+- Tagesansicht: eine Linie zeigt die aktuelle Uhrzeit (im Viertelstundentakt).
+- Beim Öffnen einer Stundenplan-Stunde stehen deren Uhrzeiten in den Feldern
+  statt „--:--".
+- Der Weg zur Anwesenheit stand im Stunden-Dialog zweimal; er steht jetzt
+  einmal unter „Öffnen" und springt auf den Tag des Termins.
 - Verlaufsplan: das Feld „Dauer" ist breit genug für seine Beschriftung.
-- Schülerdialog: die E/G-Zeile erscheint nur in Kursen mit E/G-Einteilung.
+- WebUntis-Import: fehlende Kurse schlägt der Dialog zum Anlegen vor
+  („Mathe 7.5"), Fach und Jahrgang kommen mit.
 
-- Kalender, Tagesansicht: eine Linie zeigt die aktuelle Uhrzeit (im
-  Viertelstundentakt).
-- Die Teile eines Moduls stehen nur noch im Profil — im Zahnrad der Modulseite
-  standen dieselben Schalter ein zweites Mal.
-- Der Kurs verlinkt auf „Karteikarten" statt auf „Karten".
-- Sitzplan: wer heute fehlt, verspätet oder entschuldigt ist, steht am Platz.
-  Ein Klick auf ein Kind schreibt eine Bemerkung ins Notenbuch. Gelöscht wird
-  ein Platz, indem man ihn auf den Mülleimer zieht, der beim Ziehen erscheint.
-- Fehler melden: ein angehängtes Bild wird im Dialog gezeigt.
-- Tafel: mehrere Tafeln lassen sich unter einem Namen speichern und wieder
-  öffnen — sie hängen am Konto, nicht am Browser.
-- Tafel im Vollbild: der Schließen-Knopf steht wieder vollständig im Bild.
-- Desktop-App: „Neuer Tab" (Cmd+T) öffnet einen zweiten Tab, Zurück und
-  Vorwärts stehen im Menü (Cmd+[ / Cmd+]).
-- In der App und in der installierten Web-App steht ein Zurück-Pfeil in der
-  Navigationsleiste — dort gibt es keinen des Browsers.
-- Neu: das Gerüst der iPhone-/iPad-App (`apps/ios`) — dieselbe Hülle wie am
-  Mac, mit Einrichtungsseite für die Serveradresse.
-- Kalender: der Weg zur Anwesenheit stand im Stunden-Dialog zweimal; er steht
-  jetzt einmal unter „Öffnen" und springt auf den Tag des Termins.
-- Notenbuch: fehlende Kinder werden auch dann an der Spalte markiert, wenn der
-  Kurs aus mehreren Fach-Klassen besteht.
+**Kurse und Personen**
 
-- Der Speichern-Knopf bleibt am Bildschirm: scrollt er aus dem Bild, während
-  etwas offen ist, erscheint er unten.
-- Kurs: das Schuljahr wird ausgewählt, „andere …" legt ein neues an.
-- Kurs und Thema: das Feld „Jahrgang" ist weg — das Schuljahr sagt es bereits.
-- Profil: die Schalter unter „Teile der Module" stehen in einer Spalte; die
-  Checklisten in Orga lassen sich jetzt ebenfalls ausblenden.
-- Person: ein vorhandenes Foto lässt sich neu zuschneiden, ohne es noch einmal
-  auszuwählen. Die Klassenleitung steht wieder im Dialog, und der Platzhalter
-  der Notiz schlägt keinen Nachteilsausgleich mehr vor — der gehört an den
-  Kurs, damit er bei Klassenarbeiten erscheint.
 - Kurs bearbeiten: ein Klick auf ein Kind öffnet seine Angaben — Niveau,
   Förderschwerpunkt und der Nachteilsausgleich für diesen Kurs an einer Stelle.
   Die beiden eigenen Listen darunter sind weg; die Kinderliste zeigt „NTA" und
   E/G als Merkzeichen. Umbenannt wird mit dem Stift.
-- WebUntis-Import: fehlende Kurse schlägt der Dialog zum Anlegen vor („Mathe 7.5"),
-  Fach und Jahrgang kommen mit.
+- Das Schuljahr wird ausgewählt, „andere …" legt ein neues an.
+- Kurs und Thema: das Feld „Jahrgang" ist weg — das Schuljahr sagt es bereits.
+- Die E/G-Zeile im Schülerdialog erscheint nur in Kursen mit E/G-Einteilung.
+- Person: ein vorhandenes Foto lässt sich neu zuschneiden, ohne es noch einmal
+  auszuwählen. Die Klassenleitung steht wieder im Dialog, und der Platzhalter
+  der Notiz schlägt keinen Nachteilsausgleich mehr vor — der gehört an den
+  Kurs, damit er bei Klassenarbeiten erscheint.
 - Fördermaßnahmen: der Knopf heißt wieder „+ Maßnahme" statt „+ + Maßnahme".
 
-**Notenbuch**
+**Sitzplan, Tafel, Notenbuch**
 
+- Sitzplan: wer heute fehlt, verspätet oder entschuldigt ist, steht am Platz.
+  Ein Klick auf ein Kind schreibt eine Bemerkung ins Notenbuch. Gelöscht wird
+  ein Platz, indem man ihn auf den Mülleimer zieht, der beim Ziehen erscheint.
+- Tafel: mehrere Tafeln lassen sich unter einem Namen speichern und wieder
+  öffnen — sie hängen am Konto, nicht am Browser. Im Vollbild steht der
+  Schließen-Knopf wieder vollständig im Bild.
+- Notenbuch: fehlende Kinder werden auch dann an der Spalte markiert, wenn der
+  Kurs aus mehreren Fach-Klassen besteht.
 - „Vergleichen" ist aus dem Spaltenmenü verschwunden: es war für Klassenarbeiten
   gedacht und stand trotzdem an jeder Spalte. Klassenarbeiten haben ihren
   Vergleich als eigene Seite; was eine einzelne Spalte hergibt, steht unter
@@ -87,6 +73,22 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Das Thema einer Spalte schlägt sich aus dem Kalendereintrag des Tages vor.
 - Der Wechsel von Halbjahr, Klasse oder Kurs fragt nicht mehr erneut nach
   Änderungen, die man vorher aufgegeben hat.
+
+**Bedienung und Apps**
+
+- Der Speichern-Knopf bleibt am Bildschirm: scrollt er aus dem Bild, während
+  etwas offen ist, erscheint er unten.
+- Die Teile eines Moduls stehen nur noch im Profil — im Zahnrad der Modulseite
+  standen dieselben Schalter ein zweites Mal. Die Checklisten in Orga lassen
+  sich jetzt ebenfalls ausblenden, und die Schalter stehen in einer Spalte.
+- Der Kurs verlinkt auf „Karteikarten" statt auf „Karten".
+- Fehler melden: ein angehängtes Bild wird im Dialog gezeigt.
+- Desktop-App: „Neuer Tab" (Cmd+T) öffnet einen zweiten Tab, Zurück und
+  Vorwärts stehen im Menü (Cmd+[ / Cmd+]).
+- In der App und in der installierten Web-App steht ein Zurück-Pfeil in der
+  Navigationsleiste — dort gibt es keinen des Browsers.
+- Neu: das Gerüst der iPhone-/iPad-App (`apps/ios`) — dieselbe Hülle wie am
+  Mac, mit Einrichtungsseite für die Serveradresse.
 
 ## 4.3.1 — 07.09.2026
 
