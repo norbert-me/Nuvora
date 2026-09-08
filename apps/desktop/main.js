@@ -26,7 +26,13 @@ function saveUrl(url) {
   catch (e) { console.error("settings speichern fehlgeschlagen:", e); }
 }
 
-let win = null;
+// Alle offenen Fenster. Auf macOS liegen sie als NATIVE Tabs in einem Fenster
+// (`tabbingIdentifier`) — Cmd+T legt einen an, die Tableiste kommt vom System.
+// Ein selbst gebautes Tab-Band waere eine zweite, schlechtere Fassung davon:
+// ohne Ziehen zwischen Fenstern, ohne Tastaturwege, ohne Vollbild-Verhalten.
+let win = null;          // zuletzt benutztes Fenster (fuer Menue und Setup)
+const fenster = new Set();
+const aktiv = () => BrowserWindow.getFocusedWindow() || win;
 
 // Offline-LESEN braucht einen Service-Worker, und den gibt Chromium nur in einem
 // "secure context" her: https, oder localhost. Die typische Schulinstallation
@@ -56,14 +62,16 @@ function secureOriginErlauben() {
   return origin;
 }
 
-function loadTarget() {
+function loadTarget(ziel = null) {
+  const w = ziel || aktiv();
+  if (!w) return;
   const url = readUrl();
-  if (url) win.loadURL(url);
-  else win.loadFile(path.join(__dirname, "setup.html")); // Erststart: Adresse abfragen
+  if (url) w.loadURL(url);
+  else w.loadFile(path.join(__dirname, "setup.html")); // Erststart: Adresse abfragen
 }
 
 function createWindow() {
-  win = new BrowserWindow({
+  const neu = new BrowserWindow({
     width: 1280,
     height: 860,
     minWidth: 900,
@@ -84,21 +92,40 @@ function createWindow() {
       // im Renderer nicht zu haben ist (kein Node dort, und das ist gut so).
       additionalArguments: [`--nuvora-version=${app.getVersion()}`],
     },
+    // macOS legt Fenster mit derselben Kennung als Tabs zusammen.
+    tabbingIdentifier: "nuvora",
   });
+  win = neu;
+  fenster.add(neu);
+  neu.on("focus", () => { win = neu; });
+  neu.on("closed", () => { fenster.delete(neu); if (win === neu) win = [...fenster][0] || null; });
 
   // Externe Links (mailto, fremde Hosts) im echten Browser oeffnen, nicht in
   // der App — die App bleibt bei Nuvora. Nur die drei Schemata, die eine
   // Weboberflaeche legitim nach draussen reicht: file: und exotische Schemata
   // (Protokoll-Handler fremder Programme) gehoeren nicht in den Standardbrowser
   // und werden still verworfen.
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  neu.webContents.setWindowOpenHandler(({ url }) => {
     let schema = "";
     try { schema = new URL(url).protocol; } catch { schema = ""; }
     if (schema === "http:" || schema === "https:" || schema === "mailto:") shell.openExternal(url);
     return { action: "deny" };
   });
 
-  loadTarget();
+  loadTarget(neu);
+  return neu;
+}
+
+// Ein weiterer Tab auf dieselbe Installation. `addTabbedWindow` haengt ihn an
+// die Tableiste des aktuellen Fensters; ohne das oeffnete macOS ein zweites
+// freistehendes Fenster.
+function neuerTab() {
+  const vorher = aktiv();
+  const t = createWindow();
+  if (vorher && !vorher.isDestroyed() && process.platform === "darwin") {
+    try { vorher.addTabbedWindow(t); } catch { /* aelteres macOS: dann eben ein eigenes Fenster */ }
+  }
+  return t;
 }
 
 // Setup-Seite meldet die eingegebene Adresse hierher.
@@ -107,12 +134,13 @@ ipcMain.handle("nuvora:set-url", (_e, url) => {
   if (!/^https?:\/\//i.test(u)) return { ok: false, error: "Bitte mit http:// oder https:// beginnen." };
   const vorher = readUrl();
   saveUrl(u);
-  win.loadURL(u);
+  const w = aktiv();
+  if (w) w.loadURL(u);
   // Der Secure-Origin-Schalter (siehe secureOriginErlauben) wird beim Start
   // gesetzt. Zeigt die neue Adresse auf http, fehlt das Offline-Lesen bis zum
   // Neustart — das sagen wir der Lehrkraft hier, statt sie raten zu lassen.
   if (u !== vorher && /^http:\/\//i.test(u)) {
-    dialog.showMessageBox(win, {
+    dialog.showMessageBox(aktiv(), {
       type: "info",
       title: "Neustart für Offline-Lesen",
       message: "Adresse gespeichert.",
@@ -124,13 +152,50 @@ ipcMain.handle("nuvora:set-url", (_e, url) => {
   return { ok: true };
 });
 
+// Ein Schritt im Verlauf des gerade sichtbaren Tabs. Electron 44 fuehrt den
+// Verlauf unter `webContents.navigationHistory`; die alten Methoden
+// (`goBack`/`canGoBack`) gibt es dort nicht mehr.
+function verlauf(w) {
+  const c = w && !w.isDestroyed() ? w.webContents : null;
+  return c ? (c.navigationHistory || c) : null;
+}
+function zurueck() {
+  const h = verlauf(aktiv());
+  if (h && h.canGoBack()) h.goBack();
+}
+function vorwaerts() {
+  const h = verlauf(aktiv());
+  if (h && h.canGoForward()) h.goForward();
+}
+
 function buildMenu() {
   const template = [
     { role: "appMenu" },
     {
+      label: "Datei",
+      submenu: [
+        { label: "Neuer Tab", accelerator: "CmdOrCtrl+T", click: () => neuerTab() },
+        { role: "close" },
+      ],
+    },
+    {
+      // Zurueck und Vorwaerts gibt es in der App sonst nirgends: es gibt keine
+      // Adressleiste, und die Weboberflaeche ist eine SPA — wer sich verklickt
+      // hat, kam bisher nur ueber die Navigation zurueck. Die Tasten sind die
+      // des Browsers (Cmd+[ / Cmd+]) plus die Pfeile, die auf dem Mac ebenso
+      // gelaeufig sind.
+      label: "Verlauf",
+      submenu: [
+        { label: "Zurück", accelerator: "CmdOrCtrl+[", click: () => zurueck() },
+        { label: "Zurück ", accelerator: "CmdOrCtrl+Left", visible: false, click: () => zurueck() },
+        { label: "Vorwärts", accelerator: "CmdOrCtrl+]", click: () => vorwaerts() },
+        { label: "Vorwärts ", accelerator: "CmdOrCtrl+Right", visible: false, click: () => vorwaerts() },
+      ],
+    },
+    {
       label: "Ansicht",
       submenu: [
-        { label: "Neu laden", accelerator: "CmdOrCtrl+R", click: () => win && win.reload() },
+        { label: "Neu laden", accelerator: "CmdOrCtrl+R", click: () => { const w = aktiv(); if (w) w.reload(); } },
         { role: "toggleDevTools" },
         { type: "separator" },
         { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" },
@@ -144,8 +209,9 @@ function buildMenu() {
           label: "Server-Adresse ändern…",
           click: async () => {
             const cur = readUrl();
+            const w = aktiv();
             // Kleiner Umweg ueber die Setup-Seite, damit kein extra Dialog noetig ist.
-            win.loadFile(path.join(__dirname, "setup.html"), { query: cur ? { url: cur } : {} });
+            if (w) w.loadFile(path.join(__dirname, "setup.html"), { query: cur ? { url: cur } : {} });
           },
         },
         { label: "Zur App", click: () => loadTarget() },
@@ -178,8 +244,9 @@ app.on("web-contents-created", (_e, contents) => {
     if (errorCode === -3) return;
     if (istHauptrahmen === false) return;
     if (!validatedURL || !validatedURL.startsWith("http")) return;
-    if (win) win.loadFile(path.join(__dirname, "offline.html"));
-    dialog.showMessageBox(win, {
+    const w = aktiv();
+    if (w) w.loadFile(path.join(__dirname, "offline.html"));
+    dialog.showMessageBox(w, {
       type: "info",
       title: "Nuvora offline",
       message: "Der Server ist gerade nicht erreichbar.",

@@ -700,6 +700,13 @@ function Nav({ user, onLogout }) {
   // Konto, dass sie gelaufen ist.
   const { setUser } = React.useContext(RahmenKontext);
   const location = useLocation();
+  const nav = useNavigate();
+  // Laeuft die Oberflaeche in einem Fenster OHNE Adressleiste? Desktop-Huelle
+  // oder installierte PWA. Nur dort fehlt der Zurueck-Pfeil des Browsers.
+  const inHuelle = typeof window !== "undefined" && (
+    !!window.nuvora || !!window.nuvoraDesktop
+    || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
+    || window.navigator.standalone === true);
   const [menuOpen, setMenuOpen] = useState(false);
   const { t } = useLanguage();
   // Re-Render, wenn ein Modul-Zahnrad die sichtbaren Reiter ändert (localStorage).
@@ -830,6 +837,18 @@ function Nav({ user, onLogout }) {
         height: 52,
         gap: 4,
       }}>
+        {/* Zurueck — nur in der App-Huelle und in der installierten PWA.
+            Im Browser gibt es dafuer den Pfeil des Browsers; in einem Fenster
+            ohne Adressleiste gibt es ihn nicht, und wer sich verklickt hat,
+            musste ueber die Navigation zurueckfinden. Kein Vorwaerts daneben:
+            das braucht man erst, wenn man zurueckgegangen ist, und dann steht
+            es im Menue der App (Cmd+]). */}
+        {inHuelle && (
+          <button onClick={() => nav(-1)} className="icon-btn" style={{ ...iconBtn, flexShrink: 0, color: "var(--text)" }}
+            title={t("common.back")} aria-label={t("common.back")}>
+            <Icon d={ICONS.chevronLeft} size={20} color="currentColor" />
+          </button>
+        )}
         <NavLink to="/" data-tour="home" onClick={() => setMenuOpen(false)} style={{ textDecoration: "none", flexShrink: 0 }}>
           <div style={{
             fontWeight: 700,

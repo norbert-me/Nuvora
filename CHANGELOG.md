@@ -39,6 +39,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Tafel: mehrere Tafeln lassen sich unter einem Namen speichern und wieder
   öffnen — sie hängen am Konto, nicht am Browser.
 - Tafel im Vollbild: der Schließen-Knopf steht wieder vollständig im Bild.
+- Desktop-App: „Neuer Tab" (Cmd+T) öffnet einen zweiten Tab, Zurück und
+  Vorwärts stehen im Menü (Cmd+[ / Cmd+]).
+- In der App und in der installierten Web-App steht ein Zurück-Pfeil in der
+  Navigationsleiste — dort gibt es keinen des Browsers.
 - Kalender: der Weg zur Anwesenheit stand im Stunden-Dialog zweimal; er steht
   jetzt einmal unter „Öffnen" und springt auf den Tag des Termins.
 - Notenbuch: fehlende Kinder werden auch dann an der Spalte markiert, wenn der
