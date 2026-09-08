@@ -126,6 +126,16 @@ export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau =
         </div>
       </>) : null}
 
+      {/* Die Klassenleitung gehoert zur PERSON, nicht zu einer ihrer Zeilen:
+          wer die 7a fuehrt, ist in Mathe dieselbe wie in Deutsch. Gepflegt
+          wurde sie bisher nur in der Klassenmaske — und die ist auf dem Weg
+          hinaus (der Kurs wird die Bedienebene), womit das Feld an keiner
+          Stelle mehr zu erreichen war. */}
+      <div style={titel}>{t("classes.classTeacher")}</div>
+      <input value={w.klassenlehrer || ""} onChange={(ev) => e.setz({ klassenlehrer: ev.target.value })}
+        placeholder={t("classes.classTeacherPlaceholder")} maxLength={120}
+        style={{ ...inputStyle, width: "100%", maxWidth: "100%", fontSize: 13 }} />
+
       <div style={titel}>{t("classes.notes")}</div>
       <textarea value={w.notizen || ""} onChange={(ev) => e.setz({ notizen: ev.target.value })}
         rows={2} maxLength={2000} placeholder={t("classes.notesPlaceholder")}

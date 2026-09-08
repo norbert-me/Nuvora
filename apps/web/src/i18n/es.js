@@ -783,7 +783,7 @@ export default {
   "classes.measureExamHint": "Se aplica en exámenes — el calendario lo muestra en la fecha.",
   "classes.measureAdd": "+ Medida",
   "classes.notes": "Notas",
-  "classes.notesPlaceholder": "p. ej. adaptaciones, observaciones…",
+  "classes.notesPlaceholder": "p. ej. se sienta delante, acuerdo con la familia…",
   "classes.staysPrivate": "Se queda contigo: esta información no aparece en ninguna exportación ni publicación.",
   "classes.eCourse": "Curso E",
   "classes.gCourse": "Curso G",

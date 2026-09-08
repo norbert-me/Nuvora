@@ -782,7 +782,7 @@ export default {
   "classes.measureExamHint": "Applies in exams — the calendar shows it on the exam date.",
   "classes.measureAdd": "+ Measure",
   "classes.notes": "Notes",
-  "classes.notesPlaceholder": "e.g. accommodations, notes…",
+  "classes.notesPlaceholder": "e.g. sits at the front, agreement with the parents…",
   "classes.staysPrivate": "Stays with you: this information is in no export and no publication.",
   "classes.eCourse": "E course",
   "classes.gCourse": "G course",

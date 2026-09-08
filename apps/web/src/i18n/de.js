@@ -784,7 +784,7 @@ export default {
   "classes.measureExamHint": "Gilt in Klassenarbeiten — der Kalender zeigt es am Termin.",
   "classes.measureAdd": "+ Maßnahme",
   "classes.notes": "Notizen",
-  "classes.notesPlaceholder": "z. B. Nachteilsausgleich, Besonderheiten…",
+  "classes.notesPlaceholder": "z. B. sitzt vorne, Absprache mit dem Elternhaus…",
   "classes.staysPrivate": "Bleibt bei dir: diese Angaben stehen in keinem Export und in keiner Veröffentlichung.",
   "classes.eCourse": "E-Kurs",
   "classes.gCourse": "G-Kurs",

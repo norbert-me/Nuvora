@@ -34,7 +34,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Profil: die Schalter unter „Teile der Module" stehen in einer Spalte; die
   Checklisten in Orga lassen sich jetzt ebenfalls ausblenden.
 - Person: ein vorhandenes Foto lässt sich neu zuschneiden, ohne es noch einmal
-  auszuwählen.
+  auszuwählen. Die Klassenleitung steht wieder im Dialog, und der Platzhalter
+  der Notiz schlägt keinen Nachteilsausgleich mehr vor — der gehört an den
+  Kurs, damit er bei Klassenarbeiten erscheint.
 - Kurs bearbeiten: ein Klick auf ein Kind öffnet seine Angaben — Niveau,
   Förderschwerpunkt und der Nachteilsausgleich für diesen Kurs an einer Stelle.
   Die beiden eigenen Listen darunter sind weg; die Kinderliste zeigt „NTA" und
