@@ -17,6 +17,14 @@ function precacheListe() {
     name: "nuvora-precache-liste",
     apply: "build",
     generateBundle(_optionen, bundle) {
+      // Nur was Rollup gebaut hat. Alles aus `public/` wird von Vite daneben
+      // kopiert und taucht hier gar nicht auf — das ist der Grund, warum
+      // `public/vendor/opencv/opencv.js` (rund 10 MB, die ArUco-Erkennung im
+      // Browser) nicht im Vorrat landet: `precache.json` umfasst sonst 2,7 MB,
+      // und wer nie scannt, soll dafuer nicht zahlen. Die Datei wird beim
+      // Betreten der Scan-Seite geholt und bleibt danach im Cache des
+      // Service-Workers. Wer sie doch vorladen will, traegt sie ausdruecklich
+      // ein — automatisch passiert es nicht.
       const dateien = Object.keys(bundle)
         // woff2 ja, .woff NEIN: die alte Fassung steht nur als Rueckfall in der
         // CSS-Regel und wird von keinem Browser der letzten Jahre geholt — im

@@ -16,6 +16,13 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote erkennt die Karten im Gerät.** Der Scanner schickte bisher jedes
+  Kamerabild an den Server — mehrere je Sekunde, eine Unterrichtsstunde lang;
+  fiel das Schulnetz aus, fiel die Abstimmung aus. Erkannt wird jetzt im
+  Browser (mitgeliefertes `opencv.js`, dieselbe Bibliothek wie auf dem Server).
+  Der Server bleibt der Rückfall, wenn das auf einem Gerät nicht startet, und
+  die Seite sagt es dann. Bestätigte Karten warten offline in der
+  Warteschlange, der Scanner zeigt an, wie viele.
 - Nuvora bittet beim Start um dauerhafte Ablage des Offline-Vorrats — ohne
   Dialog; ob der Browser sie gewährt, steht in der Offline-Bereitschaft.
 - Profil: „Offline-Bereitschaft" sagt auf dem Gerät, woran es hängt — sichere

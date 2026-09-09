@@ -57,6 +57,18 @@ class ScanImageResponse(BaseModel):
     cards: List[DetectedCard]
 
 
+# ─── Doppelte Rechnung — zusammen aendern! ───
+#
+# Die drei folgenden Funktionen (angle_from_corners, answer_from_angle,
+# zuversicht) stehen ein zweites Mal in apps/web/src/cardvote/aruco.js
+# (winkelAusEcken, antwortAusWinkel, zuversicht). Die Erkennung laeuft seit dem
+# Umbau im BROWSER (opencv.js, dieselbe Bibliothek nach WebAssembly uebersetzt);
+# dieser Server-Weg bleibt der Rueckfall, wenn das WebAssembly nicht startet.
+# Laeuft eine Seite anders, bekommt dieselbe hochgehaltene Karte je nach Geraet
+# eine andere Antwort. Dieselbe Lage wie bei scoring.py / scoring.js, mit
+# demselben Test daneben: tests/test_aruco_parity.py.
+
+
 def angle_from_corners(corners: np.ndarray) -> float:
     """Compute rotation angle of an ArUco marker from its 4 corners.
 

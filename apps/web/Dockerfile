@@ -14,7 +14,7 @@ RUN npx vite build
 # Einmal beim Bauen komprimieren statt bei jedem Aufruf: nginx liefert die
 # .gz-Datei per gzip_static aus (siehe nginx.conf). -9 lohnt hier, weil es genau
 # einmal passiert; -k behaelt das Original fuer Clients ohne gzip.
-RUN find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.json' -o -name '*.svg' \) \
+RUN find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.json' -o -name '*.svg' -o -name '*.wasm' \) \
     -size +1k -exec gzip -9 -k {} +
 
 # Gleiche Fassung wie der proxy-Dienst in docker-compose.yml — zusammen aendern.

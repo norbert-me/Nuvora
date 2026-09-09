@@ -386,13 +386,24 @@ def teste_sicherheit(api, b):
             raise AssertionError("keine Content-Security-Policy")
         teile = {t.strip().split(" ")[0]: t.strip() for t in csp.split(";") if t.strip()}
         script = teile.get("script-src", "")
-        if "unsafe-inline" in script or "unsafe-eval" in script:
+        # 'wasm-unsafe-eval' zuerst herausnehmen: es traegt "unsafe-eval" als
+        # Teilzeichenkette, meint aber ausschliesslich WebAssembly und ist
+        # ausdruecklich gewollt (Kartenerkennung im Browser, siehe nginx.conf).
+        # Ohne diesen Abzug meldete die Probe genau die Erlaubnis als Loch, die
+        # sie schuetzen soll.
+        ohne_wasm = script.replace("'wasm-unsafe-eval'", "")
+        if "unsafe-inline" in ohne_wasm or "unsafe-eval" in ohne_wasm:
             raise AssertionError(f"script-src erlaubt Inline-Javascript: {script}")
+        if "'wasm-unsafe-eval'" not in script:
+            # Kein Sicherheitsloch, aber ein stiller Ausfall: ohne die Erlaubnis
+            # startet opencv.js in Chrome/Firefox nicht, und der Scanner faellt
+            # dauerhaft auf den Server zurueck — sichtbar erst im Unterricht.
+            raise AssertionError("script-src ohne 'wasm-unsafe-eval' — die Kartenerkennung im Browser startet nicht")
         if "object-src 'none'" not in csp:
             raise AssertionError("object-src 'none' fehlt")
         if not csp.startswith("default-src 'none'"):
             raise AssertionError("default-src ist nicht 'none' — nicht Erlaubtes laedt trotzdem")
-        return "script-src ohne unsafe-inline, default-src/object-src 'none'"
+        return "script-src ohne unsafe-inline (wasm erlaubt), default-src/object-src 'none'"
 
     b.pruefe("Sicherheit", "CSP verbietet Inline-Javascript", csp_ohne_inline_javascript)
 
@@ -553,12 +564,22 @@ def teste_web_dateien(api, b):
         if alt_schriften:
             raise AssertionError(f"{len(alt_schriften)} .woff-Dateien in der Vorladeliste — "
                                  "das laedt jedes Geraet umsonst (vite.config.js: precacheListe)")
+        # opencv.js (rund 10 MB) gehoert NICHT hinein: die Vorladeliste umfasst
+        # sonst 2,7 MB, und wer nie scannt, soll das Fuenffache nicht
+        # mitbezahlen. Die Datei liegt in public/ und taucht deshalb gar nicht
+        # erst im Rollup-Bundle auf — geholt wird sie beim Betreten der
+        # Scan-Seite. Ein Eintrag hier hiesse, dass jemand sie ausdruecklich
+        # eingetragen hat.
+        schwer = [p for p in liste if isinstance(p, str) and "opencv" in p]
+        if schwer:
+            raise AssertionError("opencv.js steht in der Vorladeliste — rund 10 MB fuer jedes "
+                                 "Geraet, auch fuer jedes, das nie scannt (vite.config.js)")
         # Stichprobe: erste, mittlere, letzte Datei muessen wirklich da sein.
         for pfad in (liste[0], liste[len(liste) // 2], liste[-1]):
             st, _ = api.call("GET", pfad, roh=True)
             if st != 200:
                 raise AssertionError(f"{pfad} gibt HTTP {st} — die Liste zeigt auf einen alten Build")
-        return f"{len(liste)} Dateien, keine Alt-Schriften, Stichprobe erreichbar"
+        return f"{len(liste)} Dateien, keine Alt-Schriften, kein opencv.js, Stichprobe erreichbar"
 
     b.pruefe("Web-Dateien", "robots.txt", robots)
     b.pruefe("Web-Dateien", "security.txt (RFC 9116)", security_txt)
@@ -567,6 +588,33 @@ def teste_web_dateien(api, b):
     b.pruefe("Web-Dateien", "icon-192.png", datei("/icon-192.png", "Symbol fuer den Startbildschirm fehlt"))
     b.pruefe("Web-Dateien", "sw.js", datei("/sw.js", "Service Worker fehlt"), schwere="warnung")
     b.pruefe("Web-Dateien", "precache.json (Seiten vorladen)", precache, schwere="warnung")
+
+    def opencv_ausgeliefert():
+        # Die CardVote-Kartenerkennung laeuft im Browser; die Bibliothek wird
+        # MITGELIEFERT, weil die CSP kein CDN zulaesst (script-src 'self').
+        # Fehlt sie, faellt der Scanner auf den Server zurueck — er sagt das
+        # zwar, aber dann ist die Abstimmung wieder vom Schulnetz abhaengig.
+        status, _ = api.call("GET", "/vendor/opencv/opencv.js", roh=True)
+        if status != 200:
+            raise AssertionError(f"HTTP {status} — ohne opencv.js erkennt kein Geraet selbst")
+        laenge = api.letzte_kopfe.get("content-length") or "?"
+
+        # Das WebAssembly liegt als EIGENE Datei daneben (siehe
+        # scripts/opencv_ohne_eval.py): eingebettet holte Emscripten es per
+        # `fetch` von einer `data:`-URL, und die verbietet unser
+        # `connect-src 'self'`. Fehlt die Datei, entsteht `window.cv`
+        # trotzdem — nur ohne eine einzige OpenCV-Funktion darin. Das sieht
+        # im Browser nach allem Moeglichen aus, nur nicht nach 404.
+        status, _ = api.call("GET", "/vendor/opencv/opencv.wasm", roh=True)
+        if status != 200:
+            raise AssertionError(f"HTTP {status} fuer opencv.wasm — opencv.js startet dann leer")
+        typ = (api.letzte_kopfe.get("content-type") or "").split(";")[0].strip()
+        if typ != "application/wasm":
+            # Kein Abbruch: der Browser faellt auf den langsameren Weg zurueck.
+            return f"opencv.js ({laenge} Bytes) + opencv.wasm, aber Typ '{typ}' statt application/wasm"
+        return f"opencv.js ({laenge} Bytes) + opencv.wasm (application/wasm)"
+
+    b.pruefe("Web-Dateien", "opencv.js/.wasm (Erkennung im Browser)", opencv_ausgeliefert, schwere="warnung")
     b.pruefe("Web-Dateien", "Unbekannte Adresse", unbekannte_seite)
     b.pruefe("Web-Dateien", "Auslieferung der Anwendung", auslieferung, schwere="warnung")
 

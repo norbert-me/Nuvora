@@ -65,6 +65,23 @@ const SPERRE = [
   [/^\/api\/modules\//, "Modul an/aus — offline umgeschaltet stuende die Oberflaeche anders als die Schranke im Server"],
   [/^\/api\/sessions/, "laufende CardVote-Sitzung — eine Abstimmung ohne Server ist keine"],
   [/^\/api\/results/, "Scan-Ergebnisse einer laufenden Sitzung"],
+  // AUSDRUECKLICH NICHT gesperrt: /api/scan-confirm.
+  //
+  // Die Kartenerkennung laeuft im Browser (src/cardvote/aruco.js), gerade damit
+  // eine Abstimmung ein ausgefallenes Schulnetz uebersteht. Erkennen ohne Netz
+  // nuetzt aber nichts, wenn das Ergebnis nicht wartet, bis das Netz
+  // wiederkommt — also geht die bestaetigte Karte in die Warteschlange und wird
+  // nachgereicht. Der Aufruf traegt JSON, ist ein idempotenter Upsert je
+  // (Sitzung, Frage, Karte) und darf deshalb mehrfach nachgespielt werden.
+  //
+  // Die Grenze steht dazu: der Server traegt die Karten auf die Frage ein, die
+  // beim NACHSPIELEN gerade laeuft. Kommt das Netz erst zurueck, nachdem die
+  // Lehrkraft weitergeklickt hat, landen sie auf der falschen Frage. Deshalb
+  // zeigt der Scanner sichtbar an, wie viele Ergebnisse warten — die
+  // Alternative waere, sie ganz zu verlieren.
+  //
+  // /api/scan-image-raw steht nicht auf der Liste und muss auch nicht: es
+  // schickt ein Bild (kein JSON), classify() lehnt das ohnehin ab.
   [/^\/api\/codedetektiv\/sessions/, "laufende Sitzung"],
   [/^\/api\/kalender\/(subscribe|feed|external)/, "reicht nach aussen (Abo, fremder Kalender)"],
   [/^\/api\/kalender\/untis/, "holt live bei WebUntis — und der Abruf traegt ein Passwort, das nirgends liegen bleiben darf"],

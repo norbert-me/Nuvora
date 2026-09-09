@@ -8,6 +8,8 @@ import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 import { lies } from "../core/speicher.js";
 import { alsJson } from "../core/melden.js";
+import { ladeErkennung, erkenne } from "../cardvote/aruco.js";
+import { subscribe as outboxSubscribe } from "../core/outbox.js";
 
 const API = "/api";
 // Antwortfarben kommen aus dem Kern (ANTWORT_COLORS) — die Kopie hier war die
@@ -34,6 +36,16 @@ export default function Scanner() {
   const [hostRevealed, setHostRevealed] = useState(false);
   const [hostIsLast, setHostIsLast] = useState(false);
   const [sessionFinished, setSessionFinished] = useState(false);
+  // Erkennt das Geraet selbst? Erst wenn opencv.js wirklich laeuft (siehe
+  // toggleScanning) — bis dahin bleibt der Server der Weg.
+  const lokalRef = useRef(false);
+  const [serverGrund, setServerGrund] = useState("");
+  // Wieviel wartet auf die Verbindung? /api/scan-confirm steht bewusst NICHT
+  // auf der Outbox-Sperrliste (siehe core/outbox.js) — ohne diese Anzeige
+  // saehe die Lehrkraft nicht, dass die bestaetigten Karten noch nicht beim
+  // Server sind. Gezaehlt wird die ganze Warteschlange; waehrend des Scannens
+  // schreibt nichts anderes.
+  const [wartend, setWartend] = useState(0);
   const recentTimers = useRef({});
   const confirmBuffer = useRef({});
   const CONFIRM_COUNT = 2;
@@ -82,6 +94,8 @@ export default function Scanner() {
       streamRef.current = null;
     }
   };
+
+  useEffect(() => outboxSubscribe((n) => setWartend(n)), []);
 
   useEffect(() => {
     return () => {
@@ -231,31 +245,42 @@ export default function Scanner() {
     const canvas = canvasRef.current;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
+    // willReadFrequently: die Erkennung im Geraet liest den Canvas bei JEDEM
+    // Bild aus (cv.imread). Ohne den Hinweis legt der Browser ihn in die
+    // Grafikkarte und liest ihn jedes Mal zurueck.
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     ctx.drawImage(video, 0, 0);
 
-    // Das Bild als Rohdaten schicken, nicht als base64 in JSON: toDataURL
-    // erzeugte eine Zeichenkette, die ein Drittel groesser ist als das Bild
-    // selbst (und blockiert dabei den Hauptthread, waehrend toBlob nebenher
-    // arbeitet). Bei mehreren Bildern je Sekunde ueber eine Unterrichtsstunde
-    // war das der groesste Netzposten im ganzen Werkzeug.
-    const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", JPEG_GUETE));
-    if (!blob) return;
-
     try {
-      const res = await fetch(`${API}/scan-image-raw?session_id=${resolvedIdRef.current}&save=false`, {
-        method: "POST",
-        headers: { "Content-Type": "image/jpeg" },
-        body: blob,
-      });
-      const data = await res.json();
-      drawOverlay(data.cards || []);
+      let cards;
+      if (lokalRef.current) {
+        // Der Regelfall: erkannt wird hier, nichts geht ueber die Leitung.
+        // Faellt das Schulnetz aus, laeuft die Abstimmung weiter — und im
+        // Normalbetrieb entfaellt der groesste Netzposten im ganzen Werkzeug
+        // (mehrere Bilder je Sekunde, eine Unterrichtsstunde lang).
+        cards = erkenne(canvas);
+      } else {
+        // Rueckfall: opencv.js laeuft auf diesem Geraet nicht. Das Bild als
+        // Rohdaten schicken, nicht als base64 in JSON — toDataURL erzeugte
+        // eine Zeichenkette, die ein Drittel groesser ist als das Bild selbst
+        // (und blockiert dabei den Hauptthread, waehrend toBlob nebenher
+        // arbeitet).
+        const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", JPEG_GUETE));
+        if (!blob) return;
+        const res = await fetch(`${API}/scan-image-raw?session_id=${resolvedIdRef.current}&save=false`, {
+          method: "POST",
+          headers: { "Content-Type": "image/jpeg" },
+          body: blob,
+        });
+        cards = (await res.json()).cards || [];
+      }
+      drawOverlay(cards);
 
-      if (!data.cards || data.cards.length === 0) { leereBilder.current++; return; }
+      if (cards.length === 0) { leereBilder.current++; return; }
       leereBilder.current = 0;
 
       const confirmed = [];
-      for (const card of data.cards) {
+      for (const card of cards) {
         const buf = confirmBuffer.current[card.marker_id];
         if (buf && buf.answer === card.answer) {
           buf.count++;
@@ -267,7 +292,7 @@ export default function Scanner() {
         }
       }
 
-      setStatus(t("scanner.detected", { count: data.cards.length }) + (confirmed.length > 0 ? ` · ${confirmed.length} ${t("scanner.confirmed")}` : ""));
+      setStatus(t("scanner.detected", { count: cards.length }) + (confirmed.length > 0 ? ` · ${confirmed.length} ${t("scanner.confirmed")}` : ""));
 
       if (confirmed.length > 0) {
         await fetch(`${API}/scan-confirm`, alsJson("POST", {
@@ -362,6 +387,20 @@ export default function Scanner() {
       if (!info) return;
       const camOk = await startCamera();
       if (!camOk) return;
+      // opencv.js (rund 10 MB) wird ERST hier geholt — nicht beim Start der App
+      // und nicht ueber precache.json: wer nie scannt, soll dafuer nicht
+      // zahlen. Danach liegt sie im Cache des Service-Workers.
+      setStatus(t("scanner.loadingDetection"));
+      try {
+        await ladeErkennung();
+        lokalRef.current = true; setServerGrund("");
+      } catch {
+        // Altes Geraet, zu wenig Speicher, Datei nicht da: der Server erkennt
+        // weiter — aber die Seite sagt es, sonst wundert sich niemand ueber
+        // eine Abstimmung, die ohne Netz stehen bleibt.
+        lokalRef.current = false;
+        setServerGrund(t("scanner.serverFallback"));
+      }
       setScanning(true);
       setLastCards([]);
       setStatus(t("scanner.scanning"));
@@ -470,6 +509,20 @@ export default function Scanner() {
       {sessionError && (
         <div style={{ ...panelStyle, padding: "12px 16px", marginBottom: 8, background: C.incorrectBg, border: "none", fontSize: 14, fontWeight: 500, color: C.danger }}>
           {sessionError}
+        </div>
+      )}
+
+      {/* Die Erkennung laeuft im Geraet — steht hier nur, wenn sie es ausnahmsweise nicht tut. */}
+      {serverGrund && (
+        <div style={{ ...panelStyle, padding: "12px 16px", marginBottom: 8, fontSize: 13, color: "var(--text3)" }}>
+          {serverGrund}
+        </div>
+      )}
+
+      {/* Bestaetigte Karten, die noch nicht beim Server sind (Outbox). */}
+      {wartend > 0 && (
+        <div style={{ ...panelStyle, padding: "12px 16px", marginBottom: 8, background: "var(--accent-bg)", fontSize: 13, color: "var(--text)" }}>
+          {t("scanner.queued", { count: wartend })}
         </div>
       )}
 
