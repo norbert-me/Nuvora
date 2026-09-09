@@ -170,6 +170,9 @@ async function lauf(motor) {
     }
     await handy.close();
 
+    // ── Offline: Kaltstart und wartende Aenderungen ──
+    await offlineProbe(browser, token, user);
+
     // ── Dunkles Design: feste Farben fallen erst hier auf ──
     const dunkel = await neuerKontext(browser, token, user, null, "dark");
     for (const { pfad, name } of seiten) {
@@ -562,6 +565,121 @@ async function sitzplanProbe(kontext, api) {
       await api(`/api/classes/${klasse.id}`, "delete").catch(() => {});
       await api(`/api/classes/${klasse.id}/purge`, "delete").catch(() => {});
     }
+  }
+}
+
+/**
+ * Kaltstart ohne Netz — das eigentliche Versprechen der installierten App.
+ *
+ * „Offline lesen" laesst sich nicht behaupten, es muss vorgefuehrt werden, und
+ * zwar an der Stelle, an der es bricht: nicht „ich war schon in der App und
+ * verliere das Netz", sondern „die App wird OHNE Netz gestartet". Dann gibt es
+ * keinen laufenden Zustand mehr — nur den Token im localStorage, den
+ * Service-Worker und seinen Zwischenspeicher. Faellt einer davon aus, landet die
+ * Lehrkraft auf der Anmeldung oder vor einer weissen Flaeche, und das faellt
+ * sonst niemandem auf, weil im Buero immer Netz ist.
+ *
+ * Zwei Dinge werden gemessen:
+ *   1. der Kaltstart selbst (Startseite und ein Deep-Link),
+ *   2. dass eine offline getippte Aenderung SICHTBAR wartet — puffern allein
+ *      genuegt nicht, wenn niemand erfaehrt, dass noch etwas aussteht.
+ *
+ * Der Kontext wird geschlossen, SOLANGE er offline ist: die Warteschlange liegt
+ * in seiner IndexedDB und stirbt mit ihm. Nichts davon erreicht je den Server.
+ */
+async function offlineProbe(browser, token, user) {
+  const G = "Offline";
+  // Service-Worker gibt es in Playwright nur unter Chromium. Ohne ihn ist der
+  // Kaltstart nicht pruefbar — eine fehlende Werkbank ist kein Befund ueber die
+  // Seite (dieselbe Regel wie beim Desktop-Teil).
+  if (MOTOR !== "chromium") {
+    notiere(G, "Kaltstart ohne Netz", true, "uebersprungen: Service-Worker nur unter Chromium pruefbar", "hinweis");
+    return;
+  }
+  const k = await browser.newContext({ baseURL: URL_BASIS, locale: "de-DE", viewport: { width: 390, height: 844 } });
+  try {
+    await anmeldungHinterlegen(k, token, user);
+    const auf = await k.newPage();
+    await auf.goto("/", { waitUntil: "domcontentloaded" });
+    // Der Worker muss nicht nur installiert sein, sondern die Seite auch
+    // STEUERN — sonst beantwortet niemand die Anfragen des Kaltstarts.
+    const uebernommen = await auf.evaluate(async () => {
+      if (!("serviceWorker" in navigator)) return false;
+      await navigator.serviceWorker.ready;
+      for (let i = 0; i < 80 && !navigator.serviceWorker.controller; i++) await new Promise((r) => setTimeout(r, 250));
+      return !!navigator.serviceWorker.controller;
+    }).catch(() => false);
+    if (!uebernommen) {
+      notiere(G, "Service-Worker uebernimmt", false, "kein controller — offline waere die App eine weisse Flaeche");
+      return;
+    }
+    notiere(G, "Service-Worker uebernimmt", true);
+
+    // Den Vorrat holen, aus dem der Kaltstart lebt. Ohne die Antwort auf
+    // /api/auth/me weiss die frisch gestartete App nicht, wer angemeldet ist.
+    await auf.evaluate(async () => {
+      for (const p of ["/api/auth/me", "/api/modules", "/api/classes", "/api/kurse"]) {
+        await fetch(p, { headers: { Accept: "application/json" } }).catch(() => {});
+      }
+    });
+    const imVorrat = await auf.evaluate(async () => {
+      const c = await caches.open("nuvora-api-v4");
+      return (await c.keys()).some((r) => r.url.endsWith("/api/auth/me"));
+    }).catch(() => false);
+    notiere(G, "Vorrat: /api/auth/me liegt im Zwischenspeicher", imVorrat,
+      imVorrat ? "" : "ohne sie faellt der Kaltstart auf den localStorage zurueck");
+
+    // ── Ab hier kein Netz mehr ──
+    await k.setOffline(true);
+    // Eine NEUE Seite ist ein neues Dokument: nichts bleibt ausser
+    // localStorage, Worker und Zwischenspeicher — genau der Zustand nach dem
+    // Antippen des Symbols auf dem Home-Bildschirm.
+    for (const [pfad, name] of [["/", "Startseite"], ["/kalender", "Deep-Link /kalender"]]) {
+      const seite = await k.newPage();
+      const konsole = [];
+      seite.on("pageerror", (e) => konsole.push(String(e).slice(0, 120)));
+      let stand = {};
+      try {
+        await seite.goto(pfad, { waitUntil: "domcontentloaded", timeout: 20000 });
+        await seite.waitForTimeout(3500);
+        stand = await seite.evaluate(() => ({
+          nav: !!document.querySelector("nav"),
+          passwort: !!document.querySelector("input[type=password]"),
+          zeichen: (document.body.innerText || "").trim().length,
+          auffang: /Diese Seite konnte nicht geladen|could not be loaded|no se pudo cargar/i.test(document.body.innerText || ""),
+        }));
+      } catch (e) {
+        stand = { fehler: String(e.message || e).slice(0, 120) };
+      }
+      const ok = !stand.fehler && stand.nav && !stand.passwort && !stand.auffang && stand.zeichen > 200;
+      notiere(G, `Kaltstart ohne Netz · ${name}`, ok,
+        ok ? `${stand.zeichen} Zeichen` :
+        stand.fehler ? stand.fehler :
+        stand.passwort ? "landet auf der Anmeldung" :
+        stand.auffang ? "Auffangseite statt Inhalt" :
+        !stand.nav ? "keine Navigationsleiste" : `nur ${stand.zeichen} Zeichen`);
+      if (pfad === "/") {
+        // ── Wartende Aenderung: gepuffert UND sichtbar ──
+        // Der Aufruf laeuft ueber window.fetch, also durch den Interceptor der
+        // Shell — genau den Weg, den ein Klick in der Oberflaeche nimmt.
+        await seite.evaluate((marke) => fetch("/api/notizblock", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: marke, content: marke }),
+        }).catch(() => {}), `${MARKE} offline`);
+        const anzeige = seite.getByText(/warten auf Sync|waiting to sync|esperando sincronizaci/i).first();
+        const sichtbar = await anzeige.waitFor({ state: "visible", timeout: 8000 }).then(() => true).catch(() => false);
+        const text = sichtbar ? (await anzeige.innerText()).trim() : "";
+        notiere(G, "Wartende Aenderung wird angezeigt", sichtbar && /\d/.test(text),
+          sichtbar ? `„${text}"` : "kein Hinweis auf die Warteschlange — offline getippt und niemand sagt es");
+      }
+      if (konsole.length) notiere(G, `Kaltstart ohne Netz · ${name} · Konsole`, false, konsole.join(" | "));
+      await seite.close();
+    }
+  } finally {
+    // Geschlossen wird OFFLINE: die gepufferte Aenderung liegt in der
+    // IndexedDB dieses Kontexts und wird mit ihm verworfen. Kaeme das Netz
+    // vorher zurueck, legte der Test einen echten Notizzettel an.
+    await k.close();
   }
 }
 

@@ -776,6 +776,7 @@ export default {
   "common.rename": "Renombrar",
   "common.abort": "Cancelar",
   "common.ok": "OK",
+  "install.ios": "Nuvora puede vivir en la pantalla de inicio: en Safari pulsa «Compartir» y luego «Añadir a pantalla de inicio».",
   "outbox.pending": "{{n}} cambio(s) esperando sincronización",
   "outbox.synced": "sincronizado",
   "outbox.rejected": "No se pudieron guardar {{n}} cambio(s)",

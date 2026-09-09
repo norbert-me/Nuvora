@@ -775,6 +775,7 @@ export default {
   "common.rename": "Rename",
   "common.abort": "Cancel",
   "common.ok": "OK",
+  "install.ios": "Nuvora can live on your home screen: in Safari tap “Share”, then “Add to Home Screen”.",
   "outbox.pending": "{{n}} change(s) waiting to sync",
   "outbox.synced": "synced",
   "outbox.rejected": "{{n}} change(s) could not be saved",

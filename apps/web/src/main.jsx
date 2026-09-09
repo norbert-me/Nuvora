@@ -229,6 +229,7 @@ import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";
 import Fehlermelder from "./components/Fehlermelder.jsx";
+import InstallHinweis from "./components/InstallHinweis.jsx";
 import { sparsamAn, setzeSparsam } from "./core/sparsam.js";
 import AppUpdate from "./components/AppUpdate.jsx";
 import WasIstNeu from "./components/WasIstNeu.jsx";
@@ -649,9 +650,17 @@ function ConnectionMonitor() {
   // Nav-Header per CSS-Variable unter den Offline-Balken schieben (statt zu überdecken)
   useEffect(() => {
     const root = document.documentElement;
-    if (!online) root.style.setProperty("--offline-banner-h", "34px");
-    else root.style.removeProperty("--offline-banner-h");
-    return () => root.style.removeProperty("--offline-banner-h");
+    if (!online) {
+      root.style.setProperty("--offline-banner-h", "calc(34px + env(safe-area-inset-top, 0px))");
+      // Solange der Balken steht, ist ER das oberste Element — die
+      // Navigationsleiste darunter darf die Aussparung nicht ein zweites Mal
+      // aufschlagen, sonst klafft in der installierten App eine Luecke.
+      root.style.setProperty("--safe-top", "0px");
+    } else {
+      root.style.removeProperty("--offline-banner-h");
+      root.style.removeProperty("--safe-top");
+    }
+    return () => { root.style.removeProperty("--offline-banner-h"); root.style.removeProperty("--safe-top"); };
   }, [online]);
 
   if (online) return null;
@@ -665,7 +674,8 @@ function ConnectionMonitor() {
       position: "fixed", top: 0, left: 0, right: 0, zIndex: 200, minHeight: 34,
       background: C.danger, color: C.aufAkzent,
       display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-      padding: "6px 14px", fontSize: 13, fontWeight: 600, textAlign: "center",
+      padding: "6px 14px", paddingTop: "calc(6px + env(safe-area-inset-top, 0px))",
+      fontSize: 13, fontWeight: 600, textAlign: "center",
       boxShadow: SHADOW.schwebend,
     }}>
       <style>{`@keyframes cmspin{to{transform:rotate(360deg)}}`}</style>
@@ -835,7 +845,14 @@ function Nav({ user, onLogout }) {
         zIndex: 100,
         display: "flex",
         alignItems: "center",
-        height: 52,
+        // In der installierten App reicht die Seite unter die Statusleiste
+        // (viewport-fit=cover). Die Leiste klebt oben und stuende sonst unter
+        // der Uhrzeit — sie traegt die Aussparung deshalb selbst, als Polster
+        // ueber ihren 52 Pixeln. Steht der Offline-Balken darueber, ist
+        // --safe-top auf 0 gesetzt (ConnectionMonitor): dann traegt ihn der
+        // Balken, und zwei Polster uebereinander gibt es nie.
+        paddingTop: "var(--safe-top, 0px)",
+        height: "calc(52px + var(--safe-top, 0px))",
         gap: 4,
       }}>
         {/* Zurueck — nur in der App-Huelle und in der installierten PWA.
@@ -938,7 +955,7 @@ function Nav({ user, onLogout }) {
         // Flaeche: die Ecken oben wuerden am Bildschirmrand nur stoeren.
         <div className="nav-mobile-menu" style={{
           ...popoverPanel,
-          position: "fixed", top: 52, left: 0, right: 0, bottom: 0, zIndex: 99, maxWidth: "none",
+          position: "fixed", top: "calc(52px + var(--safe-top, 0px))", left: 0, right: 0, bottom: 0, zIndex: 99, maxWidth: "none",
           // Kein Radius-Token, sondern gar keine Ecken: das Panel geht von Rand
           // zu Rand, gerundete Ecken haetten dort nichts, woran sie sitzen.
           borderRadius: "unset", border: "none", borderTop: "1px solid var(--border)",
@@ -1202,7 +1219,7 @@ function UpdateBanner() {
 
   return (
     <div style={{
-      position: "fixed", left: 16, right: 16, bottom: 16, zIndex: 250,
+      position: "fixed", left: 16, right: 16, bottom: "max(16px, env(safe-area-inset-bottom))", zIndex: 250,
       maxWidth: 460, margin: "0 auto",
       display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
       ...cardStyle, padding: 12, boxShadow: SHADOW.schwebend,
@@ -1241,7 +1258,7 @@ function SpeicherHinweis() {
 
   return (
     <div role="status" style={{
-      position: "fixed", left: 16, right: 16, bottom: 16, zIndex: 260,
+      position: "fixed", left: 16, right: 16, bottom: "max(16px, env(safe-area-inset-bottom))", zIndex: 260,
       maxWidth: 520, margin: "0 auto",
       display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap",
       ...cardStyle, padding: 12, boxShadow: SHADOW.schwebend,
@@ -1366,6 +1383,11 @@ function Wurzel() {
         {user && <Fehlermelder />}
         {/* Nach einem Update: die Aenderungsliste beim ersten Anmelden danach. */}
         {user && <WasIstNeu />}
+        {/* Nur auf dem iPhone in Safari und nur, solange Nuvora dort noch im
+            Browser laeuft — der Weg auf den Home-Bildschirm steht nirgends
+            sonst. Nur fuer Angemeldete: wer den QR-Code eines Kindes oeffnet,
+            soll nichts installieren. */}
+        {user && <InstallHinweis />}
         <UpdateBanner />
         <SpeicherHinweis />
         {/* Die beiden oeffentlichen Seiten liegen ausserhalb des Rahmens und

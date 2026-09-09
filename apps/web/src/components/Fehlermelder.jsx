@@ -102,7 +102,7 @@ export default function Fehlermelder() {
       <button onClick={() => { setOffen(true); setProblem(false); }}
         title={t("melder.titel")} aria-label={t("melder.titel")}
         style={{
-          position: "fixed", right: 16, bottom: 16, zIndex: 300,
+          position: "fixed", right: 16, bottom: "max(16px, env(safe-area-inset-bottom))", zIndex: 300,
           // Am Rechner ein Viertel groesser: dort ist der Knopf eine kleine
           // Marke am Bildrand und wurde uebersehen. Auf dem Handy bleibt er,
           // wie er war — 40 px sind dort schon eine Daumenflaeche, und der

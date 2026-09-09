@@ -31,13 +31,23 @@ export function OutboxHost() {
   if (abgelehnt > 0) {
     const liste = fehler();
     return (
-      <div style={{ position: "fixed", bottom: 16, left: 16, zIndex: 9998, maxWidth: 380,
+      <div style={{ position: "fixed", bottom: "max(16px, env(safe-area-inset-bottom))", left: 16, zIndex: 9998, maxWidth: 380,
         ...cardStyle, padding: 12, boxShadow: SHADOW.schwebend, fontSize: 13 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, color: COLORS.danger }}>
           <Icon d={ICONS.bulb} size={15} color={COLORS.danger} />
           {t("outbox.rejected", { n: abgelehnt })}
         </div>
         <div style={{ color: "var(--text3)", margin: "6px 0 8px" }}>{t("outbox.rejectedHint")}</div>
+        {/* Abgelehnt UND wartend zugleich: vorher verdraengte die Absage die
+            Zahl der wartenden Aenderungen, weil beides dieselbe Ecke belegt.
+            Wer eine Absage wegklickt, waehrend noch zehn Aenderungen warten,
+            hielt die Warteschlange danach fuer leer. */}
+        {n > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "0 0 8px", color: "var(--text2)" }}>
+            <Icon d={ICONS.hourglass} size={13} color="currentColor" />
+            {t("outbox.pending", { n })}
+          </div>
+        )}
         {offen && (
           <ul style={{ margin: "0 0 8px", paddingLeft: 18, color: "var(--text2)", maxHeight: 160, overflowY: "auto" }}>
             {liste.map((f, i) => (
@@ -64,7 +74,7 @@ export function OutboxHost() {
   const done = n === 0 && justDone;
   return (
     <div style={{
-      position: "fixed", bottom: 16, left: 16, zIndex: 9998,
+      position: "fixed", bottom: "max(16px, env(safe-area-inset-bottom))", left: 16, zIndex: 9998,
       display: "flex", alignItems: "center", gap: 8,
       padding: "8px 12px", borderRadius: chipStyle.borderRadius, fontSize: 13, fontWeight: 600,
       background: done ? COLORS.success : "var(--card)", color: done ? COLORS.aufAkzent : "var(--text)",

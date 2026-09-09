@@ -23,8 +23,68 @@
          Statusleiste passend, Home-Name kurz. Die App verhält sich dann wie
          ein eigenes Programm (kein Safari-Rahmen). -->
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <!-- „black-translucent" statt „default": die Statusleiste bekommt KEINE
+         eigene Farbe, die Seite reicht darunter durch und malt ihren eigenen
+         Grund. „default" haette im dunklen Design einen hellen Streifen ueber
+         die schwarze App gelegt — ein fester Wert ist bei zwei Designs immer
+         fuer eines falsch. Bedingung dafuer ist, dass der Inhalt die
+         Statusleiste aussparen muss: siehe --safe-top weiter unten. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Nuvora">
+    <!-- Startbilder der installierten iPhone-App. Ohne sie zeigt iOS beim
+         Start eine weisse Flaeche, bis die App gezeichnet hat — im dunklen
+         Design blendet sie. Erzeugt von scripts/splash-erzeugen.mjs; ein neues
+         Geraet bekommt dort eine Zeile, dann laeuft das Skript und gibt diese
+         <link>-Zeilen aus. Von Hand pflegt sie niemand: es sind zwei Dutzend
+         Mal dasselbe Bild in anderer Aufloesung. -->
+    <!-- SE 1 -->
+    <link rel="apple-touch-startup-image" href="/splash/320x568@2-hell.png" media="(prefers-color-scheme: light) and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <!-- SE 1 -->
+    <link rel="apple-touch-startup-image" href="/splash/320x568@2-dunkel.png" media="(prefers-color-scheme: dark) and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <!-- SE 2/3, 8 -->
+    <link rel="apple-touch-startup-image" href="/splash/375x667@2-hell.png" media="(prefers-color-scheme: light) and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <!-- SE 2/3, 8 -->
+    <link rel="apple-touch-startup-image" href="/splash/375x667@2-dunkel.png" media="(prefers-color-scheme: dark) and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <!-- 8 Plus -->
+    <link rel="apple-touch-startup-image" href="/splash/414x736@3-hell.png" media="(prefers-color-scheme: light) and (device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 8 Plus -->
+    <link rel="apple-touch-startup-image" href="/splash/414x736@3-dunkel.png" media="(prefers-color-scheme: dark) and (device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- X, 11 Pro, 13 mini -->
+    <link rel="apple-touch-startup-image" href="/splash/375x812@3-hell.png" media="(prefers-color-scheme: light) and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- X, 11 Pro, 13 mini -->
+    <link rel="apple-touch-startup-image" href="/splash/375x812@3-dunkel.png" media="(prefers-color-scheme: dark) and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- XR, 11 -->
+    <link rel="apple-touch-startup-image" href="/splash/414x896@2-hell.png" media="(prefers-color-scheme: light) and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <!-- XR, 11 -->
+    <link rel="apple-touch-startup-image" href="/splash/414x896@2-dunkel.png" media="(prefers-color-scheme: dark) and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <!-- XS Max, 11 Pro Max -->
+    <link rel="apple-touch-startup-image" href="/splash/414x896@3-hell.png" media="(prefers-color-scheme: light) and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- XS Max, 11 Pro Max -->
+    <link rel="apple-touch-startup-image" href="/splash/414x896@3-dunkel.png" media="(prefers-color-scheme: dark) and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 12, 13, 14 -->
+    <link rel="apple-touch-startup-image" href="/splash/390x844@3-hell.png" media="(prefers-color-scheme: light) and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 12, 13, 14 -->
+    <link rel="apple-touch-startup-image" href="/splash/390x844@3-dunkel.png" media="(prefers-color-scheme: dark) and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 13 Pro Max, 14 Plus -->
+    <link rel="apple-touch-startup-image" href="/splash/428x926@3-hell.png" media="(prefers-color-scheme: light) and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 13 Pro Max, 14 Plus -->
+    <link rel="apple-touch-startup-image" href="/splash/428x926@3-dunkel.png" media="(prefers-color-scheme: dark) and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 14 Pro, 15, 16 -->
+    <link rel="apple-touch-startup-image" href="/splash/393x852@3-hell.png" media="(prefers-color-scheme: light) and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 14 Pro, 15, 16 -->
+    <link rel="apple-touch-startup-image" href="/splash/393x852@3-dunkel.png" media="(prefers-color-scheme: dark) and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 15 Plus, 16 Plus -->
+    <link rel="apple-touch-startup-image" href="/splash/430x932@3-hell.png" media="(prefers-color-scheme: light) and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 15 Plus, 16 Plus -->
+    <link rel="apple-touch-startup-image" href="/splash/430x932@3-dunkel.png" media="(prefers-color-scheme: dark) and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 16 Pro -->
+    <link rel="apple-touch-startup-image" href="/splash/402x874@3-hell.png" media="(prefers-color-scheme: light) and (device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 16 Pro -->
+    <link rel="apple-touch-startup-image" href="/splash/402x874@3-dunkel.png" media="(prefers-color-scheme: dark) and (device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 16 Pro Max -->
+    <link rel="apple-touch-startup-image" href="/splash/440x956@3-hell.png" media="(prefers-color-scheme: light) and (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <!-- 16 Pro Max -->
+    <link rel="apple-touch-startup-image" href="/splash/440x956@3-dunkel.png" media="(prefers-color-scheme: dark) and (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
     <meta name="mobile-web-app-capable" content="yes">
     <!-- Schriften (Inter) und KaTeX werden lokal gebundelt — keine CDN-/Drittanbieter-Anfragen -->
     <style>
@@ -39,8 +99,18 @@
            (52 px, plus Offline-Balken). Eine Tabelle, die IN einem eigenen
            Rahmen scrollt, setzt die Variable bei sich auf 0 — dort ist der
            Rahmen der Bezug, nicht das Fenster. */
-        --tabellenkopf-top: calc(52px + var(--offline-banner-h, 0px));
+        --tabellenkopf-top: calc(52px + var(--safe-top, 0px) + var(--offline-banner-h, 0px));
         --success-bg: #d4edda; --warn-bg: #fff3cd; --danger-bg: #fde2d9;
+        /* Wo endet der Bildschirm, und wo endet das BENUTZBARE Bild?
+           Auf dem iPhone liegt oben die Statusleiste (in der installierten App
+           ueber der Seite, weil `viewport-fit=cover` gesetzt ist) und unten der
+           Strich zum Wischen. Ohne Aussparung steht die Navigationsleiste unter
+           der Uhrzeit und die Speichern-Leiste unter dem Strich. Ein Wert, zwei
+           Namen: gebraucht wird er in index.html und in Bauteilen, die inline
+           gesetzt werden. Der Rueckfall 0px gilt ueberall sonst — auf dem
+           Rechner gibt es keine unsicheren Raender. */
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
         color-scheme: light;
       }
       .dark {
@@ -66,6 +136,11 @@
         background: var(--bg);
         color: var(--text);
         line-height: 1.5;
+        /* Quer gehalten liegt die Aussparung des iPhones links oder rechts.
+           Nur waagerecht am body: senkrecht traegt sie die Navigationsleiste
+           selbst (sie klebt oben und muesste sonst unter der Uhr stehen). */
+        padding-left: env(safe-area-inset-left, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
       }
       input, select, button, textarea { font-family: inherit; }
       /* iOS zoomt beim Fokus in Felder mit Schrift < 16px hinein. Auf schmalen

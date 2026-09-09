@@ -51,7 +51,7 @@ export function UndoHost() {
 
   if (!items.length) return null;
   return (
-    <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", zIndex: 3200, display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
+    <div style={{ position: "fixed", left: "50%", bottom: "max(24px, env(safe-area-inset-bottom))", transform: "translateX(-50%)", zIndex: 3200, display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
       {/* Umgekehrte Flaeche wie btnPrimary (var(--text) auf var(--bg)): ein fest
           dunkler Toast war im dunklen Design nicht vom Hintergrund zu trennen. */}
       {items.map((it) => (

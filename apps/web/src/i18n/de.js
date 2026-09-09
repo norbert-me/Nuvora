@@ -777,6 +777,7 @@ export default {
   "common.rename": "Umbenennen",
   "common.abort": "Abbrechen",
   "common.ok": "OK",
+  "install.ios": "Nuvora lässt sich als App ablegen: in Safari auf „Teilen“ tippen, dann „Zum Home-Bildschirm“.",
   "outbox.pending": "{{n}} Änderung(en) warten auf Sync",
   "outbox.synced": "synchronisiert",
   "outbox.rejected": "{{n}} Änderung(en) konnten nicht gespeichert werden",

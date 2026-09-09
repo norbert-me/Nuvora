@@ -16,6 +16,14 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Auf dem iPhone ist Nuvora eine App.** Startbilder für alle gängigen
+  iPhone-Größen in hell und dunkel (statt einer weißen Fläche beim Start),
+  Navigationsleiste und schwebende Leisten weichen Statusleiste und
+  Wischstrich aus, und in Safari steht einmal der Weg dorthin: Teilen → „Zum
+  Home-Bildschirm".
+- **Wartende Änderungen bleiben sichtbar, auch neben einer Absage.** Stand
+  eine abgelehnte Änderung im Weg, verschwand die Zahl der noch wartenden.
+
 - **Terminierte Aufgaben stehen im abonnierten Kalender.** Ein To-do mit
   Fälligkeitsdatum erscheint als „Aufgabe: …" im ICS-Abo und im CalDAV-Kalender
   (mit Uhrzeit als halbstündiger Termin, sonst ganztägig). Erledigte fallen
