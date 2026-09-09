@@ -153,17 +153,36 @@ async def delete_todo(todo_id: int, user: User = Depends(require_module), db: As
     await db.commit()
 
 
+async def datierte(db: AsyncSession, owner_id: int, von=None, bis=None,
+                   nur_offen: bool = False) -> List[Todo]:
+    """Die datierten To-dos eines Kontos — die EINE Auswahl fuer jeden Kalender.
+
+    Sie beantwortet dieselbe Frage fuer die Anzeige IN Nuvora (`/calendar`) und
+    fuer die Kalender, die nach draussen gehen (ICS-Feed, CalDAV). Zwei
+    Abfragen waeren zwei Wahrheiten: im Handy stuende dann etwas anderes als
+    im Browser, sobald jemand eine der beiden anfasst.
+
+    `nur_offen` ist der einzige Unterschied der beiden Leser, und er ist
+    fachlich: in Nuvora bleibt ein erledigtes To-do als durchgestrichene Zeile
+    stehen (man sieht, dass es erledigt IST), im fremden Kalender hat ein
+    abgehaktes To-do nichts mehr verloren.
+    """
+    q = select(Todo).where(Todo.owner_id == owner_id, Todo.due_date.is_not(None))
+    if von:
+        q = q.where(Todo.due_date >= von)
+    if bis:
+        q = q.where(Todo.due_date <= bis)
+    if nur_offen:
+        q = q.where(Todo.done.is_(False))
+    return list((await db.execute(q.order_by(Todo.due_date, Todo.due_time))).scalars().all())
+
+
 @router.get("/calendar")
 async def calendar_todos(frm: str = "", to: str = "", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Datierte To-dos in einem Zeitraum (fuer die Kalender-Anzeige). Nur mit Datum;
     erledigte bleiben sichtbar (durchgestrichen im Kalender), aber markiert."""
-    f = _parse_date(frm[:10]) if frm else None
-    t2 = _parse_date(to[:10]) if to else None
-    q = select(Todo).where(Todo.owner_id == user.id, Todo.due_date.is_not(None))
-    if f:
-        q = q.where(Todo.due_date >= f)
-    if t2:
-        q = q.where(Todo.due_date <= t2)
-    rows = (await db.execute(q.order_by(Todo.due_date, Todo.due_time))).scalars().all()
+    rows = await datierte(db, user.id,
+                          _parse_date(frm[:10]) if frm else None,
+                          _parse_date(to[:10]) if to else None)
     return [{"id": t.id, "date": t.due_date.isoformat(), "time": t.due_time or "",
              "text": t.text, "done": t.done} for t in rows]

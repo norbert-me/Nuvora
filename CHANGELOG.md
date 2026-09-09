@@ -16,6 +16,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Terminierte Aufgaben stehen im abonnierten Kalender.** Ein To-do mit
+  Fälligkeitsdatum erscheint als „Aufgabe: …" im ICS-Abo und im CalDAV-Kalender
+  (mit Uhrzeit als halbstündiger Termin, sonst ganztägig). Erledigte fallen
+  heraus; geändert und abgehakt wird im Notizbrett, im fremden Kalender sind sie
+  schreibgeschützt.
 - **CardVote erkennt die Karten im Gerät.** Der Scanner schickte bisher jedes
   Kamerabild an den Server — mehrere je Sekunde, eine Unterrichtsstunde lang;
   fiel das Schulnetz aus, fiel die Abstimmung aus. Erkannt wird jetzt im

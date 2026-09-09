@@ -6,8 +6,13 @@ bietet gar keinen „Termin hinzufuegen"-Knopf an. CalDAV ist dasselbe
 Protokoll, das iCloud und Nextcloud sprechen — damit legt das Handy Termine an,
 aendert und loescht sie, und sie stehen in Nuvora.
 
-**Was in diesem Kalender liegt: nur die Kalender-Eintraege.** Freie Zeitraeume
-und die wiederkehrenden Stundenplan-Stunden bleiben im ICS-Feed. CalDAV kennt
+**Was in diesem Kalender liegt:** die Kalender-Eintraege, die Stundenplan-
+Stunden, auf Wunsch die fremden Termine — und die terminierten To-dos aus dem
+Notizbrett. Die drei letzten sind read-only: Schreiben gibt 403 mit
+Vorbedingung (bei der Stunde bedeutet Loeschen „faellt aus", beim fremden
+Termin „in Nuvora ausblenden"; ein To-do laesst sich gar nicht wegwischen —
+erledigt oder geloescht ist ein Unterschied, den nur die Lehrkraft kennt).
+Freie Zeitraeume bleiben im ICS-Feed. CalDAV kennt
 kein „dieses eine Ereignis ist schreibgeschuetzt"; waeren sie hier drin,
 loeschte ein Wisch im Handy eine Stundenplan-Vorlage, die es als Ereignis gar
 nicht gibt. Zwei Kalender im Handy sind ehrlicher als einer, der die Haelfte
@@ -49,7 +54,8 @@ from ..oeffentlich import site_url as _site_url
 from ..zeit import tagesbeginn
 from .auth import _hash_pw, _verify_pw, rate_limit
 from .kalender import (_d_iso, _kurs_label, ext_dateiname, ext_uid,
-                       externe_ereignisse, stundenplan_vorkommen)
+                       externe_ereignisse, stundenplan_vorkommen,
+                       todo_dateiname, todo_termine, todo_uid)
 from .modules import is_active, modul_pflicht
 
 router = APIRouter(prefix="/api/caldav", tags=["caldav"])
@@ -381,6 +387,23 @@ async def _ressourcen(db: AsyncSession, u: User, fenster=None) -> list:
     # kann, ist keine Loeschung, sondern ein AUSBLENDEN in Nuvora — dieselbe
     # Bedeutung wie beim Wegwischen einer Stundenplan-Stunde, die als Datensatz
     # ebenfalls nicht existiert.
+    # VIERTE Sorte, read-only: die terminierten To-dos aus dem Notizbrett.
+    # Warum sie hier ueberhaupt liegen: der CalDAV-Kalender ist der, den Apple
+    # im Tagesplan zeigt — eine faellige Aufgabe, die nur im ICS-Abo steht,
+    # sieht nur, wer beide Kalender eingerichtet hat.
+    #
+    # Schreiben ist ausgeschlossen (PUT/DELETE geben 403 mit Vorbedingung, wie
+    # beim fremden Termin): eine drueben geaenderte Aufgabe kaeme in Nuvora als
+    # Kopie an, und das Abhaken gehoert ins Notizbrett — dort haengt der Rest
+    # der Liste dran (Reihenfolge, Notiz, erledigt).
+    for td in await todo_termine(db, u, von, bis):
+        out.append({"name": todo_dateiname(td["id"]), "text": X.baue_vevent(
+            uid=todo_uid(td["id"]), tag=td["tag"], titel=td["titel"],
+            notiz=td["notiz"], start_time=td["zeit"], end_time=td["ende"],
+            # Fester Zeitstempel wie bei Stunden und fremden Terminen: ein
+            # wanderndes DTSTAMP aenderte das ETag bei jedem Abruf.
+            stand=datetime(td["tag"].year, td["tag"].month, td["tag"].day))})
+
     for ev in await _externe(u):
         tag = _d_iso(ev["date"])
         if not tag or (von and tag < von) or (bis and tag > bis):
@@ -698,9 +721,12 @@ async def ressource(request: Request, user_id: int, name: str,
     # Ein fremder (abonnierter) Termin? Auch den gibt es nicht als Zeile: er
     # kommt aus einem anderen Kalender und wird nur mit ausgeliefert.
     fremd = name.startswith("ext-")
+    # Ein terminiertes To-do? Auch das ist hier read-only — es gehoert dem
+    # Notizbrett, nicht dem Kalender (siehe _ressourcen).
+    aufgabe = name.startswith("todo-")
     eintraege = await _alle(db, u)
     treffer = next((e for e in eintraege if _dateiname(e) == name), None)
-    if stunde is not None or fremd:
+    if stunde is not None or fremd or aufgabe:
         alles = await _ressourcen(db, u)
         vorhanden = next((r for r in alles if r["name"] == name), None)
     else:
@@ -729,6 +755,16 @@ async def ressource(request: Request, user_id: int, name: str,
                         headers={**_DAV_KOPF, "ETag": X.etag(text)})
 
     if request.method == "DELETE":
+        if aufgabe:
+            # Ein To-do laesst sich von hier aus nicht wegwischen. Anders als
+            # bei der Stundenplan-Stunde gibt es dafuer auch keine sinnvolle
+            # Ersatzbedeutung: „weg" hiesse entweder erledigt oder geloescht,
+            # und das ist ein Unterschied, den nur die Lehrkraft kennt. Also
+            # dieselbe Bauform wie beim fremden Termin: 403 mit Vorbedingung,
+            # damit das Geraet sagen kann, WAS nicht ging.
+            notiere(u.email, request, 403, "To-do ist im Kalender nicht aenderbar")
+            return Response(content=X.fehler_xml("valid-calendar-object-resource"), status_code=403,
+                            media_type="application/xml; charset=utf-8", headers=_DAV_KOPF)
         if fremd:
             # Ein fremder Termin laesst sich von hier aus nicht loeschen — er
             # gehoert dem anderen Kalender. Was der Nutzer meint, wenn er ihn
@@ -770,6 +806,14 @@ async def ressource(request: Request, user_id: int, name: str,
         return Response(status_code=204, headers=_DAV_KOPF)
 
     # PUT: anlegen oder aendern.
+    if aufgabe:
+        # Geaendert wird eine Aufgabe im Notizbrett. Sie hier zu uebernehmen
+        # hiesse, aus ihr einen Kalender-Eintrag zu machen — die Aufgabe
+        # stuende danach doppelt da und waere im Notizbrett trotzdem
+        # unveraendert.
+        notiere(u.email, request, 403, "To-do ist im Kalender nicht aenderbar")
+        return Response(content=X.fehler_xml("valid-calendar-object-resource"), status_code=403,
+                        media_type="application/xml; charset=utf-8", headers=_DAV_KOPF)
     if fremd:
         # Aendern geht dort, wo der Termin herkommt. Ihn hier zu uebernehmen
         # hiesse, eine Kopie anzulegen, die beim naechsten Abgleich neben dem

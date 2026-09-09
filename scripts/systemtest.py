@@ -2569,6 +2569,63 @@ def teste_bruecken(api, b, u, sch, spuren, cv):
 
     b.pruefe("Bruecken", "Karten -> Themenstand", karten_im_themenstand)
 
+    # ── Bruecke 9: terminiertes To-do im ICS-Feed ──
+    def todo_im_feed():
+        """Eine faellige Aufgabe gehoert in den abonnierten Kalender — aber nur,
+        solange das Notizbrett laeuft (Regel 3).
+
+        Warum die Probe hier steht und nicht bei `inhalt_kalender`: dort laeuft
+        NUR das Modul Kalender, und das To-do liesse sich gar nicht anlegen.
+        Genau das ist der Kern der Bruecke, also gehoert sie in diesen
+        Abschnitt — mit beiden Modulen muss sie wirken, mit einem darf sie
+        nichts tun.
+        """
+        sch.setze({"kalender", "notizbrett"})
+        morgen = (datetime.now() + timedelta(days=1)).date().isoformat()
+        aufgabe = api.call("POST", "/api/todo", {
+            "text": f"{PRAEFIX} Kopien fuer den Feed", "due_date": morgen,
+            "due_time": "07:30"}, erwartet=(201,))
+        spuren.append(("Feed-To-do", lambda: api.call(
+            "DELETE", f"/api/todo/{aufgabe['id']}", erwartet=(204, 404))))
+        abo = api.call("GET", "/api/kalender/subscribe", erwartet=(200,))
+        weg = "/api/kalender/feed/" + abo["url"].split("/api/kalender/feed/", 1)[1]
+
+        def feed():
+            # Ohne Anmeldung: genau so holt der Kalender im Handy den Feed.
+            status, text = Api(api.basis, debug=api.debug).call("GET", weg, roh=True)
+            if status != 200:
+                raise AssertionError(f"Feed nicht abrufbar (HTTP {status})")
+            return text
+
+        text = feed()
+        marke = f"SUMMARY:Aufgabe: {PRAEFIX} Kopien fuer den Feed"
+        if marke not in text:
+            raise AssertionError("terminiertes To-do fehlt im Feed")
+        # Getaktet, nicht ganztaegig — und das Ende liegt am selben Tag.
+        tag = morgen.replace("-", "")
+        if f"DTSTART:{tag}T073000" not in text or f"DTEND:{tag}T080000" not in text:
+            raise AssertionError("To-do steht nicht als getakteter Termin (07:30-08:00) im Feed")
+
+        # Abgehakt heisst weg: im fremden Kalender hat eine erledigte Aufgabe
+        # nichts mehr verloren.
+        api.call("PUT", f"/api/todo/{aufgabe['id']}", {"done": True}, erwartet=(200,))
+        if marke in feed():
+            raise AssertionError("erledigtes To-do steht weiter im Feed")
+        api.call("PUT", f"/api/todo/{aufgabe['id']}", {"done": False}, erwartet=(200,))
+
+        # Ohne das Notizbrett faellt es weg — ohne Fehler, der Feed liefert weiter.
+        sch.setze({"kalender"})
+        ohne = feed()
+        if marke in ohne:
+            raise AssertionError("To-do steht im Feed, obwohl das Notizbrett aus ist")
+        if not ohne.startswith("BEGIN:VCALENDAR"):
+            raise AssertionError("Feed ohne Notizbrett kaputt statt nur ohne To-dos")
+        sch.setze({"kalender", "notizbrett"})
+        api.call("DELETE", f"/api/todo/{aufgabe['id']}", erwartet=(204, 404))
+        return "getaktetes To-do im Feed, erledigt und ohne Modul nicht"
+
+    b.pruefe("Bruecken", "Terminiertes To-do -> ICS-Feed", todo_im_feed)
+
 
 # ───────────── 6. Fruehwarnung und Themenstand nachgerechnet ─────────────
 #

@@ -31,7 +31,11 @@ from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, Sch
 # Optimistisches Sperren (siehe app/versionierung.py).
 from ..versionierung import VersionOut, pruefe, stand
 from .auth import rate_limit
-from .modules import is_active, modul_pflicht
+from .modules import is_active, modul_pflicht, option_an
+# Die Auswahl der datierten To-dos gehoert dem Notizbrett; der Kalender
+# holt sie dort, statt sie ein zweites Mal zu formulieren (Regel 3 gilt
+# trotzdem: ohne das Modul wird gar nicht erst gefragt).
+from .todos import datierte as todo_datierte
 
 router = APIRouter(prefix="/api/kalender", tags=["kalender"])
 MODULE_KEY = "kalender"
@@ -1777,6 +1781,75 @@ def _d_iso(s: str):
         return None
 
 
+# ─── Terminierte To-dos im Kalender nach draussen ───
+#
+# Regel 3: der Kalender haengt NICHT am Notizbrett. Ist das Modul aus oder der
+# Teil „Aufgaben" abgeschaltet, fallen die To-dos einfach weg — kein Fehler,
+# keine leere Sonderbehandlung. `option_an` beantwortet beide Fragen auf
+# einmal: ohne aktives Modul gibt es keine Zeile in `user_modules`, und dann
+# ist die Antwort schon False.
+TODO_PRAEFIX = "Aufgabe: "
+# Ein To-do mit Uhrzeit ist ein Zeitpunkt, kein Zeitraum — ein Ende hat es
+# nicht. Eine halbe Stunde ist die schlichteste Antwort darauf: im Tagesplan
+# des Handys sieht man den Block, und er verstellt trotzdem nicht den halben
+# Nachmittag. Laenger waere geraten, kuerzer im Kalender kaum sichtbar.
+TODO_DAUER_MIN = 30
+# Formmarker wie bei Eintraegen und freien Zeitraeumen: Apple merkt sich Art
+# und Dauer eines Ereignisses PRO UID. Ohne eigenen Marker in der eigenen
+# UID-Form kaeme eine spaetere Korrektur (etwa an der Dauer) am Geraet nicht
+# an, und ein Client koennte die Aufgabe fuer einen Kalender-Eintrag halten.
+TODO_MARKER = "t1"
+
+
+def todo_uid(todo_id: int) -> str:
+    return f"nuvora-todo-{todo_id}-{TODO_MARKER}@nuvora"
+
+
+def todo_dateiname(todo_id: int) -> str:
+    return f"todo-{todo_id}-{TODO_MARKER}.ics"
+
+
+def todo_ende(start: str) -> str:
+    """"HH:MM" + TODO_DAUER_MIN, geklemmt auf denselben Tag.
+
+    Nicht ueber Mitternacht: ein Termin, der in den Folgetag laeuft, stuende im
+    Handy an zwei Tagen — fuer eine Aufgabe um 23:50 ist das mehr Aufwand als
+    Nutzen, „bis 23:59" sagt dasselbe.
+    """
+    try:
+        hh, mm = (start or "").split(":")[:2]
+        minuten = int(hh) * 60 + int(mm) + TODO_DAUER_MIN
+    except Exception:
+        return ""
+    minuten = min(minuten, 23 * 60 + 59)
+    return f"{minuten // 60:02d}:{minuten % 60:02d}"
+
+
+async def todo_termine(db: AsyncSession, u: User, von=None, bis=None) -> list:
+    """Die terminierten, offenen To-dos als Kalender-Ereignisse.
+
+    Die Auswahl selbst steht im Notizbrett (`todos.datierte`) — hier wird sie
+    nur um die Modul-Frage und um die Form ergaenzt, in der ein fremder
+    Kalender sie zeigt.
+    """
+    if not await option_an(db, u.id, "notizbrett", "aufgaben"):
+        return []
+    rows = await todo_datierte(db, u.id, von, bis, nur_offen=True)
+    out = []
+    for t in rows:
+        zeit = (t.due_time or "").strip()
+        out.append({
+            "id": t.id, "tag": t.due_date, "zeit": zeit, "ende": todo_ende(zeit) if zeit else "",
+            # Im fremden Kalender steht der Termin zwischen Arztterminen. „Zeugnisse"
+            # allein liest sich dort wie ein Termin; das vorangestellte Wort sagt in
+            # Klartext, dass es eine Aufgabe ist — kein Kuerzel, das man erst lernen
+            # muss, und keine Klammer-Konstruktion, die auf schmalen Displays abreisst.
+            "titel": TODO_PRAEFIX + (t.text or "Aufgabe"),
+            "notiz": t.notiz or "",
+        })
+    return out
+
+
 @router.get("/feed/{token}.ics")
 async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depends(get_db)):
     """ICS-Feed eines Kontos (Token statt Login). Kalender-Eintraege als
@@ -1962,6 +2035,29 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
                       f"DTSTART;VALUE=DATE:{d8(day)}",
                       f"DTEND;VALUE=DATE:{d8(day + timedelta(days=1))}",
                       f"SUMMARY:{_ics_escape(v['titel'])}"] + ort + ["END:VEVENT"]
+
+    # Terminierte To-dos aus dem Notizbrett. Sie stehen im Handy zwischen den
+    # Unterrichtsstunden, weil dort die Frage „was ist heute noch zu tun?"
+    # gestellt wird. Erledigte fallen heraus (siehe todo_termine), ebenso das
+    # ganze Paket, wenn das Modul oder der Teil „Aufgaben" aus ist.
+    for td in await todo_termine(db, u):
+        a, b2 = _hm(td["zeit"]), _hm(td["ende"])
+        zeilen = ["BEGIN:VEVENT", f"UID:{todo_uid(td['id'])}", f"DTSTAMP:{now}",
+                  f"LAST-MODIFIED:{now}", f"SEQUENCE:{seq}"]
+        if a and b2:
+            # Getaktet: DTEND ist ein Zeitpunkt am selben Tag (Faelligkeit +
+            # TODO_DAUER_MIN) — kein "+1 Tag".
+            zeilen += [f"DTSTART:{d8(td['tag'])}T{a}", f"DTEND:{d8(td['tag'])}T{b2}"]
+        else:
+            # Ohne Uhrzeit ein Ganztags-Termin: DTEND ist EXKLUSIV, also genau
+            # ein "+1".
+            zeilen += [f"DTSTART;VALUE=DATE:{d8(td['tag'])}",
+                       f"DTEND;VALUE=DATE:{d8(td['tag'] + timedelta(days=1))}"]
+        zeilen.append(f"SUMMARY:{_ics_escape(td['titel'])}")
+        if td["notiz"]:
+            zeilen.append(f"DESCRIPTION:{_ics_escape(td['notiz'])}")
+        zeilen.append("END:VEVENT")
+        lines += zeilen
 
     # Die Termine der abonnierten fremden Kalender — nur wenn ausdruecklich
     # eingeschaltet (users.feed_external). Sie sind hier Beifang und bleiben
