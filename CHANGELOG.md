@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Notenbuch: eine Spalte ohne „Datum der Leistung" wird nicht mehr eingefärbt.
+  Sie erbte das Anlagedatum — und war rot, wenn das Kind am Tag des Anlegens
+  gefehlt hatte.
 - **Fehlzeiten färben die Notentabelle — jetzt wirklich.** Der Aufruf nannte
   seinen Kurs nicht; liegt eine Klasse in zwei Kursen, passte kein Schlüssel und
   es blieb bei einer Tabelle ohne Rot.

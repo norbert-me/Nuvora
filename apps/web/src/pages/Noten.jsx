@@ -186,10 +186,17 @@ export default function Noten() {
     hol(`${API}/classes/${id}/dividers?term=${term}${kp}`).then((d) => setDividers(Array.isArray(d) ? d : []));
   };
   // Fehlzeiten zu den Datumsangaben der Spalten — ein Aufruf fuer alle Tage.
+  //
+  // NUR Spalten mit einem eingetragenen Datum. Das Anlagedatum als Ersatz zu
+  // nehmen war falsch und sah aus wie ein Fehler in der Anwesenheit: eine
+  // Spalte „2.1.1" ohne Datum, heute angelegt, faerbte sich rot, weil das Kind
+  // HEUTE gefehlt hat — mit der Leistung in dieser Spalte hat das nichts zu
+  // tun. Der Tag der Leistung ist eine Angabe, keine Vermutung; fehlt er, gibt
+  // es keinen Tag, zu dem eine Abwesenheit passen koennte.
   useEffect(() => {
     if (!classId || !orgaAktiv) { setFehlzeiten({}); return; }
     const tage = [...new Set(sections.flatMap((sec) => (sec.categories || [])
-      .map((c) => c.date || (c.created_at ? String(c.created_at).slice(0, 10) : ""))
+      .map((c) => c.date)
       .filter(Boolean)))];
     if (!tage.length) { setFehlzeiten({}); return; }
     let ab = false;
@@ -210,11 +217,11 @@ export default function Noten() {
     // steht: ein Kurswechsel ohne neue Spalten holte sonst die Fehlzeiten des
     // vorigen Kurses.
   }, [classId, kursId, sections, orgaAktiv]);
-  // Status eines Kindes an dem Tag, den die Spalte traegt ("" = war da / unbekannt).
+  // Status eines Kindes an dem Tag, den die Spalte traegt ("" = war da /
+  // unbekannt / die Spalte hat gar keinen Tag).
   const statusVon = (studentId, cat) => {
-    const tag = cat.date || (cat.created_at ? String(cat.created_at).slice(0, 10) : "");
-    if (!tag) return "";
-    return (fehlzeiten[tag] || {})[String(studentId)] || "";
+    if (!cat.date) return "";
+    return (fehlzeiten[cat.date] || {})[String(studentId)] || "";
   };
   const toggleDivider = async (catId) => {
     const r = await fetch(`${API}/classes/${classId}/dividers/toggle?term=${term}${kp}`, alsJson("POST", { after_category_id: catId })).catch(() => null);
