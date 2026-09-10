@@ -14,7 +14,7 @@ import { useAktiv } from "../core/modules.js";
 import { swr , lastClass } from "../core/cache.js";
 import { useUrlClass } from "../core/klassenwahl.js";
 import { parseYmd, wochentagMo0, ymd } from "../core/datum.js";
-import { slotGiltAm } from "../core/stunden";
+import { laufendeStunde, slotGiltAm } from "../core/stunden";
 import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api/anwesenheit";
@@ -43,11 +43,12 @@ export default function Anwesenheit() {
   const [offen, setOffen] = useState(null); // aufgeklappter Schüler in der Übersicht
   const [verlauf, setVerlauf] = useState([]);
   const [stunde, setStunde] = useState(0); // 0 = ganzer Tag, sonst Stundenplan-Period
+  const [zeiten, setZeiten] = useState({ times: [], zero: null }); // Uhrzeiten des Stundenrasters
 
   useEffect(() => {
     const stop = swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
     if (kalenderAktiv) {
-      hol("/api/kalender/timetable", null).then((d) => setSlots(d?.slots || []));
+      hol("/api/kalender/timetable", null).then((d) => { setSlots(d?.slots || []); setZeiten({ times: d?.times || [], zero: d?.zero || null }); });
       hol("/api/kalender/breaks").then((d) => setBreaks(Array.isArray(d) ? d : []));
     }
     return stop;
@@ -87,13 +88,37 @@ export default function Anwesenheit() {
     if (classId === null || !sichtbareKlassen.some((c) => c.id === classId)) { const w = lastClass(); setClassId(sichtbareKlassen.some((c) => c.id === w) ? w : sichtbareKlassen[0].id); }
   }, [sichtbareKlassen, classId]);
 
-  // Stunde+Kurs auf die erste Stunde des Tages, wenn die aktuelle nicht passt.
+  // Welche Stunde und welche Klasse zeigt die Seite, wenn sie aufgeht?
+  //
+  // Vorher stand hier stur `tagSlots[0]` — die ERSTE Stunde des Tages samt
+  // DEREN Klasse. Beides war falsch, und zusammen sahen sie aus wie ein
+  // Ladefehler („die Anwesenheit wird nicht geladen, sondern nur gesetzt"):
+  //
+  //   * Wer in der 5. Stunde Fehlzeiten eintraegt und die Seite spaeter wieder
+  //     oeffnet, landete auf der 1. — und dort liegt nichts. Geladen wurde
+  //     also sehr wohl, nur die falsche Stunde.
+  //   * Aus dem Kalender heraus (`?class=`) wurde die VERLINKTE Klasse durch
+  //     die der ersten Tagesstunde ersetzt: man bekam eine fremde Liste.
+  //
+  // Jetzt zwei Regeln: eine bereits gewaehlte Klasse (Link, zuletzt gewaehlte)
+  // gewinnt und bekommt nur ihre Stunde ergaenzt, und gewaehlt wird die Stunde,
+  // die zur Uhrzeit gerade laeuft (`core/stunden.js` — an einem anderen Tag und
+  // ohne gepflegte Uhrzeiten wie bisher die erste).
+  const jetztMin = useMemo(() => {
+    if (datum !== ymd(new Date())) return null;   // anderer Tag: die Uhr sagt nichts
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  }, [datum]);
   useEffect(() => {
     if (stundenWahl) {
-      if (!tagSlots.some((s) => s.period === stunde && s.class_id === classId)) { setStunde(tagSlots[0].period); setClassId(tagSlots[0].class_id); }
+      if (!tagSlots.some((s) => s.period === stunde && s.class_id === classId)) {
+        const eigen = tagSlots.filter((s) => s.class_id === classId);
+        const ziel = laufendeStunde(eigen.length ? eigen : tagSlots, zeiten.times, zeiten.zero, jetztMin);
+        if (ziel) { setStunde(ziel.period); setClassId(ziel.class_id); }
+      }
     } else if (tagStunden.length && !tagStunden.includes(stunde)) setStunde(tagStunden[0]);
     else if (!tagStunden.length && stunde !== 0) setStunde(0);
-  }, [tagSlots, tagStunden, stundenWahl]); // eslint-disable-line
+  }, [tagSlots, tagStunden, stundenWahl, zeiten, jetztMin]); // eslint-disable-line
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = cls?.students || [];
@@ -105,12 +130,11 @@ export default function Anwesenheit() {
   // Entwurf — sonst zeigte die Liste die Status des vorigen Tages weiter.
   const frisch = useRef(false);
   const loadTag = useCallback(() => {
-    if (globalThis.__LOG) console.log("LOADTAG classId=", classId, "stunde=", stunde);
     if (!classId) return;
     // Bei gewählter Stunde diese Stunde laden (Server belegt sie aus der
     // vorherigen vor); Stunde 0 = ganzer Tag (stärkster Status).
     const p = stunde ? `&period=${stunde}` : "";
-    hol(`${API}/${classId}?date=${isoOf(datum)}${p}`, {}).then((d) => { if (globalThis.__LOG) console.log("LOADTAG-THEN", JSON.stringify(d)); frisch.current = true; setTag(d || {}); });
+    hol(`${API}/${classId}?date=${isoOf(datum)}${p}`, {}).then((d) => { frisch.current = true; setTag(d || {}); });
   }, [classId, datum, stunde]);
   const loadSumme = useCallback(() => {
     if (!classId) return;
@@ -131,15 +155,32 @@ export default function Anwesenheit() {
     students.forEach((s) => { o[String(s.id)] = tag[String(s.id)]?.status || "da"; });
     return o;
   }, [students, tag]);
+  // Wen hat die Lehrkraft in DIESER Runde selbst angefasst? Nur diese Kinder
+  // sind vor frischen Serverdaten geschuetzt (siehe unten).
+  const angefasst = useRef(new Set());
   const eTag = useEntwurf(basis, async (wert) => {
     for (const s of students) {
       const k = String(s.id);
       if (wert[k] === basis[k]) continue;
       await mark(s.id, wert[k], isoOf(datum), stunde || null).catch(() => {});
     }
+    angefasst.current.clear();
     loadTag();
   });
-  useEffect(() => { if (frisch.current) { frisch.current = false; eTag.verwerfen(); } });
+  // ... aber NICHT, was die Lehrkraft gerade selbst getippt hat. Auf schlechtem
+  // Netz kommt die Antwort erst, wenn schon die halbe Klasse angehakt ist; ein
+  // blankes `verwerfen()` warf diese Eingabe wortlos weg. Umgekehrt darf ein
+  // einziger Griff auch nicht dazu fuehren, dass der Serverstand fuer ALLE
+  // anderen ungesehen bleibt — genau das tut `useEntwurf` von sich aus, sobald
+  // es „beruehrt" ist. Also wird zusammengefuehrt: frischer Stand fuer alle,
+  // die eigene Eingabe fuer die angefassten.
+  useEffect(() => {
+    if (!frisch.current) return;
+    frisch.current = false;
+    const eigene = [...angefasst.current];
+    if (!eigene.length) { eTag.verwerfen(); return; }
+    eTag.setz((v) => { const o = { ...basis }; eigene.forEach((k) => { if (k in v) o[k] = v[k]; }); return o; });
+  });
   // Klassen-/Tageswechsel mit offenen Änderungen: nachfragen statt still verwerfen.
   const wechseln = (fn) => {
     // Wer den Wechsel bestaetigt, hat die Aenderungen aufgegeben — die
@@ -148,13 +189,14 @@ export default function Anwesenheit() {
     // fragte die Seite erneut, obwohl niemand etwas getan hatte.
     if (eTag.geaendert) {
       if (!window.confirm(t("speichern.verlassen"))) return;
+      angefasst.current.clear();
       eTag.verwerfen();
     }
     fn();
   };
 
   const statusOf = (sid) => eTag.wert[String(sid)] || tag[String(sid)]?.status || "da";
-  const setStatus = (sid, status) => eTag.setz({ [String(sid)]: status });
+  const setStatus = (sid, status) => { angefasst.current.add(String(sid)); eTag.setz({ [String(sid)]: status }); };
   const shift = (n) => { const d = new Date(datum + "T00:00:00"); d.setDate(d.getDate() + n); setDatum(ymd(d)); };
 
   // PDF-Report laden (Endpunkt ist auth-geschützt, daher fetch + Blob statt <a href>).

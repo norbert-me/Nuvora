@@ -55,7 +55,6 @@ export function useEntwurf(gespeichert, speichernFn) {
   // und zeigt leere Felder. Genau das ist beim ersten Einsatz passiert.
   const beruehrt = useRef(false);
   useEffect(() => {
-    if (globalThis.__LOG) console.log("EFFEKT gespeichert=", JSON.stringify(gespeichert), "beruehrt=", beruehrt.current);
     if (!beruehrt.current) setWert(gespeichert);
   }, [gespeichert]);
 
@@ -80,7 +79,7 @@ export function useEntwurf(gespeichert, speichernFn) {
     }
   }, [laeuft, speichernFn, wert]);
 
-  const verwerfen = useCallback(() => { if (globalThis.__LOG) console.log("VERWERFEN ->", JSON.stringify(gespeichert)); beruehrt.current = false; setWert(gespeichert); }, [gespeichert]);
+  const verwerfen = useCallback(() => { beruehrt.current = false; setWert(gespeichert); }, [gespeichert]);
 
   return useMemo(() => ({ wert, setz, geaendert, speichern, verwerfen, laeuft }),
     [wert, setz, geaendert, speichern, verwerfen, laeuft]);

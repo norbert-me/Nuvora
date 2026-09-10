@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Anwesenheit öffnet in der Stunde, die gerade läuft.** Sie sprang auf die
+  erste Stunde des Tages — dort steht nichts, und es sah aus, als würde nichts
+  geladen. Aus dem Kalender heraus bleibt jetzt auch die verlinkte Klasse
+  stehen, und eine Eingabe während des Ladens geht nicht mehr verloren.
 - Desktop-App: der Hinweis „neue Fassung" stand dauerhaft oben, weil die Hülle
   im Quelltext noch die Fassung 0.1.0 trug.
 - Notenbuch: eine Spalte ohne „Datum der Leistung" wird nicht mehr eingefärbt.
