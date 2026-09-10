@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Sitzplan: Ziehen auf den Mülleimer löscht wieder.** Die Speicherleiste lag
+  genau darüber und verdeckte ihn; eine abgebrochene Geste löscht jetzt nicht
+  mehr.
 - Kalender-Eintrag: Material wird im Bearbeiten-Modus hochgeladen; die Ansicht
   zeigt die Dateien nur noch zum Nachschlagen.
 - Kalender-Eintrag: „Zum Sitzplan" steht neben Anwesenheit und Checkliste.

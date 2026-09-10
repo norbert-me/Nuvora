@@ -520,18 +520,24 @@ export default function Sitzplan() {
     // rot ausdrücklich beibehalten (Drag darf die Drehung nie verwerfen).
     setSeats((prev) => prev.map((s) => (s.sid === d.sid ? { ...s, x, y, rot: s.rot ?? d.rot } : s)));
   };
-  const onUp = () => {
+  const onUp = (e) => {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
     window.removeEventListener("pointercancel", onUp);
     const d = dragRef.current;
+    // Eine ABGEBROCHENE Geste ist kein Loslassen: unter iOS uebernimmt das
+    // System den Finger, sobald es die Bewegung fuer ein Scrollen haelt, und
+    // schickt `pointercancel`. Wer dabei zufaellig ueber dem Muelleimer stand,
+    // haette ein Kind geloescht, ohne den Finger je gehoben zu haben. Der Zug
+    // endet dann dort, wo er ist — geloescht wird nur auf `pointerup`.
+    const abgebrochen = e && e.type === "pointercancel";
     dragRef.current = null;
     // Wurde ueber den linken/oberen Rand hinaus gezogen, wandert die ganze
     // Anordnung zurueck ins Positive — die Flaeche ist damit nach links
     // gewachsen, ohne dass jemand Koordinaten von Hand aufraeumen muss.
     setZiehtPlatz(false);
     setUeberMuell(false);
-    if (d?.gezogen && d.imMuell) {
+    if (d?.gezogen && d.imMuell && !abgebrochen) {
       // Der Schnappschuss steht schon (erster Zug) — „Rueckgaengig" holt den
       // Platz mitsamt seiner Position zurueck.
       // Funktional filtern: `seats` in dieser Funktion ist der Stand von vor
@@ -1020,11 +1026,20 @@ export default function Sitzplan() {
       {/* Der Muelleimer erscheint nur waehrend eines Zugs — sonst waere er
           eine Flaeche, die die ganze Zeit auf einen Fehlgriff wartet. Fest am
           Bildschirm, weil die Zeichenflaeche scrollt und der Zug sie sonst
-          verlassen muesste. */}
+          verlassen muesste.
+
+          Er muss dabei UEBER der Speicherleiste liegen und ueber ihr stehen:
+          die schwebt unten mittig (fixed, bottom 16, zIndex 60) und erscheint,
+          sobald etwas offen ist — waehrend eines Zugs also IMMER, denn der Zug
+          selbst oeffnet den Entwurf. Bei zIndex 40 und derselben Ecke deckte
+          sie den Muelleimer vollstaendig zu: man zog nach unten, sah dort nur
+          „Speichern/Abbrechen", bekam nie die rote Faerbung zu sehen und traf
+          neben dem (schmaleren) Feld daneben — „rausziehen zum Loeschen
+          funktioniert nicht". Deshalb eine Leistenhoehe hoeher und darueber. */}
       {ziehtPlatz && (
         <div ref={muellRef} aria-hidden
           style={{ position: "fixed", left: "50%", transform: "translateX(-50%)",
-            bottom: "max(24px, env(safe-area-inset-bottom))", zIndex: 40,
+            bottom: "calc(max(24px, env(safe-area-inset-bottom)) + 60px)", zIndex: 70,
             display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: CONTROL_R + 4,
             border: `2px ${ueberMuell ? "solid" : "dashed"} ${C.danger}`,
             background: ueberMuell ? C.danger : "var(--card)",
