@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Notenbuch: die Auswahl „Teilkurs" ist weg — das gibt es nicht.
 - Notenliste: der Schülerdialog schließt über das Kreuz oben rechts; der
   „Schließen"-Knopf unter der Maske ist weg.
 - **Stundenplan: Pausen mit Uhrzeiten.** Zwischen den Stunden steht die Pause

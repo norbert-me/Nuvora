@@ -41,7 +41,6 @@ const JE_MODUL = {
 // seinen Kurs und erwartet die Aufgaben, nicht eine leere Liste.
 const JE_KURS = {
   karten: ["/api/karten/decks?kurs_id={id}"],
-  auswertung: ["/api/noten/kurse/{id}/students"],
   kalender: ["/api/kalender/zeitleiste?kurs_id={id}"],
 };
 

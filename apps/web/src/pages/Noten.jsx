@@ -78,11 +78,6 @@ export default function Noten() {
   // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen.
   useUrlClass(setClassId, setKursId);
   const kp = kursId != null ? `&kurs_id=${kursId}` : "";
-  // Teilkurs (Kurse aus Teilen von Klassen): Noten-Zeilen = die Einzel-SuS des
-  // Kurses. classId zeigt dann auf die Repräsentant-Klasse (erster SuS) für die
-  // FK; kursId = Teilkurs, damit Spalten/Noten sauber am Kurs hängen.
-  const [subsetKurs, setSubsetKurs] = useState(null);
-  const [subsetKurse, setSubsetKurse] = useState([]);
   const [students, setStudents] = useState([]);
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -168,19 +163,8 @@ export default function Noten() {
   useKlassenListe(setClasses, setClassId);
   useKlasseMerken(classId);
 
-  // Teilkurse (nur solche mit einzeln hinzugefügten SuS) für die Auswahl.
-  useEffect(() => {
-    hol("/api/kurse").then((d) => {
-      setSubsetKurse((Array.isArray(d) ? d : []).filter((k) => (k.member_count || 0) > 0));
-    });
-  }, []);
-
   // Noten-Zeilen kommen aus dem KURS (dedupliziert), nicht aus der Fach-Klasse.
-  // Beim Teilkurs aus der Kurs-Route (enthält auch die Einzel-SuS fremder Klassen).
-  const loadRoster = (id) => {
-    const url = subsetKurs ? `${API}/noten/kurse/${subsetKurs}/students` : `${API}/classes/${id}/students`;
-    return hol(url).then((d) => setStudents(Array.isArray(d) ? d : []));
-  };
+  const loadRoster = (id) => hol(`${API}/classes/${id}/students`).then((d) => setStudents(Array.isArray(d) ? d : []));
   const load = async (id) => {
     if (!id) return;
     setLoading(true);
@@ -228,7 +212,7 @@ export default function Noten() {
     const r = await fetch(`${API}/classes/${classId}/dividers/toggle?term=${term}${kp}`, alsJson("POST", { after_category_id: catId })).catch(() => null);
     if (r && r.ok) setDividers(await r.json());
   };
-  useEffect(() => { if (classId) load(classId); }, [classId, kursId, subsetKurs, classes, term, agg]);
+  useEffect(() => { if (classId) load(classId); }, [classId, kursId, classes, term, agg]);
   const setAggPersist = (m) => { setAgg(m); try { localStorage.setItem("noten_agg", m); } catch { /* egal */ } };
 
   const doExport = async () => {
@@ -511,26 +495,8 @@ export default function Noten() {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <label data-tour="noten-class" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
           {t("nav.classes")}
-          <KursKlasseSelect value={subsetKurs ? null : classId} kursValue={subsetKurs ? null : kursId} onChange={(id, kid) => wechseln(() => { setSubsetKurs(null); setClassId(id); setKursId(kid); })} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} />
+          <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />
         </label>
-        {subsetKurse.length > 0 && (
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
-            {t("noten.teilkurs")}
-            <select value={subsetKurs || ""} style={selectStyle}
-              onChange={async (e) => {
-                const kid = e.target.value ? Number(e.target.value) : null;
-                if (!kid) { setSubsetKurs(null); return; }
-                // Repräsentant-Klasse (erster SuS) für die FK bestimmen.
-                const list = await fetch(`${API}/noten/kurse/${kid}/students`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
-                const rep = Array.isArray(list) && list.length ? list[0].class_id : null;
-                if (!rep) return;
-                setSubsetKurs(kid); setClassId(rep); setKursId(kid);
-              }}>
-              <option value="">{t("noten.teilkursNone")}</option>
-              {subsetKurse.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-            </select>
-          </label>
-        )}
         {/* Kurze Beschriftungen („1. HJ"), damit die ganze Leiste in EINE Zeile
             passt — sonst rutschen Plus und Mehr in eine zweite. Die lange Form
             steht im title. Beide Umschalter kommen aus `Tabs` (Icons.jsx):
