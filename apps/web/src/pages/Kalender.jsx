@@ -409,12 +409,28 @@ export default function Kalender() {
   };
   // Ein mehrtaegiger Eintrag gehoert an JEDEN Tag seines Zeitraums, nicht nur
   // an den ersten — sonst waere die Klassenfahrt ab Dienstag unsichtbar.
+  // Wann faengt der Eintrag an? Eigene Uhrzeit schlaegt die Zeit seiner
+  // Stunde; ein ganztaegiger hat keine und steht deshalb oben — er gilt fuer
+  // den ganzen Tag und laesst sich nirgends dazwischen einsortieren.
+  const beginnMin = (e) => {
+    const eigen = hmToMin(e.start_time);
+    if (eigen != null) return eigen;
+    if (e.period != null) {
+      const w = stundenZeit(tt.times, tt.zero, e.period);
+      const m = w ? hmToMin(w.start) : null;
+      // Ohne hinterlegte Uhrzeit bleibt die Stundennummer die Reihenfolge.
+      return m != null ? m : e.period * 60;
+    }
+    return -1;
+  };
   const byDay = (d) => entries.filter((e) => {
     const tag = ymd(d);
     const von = ymd(new Date(e.date));
     const bis = e.end_date ? ymd(new Date(e.end_date)) : von;
     return tag >= von && tag <= bis;
-  });
+  // Nach Uhrzeit, nicht nach Anlagereihenfolge: ein Tag wird von oben nach
+  // unten gelesen, und ein um 8:00 nachgetragener Termin gehoert nach vorn.
+  }).sort((a, b) => beginnMin(a) - beginnMin(b) || (a.id || 0) - (b.id || 0));
   // Ganztägig ein/ausblenden: filtert ganztägige Einträge bzw. externe Termine
   // ohne Uhrzeit aus den Kalenderansichten (Stundenplan-Slots bleiben).
   const byDayV = (d) => showAllDay ? byDay(d) : byDay(d).filter((e) => !isAllDayEntry(e));
