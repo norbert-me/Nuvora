@@ -95,3 +95,16 @@ async def test_fremde_klasse_bleibt_zu(s):
     with pytest.raises(HTTPException) as e:
         await N.create_entry(_beob(cls, max_), user=fremd, db=s)
     assert e.value.status_code in (403, 404)
+
+
+@pytest.mark.asyncio
+async def test_beobachtung_ohne_halbjahr_steht_in_jedem(s):
+    """Der Sitzplan kennt kein Halbjahr — seine Bemerkung darf trotzdem nicht
+    aus der Notenliste fallen. Ohne `term` gehoert sie zu keinem Halbjahr und
+    erscheint deshalb in jedem; unsichtbar waere der schlechtere Fehler."""
+    u, cls, max_ = await _grund(s)
+    await N.create_entry(_beob(cls, max_, term=""), user=u, db=s)
+    for hj in ("1", "2"):
+        rows = await N.list_entries(cls.id, term=hj, user=u, db=s)
+        assert [r.note for r in rows] == ["hat geholfen"], hj
+        assert [x.observations for x in await N.summary(cls.id, term=hj, user=u, db=s)] == [1]

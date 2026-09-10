@@ -17,7 +17,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -530,7 +530,13 @@ def _obs_where(class_id, kurs_id, term: str = ""):
     den Abschnitten (`kurs_oder_klasse`), nur am Eintrag selbst."""
     w = [GradeEntry.category_id.is_(None), *kurs_oder_klasse_ohne_owner(class_id, kurs_id)]
     if term:
-        w.append(GradeEntry.term == term)
+        # Eine Beobachtung OHNE Halbjahr gehoert zu keinem und faellt deshalb
+        # in jedes: sie kommt aus Ansichten, die gar kein Halbjahr kennen (der
+        # Klick auf ein Kind im Sitzplan), und war mit einem harten
+        # `term == "1"` in der Notenliste nirgends zu sehen — geschrieben,
+        # gespeichert, unsichtbar. Zweimal zu erscheinen ist der bessere
+        # Fehler als zu verschwinden.
+        w.append(or_(GradeEntry.term == term, GradeEntry.term == ""))
     return w
 
 
