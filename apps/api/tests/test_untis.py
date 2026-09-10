@@ -190,7 +190,7 @@ async def test_import_legt_jeden_kurs_genau_einmal_an(s):
     await s.commit()
 
     slot = lambda wd, p, name: K.UntisSlotIn(weekday=wd, period=p, title="M 7.5",
-                                             kurs_neu=name, fach="Mathe", jahrgang="7")
+                                             kurs_neu=name, fach="Mathe")
     d = await K.untis_uebernehmen(K.UntisUebernahmeIn(slots=[
         slot(0, 1, "Mathe 7.5"), slot(2, 3, "Mathe 7.5"),   # derselbe Kurs, zwei Stunden
         slot(1, 2, "Lernzeit 7.5"),                          # den gibt es schon
@@ -201,7 +201,7 @@ async def test_import_legt_jeden_kurs_genau_einmal_an(s):
     kurse = (await s.execute(select(Kurs).where(Kurs.owner_id == u.id))).scalars().all()
     assert sorted(k.name for k in kurse) == ["Lernzeit 7.5", "Mathe 7.5"]
     mathe = [k for k in kurse if k.name == "Mathe 7.5"][0]
-    assert (mathe.fach, mathe.jahrgang) == ("Mathe", "7"), "Fach und Jahrgang kommen aus Untis mit"
+    assert mathe.fach == "Mathe", "das Fach kommt aus Untis mit (einen Jahrgang traegt der Kurs nicht)"
 
     slots = (await s.execute(select(K.TimetableSlot).where(K.TimetableSlot.owner_id == u.id))).scalars().all()
     assert {sl.kurs_id for sl in slots} == {mathe.id, [k for k in kurse if k.name == "Lernzeit 7.5"][0].id}

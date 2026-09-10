@@ -26,9 +26,11 @@ async def test_jahrgang_nimmt_zahl_und_text(s):
     t2 = await TOP.create_topic(TOP.TopicIn(name="Wahlpflicht", jahrgang="7/8"), user=u, db=s)
     assert t2.jahrgang == "7/8"
 
-    # Dasselbe am Kurs
+    # Der KURS traegt seit dem 10.09.2026 keinen Jahrgang mehr (das Schuljahr
+    # sagt ihn). Ein alter Client schickt das Feld trotzdem — das muss still
+    # durchgehen statt 422 zu geben, sonst laesst sich der Kurs nicht mehr
+    # umbenennen.
     k = await KUR.create_kurs(KUR.KursIn(name="WP 7/8"), user=u, db=s)
     aus = await KUR.rename_kurs(k.id, KUR.KursIn(name="WP 7/8", jahrgang=8), user=u, db=s)
-    assert aus.jahrgang == "8"
-    aus = await KUR.rename_kurs(k.id, KUR.KursIn(name="WP 7/8", jahrgang="7/8"), user=u, db=s)
-    assert aus.jahrgang == "7/8"
+    assert aus.name == "WP 7/8"
+    assert not hasattr(aus, "jahrgang")

@@ -305,16 +305,14 @@ class Kurs(Versioniert, Base):
     # bei Kursen ohne Niveau-Differenzierung nervt sie sonst. E/G wird im Kurs
     # gepflegt (nicht je Fach-Klasse), weil es die Person betrifft.
     niveau_aktiv: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    # Fach und Jahrgang des Kurses — das Gegenstueck zu `topics.fach` /
-    # `topics.jahrgang`. Erst dadurch ist „die Themen dieses Kurses" eine
-    # Abfrage und kein Namensraten (der Name ist frei, „Mathe 7.5" genauso wie
-    # „M7b" oder „Mathe Gruppe rot").
+    # Fach des Kurses — das Gegenstueck zu `topics.fach`. Erst dadurch ist
+    # „die Themen dieses Kurses" eine Abfrage und kein Namensraten (der Name
+    # ist frei, „Mathe 7.5" genauso wie „M7b" oder „Mathe Gruppe rot").
+    # Einen JAHRGANG traegt der Kurs NICHT mehr (10.09.2026): das Schuljahr
+    # sagt bereits, um welchen es geht, und zwei Angaben ueber dieselbe Sache
+    # laufen auseinander. Die Spalte bleibt in der Datenbank stehen — geloescht
+    # wird hier nichts —, das Modell kennt sie nur nicht mehr.
     fach: Mapped[str] = mapped_column(String(60), default="", server_default="")
-    # TEXT, nicht Zahl: „7/8" ist ein üblicher Jahrgang (Kombiklasse,
-    # WP-Kurs über zwei Stufen), und eine Zahl kann das nicht abbilden.
-    # Sortiert wird ohnehin nach Namen, gefiltert per Vergleich — beides
-    # funktioniert mit Text.
-    jahrgang: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     # Farbe des Kurses (Stundenplan/Kalender). Die Fach-Klassen teilen sie sich —
     # darum am Kurs, nicht je Klasse.
     color: Mapped[str] = mapped_column(String(9), default="", server_default="")

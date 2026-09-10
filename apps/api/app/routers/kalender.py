@@ -2609,7 +2609,6 @@ class UntisSlotIn(BaseModel):
     # jedem anderen Import).
     kurs_neu: str = ""
     fach: str = ""
-    jahrgang: str = ""
 
 
 class UntisAusfallIn(BaseModel):
@@ -2655,8 +2654,7 @@ async def untis_uebernehmen(body: UntisUebernahmeIn, user: User = Depends(requir
         if treffer:
             nach_name[name.lower()] = treffer
             continue
-        k = Kurs(owner_id=user.id, name=name, fach=(s.fach or "").strip()[:60],
-                 jahrgang=((s.jahrgang or "").strip()[:20] or None))
+        k = Kurs(owner_id=user.id, name=name, fach=(s.fach or "").strip()[:60])
         db.add(k)
         await db.flush()
         nach_name[name.lower()] = k.id

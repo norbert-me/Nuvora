@@ -40,11 +40,6 @@ export function kursName(v) {
 }
 
 // Der Jahrgang steckt vorn im Klassennamen („7.5" → „7", „10b" → „10").
-export function jahrgangAus(v) {
-  const m = /^(\d{1,2})/.exec(((v.klassen || [])[0] || "").trim());
-  return m ? m[1] : "";
-}
-
 export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [], periods = 6 }) {
   const [hilfe, setHilfe] = useState(false);
   const { t } = useLanguage();
@@ -117,7 +112,6 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
         // Themen desselben Fachs.
         kurs_neu: w.startsWith("n") ? w.slice(1) : "",
         fach: w.startsWith("n") ? ((f.faecher || [])[0] || "") : "",
-        jahrgang: w.startsWith("n") ? jahrgangAus(f) : "",
         // Der Untis-Titel bleibt als Beschriftung stehen, auch wenn ein Kurs
         // zugeordnet ist: „M 7a" sagt im Raster mehr als der Kursname allein.
         title: f.titel || "",

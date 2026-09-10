@@ -47,7 +47,7 @@ export default function Kurse() {
   // Jahresfolge: Schuljahr und der Kurs des Vorjahres. Die Daten bleiben
   // getrennt (Zeugnisnoten gelten je Schuljahr) — verbunden wird nur die Kette,
   // damit „6.5 Mathe" und „7.5 Mathe" nicht als zwei fremde Gruppen dastehen.
-  const LEER = { name: "", jahr: "", fach: "", jahrgang: "", raum: "", vorgaenger: "", niveauAktiv: false, archiviert: false, klassen: [] };
+  const LEER = { name: "", jahr: "", fach: "", raum: "", vorgaenger: "", niveauAktiv: false, archiviert: false, klassen: [] };
   const [kursBasis, setKursBasis] = useState(LEER);
   const kurs = useEntwurf(kursBasis, (w) => kursSpeichern(w));
   const kursUebernehmen = (stand) => { setKursBasis(stand); kurs.setz(stand); };
@@ -91,7 +91,7 @@ export default function Kurse() {
     if (kurs.geaendert && !window.confirm(t("speichern.verlassen"))) return;
     setEditKurs(k.id);
     kursUebernehmen({
-      name: k.name, jahr: k.schuljahr || "", fach: k.fach || "", jahrgang: k.jahrgang || "", raum: k.raum || "",
+      name: k.name, jahr: k.schuljahr || "", fach: k.fach || "", raum: k.raum || "",
       vorgaenger: k.vorgaenger_id ? String(k.vorgaenger_id) : "",
       niveauAktiv: !!k.niveau_aktiv, archiviert: archiv, klassen: k.classes.map((c) => c.id),
     });
@@ -112,7 +112,7 @@ export default function Kurse() {
     const name = w.name.trim();
     if (!name) return false;
     const koerper = { name, schuljahr: w.jahr === NEU ? "" : w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv,
-                      fach: (w.fach || "").trim(), jahrgang: (w.jahrgang || "").trim(),
+                      fach: (w.fach || "").trim(),
                       raum: (w.raum || "").trim() };
     if (!(await sende(`${API}/kurse/${k.id}`, alsJson("PUT", koerper), t("kurse.editName")))) return false;
     setKursBasis(w);
@@ -231,11 +231,11 @@ export default function Kurse() {
                   </div>
                 </div>
 
-                {/* Fach und Jahrgang: das Gegenstueck zu denselben Feldern am
-                    Thema. Erst dadurch laesst sich fragen „welche Themen
-                    gehoeren zu diesem Kurs" — der NAME ist frei und taugt nicht
-                    als Schluessel. Ohne diese beiden bleibt der
-                    Stoffverteilungsplan ohne Vorschlaege. */}
+                {/* Das Fach: das Gegenstueck zu `topics.fach`. Erst dadurch
+                    laesst sich fragen „welche Themen gehoeren zu diesem Kurs"
+                    — der NAME ist frei („Mathe 7.5", „M7b", „Gruppe rot") und
+                    taugt nicht als Schluessel. Es steht ausserdem im
+                    Kalender-Etikett („Fach · Kurs"). */}
                 <div>
                   <div style={editLabel}>{t("kurse.editFach")}</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -245,11 +245,6 @@ export default function Kurse() {
                     <datalist id="nuvora-faecher-kurs">
                       {FACH_VORSCHLAEGE.map((f) => <option key={f} value={f} />)}
                     </datalist>
-                    {/* Der Jahrgang stand hier und ist entfernt (08.09.2026):
-                        das Schuljahr sagt bereits, um welchen Jahrgang es geht.
-                        Spalte und API bleiben, damit Bestandswerte nicht
-                        verschwinden — der Entwurf traegt sie unveraendert
-                        zurueck. */}
                     {/* Der Stammraum. Am Kurs und nicht je Stundenplan-Stunde:
                         derselbe Kurs hat vier Stunden in der Woche und meist
                         denselben Raum. Der Kalender setzt ihn als Ort ein. */}

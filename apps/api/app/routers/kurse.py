@@ -8,7 +8,7 @@ Mitgliedschaft ist many-to-many (Tabelle kurs_tags): eine Klasse kann in
 mehreren Kursen sein. Alle Mitglieder eines Kurses teilen — es gibt keinen
 Unterschied „Sharing vs. Tag" mehr.
 """
-from typing import List, Optional, Union
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -47,13 +47,12 @@ class KursIn(BaseModel):
     niveau_aktiv: Optional[bool] = None
     schuljahr: Optional[str] = None      # "2025/26" — Beschriftung, kein Zeitraum
     vorgaenger_id: Optional[int] = None  # dieselbe Lerngruppe im Vorjahr (0/None = keiner)
-    # Fach und Jahrgang — das Gegenstueck zu `topics.fach`/`topics.jahrgang`.
-    # Erst dadurch ist „die Themen dieses Kurses" eine Abfrage: der NAME ist
-    # frei („Mathe 7.5", „M7b", „Mathe Gruppe rot"), und daraus einen
-    # Zusammenhang zu raten waere genau der Fehler, den die Taxonomie vermeidet.
+    # Fach — das Gegenstueck zu `topics.fach`. Erst dadurch ist „die Themen
+    # dieses Kurses" eine Abfrage: der NAME ist frei („Mathe 7.5", „M7b",
+    # „Mathe Gruppe rot"), und daraus einen Zusammenhang zu raten waere genau
+    # der Fehler, den die Taxonomie vermeidet. Einen Jahrgang gibt es hier
+    # nicht: den sagt das Schuljahr.
     fach: Optional[str] = None
-    # Zahl ODER Text — siehe topics.py: „7/8" muss gehen, die blanke 7 auch.
-    jahrgang: Optional[Union[int, str]] = None
     # Stammraum ("B204"). Der Kalender setzt ihn als Ort der Stunde ein.
     raum: Optional[str] = None
     # „Aus einem anderen Kurs entwickeln": dessen Kinder werden uebernommen.
@@ -83,8 +82,6 @@ class KursOut(VersionOut):
     member_count: int = 0    # einzeln hinzugefügte SuS (Kurs aus Teilen von Klassen)
     schuljahr: str = ""
     fach: str = ""
-    # Zahl ODER Text — siehe topics.py: „7/8" muss gehen, die blanke 7 auch.
-    jahrgang: Optional[Union[int, str]] = None
     raum: str = ""
     vorgaenger_id: Optional[int] = None
     vorgaenger_name: str = ""       # damit die Liste nicht je Kurs nachfragen muss
@@ -191,7 +188,7 @@ async def list_kurse(archiviert: bool = False, user: User = Depends(get_current_
         nachfolger[k2[2]] = (k2[0], k2[1])
     return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv,
                     color=k.color, member_count=int(mc.get(k.id, 0)),
-                    schuljahr=k.schuljahr, fach=k.fach or "", jahrgang=k.jahrgang,
+                    schuljahr=k.schuljahr, fach=k.fach or "",
                     raum=k.raum or "", vorgaenger_id=k.vorgaenger_id,
                     vorgaenger_name=alle.get(k.vorgaenger_id, "") if k.vorgaenger_id else "",
                     **stand(k),
@@ -279,15 +276,11 @@ async def rename_kurs(kurs_id: int, body: KursIn, request: Request = None, user:
         k.vorgaenger_id = neu_id
     if body.fach is not None:
         k.fach = (body.fach or "").strip()[:60]
-    if body.jahrgang is not None:
-        # Leer heisst „keine Angabe" — die Oberflaeche schickt bei geleertem
-        # Feld einen leeren Text, und beides muss hier dasselbe bedeuten.
-        k.jahrgang = (str(body.jahrgang).strip()[:20] or None)
     if body.raum is not None:
         k.raum = (body.raum or "").strip()[:60]
     await db.commit()
     return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color,
-                   schuljahr=k.schuljahr, fach=k.fach or "", jahrgang=k.jahrgang,
+                   schuljahr=k.schuljahr, fach=k.fach or "",
                    raum=k.raum or "", vorgaenger_id=k.vorgaenger_id, **stand(k))
 
 

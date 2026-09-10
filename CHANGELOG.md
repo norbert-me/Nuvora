@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Kurs: das Feld „Jahrgang" ist weg — das Schuljahr sagt ihn.
 - **Sitzplan: zoomen mit zwei Fingern** (und mit der Zangengeste am Trackpad).
 - Textfelder zeigen die Ecke zum Größerziehen wieder — als kräftiger Keil in der
   Akzentfarbe statt der grauen Treppe, die in der runden Ecke verschwand.
