@@ -601,6 +601,17 @@ async function offlineProbe(browser, token, user) {
     await anmeldungHinterlegen(k, token, user);
     const auf = await k.newPage();
     await auf.goto("/", { waitUntil: "domcontentloaded" });
+    // Ohne https gibt es GAR KEINEN Service-Worker: der Browser laesst ihn im
+    // unsicheren Kontext nicht zu (localhost ausgenommen). Auf einer
+    // LAN-Installation (http://192.168.x.y:8090) ist das kein Befund ueber die
+    // Seite, sondern ueber die Adresse — dieselbe Regel wie bei WebKit. Rot
+    // gemeldet sah es aus, als sei das Offline-Lesen kaputt.
+    const sicher = await auf.evaluate(() => window.isSecureContext).catch(() => false);
+    if (!sicher) {
+      notiere(G, "Kaltstart ohne Netz", true,
+        `uebersprungen: ${URL_BASIS} ist kein sicherer Kontext — ohne https gibt es keinen Service-Worker`, "hinweis");
+      return;
+    }
     // Der Worker muss nicht nur installiert sein, sondern die Seite auch
     // STEUERN — sonst beantwortet niemand die Anfragen des Kaltstarts.
     const uebernommen = await auf.evaluate(async () => {
