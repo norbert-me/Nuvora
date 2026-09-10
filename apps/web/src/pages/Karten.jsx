@@ -44,10 +44,6 @@ export default function Karten() {
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null); // Karten hängen am Kurs (Fach)
-  // Teilkurs (Kurse aus Teilen von Klassen): Roster/Progress/Tokens des Kurses,
-  // classId = Repräsentant-Klasse für die FK, kursId = Teilkurs (für die Decks).
-  const [subsetKurs, setSubsetKurs] = useState(null);
-  const [subsetKurse, setSubsetKurse] = useState([]);
   // Die vollstaendige Kursliste: an sie wird ein Stapel ausgerollt.
   const [alleKurse, setAlleKurse] = useState([]);
   // Alle Kurse der Lehrkraft: die Stapel-Sammlung wird ihnen zugewiesen, und
@@ -97,7 +93,6 @@ export default function Karten() {
   // Gelöschte Stapel und Karten liegen im gemeinsamen Papierkorb des Kerns
   // (/papierkorb) — das Modul löscht nur noch.
   const kq = kursId != null ? `?kurs_id=${kursId}` : "";
-  const sq = subsetKurs ? `&subset_kurs=${subsetKurs}` : ""; // Teilkurs-Roster
   const [loadingDecks, setLoadingDecks] = useState(true);
   const decksLoadedOnce = useRef(false); // Skeleton nur beim ersten Laden, nicht bei Klassen-/Kurswechsel
   // Laufende Nummer je Ladevorgang: KursKlasseSelect meldet den Kurs bewusst
@@ -292,14 +287,14 @@ export default function Karten() {
     return true;
   };
 
-  const loadProgress = () => hol(`${API}/classes/${classId}/progress${kq}${sq}`).then(setProgress);
+  const loadProgress = () => hol(`${API}/classes/${classId}/progress${kq}`).then(setProgress);
   const openDetail = async (p) => {
-    const cards = await fetch(`${API}/classes/${classId}/students/${p.student_id}/cards${kq}${sq}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+    const cards = await fetch(`${API}/classes/${classId}/students/${p.student_id}/cards${kq}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
     setDetail({ student: p, cards });
   };
   const rotateTokens = async () => {
     if (!(await askConfirm(t("karten.rotateConfirm")))) return;
-    const r = await fetch(`${API}/classes/${classId}/tokens/rotate${subsetKurs ? `?subset_kurs=${subsetKurs}` : ""}`,
+    const r = await fetch(`${API}/classes/${classId}/tokens/rotate`,
       { method: "POST" }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
     if (r) setTokens(r);
   };
@@ -308,7 +303,7 @@ export default function Karten() {
   // stand dort versehentlich `{ method: "POST" }`, also landete dieses Objekt
   // als "Liste" im Zustand und die Seite stuerzte beim `.map` ab: der QR-Reiter
   // zeigte nur noch "Diese Seite konnte nicht geladen werden".
-  const loadTokens = () => fetch(`${API}/classes/${classId}/tokens${subsetKurs ? `?subset_kurs=${subsetKurs}` : ""}`, { method: "POST" })
+  const loadTokens = () => fetch(`${API}/classes/${classId}/tokens`, { method: "POST" })
     .then((r) => (r.ok ? r.json() : []))
     .catch(() => [])
     .then((d) => setTokens(Array.isArray(d) ? d : []));
@@ -317,19 +312,11 @@ export default function Karten() {
     if (!classId) return;
     if (view === "progress") loadProgress(); // eslint-disable-line
     if (view === "qr") loadTokens();
-  }, [view, classId, kursId, subsetKurs]);
+  }, [view, classId, kursId]);
 
-  // Kurse: fuer den Filter, die Zuweisung UND die Frage, ob mit E/G gearbeitet
-  // wird. Teilkurse sind daraus die mit einzeln hinzugefuegten SuS.
+  // Kurse: fuer die Zuweisung UND die Frage, ob mit E/G gearbeitet wird.
   useEffect(() => {
-    hol("/api/kurse").then((d) => {
-      // Nur noch die Teilkurse werden gebraucht: seit die Zuordnung ueber die
-      // Stunde laeuft, gibt es keinen Kurs-Filter mehr, der die volle Liste
-      // braeuchte.
-      const list = Array.isArray(d) ? d : [];
-      setAlleKurse(list);
-      setSubsetKurse(list.filter((k) => (k.member_count || 0) > 0));
-    });
+    hol("/api/kurse").then((d) => setAlleKurse(Array.isArray(d) ? d : []));
   }, []);
 
   // Name je Kurs und „arbeitet dieser Stapel mit E/G?" — ein Stapel kann in
@@ -354,26 +341,7 @@ export default function Karten() {
             Fortschritt und Zugangs-Codes brauchen dagegen weiter eine Klasse
             (ihre SuS). */}
         {view === "cards" ? null : (
-          <span data-tour="karten-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? null : classId} kursValue={wantKurs} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); setTokens(null); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
-        )}
-        {view !== "cards" && subsetKurse.length > 0 && (
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
-            {t("noten.teilkurs")}
-            {/* Gleiche Hoehe und Form wie die Klassenauswahl daneben (selectStyle). */}
-            <select value={subsetKurs || ""} style={selectStyle}
-              onChange={async (e) => {
-                const kid = e.target.value ? Number(e.target.value) : null;
-                setTokens(null);
-                if (!kid) { setSubsetKurs(null); return; }
-                const list = await fetch(`${API}/kurse/${kid}/members`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
-                const rep = Array.isArray(list) && list.length ? list[0].class_id : null;
-                if (!rep) return;
-                setSubsetKurs(kid); setClassId(rep); setKursId(kid);
-              }}>
-              <option value="">{t("noten.teilkursNone")}</option>
-              {subsetKurse.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-            </select>
-          </label>
+          <span data-tour="karten-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={classId} kursValue={wantKurs} onChange={(id, kid) => { setClassId(id); setKursId(kid); setTokens(null); }} onKurs={setKursId} /></span>
         )}
       </>} />
 

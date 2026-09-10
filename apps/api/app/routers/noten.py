@@ -194,15 +194,6 @@ async def kurs_students(class_id: int, user: User = Depends(require_module), db:
     return [_person(s) for s in await _kurs_roster(db, user, class_id)]
 
 
-@router.get("/kurse/{kurs_id}/students")
-async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    """Noten-Zeilen eines Teilkurses — inkl. der EINZELN hinzugefügten SuS
-    (Kurse aus Teilen von Klassen). Deduplikat per Name wie beim Klassen-Roster."""
-    await eigener_kurs(db, user, kurs_id)
-    ordered = await _kanon_kurs(db, kurs_id)
-    return [_person(s) for s in ordered]
-
-
 def _sec_kurs_where(user, class_id, kurs_id):
     """Abschnitte haengen am Kurs (Fach); Fallback Klasse ohne Kurs.
 

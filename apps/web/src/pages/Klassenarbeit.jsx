@@ -133,8 +133,6 @@ export default function Klassenarbeit() {
   const [kursId, setKursId] = useState(Number(params.get("kurs")) || null);
   // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen.
   useUrlClass(setClassId, setKursId);
-  const [subsetKurs, setSubsetKurs] = useState(null); // gewählter Teilkurs (Kurs aus Teilen von Klassen) oder null
-  const [subsetKurse, setSubsetKurse] = useState([]); // Kurse mit einzeln hinzugefügten SuS
   const [students, setStudents] = useState([]);
   // Kern-Themen aus core/topics.js — dieselbe Zeile stand auf sechs Seiten.
   const topics = useThemen();
@@ -148,14 +146,11 @@ export default function Klassenarbeit() {
   const [busy, setBusy] = useState(false);
   const kq = kursId != null ? `?kurs_id=${kursId}` : "";
 
-  // Teilkurse (Kurse aus Teilen von Klassen = einzeln hinzugefügte SuS) laden.
-  useEffect(() => { hol("/api/kurse").then((d) => setSubsetKurse((Array.isArray(d) ? d : []).filter((k) => k.member_count > 0))); }, []);
   // Beim ersten Besuch gleich eine Klasse wählen (zuletzt genutzte, sonst erste),
   // damit die Arbeitsauswahl nicht ausgeblendet bleibt, bis man von Hand klickt.
   // Dieselbe Vorwahl wie ueberall (core/klassenwahl.js). Sie lief hier als
   // einzige mit rohem `fetch` statt `swr` — ohne Cache und ohne Grund.
   useKlassenListe(null, setClassId);
-  const repClass = useRef(null); // Referenz-Klasse eines Teilkurses (für work.class_id, FK)
   // Laufende Nummer je Ladevorgang. Der Effekt feuert zweimal kurz nacheinander:
   // erst mit kursId = null (Anfangszustand), dann mit dem Kurs aus der Adresse.
   // Ohne kurs_id liefert list_works nur die KURSLOSEN Arbeiten (klassenarbeit.py,
@@ -165,17 +160,6 @@ export default function Klassenarbeit() {
   // reines Glueck: in drei von fuenf Laeufen ging das Rennen falsch aus.
   const ladenr = useRef(0);
   useEffect(() => {
-    // Teilkurs (Kurs aus Teilen von Klassen): Roster + Arbeiten über den Kurs.
-    if (subsetKurs) {
-      fetch(`${API}/kurse/${subsetKurs}/students`).then((r) => (r.ok ? r.json() : [])).then((list) => {
-        const studs = Array.isArray(list) ? list : []; setStudents(studs);
-        const rep = studs[0]?.class_id || null; repClass.current = rep;
-        if (rep) hol(`${API}/classes/${rep}/works?kurs_id=${subsetKurs}`).then((d) => { const l = Array.isArray(d) ? d : []; setWorks(l); zeigeArbeit(l[0] || null); });
-        else { setWorks([]); zeigeArbeit(null); }
-      }).catch(() => { setStudents([]); setWorks([]); zeigeArbeit(null); });
-      return;
-    }
-    repClass.current = null;
     if (classId) rememberClass(classId);
     if (!classId) { setStudents([]); setWorks([]); zeigeArbeit(null); return; }
     const meine = ++ladenr.current;   // nur die jüngste Antwort darf schreiben
@@ -191,7 +175,7 @@ export default function Klassenarbeit() {
       if (target) wantWork.current = null;
       zeigeArbeit(target || l[0] || null);
     });
-  }, [classId, kursId, subsetKurs]);
+  }, [classId, kursId]);
 
   // Beschriftung UND Reihenfolge aus core/topics.js — die eine Quelle. Die
   // frueher hier nachgebaute Fassung konnte nur beschriften; die Auswahl stand
@@ -234,9 +218,8 @@ export default function Klassenarbeit() {
   };
 
   const neueArbeit = async () => {
-    // Teilkurs: class_id = Referenz-Klasse (FK), kurs_id = Teilkurs (Roster kommt daraus).
-    const cid = subsetKurs ? repClass.current : classId;
-    const kid = subsetKurs || kursId;
+    const cid = classId;
+    const kid = kursId;
     if (!cid) return;
     // Datum mitgeben: der Server markiert daraus die Kinder, die heute fehlen,
     // gleich als abwesend (nur mit Modul Orga). Vergisst man das von Hand,
@@ -255,7 +238,7 @@ export default function Klassenarbeit() {
     const neu = await r.json();
     setKopieOffen(false);
     // Direkt hinspringen: die Kopie ist das, womit weitergearbeitet wird.
-    setClassId(zielClassId); setKursId(zielKursId ?? null); setSubsetKurs(null);
+    setClassId(zielClassId); setKursId(zielKursId ?? null);
     setWorks((ws) => [neu, ...ws]); zeigeArbeit(neu);
     return true;
   };
@@ -570,17 +553,11 @@ export default function Klassenarbeit() {
   const th = { ...thBase, padding: "6px 8px", borderBottom: "2px solid var(--border)" };
   const td = { ...tdBase, padding: 0 };
 
-  const hasRoster = classId != null || subsetKurs != null;
+  const hasRoster = classId != null;
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <span data-tour="ka-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? "" : classId} kursValue={subsetKurs ? null : kursId} onChange={(id, kid) => wechseln(() => { setSubsetKurs(null); setClassId(id); setKursId(kid); })} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
-        {subsetKurse.length > 0 && (
-          <select value={subsetKurs || ""} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; wechseln(() => setSubsetKurs(v)); }} style={{ ...selectStyle, fontSize: 13 }} title={t("klassenarbeit.subsetHint")}>
-            <option value="">{t("klassenarbeit.subsetPick")}</option>
-            {subsetKurse.map((k) => <option key={k.id} value={k.id}>{k.name} ({k.member_count})</option>)}
-          </select>
-        )}
+        <span data-tour="ka-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} /></span>
       </div>
 
       {/* Frühwarnung: eine einzelne Arbeit zeigt den Stand, nicht die Richtung.
@@ -876,7 +853,7 @@ export default function Klassenarbeit() {
           {notenModal && (() => {
             const noten = notenAusArbeit(students, work, effScale);
             return <NotenUebernahme titel={t("klassenarbeit.toNoten")} hinweis={t("klassenarbeit.toNotenHint", { n: noten.length })}
-              classId={subsetKurs ? repClass.current : classId} kursId={subsetKurs || kursId} grades={noten}
+              classId={classId} kursId={kursId} grades={noten}
               quelle="klassenarbeit" notiz={t("klassenarbeit.title")} spalte={work.name || t("klassenarbeit.newName")}
               onClose={() => setNotenModal(false)} />;
           })()}

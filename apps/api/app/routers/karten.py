@@ -33,7 +33,7 @@ from ..themenprofil import KartenStand
 from ..pdfdruck import neue_seite
 from .. import rueckmeldung
 from ..database import get_db
-from ..schueler import roster_kurs, sortiert
+from ..schueler import sortiert
 from ..uploads import bildtyp
 # Optimistisches Sperren (siehe app/versionierung.py).
 from ..versionierung import VersionOut, pruefe, stand
@@ -122,21 +122,18 @@ async def _owned_deck(db, user, deck_id) -> CardDeck:
     return await eigenes(db, CardDeck, deck_id, user, "Stapel nicht gefunden")
 
 
-async def _kurs_roster(db, user, class_id, subset_kurs=None):
+async def _kurs_roster(db, user, class_id):
     """SuS DIESER Fach-Klasse. Karten sind pro Fach getrennt: jede Fach-Klasse
     hat eigene Stapel und eigenen Fortschritt (SuS werden im Kern geteilt, der
     Karten-Fortschritt aber je Fach gefuehrt).
 
-    Mit subset_kurs: der Roster eines Teilkurses (Kurse aus Teilen von Klassen) —
-    die einzeln hinzugefügten SuS, auch aus fremden Klassen (dedupliziert).
-
     Sortiert wird nach position — card_id ist die Nummer der gedruckten
     ArUco-Karte, keine Reihenfolge: nach ihr sortiert stünde die Liste hier
-    anders als überall sonst, sobald die Lehrkraft umsortiert hat."""
-    if subset_kurs is not None:
-        # Derselbe Kurs-Roster wie in noten.py und klassenarbeit.py — er steht
-        # seit dem Zusammenfuehren in app/schueler.py.
-        return await roster_kurs(db, subset_kurs)
+    anders als überall sonst, sobald die Lehrkraft umsortiert hat.
+
+    Einen „Teilkurs" gibt es nicht mehr (10.09.2026): der Parameter kam aus
+    einer zweiten Auswahl neben Klasse/Kurs, die es in der Oberflaeche nicht
+    mehr gibt."""
     # OHNE Kurs bewusst NUR diese eine Fach-Klasse, nicht die Geschwister:
     # Karten-Fortschritt wird je Fach gefuehrt (siehe oben). Sieht aus wie der
     # Klassen-Roster der anderen Module, meint aber etwas anderes.
@@ -1069,13 +1066,11 @@ async def _zugang_moeglich(db: AsyncSession, user: User) -> None:
 
 
 @kern_router.post("/classes/{class_id}/tokens", response_model=List[StudentTokenOut])
-async def ensure_tokens(class_id: int, subset_kurs: Optional[int] = None, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def ensure_tokens(class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Erzeugt fehlende Schueler-Tokens fuer den Kurs (idempotent, je Person einer)."""
     await _zugang_moeglich(db, user)
     await _owned_class(db, user, class_id)
-    if subset_kurs is not None:
-        await eigener_kurs(db, user, subset_kurs)
-    students = await _kurs_roster(db, user, class_id, subset_kurs)
+    students = await _kurs_roster(db, user, class_id)
     out = []
     changed = False
     for st in students:
@@ -1089,7 +1084,7 @@ async def ensure_tokens(class_id: int, subset_kurs: Optional[int] = None, user: 
 
 
 @kern_router.get("/classes/{class_id}/zugaenge.pdf")
-async def zugaenge_pdf(class_id: int, base: str = "", subset_kurs: Optional[int] = None,
+async def zugaenge_pdf(class_id: int, base: str = "",
                        user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Zettel zum Ausschneiden: je Kind Name, QR-Code und der Link als Text.
 
@@ -1108,7 +1103,7 @@ async def zugaenge_pdf(class_id: int, base: str = "", subset_kurs: Optional[int]
     await _zugang_moeglich(db, user)
 
     cls = await _owned_class(db, user, class_id)
-    students = await _kurs_roster(db, user, class_id, subset_kurs)
+    students = await _kurs_roster(db, user, class_id)
     # Fehlende Tokens hier erzeugen: wer drucken will, hat sonst leere Zettel.
     changed = False
     for st in students:
@@ -1183,7 +1178,7 @@ class StudentProgress(BaseModel):
 
 
 @kern_router.post("/classes/{class_id}/tokens/rotate", response_model=List[StudentTokenOut])
-async def rotate_tokens(class_id: int, student_id: Optional[int] = None, subset_kurs: Optional[int] = None,
+async def rotate_tokens(class_id: int, student_id: Optional[int] = None,
                         user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Zugangs-Links neu vergeben — fuer die ganze Klasse oder eine Person.
 
@@ -1195,7 +1190,7 @@ async def rotate_tokens(class_id: int, student_id: Optional[int] = None, subset_
     rate_limit("karten_tokens", f"u{user.id}", 30, 60, "Zu viele Änderungen. Bitte kurz warten.")
     await _zugang_moeglich(db, user)
     await _owned_class(db, user, class_id)
-    students = await _kurs_roster(db, user, class_id, subset_kurs)
+    students = await _kurs_roster(db, user, class_id)
     if student_id is not None:
         students = [s for s in students if s.id == student_id]
         if not students:
@@ -1209,13 +1204,11 @@ async def rotate_tokens(class_id: int, student_id: Optional[int] = None, subset_
 
 
 @router.get("/classes/{class_id}/progress", response_model=List[StudentProgress])
-async def progress(class_id: int, kurs_id: Optional[int] = None, subset_kurs: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def progress(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     cls = await _owned_class(db, user, class_id)
-    if subset_kurs is not None:
-        await eigener_kurs(db, user, subset_kurs)
     if kurs_id is not None:
         await eigener_kurs(db, user, kurs_id)   # kurs_id kommt aus der URL: erst pruefen, wem er gehoert
-    students = await _kurs_roster(db, user, class_id, subset_kurs)
+    students = await _kurs_roster(db, user, class_id)
     now = _now()
     # Nur ausgerollte Stapel zaehlen — Entwuerfe verzerren den Fortschritt nicht.
     deck_ids = (await db.execute(select(CardDeck.id).where(
@@ -1345,17 +1338,13 @@ class CardStat(BaseModel):
 
 
 @router.get("/classes/{class_id}/students/{student_id}/cards", response_model=List[CardStat])
-async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] = None, subset_kurs: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Detailstatistik je Karte fuer einen Schueler — nur ausgerollte Stapel."""
     cls = await _owned_class(db, user, class_id)
     st = await db.get(Student, student_id)
     if not st:
         raise HTTPException(404, "Schüler nicht gefunden")
-    if subset_kurs is not None:
-        await eigener_kurs(db, user, subset_kurs)
-        if student_id not in await member_student_ids(db, subset_kurs):
-            raise HTTPException(404, "Schüler nicht in diesem Teilkurs")
-    elif st.class_id != class_id:
+    if st.class_id != class_id:
         raise HTTPException(404, "Schüler nicht in dieser Klasse")
     if kurs_id is not None:
         await eigener_kurs(db, user, kurs_id)   # sonst liest ein fremder Kurs Stapelnamen + Kartentexte aus

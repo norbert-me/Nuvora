@@ -19,6 +19,7 @@ from app.models import User, SchoolClass, Student, Kurs, KursTag
 from app.routers import karten as K
 from app.routers import kurse as KU
 from app.routers import classes as C
+from app.schueler import roster_kurs
 
 
 # position-Reihenfolge: Anna, Bea, Cem — card_id-Reihenfolge: Cem, Bea, Anna.
@@ -51,9 +52,12 @@ async def test_karten_roster_nach_position(s):
 
 
 @pytest.mark.asyncio
-async def test_karten_roster_teilkurs_nach_position(s):
+async def test_kurs_roster_nach_position(s):
+    """Der kanonische Kurs-Roster (app/schueler.py) sortiert selbst — er sammelt
+    die Mitglieder ueber IDs ein, und ohne eigene Sortierung stuende die Liste
+    in der Reihenfolge, in der die Datenbank sie hergibt."""
     u, k, cls = await _klasse(s)
-    roster = await K._kurs_roster(s, u, cls.id, subset_kurs=k.id)
+    roster = await roster_kurs(s, k.id)
     assert [x.name for x in roster] == NACH_POSITION
 
 

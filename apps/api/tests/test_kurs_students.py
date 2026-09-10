@@ -49,31 +49,32 @@ async def test_klassenarbeit_roster_kurs(s):
 
 
 @pytest.mark.asyncio
-async def test_noten_teilkurs_roster_und_speichern(s):
-    """Noten: Teilkurs-Roster = Einzel-SuS; Note für einen SuS aus einer FREMDEN
-    Klasse (nicht repClass) wird akzeptiert (member_student_ids, nicht sibling)."""
+async def test_noten_note_fuer_kind_aus_fremder_klasse(s):
+    """Ein Kurs kann Kinder mehrerer Klassen fuehren: die Note fuer ein Kind aus
+    einer anderen Klasse als der repClass muss durchgehen — geprueft wird die
+    Kurs-Mitgliedschaft (member_student_ids), nicht die Geschwisterklasse."""
     from app.models import UserModule, GradeSection, GradeCategory
     from app.routers import noten as N
+    from app.schueler import roster_kurs
     u = User(email="e@f.de", password_hash="x", name="L"); s.add(u); await s.flush()
     s.add(UserModule(user_id=u.id, module_key="noten"))
     a = SchoolClass(name="7a", owner_id=u.id); b = SchoolClass(name="7b", owner_id=u.id); s.add(a); s.add(b); await s.flush()
     a1 = Student(card_id=1, name="Ann", class_id=a.id); b1 = Student(card_id=2, name="Bo", class_id=b.id)
     s.add(a1); s.add(b1)
-    kurs = Kurs(owner_id=u.id, name="Förder"); s.add(kurs); await s.commit()
+    kurs = Kurs(owner_id=u.id, name="Foerder"); s.add(kurs); await s.commit()
     await K.add_student_member(kurs.id, a1.id, user=u, db=s)
     await K.add_student_member(kurs.id, b1.id, user=u, db=s)
 
-    # repClass ist 7a; Roster des Teilkurses enthält beide, auch Bo aus 7b.
-    roster = await N.roster_kurs(kurs.id, user=u, db=s)
-    assert {r["name"] for r in roster} == {"Ann", "Bo"}
+    # Der kanonische Kurs-Roster kennt beide, quer ueber die Klassen.
+    assert {r.name for r in await roster_kurs(s, kurs.id)} == {"Ann", "Bo"}
 
-    # Abschnitt + Spalte am Teilkurs (kurs_id gesetzt, class_id=repClass 7a).
+    # Abschnitt + Spalte am Kurs (kurs_id gesetzt, class_id=repClass 7a).
     sec = GradeSection(name="KA", weight=100, class_id=a.id, kurs_id=kurs.id, term="1", owner_id=u.id)
     s.add(sec); await s.flush()
     cat = GradeCategory(name="Test", position=0, section_id=sec.id, class_id=a.id, owner_id=u.id)
     s.add(cat); await s.commit()
 
-    # Note für Bo (aus 7b, NICHT repClass) muss durchgehen — früher abgelehnt.
+    # Note fuer Bo (aus 7b, NICHT repClass) muss durchgehen — frueher abgelehnt.
     body = N.EntryIn(category_id=cat.id, student_id=b1.id, kind="grade", value=2.0, note="2")
     await N.create_entry(body, user=u, db=s)
     ents = await N.list_entries(a.id, kurs_id=kurs.id, user=u, db=s)
@@ -81,9 +82,9 @@ async def test_noten_teilkurs_roster_und_speichern(s):
 
 
 @pytest.mark.asyncio
-async def test_karten_teilkurs_roster_und_deck_sichtbar(s):
-    """Karten voll integriert: Teilkurs-Roster (Progress) enthält Einzel-SuS
-    fremder Klassen, und ihr öffentliches Lernen sieht das Teilkurs-Deck."""
+async def test_karten_deck_ueber_kursmitgliedschaft_sichtbar(s):
+    """Ein Stapel am Kurs erreicht auch die Kinder, die ueber den Kurs — nicht
+    ueber ihre Klasse — dazugehoeren: sonst saehe Bo aus 7b nichts."""
     from datetime import datetime, timezone
     from app.models import UserModule, CardDeck
     from app.routers import karten as KT
@@ -93,18 +94,13 @@ async def test_karten_teilkurs_roster_und_deck_sichtbar(s):
     a = SchoolClass(name="7a", owner_id=u.id); b = SchoolClass(name="7b", owner_id=u.id); s.add(a); s.add(b); await s.flush()
     a1 = Student(card_id=1, name="Ann", class_id=a.id); b1 = Student(card_id=2, name="Bo", class_id=b.id)
     s.add(a1); s.add(b1)
-    kurs = Kurs(owner_id=u.id, name="Förder"); s.add(kurs); await s.commit()
+    kurs = Kurs(owner_id=u.id, name="Foerder"); s.add(kurs); await s.commit()
     await K.add_student_member(kurs.id, a1.id, user=u, db=s)
     await K.add_student_member(kurs.id, b1.id, user=u, db=s)
 
-    # Progress-Roster des Teilkurses enthält beide SuS (repClass 7a).
-    prog = await KT.progress(a.id, kurs_id=kurs.id, subset_kurs=kurs.id, user=u, db=s)
-    assert {p.name for p in prog} == {"Ann", "Bo"}
-
-    # Deck am Teilkurs, ausgerollt. Bo (fremde Klasse 7b) muss es sehen.
     deck = CardDeck(name="Vokabeln", class_id=a.id, kurs_id=kurs.id,
                     released_at=datetime(2020, 1, 1, tzinfo=timezone.utc), owner_id=u.id)
     s.add(deck); await s.commit()
     where = await KT._student_deck_where(s, b1)
     ids = (await s.execute(_sel(CardDeck.id).where(where))).scalars().all()
-    assert deck.id in ids   # Teilkurs-SuS aus fremder Klasse sieht das Deck
+    assert deck.id in ids   # Kind aus fremder Klasse sieht den Stapel seines Kurses
