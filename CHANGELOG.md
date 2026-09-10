@@ -16,7 +16,15 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
-(noch nichts)
+- **Kalender: eine verlegte Stunde bleibt verlegt.** Die Tagesansicht malte
+  einen Eintrag immer auf die Uhrzeit des Stundenplans — gespeichert war die
+  neue Zeit, zu sehen die alte, und es sah aus, als spränge die Änderung von
+  selbst zurück.
+- **Kalender: ein leerer Tag zeigt das Raster mit Uhrzeiten** statt „kein
+  Eintrag". Damit lässt sich auch dort wieder blättern (auf dem Handy wischen),
+  und ein Klick ins Raster legt den ersten Termin an.
+- Aufgaben: die Uhrzeit lässt sich wieder entfernen — auf dem iPhone ging das
+  gar nicht.
 
 ## 4.3.3 — 10.09.2026
 

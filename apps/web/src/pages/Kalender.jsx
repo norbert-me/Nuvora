@@ -1373,9 +1373,21 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   const timed = [];
   slots.forEach((s) => {
     const { s: sm, e: em } = pTime(s.period);
-    if (sm == null) return;
     const eintrag = list.find((e) => e.period === s.period);
-    timed.push({ key: "s" + s.id, start: sm, end: em != null ? em : sm + 45,
+    // Eine eigene Uhrzeit am EINTRAG schlaegt die der Vorlage — dieselbe
+    // Rangfolge wie im Dialog, in beginnMin und im ICS-Feed. Ohne sie sprang
+    // eine verlegte Stunde hier stumm auf die Zeit des Stundenplans zurueck:
+    // gespeichert war sie, zu sehen war der alte Stand, und es sah aus, als
+    // aendere sich der Eintrag von selbst wieder zurueck.
+    const eigen = eintrag ? hmToMin(eintrag.start_time) : null;
+    const eigenBis = eintrag ? hmToMin(eintrag.end_time) : null;
+    const von = eigen != null ? eigen : sm;
+    // Ohne Uhrzeit an der Stunde UND ohne eigene bleibt nichts zu zeichnen.
+    if (von == null) return;
+    const bis = eigen != null
+      ? (eigenBis != null && eigenBis > eigen ? eigenBis : eigen + 45)
+      : (em != null ? em : sm + 45);
+    timed.push({ key: "s" + s.id, start: von, end: bis,
       col: s.class_id || s.kurs_id ? slotColor(s) : "var(--accent)",
       label: (eintrag && eintragName(eintrag)) || slotName(s) || s.title || topicName(s.topic_id) || "—",
       sub: eintrag ? (eintrag.title || topicName(eintrag.topic_id) || t("kalender.planned")) + (linked(eintrag) ? " ↗" : "") : "",
@@ -1385,8 +1397,15 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   });
   list.filter((e) => e.period != null && !belegte.has(e.period)).forEach((e) => {
     const { s: sm, e: em } = pTime(e.period);
-    if (sm == null) { ganztags.push(e); return; }   // keine Uhrzeit hinterlegt -> ganztägig
-    timed.push({ key: "e" + e.id, start: sm, end: em != null ? em : sm + 45, col: "var(--accent)",
+    // Auch hier: die eigene Uhrzeit des Eintrags geht vor der seiner Stunde.
+    const eigen = hmToMin(e.start_time);
+    const eigenBis = hmToMin(e.end_time);
+    const von = eigen != null ? eigen : sm;
+    if (von == null) { ganztags.push(e); return; }   // keine Uhrzeit hinterlegt -> ganztägig
+    const bis = eigen != null
+      ? (eigenBis != null && eigenBis > eigen ? eigenBis : eigen + 45)
+      : (em != null ? em : sm + 45);
+    timed.push({ key: "e" + e.id, start: von, end: bis, col: "var(--accent)",
       label: e.title || topicName(e.topic_id) || t("kalender.planned"), sub: "", onClick: () => onOpen({ ...e, date: new Date(e.date) }) });
   });
   // Einträge mit freier Uhrzeit (kein Stundenplan-Slot) in die Zeitspur.
@@ -1498,9 +1517,14 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
         </div>
       )}
 
-      {/* Zeitleiste 0–24 Uhr: scrollbar, Start bei der ersten Stunde des Tages. */}
-      {timed.length > 0 && (
-        <div ref={scrollRef} style={{ ...cardStyle, padding: 0, maxHeight: "62vh", overflowY: "auto" }}>
+      {/* Zeitleiste 0–24 Uhr: scrollbar, Start bei der ersten Stunde des Tages.
+          Sie steht IMMER da, auch an einem Tag ohne Termin. Vorher stand dort
+          nur der Satz „Kein Eintrag an diesem Tag" — eine Zeile Text, und auf
+          dem Handy blieb darunter nichts mehr, worauf sich wischen liess: das
+          Blaettern hoerte an genau den Tagen auf, an denen man weiterblaettern
+          will. Das leere Raster fuellt die Flaeche und laesst sich ausserdem
+          anklicken, um den ersten Termin anzulegen. */}
+      <div ref={scrollRef} style={{ ...cardStyle, padding: 0, maxHeight: "62vh", overflowY: "auto" }}>
         <div style={{ position: "relative", height: 24 * HOUR }}
           onClick={(ev) => {
             // Klick auf freie Fläche der Zeitleiste öffnet direkt den Editor mit
@@ -1553,9 +1577,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
             </div>
           ))}
         </div>
-        </div>
-      )}
-      {!hasBanner && timed.length === 0 && <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("kalender.empty")}</p>}
+      </div>
     </div>
   );
 }
