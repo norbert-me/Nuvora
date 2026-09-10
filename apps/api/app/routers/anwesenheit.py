@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import klasse_oder_403
 from ..kursmitglieder import kurs_der_klasse, sibling_class_ids
-from ..schueler import in_klasse, sortiert
+from ..schueler import in_klasse, kanonisch, sortiert
 from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
 from ..models import Attendance, CalendarBreak, Student, User
@@ -58,26 +58,40 @@ def _day_bounds(d: datetime):
 
 async def _kurs_maps(db, user, class_id):
     """Anwesenheit wird über den Kurs geteilt: gleichnamige SuS der Fach-Klassen
-    desselben Kurses sind dieselbe Person. Kanonisch = kleinste student_id je
-    Name im Kurs; darauf werden Anwesenheits-Zeilen gespeichert.
+    desselben Kurses sind dieselbe Person.
+
+    Zwei Regeln, die vorher auseinanderliefen:
+
+    **Kanonisch heisst ueberall dasselbe.** Hier stand „kleinste student_id je
+    Name", im Rest des Hauses (`app/schueler.kanonisch`, benutzt von Notenbuch,
+    Klassenarbeit und Karten) „die erste Zeile in der Sortierung nach position".
+    Bei einem Kurs aus mehreren Fach-Klassen sind das verschiedene Zeilen — und
+    dann passte kein einziger Schluessel: das Notenbuch fragte die Fehlzeiten zu
+    Person A, bekam sie zu Person B und faerbte einfach nichts. Kein Fehler,
+    keine Meldung, nur eine Tabelle ohne Rot.
+
+    **Gelesen wird ueber ALLE Zeilen der Person, geschrieben auf die
+    kanonische.** Bestandsdaten liegen auf der Zeile, die frueher kanonisch war;
+    wer nur die neue liest, verliert sie aus dem Blick.
 
     Liefert:
-      canon_ids  – alle kanonischen student_ids des Kurses
-      to_canon   – student_id (dieser Klasse) -> kanonische id
-      canon_back – kanonische id -> student_id dieser Klasse (Rückabbildung fürs UI)
+      lese_ids   – alle student_ids des Kurses (fuer die Abfrage)
+      to_canon   – IRGENDEINE dieser ids -> kanonische id der Person
+      canon_back – kanonische id -> student_id dieser Klasse (fuer die Anzeige)
     """
     sib_ids = await sibling_class_ids(db, class_id)  # Klassen, die einen Kurs teilen (inkl. self)
-    kurs_studs = (await db.execute(select(Student).where(Student.class_id.in_(sib_ids)))).scalars().all()
-    # Name -> kanonische (kleinste) id
-    canon = {}
-    for s in sorted(kurs_studs, key=lambda x: x.id):
-        canon.setdefault(s.name.strip(), s.id)
-    this = [s for s in kurs_studs if s.class_id == class_id]
-    to_canon = {s.id: canon.get(s.name.strip(), s.id) for s in this}
+    # ERST sortieren, dann deduplizieren — `kanonisch` nimmt je Name den ersten
+    # Treffer der Reihenfolge, in der die Liste hereinkommt. Roh aus der
+    # Datenbank waere das die id-Reihenfolge, und genau daran lag der alte
+    # Unterschied zum Notenbuch (das ueber `roster_klasse` sortiert liest).
+    kurs_studs = await sortiert(db, Student.class_id.in_(sib_ids))
+    canon = {s.name.strip(): s.id for s in kanonisch(kurs_studs)}
+    to_canon = {s.id: canon.get(s.name.strip(), s.id) for s in kurs_studs}
     canon_back = {}
-    for s in this:
-        canon_back[canon.get(s.name.strip(), s.id)] = s.id
-    return list(canon.values()), to_canon, canon_back
+    for s in kurs_studs:
+        if s.class_id == class_id:
+            canon_back[canon.get(s.name.strip(), s.id)] = s.id
+    return [s.id for s in kurs_studs], to_canon, canon_back
 
 
 # Schwere eines Status, um bei mehreren Stunden am Tag den „Tages-Status" zu
@@ -86,13 +100,19 @@ async def _kurs_maps(db, user, class_id):
 _RANK = {"fehlt": 3, "entsch": 2, "spaet": 1, "da": 0}
 
 
-def _tages_status(rows):
-    """Aus den Stunden-Eintraegen eines Tages den staerksten je Schueler."""
+def _tages_status(rows, zu_person=None):
+    """Aus den Stunden-Eintraegen eines Tages den staerksten je PERSON.
+
+    `zu_person` bildet die Zeile auf die kanonische ab — sonst zaehlten zwei
+    Zeilen desselben Kindes (aus zwei Fach-Klassen) als zwei Kinder.
+    """
+    wer = zu_person or (lambda sid: sid)
     best = {}
     for r in rows:
-        cur = best.get(r.student_id)
+        sid = wer(r.student_id)
+        cur = best.get(sid)
         if cur is None or _RANK.get(r.status, 0) > _RANK.get(cur.status, 0):
-            best[r.student_id] = r
+            best[sid] = r
     return best
 
 
@@ -106,12 +126,14 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
     denn wer frueh fehlt, fehlt oft auch spaeter; die Lehrkraft prueft dann nur."""
     await _owned_class(db, user, class_id)
     lo, hi = _day_bounds(date)
-    canon_ids, _to_canon, canon_back = await _kurs_maps(db, user, class_id)
-    # Anwesenheit liegt auf den kanonischen SuS des Kurses (kursweit geteilt).
+    lese_ids, to_canon, canon_back = await _kurs_maps(db, user, class_id)
+    # Gelesen wird ueber ALLE Zeilen des Kurses und danach auf die Person
+    # abgebildet: Bestandsdaten liegen auf der Zeile, die frueher kanonisch war.
     rows = (await db.execute(select(Attendance).where(
-        Attendance.owner_id == user.id, Attendance.student_id.in_(canon_ids or [-1]),
+        Attendance.owner_id == user.id, Attendance.student_id.in_(lese_ids or [-1]),
         Attendance.date >= lo, Attendance.date <= hi,
     ))).scalars().all()
+    person = lambda sid: to_canon.get(sid, sid)
 
     def out(r):
         return {"status": r.status, "note": r.note, "period": r.period}
@@ -119,14 +141,14 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
     back = lambda sid: canon_back.get(sid, sid)
 
     if not period:
-        best = _tages_status(rows)
+        best = _tages_status(rows, person)
         return {str(back(sid)): out(r) for sid, r in best.items()}
 
-    exact = {r.student_id: r for r in rows if r.period == period}
+    exact = {person(r.student_id): r for r in rows if r.period == period}
     neu = False
-    fehlend = {r.student_id for r in rows if r.student_id not in exact}
+    fehlend = {person(r.student_id) for r in rows if person(r.student_id) not in exact}
     for sid in fehlend:
-        vorher = [r for r in rows if r.student_id == sid and r.period is not None and r.period < period]
+        vorher = [r for r in rows if person(r.student_id) == sid and r.period is not None and r.period < period]
         if vorher:
             quelle = max(vorher, key=lambda r: r.period)
         else:
@@ -186,11 +208,11 @@ async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
             break
     if not tage:
         return {}
-    canon_ids, _to_canon, canon_back = await _kurs_maps(db, user, class_id)
+    lese_ids, to_canon, canon_back = await _kurs_maps(db, user, class_id)
     lo = min(tage).replace(hour=0, minute=0, second=0, microsecond=0)
     hi = max(tage).replace(hour=23, minute=59, second=59, microsecond=0)
     rows = (await db.execute(select(Attendance).where(
-        Attendance.owner_id == user.id, Attendance.student_id.in_(canon_ids or [-1]),
+        Attendance.owner_id == user.id, Attendance.student_id.in_(lese_ids or [-1]),
         Attendance.date >= lo, Attendance.date <= hi,
     ))).scalars().all()
     gewuenscht = {d.strftime("%Y-%m-%d") for d in tage}
@@ -201,7 +223,7 @@ async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
             je_tag.setdefault(tag, []).append(r)
     out = {}
     for tag, tagrows in je_tag.items():
-        best = _tages_status(tagrows)
+        best = _tages_status(tagrows, lambda sid: to_canon.get(sid, sid))
         # „da" ist die Normallage und braucht keine Zeile in der Antwort.
         # `kanonisch`: die Schluessel bleiben die KANONISCHEN ids.
         #
@@ -291,8 +313,11 @@ async def student_history(class_id: int, student_id: int, user: User = Depends(r
     await _owned_class(db, user, class_id)
     _c, to_canon, _b = await _kurs_maps(db, user, class_id)
     canon_id = to_canon.get(student_id, student_id)
+    # Alle Zeilen DIESER Person, nicht nur die kanonische: aeltere Eintraege
+    # liegen auf der Zeile, die frueher als kanonisch galt.
+    ihre = [sid for sid, k in to_canon.items() if k == canon_id] or [canon_id]
     rows = (await db.execute(select(Attendance).where(
-        Attendance.owner_id == user.id, Attendance.student_id == canon_id,
+        Attendance.owner_id == user.id, Attendance.student_id.in_(ihre),
     ).order_by(Attendance.date.desc()))).scalars().all()
     # Pro Tag nur ein Eintrag (staerkster Status) — mehrere Stunden am selben Tag
     # sind eine Abwesenheit, keine drei.
@@ -415,9 +440,9 @@ async def student_report(class_id: int, student_id: int, user: User = Depends(re
 async def summary(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Zusammenfassung je Schueler: Zaehler fehlt/spaet/entsch (ueber alles)."""
     await _owned_class(db, user, class_id)
-    canon_ids, _to, canon_back = await _kurs_maps(db, user, class_id)
+    lese_ids, to_canon, canon_back = await _kurs_maps(db, user, class_id)
     rows = (await db.execute(select(Attendance).where(
-        Attendance.owner_id == user.id, Attendance.student_id.in_(canon_ids or [-1]),
+        Attendance.owner_id == user.id, Attendance.student_id.in_(lese_ids or [-1]),
     ))).scalars().all()
     # An unterrichtsfreien Tagen (Ferien/Feiertage) zaehlen Fehlzeiten nicht.
     breaks = await _break_days(db, user)
@@ -427,7 +452,7 @@ async def summary(class_id: int, user: User = Depends(require_module), db: Async
     for r in rows:
         if _in_break(r.date, breaks):
             continue
-        key = (r.student_id, schul_datum(r.date))
+        key = (to_canon.get(r.student_id, r.student_id), schul_datum(r.date))
         if key not in proTag or _RANK.get(r.status, 0) > _RANK.get(proTag[key], 0):
             proTag[key] = r.status
     agg: dict = {}

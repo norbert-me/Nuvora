@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Fehlzeiten färben die Notentabelle wieder.** Anwesenheit und Notenbuch
+  meinten mit „dieselbe Person" verschiedene Zeilen, sobald ein Kurs aus
+  mehreren Fach-Klassen besteht — dann passte kein Schlüssel und es wurde nichts
+  markiert.
 - Deploy: der Lauf sagt jetzt im Kopf, WELCHER Stand hochgeht (Commit, Uhrzeit,
   Warnung bei ungespeicherten oder ungepushten Änderungen). Und der Service
   Worker wird nicht mehr gecacht — sonst wirkt ein Deploy stundenlang „gleich".

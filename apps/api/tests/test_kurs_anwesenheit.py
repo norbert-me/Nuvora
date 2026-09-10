@@ -68,3 +68,53 @@ async def test_tage_liefert_auf_wunsch_die_kanonischen_ids(s):
     kanon = await an.get_tage(B.id, dates="2026-07-20", kanonisch=True, user=u, db=s)
     assert kanon["2026-07-20"] == {str(a.id): "fehlt"}
     assert a.id != b.id, "sonst pruefte der Test nichts"
+
+
+@pytest.mark.asyncio
+async def test_kanonisch_heisst_dasselbe_wie_im_notenbuch(s):
+    """„Kanonisch" gab es zweimal — und die Farbe blieb aus.
+
+    Die Anwesenheit rechnete „kleinste student_id je Name", der Rest des Hauses
+    (`app/schueler.kanonisch`, benutzt vom Notenbuch) „die erste Zeile nach
+    position". Sitzt dieselbe Person in zwei Fach-Klassen an verschiedenen
+    Plaetzen, sind das VERSCHIEDENE Zeilen: das Notenbuch fragte die Fehlzeiten
+    zu Person A, bekam sie zu Person B und faerbte deshalb gar nichts — ohne
+    Fehler und ohne Hinweis.
+    """
+    from app.schueler import roster_klasse
+
+    u, A, B, a, b = await _kurs_zwei_klassen(s)
+    # Die Zeile der ZWEITEN Klasse steht vorn — damit weichen die beiden alten
+    # Regeln auseinander (kleinste id: a, nach position: b).
+    b.position = 1
+    a.position = 5
+    await s.commit()
+
+    kanon_zeile = (await roster_klasse(s, A.id))[0]
+    assert kanon_zeile.id == b.id, "Aufbau stimmt nicht — sonst prueft der Test nichts"
+
+    d = datetime(2026, 7, 20)
+    await an.mark(A.id, an.MarkIn(student_id=a.id, date=d, status="fehlt", period=1), user=u, db=s)
+    kanon = await an.get_tage(A.id, dates="2026-07-20", kanonisch=True, user=u, db=s)
+    assert kanon["2026-07-20"] == {str(kanon_zeile.id): "fehlt"}, \
+        "die Schluessel muessen zu den Zeilen des Notenbuchs passen"
+
+
+@pytest.mark.asyncio
+async def test_bestand_auf_der_alten_zeile_bleibt_sichtbar(s):
+    """Gelesen wird ueber ALLE Zeilen der Person.
+
+    Was vor der Vereinheitlichung geschrieben wurde, liegt auf der Zeile, die
+    damals kanonisch war. Wer nur die neue liest, verliert den Bestand aus dem
+    Blick — die Fehlzeiten waeren ueber Nacht verschwunden.
+    """
+    u, A, B, a, b = await _kurs_zwei_klassen(s)
+    d = datetime(2026, 7, 20)
+    # Eintrag von Hand auf die NICHT-kanonische Zeile legen (so lag der Bestand).
+    s.add(Attendance(owner_id=u.id, student_id=b.id, class_id=B.id, date=d, status="fehlt", note=""))
+    await s.commit()
+
+    tag = await an.get_day(A.id, date=d, user=u, db=s)
+    assert tag.get(str(a.id), {}).get("status") == "fehlt"
+    assert (await an.summary(A.id, user=u, db=s)).get(str(a.id), {}).get("fehlt") == 1
+    assert len(await an.student_history(A.id, a.id, user=u, db=s)) == 1
