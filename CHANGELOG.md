@@ -16,6 +16,18 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Notenliste: der Umschalter „Einzelne Noten" verschwindet nicht mehr.** Gab
+  es für die Kurve zu wenige Noten, war mit dem Diagramm auch der Schalter weg —
+  und damit der Weg zurück. Jetzt steht dort ein Satz statt einer Linie.
+- **Bemerkungen aus dem Sitzplan stehen in der Notenliste.** Sie entstehen ohne
+  Halbjahr und fielen deshalb aus der Halbjahres-Ansicht heraus: geschrieben,
+  gespeichert, unsichtbar.
+- **Kalender: die Einträge eines Tages stehen nach Uhrzeit**, nicht in der
+  Reihenfolge, in der sie angelegt wurden.
+- **Rückmeldebogen mit Unterschrift.** Unter jedem Blatt (Klassenarbeit und
+  CardVote-Quiz) stehen Datum und eine Linie für die Erziehungsberechtigten.
+- **„App laden" zeigt nur, was es wirklich gibt.** Plattformen ohne Datei
+  standen als „In Vorbereitung" daneben.
 - **Auf dem iPhone ist Nuvora eine App.** Startbilder für alle gängigen
   iPhone-Größen in hell und dunkel (statt einer weißen Fläche beim Start),
   Navigationsleiste und schwebende Leisten weichen Statusleiste und
