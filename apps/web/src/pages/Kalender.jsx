@@ -1613,6 +1613,16 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
   const PXMIN = 1.3;
   const rowH = (p) => { const a = hmToMin(timeVal(idx(p), "start")), b = hmToMin(timeVal(idx(p), "end")); return a != null && b != null && b > a ? Math.max(52, (b - a) * PXMIN) : 72; };
   const gapH = (p) => { const a = hmToMin(timeVal(idx(p), "end")), b = hmToMin(timeVal(idx(p + 1), "start")); return a != null && b != null && b > a ? (b - a) * PXMIN : 0; };
+  // Die Pause ist KEIN eigener Datensatz, sondern der Abstand zwischen dem Ende
+  // der einen und dem Anfang der naechsten Stunde. Zwei Zeiten fuer dieselbe
+  // Grenze waeren zwei Wahrheiten — deshalb schreiben die Felder der Pause in
+  // genau diese beiden Werte zurueck. Eintragbar ist sie damit auch dort, wo es
+  // heute noch gar keine Luecke gibt: die Zeile steht bei angezeigten Uhrzeiten
+  // zwischen allen Stunden.
+  const pauseMin = (p) => {
+    const a = hmToMin(timeVal(idx(p), "end")), b = hmToMin(timeVal(idx(p + 1), "start"));
+    return a != null && b != null && b > a ? b - a : 0;
+  };
   return (
     <div>
       <SpeicherBalken entwurf={entwurf} />
@@ -1656,10 +1666,25 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
                       );
                     })}
                   </tr>
-                  {gap > 0 && (
-                    <tr aria-hidden style={{ height: gap }}>
-                      <td style={{ border: "none", background: "transparent" }} />
-                      {wdays.map((_, wd) => <td key={wd} style={{ border: "none", background: "repeating-linear-gradient(45deg, var(--bg), var(--bg) 6px, transparent 6px, transparent 12px)" }} />)}
+                  {/* Pause: sichtbar mit ihren Zeiten und eintragbar. Ohne
+                      Uhrzeiten bleibt sie der schraffierte Streifen von
+                      frueher — dann gibt es keine Zeit, die man zeigen
+                      koennte. */}
+                  {(showTimes ? p !== periods[periods.length - 1] : gap > 0) && (
+                    <tr style={{ height: Math.max(gap, showTimes ? 44 : 0) }}>
+                      <td style={{ border: "none", background: "transparent", padding: showTimes ? 2 : 0, verticalAlign: "middle", textAlign: "center" }}>
+                        {showTimes && (<>
+                          <div style={{ fontSize: 11, color: "var(--text3)" }}>{t("kalender.pause")}</div>
+                          <input type="time" value={timeVal(idx(p), "end")} onChange={(e) => commitTime(idx(p), "end", e.target.value)}
+                            style={timeInput} title={t("kalender.pauseVon")} />
+                          <input type="time" value={timeVal(idx(p + 1), "start")} onChange={(e) => commitTime(idx(p + 1), "start", e.target.value)}
+                            style={timeInput} title={t("kalender.pauseBis")} />
+                        </>)}
+                      </td>
+                      <td colSpan={wdays.length} style={{ border: "none", textAlign: "center", fontSize: 11, color: "var(--text3)",
+                        background: "repeating-linear-gradient(45deg, var(--bg), var(--bg) 6px, transparent 6px, transparent 12px)" }}>
+                        {showTimes && pauseMin(p) > 0 ? t("kalender.pauseDauer", { min: pauseMin(p) }) : null}
+                      </td>
                     </tr>
                   )}
                 </Fragment>
