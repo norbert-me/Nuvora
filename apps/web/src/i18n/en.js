@@ -1563,6 +1563,7 @@ export default {
   "todo.addDate": "Add date",
   "todo.addTime": "Add time",
   "todo.timeHint": "Time (optional)",
+  "todo.removeTime": "Remove time",
   "klassenarbeit.title": "Class test",
   "klassenarbeit.navWorks": "Tests",
   "klassenarbeit.navCompare": "Compare",

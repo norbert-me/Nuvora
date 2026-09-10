@@ -1542,6 +1542,7 @@ export default {
   "todo.addDate": "Datum hinzufügen",
   "todo.addTime": "Uhrzeit hinzufügen",
   "todo.timeHint": "Uhrzeit (optional)",
+  "todo.removeTime": "Uhrzeit entfernen",
   "klassenarbeit.title": "Klassenarbeit",
   "klassenarbeit.navWorks": "Arbeiten",
   "klassenarbeit.navCompare": "Vergleich",

@@ -1564,6 +1564,7 @@ export default {
   "todo.addDate": "Añadir fecha",
   "todo.addTime": "Añadir hora",
   "todo.timeHint": "Hora (opcional)",
+  "todo.removeTime": "Quitar la hora",
   "klassenarbeit.title": "Examen",
   "klassenarbeit.navWorks": "Exámenes",
   "klassenarbeit.navCompare": "Comparar",

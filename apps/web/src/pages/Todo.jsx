@@ -202,7 +202,20 @@ export default function Todo({ embedded } = {}) {
           style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", border: "1px solid var(--accent)", borderRadius: CONTROL_R, marginBottom: 8 }}>
           <input value={eText} onChange={(e) => setEText(e.target.value)} autoFocus onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditId(null); }} style={{ ...toolbarInput, flex: 1, minWidth: 140 }} />
           <input type="date" value={eDate} onChange={(e) => setEDate(e.target.value)} style={toolbarInput} />
-          {eDate && <input type="time" value={eTime} onChange={(e) => setETime(e.target.value)} style={toolbarInput} />}
+          {/* Die Uhrzeit muss sich WEGNEHMEN lassen, und zwar mit einem Knopf:
+              auf dem iPhone laesst sich ein gefuelltes `<input type="time">`
+              gar nicht leeren — der Waehler kennt kein „nichts". Ohne den X
+              blieb die einmal gesetzte Uhrzeit fuer immer stehen. */}
+          {eDate && (!eTime ? (
+            <button onClick={() => setETime(naechsteStunde())} className="icon-btn" title={t("todo.addTime")} aria-label={t("todo.addTime")} style={toolbarIconBtn}>
+              <Icon d={ICONS.clock} size={18} color="var(--text2)" />
+            </button>
+          ) : (<>
+            <input type="time" value={eTime} onChange={(e) => setETime(e.target.value)} title={t("todo.timeHint")} style={toolbarInput} />
+            <button onClick={() => setETime("")} className="icon-btn" title={t("todo.removeTime")} aria-label={t("todo.removeTime")} style={toolbarIconBtn}>
+              <Icon d={ICONS.close} size={15} color="var(--text3)" />
+            </button>
+          </>))}
           <button onClick={saveEdit} style={toolbarBtnPrimary}>{t("common.save")}</button>
           <button onClick={() => setEditId(null)} style={toolbarBtn}>{t("common.abort")}</button>
           <textarea value={eNotiz} onChange={(e) => setENotiz(e.target.value.slice(0, 5000))}
@@ -285,7 +298,15 @@ export default function Todo({ embedded } = {}) {
               <Icon d={ICONS.clock} size={18} color="var(--text2)" />
             </button>
           ) : (
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} title={t("todo.timeHint")} style={toolbarInput} />
+            // Derselbe Grund wie in der Bearbeitungszeile: das Zeitfeld laesst
+            // sich auf dem iPhone nicht leeren, also nimmt der X die Uhrzeit
+            // weg — das Datum bleibt, die Aufgabe wird wieder ganztaegig.
+            <>
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} title={t("todo.timeHint")} style={toolbarInput} />
+              <button onClick={() => setTime("")} className="icon-btn" title={t("todo.removeTime")} aria-label={t("todo.removeTime")} style={toolbarIconBtn}>
+                <Icon d={ICONS.close} size={15} color="var(--text3)" />
+              </button>
+            </>
           )}
           <button onClick={() => { setDate(""); setTime(""); }} className="icon-btn" title={t("common.remove") || t("common.delete")} aria-label={t("common.remove") || t("common.delete")} style={toolbarIconBtn}>
             <Icon d={ICONS.close} size={15} color="var(--text3)" />
