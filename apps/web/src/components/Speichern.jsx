@@ -17,7 +17,7 @@
 // jemand speichert; `verwerfen` stellt den letzten gespeicherten Stand wieder
 // her. Solange etwas offen ist, warnt die Anwendung beim Verlassen der Seite
 // und beim Schließen des Fensters.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useBlocker } from "react-router-dom";
 
@@ -111,6 +111,37 @@ export function useVerlassenWarnung(offen, frage) {
   }, [offen]);
 }
 
+// Ueber dem Dialog-Overlay (modalOverlay liegt bei 1000). Der schwebende Knopf
+// stand vorher bei 60 und war in JEDEM Dialog unsichtbar: gerendert, aber hinter
+// der Verdunklung — genau der Fall „Kind im Kurs anklicken, lange Maske
+// scrollen, Speichern weg".
+const Z_SCHWEBEND = 1100;
+
+// Was oben klebt, verdeckt die Leiste, ohne dass der Beobachter davon weiss:
+// die Navigationsleiste liegt als `sticky` darueber (52 px plus Aussparung plus
+// Offline-Balken). Ein Knopf DAHINTER ist nicht zu sehen, der Beobachter hielt
+// ihn aber fuer „im Bild" — ein Streifen, in dem es gar keinen Speichern-Knopf
+// gab. Gemessen statt gerechnet: die Leiste traegt ihre Hoehe selbst.
+function obenVerdeckt() {
+  try {
+    const nav = document.querySelector('nav[data-tour="nav"]');
+    return nav ? Math.max(0, Math.round(nav.getBoundingClientRect().bottom)) : 0;
+  } catch { return 0; }
+}
+
+// Nur EIN schwebender Knopf. Liegt ein Dialog ueber einer offenen Maske, haben
+// beide etwas Offenes — zwei Leisten am unteren Rand waeren die Frage, welche
+// zu welchem Formular gehoert. Es gewinnt die zuletzt angemeldete: bei einem
+// Dialog ueber der Seite ist das der Dialog.
+let _schwebende = [];
+const _horcher = new Set();
+function _melden(id, an) {
+  _schwebende = an ? [..._schwebende.filter((x) => x !== id), id] : _schwebende.filter((x) => x !== id);
+  _horcher.forEach((f) => f());
+}
+function _abo(f) { _horcher.add(f); return () => _horcher.delete(f); }
+function _oberste() { return _schwebende[_schwebende.length - 1]; }
+
 /**
  * Speichern + Abbrechen + der Hinweis „nicht gespeichert".
  *
@@ -133,10 +164,23 @@ export default function Speicherleiste({ entwurf, immer = false, style, klein = 
   useEffect(() => {
     const el = anker.current;
     if (!el || typeof IntersectionObserver === "undefined") return undefined;
-    const beobachter = new IntersectionObserver(([e]) => setImBild(e.isIntersecting), { threshold: 0.1 });
+    const beobachter = new IntersectionObserver(([e]) => setImBild(e.isIntersecting),
+      { threshold: 0.1, rootMargin: `-${obenVerdeckt()}px 0px 0px 0px` });
     beobachter.observe(el);
     return () => beobachter.disconnect();
   }, [entwurf.geaendert]);
+
+  // Schweben soll sie, wenn etwas offen und die eigentliche Leiste nicht zu
+  // sehen ist. Ob sie es DARF, entscheidet das Register oben — sichtbar ist
+  // immer nur die oberste.
+  const willSchweben = angeheftet && entwurf.geaendert && !imBild;
+  const id = useId();
+  useEffect(() => {
+    if (!willSchweben) return undefined;
+    _melden(id, true);
+    return () => _melden(id, false);
+  }, [willSchweben, id]);
+  const oberste = useSyncExternalStore(_abo, _oberste, _oberste);
 
   if (!entwurf.geaendert && !immer) return null;
   const grund = klein ? { ...btnSmall } : null;
@@ -155,7 +199,7 @@ export default function Speicherleiste({ entwurf, immer = false, style, klein = 
       </button>
     </>
   );
-  const schwebt = angeheftet && entwurf.geaendert && !imBild;
+  const schwebt = willSchweben && oberste === id;
   return (
     <>
       <span ref={anker} style={{ display: "inline-flex", alignItems: "center", gap: 8, ...style }}>
@@ -167,7 +211,7 @@ export default function Speicherleiste({ entwurf, immer = false, style, klein = 
         // und die Leiste stuende wieder irgendwo statt am Bildschirmrand.
         <div style={{
           position: "fixed", left: "50%", transform: "translateX(-50%)",
-          bottom: "max(16px, env(safe-area-inset-bottom))", zIndex: 60,
+          bottom: "max(16px, env(safe-area-inset-bottom))", zIndex: Z_SCHWEBEND,
           display: "flex", alignItems: "center", gap: 8,
           padding: "8px 12px", borderRadius: CONTROL_R + 4,
           background: "var(--card)", border: "1px solid var(--border2)", boxShadow: SHADOW.schwebend,

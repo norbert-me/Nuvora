@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Der Speichern-Knopf klebt jetzt wirklich — auf jeder Seite und in jedem
+  Dialog.** In einem Dialog lag er hinter der Verdunklung, und hinter der
+  Navigationsleiste galt er als „sichtbar", obwohl man ihn nicht sah.
 - **Kalender: eine verlegte Stunde bleibt verlegt.** Die Tagesansicht malte
   einen Eintrag immer auf die Uhrzeit des Stundenplans — gespeichert war die
   neue Zeit, zu sehen die alte, und es sah aus, als spränge die Änderung von
