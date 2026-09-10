@@ -424,6 +424,31 @@ def teste_sicherheit(api, b):
 
     b.pruefe("Sicherheit", "CSP verbietet Inline-Javascript", csp_ohne_inline_javascript)
 
+    def keine_fremden_inline_skripte():
+        """Steht in der ausgelieferten Seite ein Inline-Skript, das nicht von uns ist?
+
+        Nuvora liefert KEINES aus (deshalb die CSP oben). Ein vorgeschalteter
+        Dienst kann trotzdem eines hineinschreiben — Cloudflare tut das mit
+        „JavaScript Detections" und „Rocket Loader", und die eigene CSP blockt
+        es dann prompt: in der Konsole steht bei jedem Aufruf „Refused to
+        execute a script because its hash, its nonce, or 'unsafe-inline' does
+        not appear in the script-src directive". Das kostet nichts an Funktion,
+        aber es sieht aus wie ein Fehler der Seite und verdeckt echte Meldungen
+        im Browser-Rundgang. Warnung, kein Fehler: abstellen laesst es sich nur
+        dort, wo der Dienst konfiguriert wird.
+        """
+        _status, text = api.call("GET", "/", roh=True)
+        import re as _re
+        fremd = [m.group(2).strip() for m in _re.finditer(r"<script([^>]*)>(.*?)</script>", text or "", _re.S)
+                 if m.group(2).strip()]
+        if fremd:
+            wer = "Cloudflare" if "__CF$cv$params" in fremd[0] or "cdn-cgi" in fremd[0] else "ein vorgeschalteter Dienst"
+            raise AssertionError(f"{wer} schreibt {len(fremd)} Inline-Skript(e) in die Seite — die CSP blockt sie, "
+                                 "in der Konsole steht bei jedem Aufruf ein Fehler")
+        return "keine Inline-Skripte in der Seite"
+
+    b.pruefe("Sicherheit", "keine fremden Inline-Skripte", keine_fremden_inline_skripte, schwere="warnung")
+
     if https:
         def hsts():
             api.call("GET", "/", roh=True)
