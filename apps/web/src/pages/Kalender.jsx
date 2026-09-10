@@ -2275,6 +2275,25 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
       return { von, bis: cur };
     });
   };
+  // Die Uhr — nur fuer die Anzeige „in welcher Phase stecke ich gerade?".
+  //
+  // Der Verlaufsplan liegt waehrend der Stunde offen, und dann ist die einzige
+  // Frage: wo sind wir? An der Tafel beantwortet das der Verlaufs-Kasten schon
+  // (Tafel.jsx); hier stand dieselbe Liste ohne jede Markierung, und man musste
+  // die Uhrzeiten mit der eigenen Uhr vergleichen. Alle 30 Sekunden reicht:
+  // feiner als eine Minute ist der Plan nicht.
+  const [jetztMin, setJetztMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
+  useEffect(() => {
+    const id = setInterval(() => { const d = new Date(); setJetztMin(d.getHours() * 60 + d.getMinutes()); }, 30000);
+    return () => clearInterval(id);
+  }, []);
+  // Nur HEUTE: an einem anderen Tag sagt die Uhr nichts ueber diese Stunde, und
+  // eine Markierung waere schlicht falsch.
+  const istHeute = ymd(new Date(entry.date)) === ymd(new Date());
+  const laufendePhase = (zt) => {
+    if (!istHeute) return -1;
+    return zt.findIndex((z) => z && jetztMin >= z.von && (z.bis == null || jetztMin < z.bis));
+  };
   // Summe der Dauern gegen die Laenge der Stunde: „35 von 45 min" beantwortet
   // beim Planen die einzige Frage, die man an einen Verlaufsplan stellt.
   const dauerSumme = (list) => list.reduce((n, p) => n + (Number(p.dauer) > 0 ? Number(p.dauer) : 0), 0);
@@ -2506,16 +2525,36 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
                   <span style={{ flex: 1 }}>{t("kalender.verlauf")}</span>
                   {summenText(verlauf) && <span style={{ fontWeight: 400, color: "var(--text3)" }}>{summenText(verlauf)}</span>}
                 </div>
-                {(() => { const zt = phasenZeit(verlauf); return verlauf.map((p, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, padding: "8px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
-                    <div style={{ minWidth: 120, flexShrink: 0, display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-                      {zt[i] && <span style={{ fontSize: 12, color: "var(--text3)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{minToHm(zt[i].von)}{zt[i].bis != null ? `–${minToHm(zt[i].bis)}` : ""}</span>}
-                      <span style={{ fontSize: 14, fontWeight: 600 }}>{p.phase || "—"}</span>
-                      {p.dauer && <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>{p.dauer} min</span>}
+                {(() => {
+                  const zt = phasenZeit(verlauf);
+                  const aktiv = laufendePhase(zt);
+                  return verlauf.map((p, i) => {
+                    const an = i === aktiv;
+                    const rest = an && zt[i]?.bis != null ? Math.max(0, zt[i].bis - jetztMin) : null;
+                    return (
+                    // Die laufende Phase traegt Toenung UND Balken — dieselbe
+                    // Bauform wie die Abwesenheit im Notenbuch: eine Toenung
+                    // allein verschwindet am Beamer und bei Sonne.
+                    <div key={i} style={{ display: "flex", gap: 8, padding: an ? "8px 8px 8px 5px" : "8px 0",
+                      borderTop: i ? "1px solid var(--border)" : "none",
+                      borderRadius: an ? CONTROL_R : undefined,
+                      background: an ? "var(--accent-bg)" : undefined,
+                      boxShadow: an ? "inset 3px 0 0 var(--accent)" : undefined,
+                      opacity: aktiv >= 0 && i < aktiv ? 0.55 : 1 }}>
+                      <div style={{ minWidth: 120, flexShrink: 0, display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                        {zt[i] && <span style={{ fontSize: 12, color: an ? "var(--accent)" : "var(--text3)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{minToHm(zt[i].von)}{zt[i].bis != null ? `–${minToHm(zt[i].bis)}` : ""}</span>}
+                        <span style={{ fontSize: 14, fontWeight: an ? 800 : 600 }}>{p.phase || "—"}</span>
+                        {p.dauer && <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>{p.dauer} min</span>}
+                        {/* „noch 7 min" ist im Unterricht die eigentliche
+                            Frage — die Uhrzeit daneben muss man erst
+                            verrechnen. */}
+                        {rest != null && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", whiteSpace: "nowrap" }}>{t("tafel.verlaufRest", { min: rest })}</span>}
+                      </div>
+                      <div style={{ flex: 1, fontSize: 14, color: "var(--text2)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{p.text}</div>
                     </div>
-                    <div style={{ flex: 1, fontSize: 14, color: "var(--text2)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{p.text}</div>
-                  </div>
-                )); })()}
+                    );
+                  });
+                })()}
               </div>
             )}
             {!clsName && !topName && !methName && !linkList.length && !notes && !verlauf.length && <p style={{ fontSize: 14, color: "var(--text3)", marginTop: 8 }}>{t("kalender.emptyEntry")}</p>}

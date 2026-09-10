@@ -399,11 +399,28 @@ export default function NuvoraHome({ user }) {
 
   return (
     <div style={{ ...pageApp }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {/* Keine Begruessung mehr. „Hallo Nina" beantwortet keine Frage, stand
-            aber bei jedem Aufruf als groesste Zeile ueber dem, weswegen man
-            gekommen ist. Der Platz bleibt leer statt gefuellt. */}
+      {/* Keine Begruessung mehr. „Hallo Nina" beantwortet keine Frage, stand
+          aber bei jedem Aufruf als groesste Zeile ueber dem, weswegen man
+          gekommen ist.
+
+          Suchfeld und Einrichten-Knopf stehen in EINER Zeile. Vorher hatte der
+          Knopf eine eigene, sonst leere Zeile ganz oben: ein Band aus nichts
+          zwischen Navigation und Suche, und der Knopf schwebte weit rechts ohne
+          Bezug zu irgendetwas. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+        {/* Sucheinstieg: nicht jeder weiss, dass die Ausleihe unter Orga sitzt.
+            Klick oder ⌘K oeffnet dieselbe Suche wie die Lupe in der Navigation
+            (components/Suche.jsx) — hier steht nur der Knopf dazu. */}
+        <button onClick={() => window.dispatchEvent(new Event("nuvora:suche"))} data-suche="startseite"
+          style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, maxWidth: 520,
+            padding: "11px 14px", border: "1px solid var(--border2)", borderRadius: CONTROL_R, background: "var(--card)",
+            color: "var(--text3)", cursor: "text", fontSize: 14, textAlign: "left" }}>
+          <Icon d={ICONS.search} size={16} color="var(--text3)" />
+          <span style={{ flex: 1 }}>{t("suche.placeholder")}</span>
+          <kbd style={{ ...chipStyle, fontWeight: 500, border: "1px solid var(--border2)" }}>⌘K</kbd>
+        </button>
         <span style={{ flex: 1 }} />
+
         {/* Der Knopf richtet jetzt auch die Widgets ein — er gehoert also auch
             dorthin, wo nur ein Modul laeuft. Vorher hing er an „mehr als eine
             Kachel", weil es nur ums Sortieren ging.
@@ -439,17 +456,6 @@ export default function NuvoraHome({ user }) {
         )}
       </div>
 
-      {/* Sucheinstieg: nicht jeder weiss, dass die Ausleihe unter Orga sitzt.
-          Klick oder ⌘K oeffnet dieselbe Suche wie die Lupe in der Navigation
-          (components/Suche.jsx) — hier steht nur der Knopf dazu. */}
-      <button onClick={() => window.dispatchEvent(new Event("nuvora:suche"))} data-suche="startseite"
-        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", maxWidth: 520, marginBottom: 24,
-          padding: "11px 14px", border: "1px solid var(--border2)", borderRadius: CONTROL_R, background: "var(--card)",
-          color: "var(--text3)", cursor: "text", fontSize: 14, textAlign: "left" }}>
-        <Icon d={ICONS.search} size={16} color="var(--text3)" />
-        <span style={{ flex: 1 }}>{t("suche.placeholder")}</span>
-        <kbd style={{ ...chipStyle, fontWeight: 500, border: "1px solid var(--border2)" }}>⌘K</kbd>
-      </button>
 
       {active.length === 0 ? (
         <div style={{ ...card, textAlign: "center", padding: 24 }}>

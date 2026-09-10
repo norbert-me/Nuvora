@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Startseite: Suche und Einrichten-Knopf stehen in einer Zeile — die leere
+  Zeile darüber ist weg.
+- Kalender-Eintrag: im Verlaufsplan ist die Phase markiert, in der man gerade
+  steckt, samt „noch X min".
 - **Anwesenheit öffnet in der Stunde, die gerade läuft.** Sie sprang auf die
   erste Stunde des Tages — dort steht nichts, und es sah aus, als würde nichts
   geladen. Aus dem Kalender heraus bleibt jetzt auch die verlinkte Klasse
