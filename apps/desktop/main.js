@@ -259,4 +259,124 @@ app.on("web-contents-created", (_e, contents) => {
 // Knopf "Erneut verbinden" auf offline.html.
 ipcMain.handle("nuvora:retry", () => { loadTarget(); });
 
+// ── Update: die neue Fassung wird DRUEBERGELEGT, nicht verlinkt ──
+//
+// Vorher fuehrte der Hinweis „es gibt eine neue Fassung" auf die GitHub-Seite:
+// dort dann die richtige Datei suchen, laden, DMG oeffnen, App ins Programme-
+// Verzeichnis ziehen, alte ersetzen bestaetigen. Fuenf Schritte fuer etwas, das
+// ein Klick sein soll.
+//
+// Warum NICHT `electron-updater`: Squirrel.Mac verlangt eine signierte App.
+// Nuvoras DMG ist unsigniert (bewusst — eine Entwicklerlizenz ist fuer eine
+// Schul-Installation ein hoher Preis), und der Updater bricht dann mit „Could
+// not get code signature for running application" ab. Also von Hand: laden,
+// mounten, das Bundle ueber das laufende kopieren, neu starten.
+//
+// Die Adresse kommt aus der Seite — geprueft wird sie HIER: nur https, nur die
+// Hosts, auf denen unsere Release-Dateien liegen, und nur die Endung, die zur
+// Plattform passt. Die Huelle darf sich nicht von einer Seite dazu bringen
+// lassen, irgendeine Datei zu laden und auszufuehren.
+const UPDATE_HOSTS = new Set(["github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"]);
+const UPDATE_MAX = 800 * 1024 * 1024;   // 800 MB: darueber stimmt etwas nicht
+
+function updateZielGeprueft(roh) {
+  let u;
+  try { u = new URL(String(roh || "")); } catch { return null; }
+  if (u.protocol !== "https:" || !UPDATE_HOSTS.has(u.hostname)) return null;
+  const endung = process.platform === "darwin" ? ".dmg"
+    : process.platform === "win32" ? ".exe"
+    : ".AppImage";
+  if (!u.pathname.toLowerCase().endsWith(endung)) return null;
+  return u.toString();
+}
+
+function laden(url, ziel, melde) {
+  // `net` statt https: es nimmt die Proxy-Einstellungen des Systems mit — im
+  // Schulnetz ist das oft der Unterschied zwischen „laedt" und „haengt".
+  const { net } = require("electron");
+  return new Promise((fertig, fehler) => {
+    const anfrage = net.request({ url, redirect: "follow" });
+    anfrage.on("response", (antwort) => {
+      if (antwort.statusCode !== 200) { fehler(new Error(`HTTP ${antwort.statusCode}`)); return; }
+      const gesamt = Number(antwort.headers["content-length"] || 0);
+      if (gesamt > UPDATE_MAX) { fehler(new Error("Datei zu gross")); return; }
+      const datei = fs.createWriteStream(ziel);
+      let geladen = 0;
+      antwort.on("data", (stueck) => {
+        geladen += stueck.length;
+        if (geladen > UPDATE_MAX) { anfrage.abort(); datei.destroy(); fehler(new Error("Datei zu gross")); return; }
+        datei.write(stueck);
+        if (gesamt) melde(Math.round((geladen / gesamt) * 100));
+      });
+      antwort.on("end", () => datei.end(() => fertig(ziel)));
+      antwort.on("error", fehler);
+    });
+    anfrage.on("error", fehler);
+    anfrage.end();
+  });
+}
+
+// Das Bundle der LAUFENDEN App: /Applications/Nuvora.app/Contents/MacOS/Nuvora
+// -> /Applications/Nuvora.app. Dorthin wird kopiert; die laufende Fassung
+// stoert das nicht, sie haelt ihre Dateien bereits geoeffnet.
+function eigenesBundle() {
+  const teil = process.execPath.split("/Contents/MacOS/")[0];
+  return teil.endsWith(".app") ? teil : null;
+}
+
+async function installiereMac(dmg) {
+  const { execFile } = require("child_process");
+  const lauf = (befehl, args) => new Promise((ok, nein) => {
+    execFile(befehl, args, { maxBuffer: 8 * 1024 * 1024 }, (e, out) => (e ? nein(e) : ok(String(out || ""))));
+  });
+  const ziel = eigenesBundle();
+  if (!ziel) throw new Error("Die laufende App liegt nicht als .app vor.");
+  // Ohne das Entfernen der Quarantaene startet die kopierte App nicht: die
+  // geladene Datei traegt die Marke, und sie vererbt sich beim Kopieren.
+  await lauf("/usr/bin/xattr", ["-dr", "com.apple.quarantine", dmg]).catch(() => {});
+  const aus = await lauf("/usr/bin/hdiutil", ["attach", "-nobrowse", "-noverify", "-plist", dmg]);
+  const treffer = aus.match(/<key>mount-point<\/key>\s*<string>([^<]+)<\/string>/);
+  const punkt = treffer && treffer[1];
+  if (!punkt) throw new Error("DMG liess sich nicht einhaengen.");
+  try {
+    const app_ = fs.readdirSync(punkt).find((x) => x.endsWith(".app"));
+    if (!app_) throw new Error("Im DMG liegt keine App.");
+    // `ditto` statt cp: es nimmt Rechte, Symlinks und erweiterte Attribute mit
+    // — ein mit cp kopiertes Bundle startet unter macOS oft gar nicht.
+    await lauf("/usr/bin/ditto", [path.join(punkt, app_), ziel]);
+    await lauf("/usr/bin/xattr", ["-dr", "com.apple.quarantine", ziel]).catch(() => {});
+  } finally {
+    await lauf("/usr/bin/hdiutil", ["detach", punkt, "-quiet"]).catch(() => {});
+  }
+}
+
+ipcMain.handle("nuvora:update", async (e, url) => {
+  const ziel = updateZielGeprueft(url);
+  if (!ziel) return { ok: false, error: "Diese Adresse gehört nicht zu einer Nuvora-Fassung." };
+  const fenster = BrowserWindow.fromWebContents(e.sender);
+  const melde = (p) => { if (fenster && !fenster.isDestroyed()) fenster.webContents.send("nuvora:update-fortschritt", p); };
+  const datei = path.join(app.getPath("temp"), `nuvora-update-${Date.now()}${path.extname(new URL(ziel).pathname)}`);
+  try {
+    await laden(ziel, datei, melde);
+    if (process.platform === "darwin") {
+      melde(100);
+      await installiereMac(datei);
+      // Neu starten, damit die eben kopierte Fassung laeuft. Ohne das laeuft
+      // die alte weiter und der Hinweis kaeme beim naechsten Start wieder.
+      app.relaunch();
+      app.exit(0);
+      return { ok: true };
+    }
+    // Windows/Linux gibt es noch nicht als Build. Bis dahin ehrlich: die
+    // geladene Datei oeffnen und den Rest dem System ueberlassen.
+    await shell.openPath(datei);
+    return { ok: true, manuell: true };
+  } catch (fehler) {
+    try { fs.unlinkSync(datei); } catch { /* egal */ }
+    return { ok: false, error: String(fehler && fehler.message ? fehler.message : fehler) };
+  } finally {
+    if (process.platform === "darwin") { try { fs.unlinkSync(datei); } catch { /* egal */ } }
+  }
+});
+
 app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });

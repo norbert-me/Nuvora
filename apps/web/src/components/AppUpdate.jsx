@@ -49,6 +49,8 @@ export default function AppUpdate() {
   const eigene = huelle?.appVersion || "";
   const [neu, setNeu] = useState(null);   // { version, datei }
   const [weg, setWeg] = useState(false);
+  const [laeuft, setLaeuft] = useState(null);   // 0..100 waehrend des Ladens, sonst null
+  const [fehler, setFehler] = useState("");
 
   useEffect(() => {
     if (!eigene) return;
@@ -68,15 +70,38 @@ export default function AppUpdate() {
     try { localStorage.setItem(KEY, neu.version); } catch { /* egal */ }
   };
   const ziel = neu.datei?.url || neu.seite || "";
+  // Die Huelle kann die neue Fassung selbst drueberlegen (apps/desktop). Dann
+  // ist der Knopf ein KNOPF und kein Link: laden, ersetzen, neu starten —
+  // vorher fuehrte er auf GitHub, wo man die richtige Datei erst suchen, dann
+  // das DMG oeffnen und die App von Hand ersetzen musste.
+  const kannInstallieren = !!(huelle && huelle.updateInstall && neu.datei?.url);
+  const starten = async () => {
+    setLaeuft(0);
+    setFehler("");
+    const aus = await huelle.updateInstall(neu.datei.url, setLaeuft);
+    if (!aus || !aus.ok) { setLaeuft(null); setFehler((aus && aus.error) || t("appupdate.fehler")); return; }
+    // Bei Erfolg startet die App neu; nur wenn das System die Datei bloss
+    // geoeffnet hat (Windows/Linux), bleibt die Seite stehen.
+    if (aus.manuell) setLaeuft(null);
+  };
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
       padding: "8px 16px", background: C.info + "1f", borderBottom: `1px solid ${C.info}55` }}>
       <Icon d={ICONS.download} size={16} color={C.info} />
       <span style={{ fontSize: 14, flex: 1, minWidth: 160 }}>
-        {t("appupdate.text", { version: neu.version })}
+        {laeuft != null ? t("appupdate.laeuft", { p: laeuft })
+          : fehler ? `${t("appupdate.fehler")} ${fehler}`
+          : t("appupdate.text", { version: neu.version })}
       </span>
-      {ziel && (
+      {kannInstallieren ? (
+        <button onClick={starten} disabled={laeuft != null}
+          style={{ ...btnPrimary, ...btnSmall, opacity: laeuft != null ? 0.6 : 1, cursor: laeuft != null ? "default" : "pointer" }}>
+          {laeuft != null ? `${laeuft} %` : t("appupdate.jetzt")}
+        </button>
+      ) : ziel && (
+        /* Aeltere Huelle (oder gar keine): dann bleibt der Weg ueber die
+           Release-Seite — mehr kann eine Seite im Browser nicht tun. */
         <a href={ziel} target="_blank" rel="noreferrer"
           style={{ ...btnPrimary, ...btnSmall, textDecoration: "none" }}>
           {t("appupdate.laden")}

@@ -465,6 +465,7 @@ async function lauf() {
     // ── 5. Menue und Fenster ──
     await menueProbe(app);
     await fensterProbe(app, seite);
+    await updateProbe(seite);
 
     // ── 2. Anmeldung ueber das echte Formular ──
     const anmeldung = await mitFrist(anmelden(seite), FRIST_ANMELDUNG, "/login").catch((e) => ({ ok: false, detail: kurzfehler(e, 1) }));
@@ -621,6 +622,30 @@ async function fensterProbe(app, seite) {
   const extern = await app.evaluate(() => global.__extern || []);
   notiere("Fenster", "fremde Adresse geht an den Browser", extern.length === 1,
     extern.length === 1 ? "shell.openExternal einmal aufgerufen" : `openExternal ${extern.length}× aufgerufen`);
+}
+
+/**
+ * Das Update legt die neue Fassung DRUEBER — und nimmt dafuer nicht jede
+ * Adresse an.
+ *
+ * Geprueft wird die Schranke, nicht der Download: die Huelle laedt eine Datei
+ * herunter und ersetzt damit sich selbst, also darf eine Seite ihr nicht
+ * beibringen, das mit irgendeiner Adresse zu tun. Ein echter Lauf haette 100 MB
+ * geladen und die laufende App ersetzt — das gehoert in keinen Testlauf.
+ */
+async function updateProbe(seite) {
+  const da = await ruhigEvaluate(seite, () => typeof window.nuvora?.updateInstall === "function", null, false);
+  notiere("Update", "die Hülle kann die neue Fassung selbst einspielen", da === true,
+    da === true ? "window.nuvora.updateInstall vorhanden" : "updateInstall fehlt — der Knopf führt wieder auf GitHub");
+  if (da !== true) return;
+  const fremd = await ruhigEvaluate(seite,
+    () => window.nuvora.updateInstall("https://beispiel.invalid/schadhaft.dmg").then((x) => x), null, null);
+  notiere("Update", "fremde Adresse wird abgewiesen", !!fremd && fremd.ok === false,
+    !!fremd && fremd.ok === false ? "abgelehnt" : `angenommen: ${JSON.stringify(fremd)} — die Hülle würde fremde Dateien einspielen`);
+  const falscheEndung = await ruhigEvaluate(seite,
+    () => window.nuvora.updateInstall("https://github.com/x/y/releases/download/v1/liste.txt").then((x) => x), null, null);
+  notiere("Update", "falsche Dateiart wird abgewiesen", !!falscheEndung && falscheEndung.ok === false,
+    !!falscheEndung && falscheEndung.ok === false ? "abgelehnt" : "angenommen — Endung wird nicht geprüft");
 }
 
 /**

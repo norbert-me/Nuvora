@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Die App aktualisiert sich mit einem Klick.** „Jetzt aktualisieren" lädt die
+  neue Fassung, legt sie über die alte und startet neu — kein Umweg mehr über
+  GitHub, kein DMG zum Selberziehen.
 - **Notenbuch, Klick auf einen Namen: der Dialog zeigt jetzt an, statt zu
   bearbeiten** — und zeigt die **Fehlzeiten** (fehlt, entschuldigt, verspätet).
   Leere Angaben bleiben weg, der Kursname steht nicht mehr doppelt.

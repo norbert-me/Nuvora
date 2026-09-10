@@ -149,6 +149,21 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   // Die ladbaren Apps kommen vom Server (er holt sie beim Release-Anbieter) —
   // aus dem Browser waere der Aufruf durch die CSP geblockt.
   const [apps, setApps] = useState(null);
+  // Die Desktop-Huelle kann eine neue Fassung selbst ueber die alte legen
+  // (apps/desktop/main.js). Ohne Huelle bleibt es beim Laden ueber den Link.
+  const [appLaeuft, setAppLaeuft] = useState(null);   // 0..100
+  const huelle = typeof window !== "undefined" ? window.nuvora : null;
+  const appInstallierbar = (key) => {
+    if (!huelle || !huelle.updateInstall) return false;
+    const passt = { mac_arm: "darwin", mac_intel: "darwin", windows: "win32", linux: "linux" };
+    return passt[key] === huelle.platform;
+  };
+  const appInstallieren = async (p) => {
+    setAppLaeuft(0);
+    const aus = await huelle.updateInstall(p.datei.url, setAppLaeuft);
+    if (!aus || !aus.ok) { setAppLaeuft(null); alert((aus && aus.error) || t("appupdate.fehler")); }
+    else if (aus.manuell) setAppLaeuft(null);
+  };
   useEffect(() => {
     fetch("/api/apps").then((r) => (r.ok ? r.json() : null)).then(setApps).catch(() => {});
   }, []);
@@ -467,9 +482,20 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                 erlaubt ist, was man dem Bildschirm nicht ansieht). Nur bei
                 iOS: bei den uebrigen Plattformen laedt man und startet. */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <a href={p.datei.url} style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>
-                {t("profile.appsLaden")}
-              </a>
+              {/* In der Desktop-Huelle wird die Fassung DRUEBERGELEGT statt
+                  verlinkt — derselbe Weg wie im Update-Hinweis oben. Nur fuer
+                  die eigene Plattform: eine Windows-Datei nuetzt einem Mac
+                  nichts, und die Huelle wuerde sie ohnehin abweisen. */}
+              {appInstallierbar(p.key) ? (
+                <button type="button" onClick={() => appInstallieren(p)} disabled={appLaeuft != null}
+                  style={{ ...btnSecondary, opacity: appLaeuft != null ? 0.6 : 1 }}>
+                  {appLaeuft != null ? `${appLaeuft} %` : t("appupdate.jetzt")}
+                </button>
+              ) : (
+                <a href={p.datei.url} style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>
+                  {t("profile.appsLaden")}
+                </a>
+              )}
               {p.key === "ios" && (
                 <span style={{ fontSize: 12, color: "var(--text3)", maxWidth: 360 }}>{t("profile.appsIos")}</span>
               )}
