@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Fehlzeiten stehen im Notenbuch am richtigen Tag.** Sie landeten eine Spalte
+  zu früh und blieben dort. Verspätungen färben die Tabelle nicht mehr — das
+  Kind war da.
+- Profil: der Abschnitt „Offline-Bereitschaft" ist wieder weg.
 - **Notenliste: der Umschalter „Einzelne Noten" verschwindet nicht mehr.** Gab
   es für die Kurve zu wenige Noten, war mit dem Diagramm auch der Schalter weg —
   und damit der Weg zurück. Jetzt steht dort ein Satz statt einer Linie.

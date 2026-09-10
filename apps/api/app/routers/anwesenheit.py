@@ -3,8 +3,10 @@
 Eigenstaendig (Regel 3): Schueler kommen aus dem Kern, hier liegt nur der
 Status je (Schueler, Datum). status: da | fehlt | spaet | entsch.
 """
+import os
 from datetime import datetime, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -36,8 +38,30 @@ require_module = modul_pflicht(MODULE_KEY)
 _owned_class = klasse_oder_403
 
 
+# Ein Schultag ist ein Tag der SCHULE, kein UTC-Tag.
+#
+# Der Browser schickt den gewaehlten Tag als Zeitpunkt („2026-09-09" wird zu
+# Mitternacht Ortszeit und damit zu 2026-09-08T22:00Z). Wer danach in UTC
+# gruppiert, legt jede Anwesenheit auf den VORTAG — im Notenbuch stand die
+# Markierung am 08.09., obwohl das Kind am 09.09. gefehlt hatte, und sie blieb
+# dort, weil sie jeden Tag um dieselbe Stunde daneben liegt. Gerechnet wird
+# deshalb in der Zeitzone der Schule; das repariert zugleich den Bestand.
+_SCHUL_TZ = ZoneInfo(os.environ.get("SCHOOL_TZ", "Europe/Berlin"))
+
+
+def _schul_tag(d: datetime) -> str:
+    """Der Kalendertag, den dieser Zeitpunkt an der Schule hat."""
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d.astimezone(_SCHUL_TZ).strftime("%Y-%m-%d")
+
+
 def _day_bounds(d: datetime):
-    start = d.replace(hour=0, minute=0, second=0, microsecond=0)
+    """Anfang und Ende des Schultags, in den dieser Zeitpunkt faellt."""
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    lokal = d.astimezone(_SCHUL_TZ)
+    start = lokal.replace(hour=0, minute=0, second=0, microsecond=0)
     return start, start.replace(hour=23, minute=59, second=59)
 
 
@@ -162,7 +186,9 @@ async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
             # vergleicht eine naive Zeitangabe nicht damit — der Aufruf endete
             # in einem 500, das lokal auf SQLite nie auftrat. Die uebrigen Wege
             # schicken ohnehin ISO-Zeitpunkte mit „Z".
-            tage.append(datetime.strptime(teil, "%Y-%m-%d").replace(tzinfo=timezone.utc))
+            # In der Zeitzone der Schule, nicht in UTC: die Spalte traegt
+            # einen Kalendertag, keinen Zeitpunkt.
+            tage.append(datetime.strptime(teil, "%Y-%m-%d").replace(tzinfo=_SCHUL_TZ))
         except ValueError:
             continue    # Unlesbares faellt still heraus: eine Spalte ohne Datum ist kein Fehler
         if len(tage) >= 40:
@@ -179,7 +205,7 @@ async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
     gewuenscht = {d.strftime("%Y-%m-%d") for d in tage}
     je_tag = {}
     for r in rows:
-        tag = r.date.strftime("%Y-%m-%d")
+        tag = _schul_tag(r.date)
         if tag in gewuenscht:
             je_tag.setdefault(tag, []).append(r)
     out = {}

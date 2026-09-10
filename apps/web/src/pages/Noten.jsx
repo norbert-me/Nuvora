@@ -107,8 +107,7 @@ export default function Noten() {
   // Für den Themenvorschlag aus dem Stundenplan (Regel 3: ohne Kalender gibt es
   // keine Stunde, aus der man ihn lesen könnte).
   const kalenderAktiv = aktiv("kalender");
-  // Wer an dem Tag gefehlt hat oder zu spaet kam, wird in seiner Spalte
-  // markiert — eine 5 an einem Tag, an dem das Kind gar nicht da war, ist eine
+  // Wer an dem Tag gefehlt hat, wird in seiner Spalte markiert — eine 5 an einem Tag, an dem das Kind gar nicht da war, ist eine
   // Frage, keine Note. Nur mit dem Modul Orga (Regel 3): ohne es bleibt die
   // Tabelle wie bisher, kein 403.
   const orgaAktiv = aktiv("orga");
@@ -843,10 +842,13 @@ export default function Noten() {
                         // Balken links. Eine Toenung allein sieht nach
                         // Zebrastreifen aus, sobald zwei Spalten nebeneinander
                         // markiert sind.
+                        // Nur ABWESENHEIT faerbt. Eine Verspaetung erklaert
+                        // keine Note — das Kind war da und hat mitgeschrieben;
+                        // sie stand nur als dritte Farbe in der Tabelle.
                         const stat = statusVon(s.student_id, c);
-                        const statFarbe = stat === "spaet" ? C.warning : (stat === "fehlt" || stat === "entsch") ? C.danger : null;
+                        const statFarbe = (stat === "fehlt" || stat === "entsch") ? C.danger : null;
                         return (
-                          <td key={c.id} title={stat ? t(`anwesenheit.${stat}`) : undefined}
+                          <td key={c.id} title={statFarbe ? t(`anwesenheit.${stat}`) : undefined}
                             style={{ ...td, padding: 0, width: 56, minWidth: 56, maxWidth: 56, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
                                      ...(statFarbe ? { background: `${statFarbe}1f`, boxShadow: `inset 3px 0 0 ${statFarbe}` } : null) }}>
                             {zelle === id
