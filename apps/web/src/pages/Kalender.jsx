@@ -2530,7 +2530,6 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
                   const aktiv = laufendePhase(zt);
                   return verlauf.map((p, i) => {
                     const an = i === aktiv;
-                    const rest = an && zt[i]?.bis != null ? Math.max(0, zt[i].bis - jetztMin) : null;
                     return (
                     // Die laufende Phase traegt Toenung UND Balken — dieselbe
                     // Bauform wie die Abwesenheit im Notenbuch: eine Toenung
@@ -2541,14 +2540,13 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
                       background: an ? "var(--accent-bg)" : undefined,
                       boxShadow: an ? "inset 3px 0 0 var(--accent)" : undefined,
                       opacity: aktiv >= 0 && i < aktiv ? 0.55 : 1 }}>
+                      {/* Keine Uhrzeiten in der Zeile: sie standen neben jeder
+                          Phase und mussten erst mit der eigenen Uhr verrechnet
+                          werden. Wo man steckt, sagt die Markierung — und wie
+                          lange die Phase dauert, die Dauer daneben. */}
                       <div style={{ minWidth: 120, flexShrink: 0, display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-                        {zt[i] && <span style={{ fontSize: 12, color: an ? "var(--accent)" : "var(--text3)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{minToHm(zt[i].von)}{zt[i].bis != null ? `–${minToHm(zt[i].bis)}` : ""}</span>}
                         <span style={{ fontSize: 14, fontWeight: an ? 800 : 600 }}>{p.phase || "—"}</span>
                         {p.dauer && <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>{p.dauer} min</span>}
-                        {/* „noch 7 min" ist im Unterricht die eigentliche
-                            Frage — die Uhrzeit daneben muss man erst
-                            verrechnen. */}
-                        {rest != null && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", whiteSpace: "nowrap" }}>{t("tafel.verlaufRest", { min: rest })}</span>}
                       </div>
                       <div style={{ flex: 1, fontSize: 14, color: "var(--text2)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{p.text}</div>
                     </div>
