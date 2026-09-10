@@ -10,7 +10,30 @@ im Kern, und keins der beiden Module importiert das andere.
 """
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
+
+# Die Zeitzone der Schule. Ein Schultag ist ein Tag der SCHULE, kein UTC-Tag:
+# der Browser schickt einen gewaehlten Tag als Zeitpunkt (Mitternacht Ortszeit,
+# in Berlin also 22:00 Uhr des Vortags in UTC). Wer danach in UTC rechnet, legt
+# jeden Eintrag auf den Vortag — im Notenbuch stand die Fehlzeit eine Spalte zu
+# frueh, im PDF ein Datum zu frueh, und der erste Ferientag zaehlte als Fehltag.
+SCHUL_TZ = ZoneInfo(os.environ.get("SCHOOL_TZ", "Europe/Berlin"))
+
+
+def schul_datum(d):
+    """Der Kalendertag (date), den dieser Zeitpunkt an der Schule hat.
+
+    Eine Quelle fuer alle, die Tage vergleichen oder zaehlen (Anwesenheit,
+    Kalenderabgleich). Naive Zeitstempel gelten als UTC — so liefert SQLite
+    (Tests) dasselbe wie Postgres.
+    """
+    if isinstance(d, datetime):
+        if d.tzinfo is None:
+            d = d.replace(tzinfo=timezone.utc)
+        return d.astimezone(SCHUL_TZ).date()
+    return d
 
 
 def jetzt() -> datetime:

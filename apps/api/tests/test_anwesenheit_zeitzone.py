@@ -48,3 +48,29 @@ async def test_tagesansicht_findet_denselben_eintrag(s):
     # Und derselbe Schultag, aus einer anderen Uhrzeit heraus gefragt.
     mittag = datetime(2026, 9, 9, 10, 0, tzinfo=timezone.utc)
     assert (await an.get_day(c.id, date=mittag, user=u, db=s))[str(st.id)]["status"] == "fehlt"
+
+
+@pytest.mark.asyncio
+async def test_zaehler_und_verlauf_rechnen_im_schultag(s):
+    """Zaehlen, Gruppieren und der Ferienabgleich muessen denselben Tagesbegriff
+    benutzen wie das Eintragen. Sonst zaehlt der erste Ferientag als Fehltag."""
+    from app.models import CalendarBreak
+
+    u, c, st = await _seed(s)
+    await an.mark(c.id, an.MarkIn(student_id=st.id, date=ORTS_MITTERNACHT, status="fehlt"), user=u, db=s)
+
+    # Ein Tag, eine Abwesenheit — und sie liegt am 09.09.
+    verlauf = await an.student_history(c.id, st.id, user=u, db=s)
+    assert len(verlauf) == 1
+    assert (await an.summary(c.id, user=u, db=s))[str(st.id)]["fehlt"] == 1
+
+    # Ferien GENAU an diesem Tag: dann zaehlt er nicht mehr. Der Zeitraum liegt
+    # (wie im Kalender) auf UTC-Mitternacht, der Eintrag auf lokaler — genau
+    # diese Kombination lag vorher eine Tagesgrenze daneben.
+    s.add(CalendarBreak(owner_id=u.id, label="Ferien",
+                        start_date=datetime(2026, 9, 9, tzinfo=timezone.utc),
+                        end_date=datetime(2026, 9, 9, tzinfo=timezone.utc)))
+    await s.commit()
+    # Kein gezaehlter Tag mehr — dann steht das Kind gar nicht erst in der
+    # Zusammenfassung (sie fuehrt nur, was zaehlt).
+    assert (await an.summary(c.id, user=u, db=s)).get(str(st.id), {}).get("fehlt", 0) == 0

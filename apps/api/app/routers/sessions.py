@@ -13,6 +13,7 @@ from ..importe import geprueft
 from ..models import (Attendance, CalendarEntry, Question, Session, QuestionSetItem,
                       SchoolClass, QuestionSet, Student, User)
 from .auth import get_current_user, rate_limit, client_ip
+from ..zeit import schul_datum
 from .. import websocket as ws
 from .modules import modul_pflicht
 
@@ -322,7 +323,10 @@ async def gefehlt_vorschlag(session_id: int, user: User = Depends(get_current_us
     studs = (await db.execute(select(Student).where(Student.class_id == s.class_id))).scalars().all()
     if not studs:
         return {}
-    tage = {e.date.date() for e in stunden if e.date}
+    # Schultag statt UTC-Tag: der Kalendereintrag liegt auf der Tagesmitte, der
+    # Anwesenheits-Eintrag auf lokaler Mitternacht (in UTC also am Vortag). Roh
+    # verglichen trafen sich die beiden nie, und der Vorschlag blieb immer leer.
+    tage = {schul_datum(e.date) for e in stunden if e.date}
     rows = (await db.execute(select(Attendance).where(
         Attendance.owner_id == user.id,
         Attendance.student_id.in_([x.id for x in studs]),
@@ -331,14 +335,14 @@ async def gefehlt_vorschlag(session_id: int, user: User = Depends(get_current_us
     # wer zu spaet kam, hat den groessten Teil der Stunde mitbekommen.
     fehlend = {}
     for r in rows:
-        if r.status in ("fehlt", "entsch") and r.date and r.date.date() in tage:
-            fehlend.setdefault(r.date.date(), set()).add(r.student_id)
+        if r.status in ("fehlt", "entsch") and r.date and schul_datum(r.date) in tage:
+            fehlend.setdefault(schul_datum(r.date), set()).add(r.student_id)
     if not fehlend:
         return {}
     karte = {x.id: x.card_id for x in studs}
     out = {}
     for e in stunden:
-        tag = e.date.date() if e.date else None
+        tag = schul_datum(e.date) if e.date else None
         for sid in fehlend.get(tag, set()):
             cid = karte.get(sid)
             if cid is None:

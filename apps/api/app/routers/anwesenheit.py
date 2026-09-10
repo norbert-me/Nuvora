@@ -3,10 +3,8 @@
 Eigenstaendig (Regel 3): Schueler kommen aus dem Kern, hier liegt nur der
 Status je (Schueler, Datum). status: da | fehlt | spaet | entsch.
 """
-import os
 from datetime import datetime, timezone
 from typing import Optional
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -19,6 +17,7 @@ from ..schueler import in_klasse, sortiert
 from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
 from ..models import Attendance, CalendarBreak, Student, User
+from ..zeit import SCHUL_TZ, schul_datum
 from .auth import rate_limit
 from .modules import modul_pflicht
 
@@ -38,29 +37,21 @@ require_module = modul_pflicht(MODULE_KEY)
 _owned_class = klasse_oder_403
 
 
-# Ein Schultag ist ein Tag der SCHULE, kein UTC-Tag.
-#
-# Der Browser schickt den gewaehlten Tag als Zeitpunkt („2026-09-09" wird zu
-# Mitternacht Ortszeit und damit zu 2026-09-08T22:00Z). Wer danach in UTC
-# gruppiert, legt jede Anwesenheit auf den VORTAG — im Notenbuch stand die
-# Markierung am 08.09., obwohl das Kind am 09.09. gefehlt hatte, und sie blieb
-# dort, weil sie jeden Tag um dieselbe Stunde daneben liegt. Gerechnet wird
-# deshalb in der Zeitzone der Schule; das repariert zugleich den Bestand.
-_SCHUL_TZ = ZoneInfo(os.environ.get("SCHOOL_TZ", "Europe/Berlin"))
-
-
+# Ein Schultag ist ein Tag der SCHULE, kein UTC-Tag — die Rechnung dazu steht
+# im Kern (`app/zeit.py`), damit sie nicht in jedem Router noch einmal entsteht.
+# JEDE Tagesrechnung dieses Moduls laeuft darueber: Eintragen, Lesen, Zaehlen,
+# Ferienabgleich, Druck. Blieb eine Stelle bei `d.date()` (also UTC), zaehlte
+# sie den Vortag.
 def _schul_tag(d: datetime) -> str:
-    """Der Kalendertag, den dieser Zeitpunkt an der Schule hat."""
-    if d.tzinfo is None:
-        d = d.replace(tzinfo=timezone.utc)
-    return d.astimezone(_SCHUL_TZ).strftime("%Y-%m-%d")
+    """Der Schultag als „YYYY-MM-DD"."""
+    return schul_datum(d).strftime("%Y-%m-%d")
 
 
 def _day_bounds(d: datetime):
     """Anfang und Ende des Schultags, in den dieser Zeitpunkt faellt."""
     if d.tzinfo is None:
         d = d.replace(tzinfo=timezone.utc)
-    lokal = d.astimezone(_SCHUL_TZ)
+    lokal = d.astimezone(SCHUL_TZ)
     start = lokal.replace(hour=0, minute=0, second=0, microsecond=0)
     return start, start.replace(hour=23, minute=59, second=59)
 
@@ -188,7 +179,7 @@ async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
             # schicken ohnehin ISO-Zeitpunkte mit „Z".
             # In der Zeitzone der Schule, nicht in UTC: die Spalte traegt
             # einen Kalendertag, keinen Zeitpunkt.
-            tage.append(datetime.strptime(teil, "%Y-%m-%d").replace(tzinfo=_SCHUL_TZ))
+            tage.append(datetime.strptime(teil, "%Y-%m-%d").replace(tzinfo=SCHUL_TZ))
         except ValueError:
             continue    # Unlesbares faellt still heraus: eine Spalte ohne Datum ist kein Fehler
         if len(tage) >= 40:
@@ -283,9 +274,12 @@ async def _break_days(db: AsyncSession, user: User) -> list:
 
 
 def _in_break(d, ranges) -> bool:
-    day = d.date() if hasattr(d, "date") else d
+    # Beide Seiten als SCHULTAG: der Eintrag liegt auf lokaler Mitternacht (in
+    # UTC also am Vortag), der Ferienzeitraum auf UTC-Mitternacht. Roh
+    # verglichen lag der erste Ferientag immer eine Tagesgrenze daneben.
+    day = schul_datum(d)
     for lo, hi in ranges:
-        if lo.date() <= day <= hi.date():
+        if schul_datum(lo) <= day <= schul_datum(hi):
             return True
     return False
 
@@ -304,7 +298,7 @@ async def student_history(class_id: int, student_id: int, user: User = Depends(r
     # sind eine Abwesenheit, keine drei.
     proTag = {}
     for r in rows:
-        key = r.date.date()
+        key = schul_datum(r.date)
         cur = proTag.get(key)
         if cur is None or _RANK.get(r.status, 0) > _RANK.get(cur["status"], 0):
             proTag[key] = {"date": r.date.isoformat(), "status": r.status, "note": r.note, "period": r.period}
@@ -403,7 +397,9 @@ async def student_report(class_id: int, student_id: int, user: User = Depends(re
         for r in rows:
             if y < 20 * mm:
                 c.showPage(); y = h - 25 * mm; c.setFont("Helvetica", 10)
-            d = datetime.fromisoformat(r["date"]).strftime("%d.%m.%Y")
+            # Der Schultag, nicht der UTC-Tag: sonst steht im PDF der 08.09.,
+            # waehrend die Lehrkraft den Eintrag am 09.09. gesetzt hat.
+            d = schul_datum(datetime.fromisoformat(r["date"])).strftime("%d.%m.%Y")
             c.drawString(20 * mm, y, d)
             c.drawString(55 * mm, y, _LABEL.get(r["status"], r["status"]))
             c.drawString(95 * mm, y, (r.get("note") or "")[:45])
@@ -431,7 +427,7 @@ async def summary(class_id: int, user: User = Depends(require_module), db: Async
     for r in rows:
         if _in_break(r.date, breaks):
             continue
-        key = (r.student_id, r.date.date())
+        key = (r.student_id, schul_datum(r.date))
         if key not in proTag or _RANK.get(r.status, 0) > _RANK.get(proTag[key], 0):
             proTag[key] = r.status
     agg: dict = {}
