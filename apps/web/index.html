@@ -150,14 +150,17 @@
         input:not(.keep-fontsize), select, textarea:not(.keep-fontsize) { font-size: 16px !important; }
       }
       input, select, textarea { background: var(--input-bg); color: var(--text); border-color: var(--border2); }
-      /* Der Anfasser zum Groesserziehen zeichnet das Betriebssystem selbst —
-         eine kleine Treppe aus Strichen, die in einer runden Ecke sitzt und
-         dort ueber den Rand ragt. Sichtbar bleibt er als Bild nicht; die
-         Funktion bleibt (Cursor und Ziehen an der Ecke arbeiten weiter), und
-         die Felder wachsen ohnehin mit dem Text (AutoTextarea). Der
-         Notizzettel dagegen ist eine KARTE mit `resize: both` — dort ist der
-         Griff die einzige Ansage, dass man ziehen kann, und bleibt. */
-      textarea::-webkit-resizer { background: transparent; }
+      /* Der Anfasser zum Groesserziehen: das Betriebssystem zeichnet eine
+         kleine graue Treppe aus Strichen, die in der runden Ecke halb
+         verschwindet — man sieht dem Feld nicht an, dass man daran ziehen
+         kann. Eine Zeit lang war er deshalb ganz unsichtbar (`transparent`),
+         und damit war die Ansage endgueltig weg. Stattdessen jetzt ein
+         eigener Keil in der Akzentfarbe: rund 5 px stark gegen den 1-px-Rand
+         daneben, in der Ecke abgerundet wie das Feld selbst. */
+      textarea::-webkit-resizer {
+        background: linear-gradient(135deg, transparent 0 52%, var(--accent) 52% 100%);
+        border-bottom-right-radius: 8px;
+      }
       input:focus, select:focus, textarea:focus {
         outline: none; border-color: var(--accent) !important;
         box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);

@@ -723,6 +723,69 @@ export default function Sitzplan() {
     panRef.current = null;
   };
 
+  // Zwei Finger zoomen — und das Trackpad zieht mit.
+  //
+  // Auf dem Tablet ist die Zangengeste die naheliegende: wer den Raum groesser
+  // sehen will, zieht ihn auseinander und sucht nicht die Lupe in der Leiste.
+  // Ohne eigenen Handgriff zoomte stattdessen die ganze SEITE, und danach lag
+  // der Sitzplan halb ausserhalb des Fensters. Zwei Regeln: der Punkt zwischen
+  // den Fingern bleibt stehen (sonst springt der Raum beim Aufziehen weg), und
+  // gerechnet wird auf der unskalierten Flaeche — der Zoom ist nur ein
+  // `transform`, die Positionen bleiben, wie sie gespeichert sind.
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let start = null;
+    const abstand = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const mitte = (a, b) => ({ x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 });
+    // Der Punkt der Flaeche (ohne Zoom), der gerade unter dem Finger liegt.
+    const punkt = (mx, my, z) => {
+      const r = el.getBoundingClientRect();
+      return { px: (el.scrollLeft + mx - r.left) / z, py: (el.scrollTop + my - r.top) / z };
+    };
+    const setzen = (z, mx, my, p) => {
+      const neu = Math.max(0.5, Math.min(2, z));
+      const r = el.getBoundingClientRect();
+      setZoom(Math.round(neu * 100) / 100);
+      el.scrollLeft = p.px * neu - (mx - r.left);
+      el.scrollTop = p.py * neu - (my - r.top);
+    };
+    const onStart = (e) => {
+      if (e.touches.length !== 2) return;
+      const m = mitte(e.touches[0], e.touches[1]);
+      start = { d: abstand(e.touches[0], e.touches[1]), z: zoomRef.current, ...punkt(m.x, m.y, zoomRef.current) };
+    };
+    const onMove = (e) => {
+      if (!start || e.touches.length !== 2) return;
+      e.preventDefault();   // sonst zoomt der Browser die ganze Seite
+      const m = mitte(e.touches[0], e.touches[1]);
+      setzen(start.z * (abstand(e.touches[0], e.touches[1]) / start.d), m.x, m.y, start);
+    };
+    const onEnde = (e) => { if (!e.touches || e.touches.length < 2) start = null; };
+    // Die Zangengeste auf dem Trackpad kommt als Rad-Ereignis MIT Strg an —
+    // dieselbe Geste, derselbe Handgriff.
+    const onWheel = (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const z = zoomRef.current;
+      setzen(z * Math.exp(-e.deltaY / 200), e.clientX, e.clientY, punkt(e.clientX, e.clientY, z));
+    };
+    el.addEventListener("touchstart", onStart, { passive: false });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnde);
+    el.addEventListener("touchcancel", onEnde);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnde);
+      el.removeEventListener("touchcancel", onEnde);
+      el.removeEventListener("wheel", onWheel);
+    };
+  }, []);
+
   return (
     <div style={{ maxWidth: "none" }}>
       <Werkzeugleiste

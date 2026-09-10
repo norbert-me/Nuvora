@@ -182,7 +182,6 @@ export default {
   "personen.neuName": "Nombre del niño",
   "personen.inKurs": "Añadir a un curso:",
   "personen.kursWaehlen": "Elegir curso …",
-  "personen.kursAngaben": "Medidas",
   "personen.titel": "Personas",
   "personen.suche": "Buscar nombre o curso",
   "personen.leer": "Todavía no hay alumnado — aparece con la primera clase o el primer curso.",

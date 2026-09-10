@@ -57,7 +57,6 @@ export default function Personen() {
   const [nameEdit, setNameEdit] = useState(null);   // { id, wert }
   const [fotoVer, setFotoVer] = useState(0);
   const [qr, setQr] = useState(null);               // { token, name }
-  const [angabenFuer, setAngabenFuer] = useState(null);   // student_id, dessen Kurs-Angaben offen sind
   const [kurse, setKurse] = useState([]);
   const [neuName, setNeuName] = useState("");
   useEffect(() => { fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => setKurse(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
@@ -275,18 +274,7 @@ export default function Personen() {
                           <button onClick={() => setQr({ token: teil.token, name: p.name })}
                             style={{ ...btnSecondary, ...btnSmall }}>{t("personen.qr")}</button>
                         )}
-                        {teil.kurs_id && (
-                          <button onClick={() => setAngabenFuer(angabenFuer === teil.student_id ? null : teil.student_id)}
-                            style={{ ...btnSecondary, ...btnSmall }}>{t("personen.kursAngaben")}</button>
-                        )}
                       </div>
-                      {/* Alles, was an DIESEM Kurs hängt — dieselbe Maske wie im
-                          Kurs selbst, nur von der Person aus erreichbar. */}
-                      {angabenFuer === teil.student_id && teil.kurs_id && (
-                        <div style={{ marginBottom: 8 }}>
-                          <SchuelerAngaben studentId={teil.student_id} kursId={teil.kurs_id} t={t} />
-                        </div>
-                      )}
                       {(teil.themen || []).length === 0 ? (
                         <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("personen.keineThemen")}</p>
                       ) : (

@@ -181,7 +181,6 @@ export default {
   "personen.neuName": "Child's name",
   "personen.inKurs": "Add to a course:",
   "personen.kursWaehlen": "Choose course …",
-  "personen.kursAngaben": "Adjustments",
   "personen.titel": "Students",
   "personen.suche": "Search name or course",
   "personen.leer": "No students yet — they appear with your first class or course.",

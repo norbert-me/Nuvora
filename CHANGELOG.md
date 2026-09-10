@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Sitzplan: zoomen mit zwei Fingern** (und mit der Zangengeste am Trackpad).
+- Textfelder zeigen die Ecke zum Größerziehen wieder — als kräftiger Keil in der
+  Akzentfarbe statt der grauen Treppe, die in der runden Ecke verschwand.
+- Person: der Knopf „Maßnahmen" an der Kurszeile ist weg.
 - Notenbuch: die Auswahl „Teilkurs" ist weg — das gibt es nicht.
 - Notenliste: der Schülerdialog schließt über das Kreuz oben rechts; der
   „Schließen"-Knopf unter der Maske ist weg.

@@ -183,7 +183,6 @@ export default {
   "personen.neuName": "Name des Kindes",
   "personen.inKurs": "In einen Kurs aufnehmen:",
   "personen.kursWaehlen": "Kurs wählen …",
-  "personen.kursAngaben": "Maßnahmen",
   "personen.titel": "Personen",
   "personen.suche": "Name oder Kurs suchen",
   "personen.leer": "Noch keine Kinder — sie entstehen mit der ersten Klasse oder dem ersten Kurs.",
