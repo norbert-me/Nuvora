@@ -24,7 +24,16 @@ import { COLORS as C, ICONS, Icon, NiveauToggle, chipStyle, iconBtn, inputStyle,
 
 const titel = { fontSize: 13, fontWeight: 600, color: "var(--text)", margin: "14px 0 6px" };
 
-export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau = false, t }) {
+/**
+ * `nurLesen`: dieselbe Quelle, nur zum ANSEHEN.
+ *
+ * Aus dem Notenbuch heraus wird nichts gepflegt — dort sitzt die Lehrkraft an
+ * den Noten und will wissen, was es zu dem Kind gibt. Und was es NICHT gibt,
+ * gehoert dann auch nicht auf den Bildschirm: leere Abschnitte fallen ganz weg,
+ * statt als leere Ueberschrift Platz zu kosten. Gepflegt wird im Kurs und auf
+ * der Personenseite.
+ */
+export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau = false, nurLesen = false, t }) {
   const [person, setPerson] = useState(null);
   const [basis, setBasis] = useState(null);
   const entwurfRef = useRef(null);
@@ -70,6 +79,29 @@ export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau =
 
   if (!person || !basis) return null;
   const w = e.wert;
+
+  if (nurLesen) {
+    const zeilen = [
+      !ohneNiveau && niveauImKurs && w.niveau
+        && [t("noten.course"), w.niveau === "E" ? t("noten.courseE") : t("noten.courseG")],
+      (w.foerder || []).length > 0 && [t("classes.supportNeeds"), w.foerder.join(", ")],
+      kursId && (w.massnahmen || []).length > 0
+        && [t("classes.measures"), w.massnahmen.map((m) => [m.art, m.detail].filter(Boolean).join(": ")).join(" · ")],
+      (w.klassenlehrer || "").trim() && [t("classes.classTeacher"), w.klassenlehrer],
+      (w.notizen || "").trim() && [t("classes.notes"), w.notizen],
+    ].filter(Boolean);
+    if (!zeilen.length) return null;
+    return (
+      <div style={{ marginBottom: 16 }}>
+        {zeilen.map(([k, v]) => (
+          <div key={k} style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 14 }}>
+            <span style={{ color: "var(--text3)", minWidth: 120, flexShrink: 0 }}>{k}</span>
+            <span style={{ fontWeight: 500, whiteSpace: "pre-wrap", minWidth: 0 }}>{v}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
   const toggleFoerder = (wert) => e.setz((v) => ({
     foerder: (v.foerder || []).includes(wert) ? v.foerder.filter((f) => f !== wert) : [...(v.foerder || []), wert],
   }));

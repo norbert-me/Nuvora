@@ -18,7 +18,7 @@ import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
 import { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
-import { useAktiv } from "../core/modules.js";
+import { useAktiv, useZielFilter } from "../core/modules.js";
 import { datumKurz } from "../core/grades.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
@@ -946,7 +946,7 @@ export default function Noten() {
       <SpeicherBalken entwurf={entwurf} />
 
       {infoFuer && (
-        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} className={cls?.name} kursId={kursId} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} />
+        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} classId={classId} kursId={kursId} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} />
       )}
     </div>
   );
@@ -1501,7 +1501,43 @@ function KommentarForm({ t, initial = "", onSave, onCancel }) {
   );
 }
 
-function StudentInfo({ t, student, summary, sections, entries = [], className, kursId = null, onZeugnis, onClose }) {
+/**
+ * Fehlzeiten dieses Kindes — die Frage, die beim Blick auf eine Note zuerst
+ * kommt („war es ueberhaupt da?").
+ *
+ * Sie stehen im Modul Orga, nicht in der Auswertung: ohne das Modul (oder mit
+ * abgeschaltetem Teil „Anwesenheit") faellt die Zeile weg, kein Fehler und kein
+ * leerer Kasten (Regel 3). Gezaehlt wird ueber alles, was erfasst ist — dieselbe
+ * Zusammenfassung, die die Anwesenheitsliste zeigt.
+ */
+function Fehlzeiten({ classId, studentId, t }) {
+  const zielDa = useZielFilter();
+  const an = zielDa({ modul: "orga", option: "anwesenheit" });
+  const [zahlen, setZahlen] = useState(null);
+  useEffect(() => {
+    if (!an || !classId || !studentId) { setZahlen(null); return; }
+    let ab = false;
+    hol(`/api/anwesenheit/${classId}/summary`)
+      .then((d) => { if (!ab) setZahlen((d && typeof d === "object" ? d[String(studentId)] : null) || null); })
+      .catch(() => { /* ohne Anwesenheit bleibt die Zeile weg */ });
+    return () => { ab = true; };
+  }, [an, classId, studentId]);
+  if (!zahlen) return null;
+  const teile = [
+    zahlen.fehlt ? `${zahlen.fehlt}× ${t("anwesenheit.fehlt")}` : null,
+    zahlen.entsch ? `${zahlen.entsch}× ${t("anwesenheit.entsch")}` : null,
+    zahlen.spaet ? `${zahlen.spaet}× ${t("anwesenheit.spaet")}` : null,
+  ].filter(Boolean);
+  if (!teile.length) return null;
+  return (
+    <div style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 14 }}>
+      <span style={{ color: "var(--text3)", minWidth: 120, flexShrink: 0 }}>{t("anwesenheit.title")}</span>
+      <span style={{ fontWeight: 500 }}>{teile.join(" · ")}</span>
+    </div>
+  );
+}
+
+function StudentInfo({ t, student, summary, sections, entries = [], classId = null, kursId = null, onZeugnis, onClose }) {
   // Hook vor jedem fruehen Ausstieg: sonst haengt die Hook-Reihenfolge daran,
   // ob gerade ein Kind gewaehlt ist.
   const [bereich, setBereich] = useState("gesamt");
@@ -1566,17 +1602,17 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, k
         {/* Zu ist das Kreuz oben rechts (DialogKopf) — ein zweiter
             „Schliessen"-Knopf unter einer langen Maske ist derselbe Weg,
             nur weiter unten. */}
-        <DialogKopf titel={student.name} onClose={onClose} schliessenLabel={t("noten.close")} style={{ marginBottom: 4 }}>
+        <DialogKopf titel={student.name} onClose={onClose} schliessenLabel={t("noten.close")} style={{ marginBottom: 12 }}>
           {onZeugnis && <button onClick={onZeugnis} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, whiteSpace: "nowrap" }} title={t("noten.zeugnisHint")}>{t("noten.zeugnis")}</button>}
         </DialogKopf>
-        <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{className}</p>
 
-        {/* Die Angaben zur Person stehen hier nicht nur, sie sind hier auch
-            aenderbar — vorher lag E/G im Kurs und der Foerderschwerpunkt in der
-            Klasse, und wer beim Eintragen der Noten etwas nachtragen wollte,
-            musste die Seite verlassen. Eine Komponente fuer alle Orte
-            (components/SchuelerAngaben.jsx). */}
-        <SchuelerAngaben studentId={student.id} kursId={kursId} t={t} />
+        {/* Aus dem Notenbuch heraus wird nur ANGESEHEN, nicht gepflegt: hier
+            sitzt die Lehrkraft an den Noten und will wissen, was es zu dem Kind
+            gibt. Was leer ist, faellt weg — eine Ueberschrift ohne Inhalt sagt
+            nichts und kostet die halbe Maske. Geaendert wird im Kurs und auf der
+            Personenseite; dieselbe Komponente, nur ohne Felder. */}
+        <Fehlzeiten classId={classId} studentId={student.id} t={t} />
+        <SchuelerAngaben studentId={student.id} kursId={kursId} nurLesen t={t} />
 
         <GradeChart series={serie} t={t}
           titel={bereich === "gesamt" ? t("noten.verlauf") : t("noten.verlaufSection", { name: secName })}

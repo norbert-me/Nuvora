@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Notenbuch, Klick auf einen Namen: der Dialog zeigt jetzt an, statt zu
+  bearbeiten** — und zeigt die **Fehlzeiten** (fehlt, entschuldigt, verspätet).
+  Leere Angaben bleiben weg, der Kursname steht nicht mehr doppelt.
 - **Sitzplan: Ziehen auf den Mülleimer löscht wieder.** Die Speicherleiste lag
   genau darüber und verdeckte ihn; eine abgebrochene Geste löscht jetzt nicht
   mehr.
