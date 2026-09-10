@@ -7,7 +7,6 @@ import { sparsamAn, setzeSparsam } from "../core/sparsam.js";
 import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel, Toggle,
   sectionLabel, Tabs, th as thBasis, td as tdBasis, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
-import OfflineDiagnose from "../components/OfflineDiagnose.jsx";
 import { alsJson } from "../core/melden.js";
 import { useModules } from "../core/modules.js";
 import BugAdmin from "../components/BugAdmin.jsx";
@@ -443,17 +442,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
 
       {/* App laden: derselbe Nuvora-Server, nur in einem eigenen Fenster. Es
           steht hier und nicht in der Fusszeile, weil es zur eigenen
-          Arbeitsumgebung gehoert wie die Sprache. Plattformen ohne fertige
-          Datei bleiben SICHTBAR und sagen „in Vorbereitung" — die Frage „gibt
-          es das fuer Windows?" beantwortet die Seite sonst gar nicht. */}
-      {/* Warum geht es hier nicht offline? Das beantwortet das Geraet selbst —
-          und zwar direkt ueber den Apps, weil die Frage dort gestellt wird
-          („brauche ich dafuer die App?"). Meist ist die Antwort: die Adresse
-          faengt mit http:// an. */}
-      <Abschnitt id="offline" titel={t("profile.offline")}>
-        <OfflineDiagnose />
-      </Abschnitt>
-
+          Arbeitsumgebung gehoert wie die Sprache. Nur Plattformen mit einer
+          Datei stehen in der Liste. */}
       <Abschnitt id="apps" titel={t("profile.apps")}>
         {/* Nur in der iPhone-/iPad-Huelle: sie merkt sich die Serveradresse in
             ihrer EIGENEN Herkunft (capacitor://localhost) — von hier aus ist

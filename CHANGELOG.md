@@ -53,10 +53,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   die Seite sagt es dann. Bestätigte Karten warten offline in der
   Warteschlange, der Scanner zeigt an, wie viele.
 - Nuvora bittet beim Start um dauerhafte Ablage des Offline-Vorrats — ohne
-  Dialog; ob der Browser sie gewährt, steht in der Offline-Bereitschaft.
-- Profil: „Offline-Bereitschaft" sagt auf dem Gerät, woran es hängt — sichere
-  Verbindung, Service Worker, Zwischenspeicher, Datenvorrat, dauerhafte Ablage
-  und wartende Änderungen. Ein Knopf holt den Vorrat sofort.
+  Dialog.
 - Die iPhone-App entsteht in der Release-Pipeline; lokal baut sie
   `scripts/ios-bauen.sh` mit einem Befehl, ohne Xcode zu öffnen.
 
