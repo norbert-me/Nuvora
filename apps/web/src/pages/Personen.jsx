@@ -240,7 +240,10 @@ export default function Personen() {
                     <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("personen.nochNichts")}</p>
                   )}
                   {(stand.teile || []).map((teil) => (
-                    <div key={teil.student_id} style={{ marginBottom: 12 }}>
+                    /* Schlüssel aus Zeile UND Kurs: dieselbe Zeile steht in
+                       mehreren Kursen (Kurs aus einem anderen entwickelt), und
+                       die Zeilennummer allein wäre dann zweimal derselbe Key. */
+                    <div key={`${teil.student_id}-${teil.kurs_id || teil.class_id}`} style={{ marginBottom: 12 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "0 0 6px" }}>
                         <span style={{ ...sectionLabel, margin: 0 }}>{teil.kurs || "—"}</span>
                         {/* Die Noten dieses Kurses, beide Halbjahre — geholt

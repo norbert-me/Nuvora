@@ -50,6 +50,50 @@ async def _zeilen(db: AsyncSession, person: Person) -> List[Student]:
         select(Student).where(Student.person_id == person.id))).scalars().all())
 
 
+async def _kurse_je_zeile(db: AsyncSession, zeilen: List[Student], klassen: dict, kurse: dict) -> dict:
+    """Alle Kurse jeder Listenzeile — auf allen Wegen, ohne Doppelte.
+
+    Eine Zeile gehoert auf drei Arten zu einem Kurs: ueber die alte Spalte
+    `students.kurs_id`, ueber ihre Klasse (`kurs_tags`, ersatzweise deren alte
+    `kurs_id`) und ueber die EINZELNE Mitgliedschaft (`kurs_students`). Der
+    dritte Weg ist kein Sonderfall: „aus einem anderen Kurs entwickeln" legt
+    genau ihn an — die Zeile bleibt, wo sie war, nur die Mitgliedschaft kommt
+    dazu. Wer nur `kurs_id` liest, sieht den neuen Kurs nie.
+
+    Steht hier und nicht zweimal, weil Liste und Detailsicht dieselbe Frage
+    stellen: zwei Fassungen waren zwei Antworten, und genau daran fehlte in der
+    Detailsicht ein Kurs, den die Liste darueber schon zeigte.
+    """
+    from ..models import KursStudent
+
+    einzeln: dict = {}
+    ueber_klasse: dict = {}
+    sids = [z.id for z in zeilen]
+    cids = [z.class_id for z in zeilen if z.class_id]
+    if sids:
+        for kid, sid in (await db.execute(select(KursStudent.kurs_id, KursStudent.student_id)
+                                          .where(KursStudent.student_id.in_(sids)))).all():
+            einzeln.setdefault(sid, []).append(kid)
+    if cids:
+        for kid, cid in (await db.execute(select(KursTag.kurs_id, KursTag.class_id)
+                                          .where(KursTag.class_id.in_(cids)))).all():
+            ueber_klasse.setdefault(cid, []).append(kid)
+
+    out: dict = {}
+    for z in zeilen:
+        kandidaten = [z.kurs_id, getattr(klassen.get(z.class_id), "kurs_id", None)]
+        kandidaten += einzeln.get(z.id, [])
+        kandidaten += ueber_klasse.get(z.class_id, [])
+        liste, gesehen = [], set()
+        for kid in kandidaten:
+            k = kurse.get(kid)
+            if k and k.id not in gesehen:
+                gesehen.add(k.id)
+                liste.append(k)
+        out[z.id] = liste
+    return out
+
+
 @router.get("", response_model=List[PersonOut])
 async def list_personen(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Alle Kinder dieser Lehrkraft — einmal je Kind, nicht je Liste."""
@@ -74,32 +118,14 @@ async def list_personen(user: User = Depends(get_current_user), db: AsyncSession
         SchoolClass.owner_id == user.id))).scalars().all()}
     kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)))).scalars().all()}
-    # Ein Kind sitzt in MEHREREN Kursen — und auf drei Wegen: der Kurs an der
-    # Zeile, der Kurs ihrer Klasse und die einzelne Mitgliedschaft
-    # (kurs_students). Der dritte fehlte, und genau ueber ihn laufen alle
-    # Kurse, die im Kurs selbst angelegt wurden: die Liste zeigte dann zu
-    # wenige oder gar keine.
-    from ..models import KursStudent, KursTag
-
-    sids = [z.id for z in zeilen]
-    einzeln = {}
-    if sids:
-        for kid, sid in (await db.execute(select(KursStudent.kurs_id, KursStudent.student_id)
-                                          .where(KursStudent.student_id.in_(sids)))).all():
-            einzeln.setdefault(sid, []).append(kid)
-    ueber_klasse = {}
-    for kid, cid in (await db.execute(select(KursTag.kurs_id, KursTag.class_id))).all():
-        ueber_klasse.setdefault(cid, []).append(kid)
-
+    # Ein Kind sitzt in MEHREREN Kursen, und auf mehreren Wegen dorthin —
+    # `_kurse_je_zeile` kennt sie alle.
+    je_zeile = await _kurse_je_zeile(db, zeilen, klassen, kurse)
     je_person = {}
     for z in zeilen:
         namen = je_person.setdefault(z.person_id, [])
-        kandidaten = [z.kurs_id, getattr(klassen.get(z.class_id), "kurs_id", None)]
-        kandidaten += einzeln.get(z.id, [])
-        kandidaten += ueber_klasse.get(z.class_id, [])
-        for kid in kandidaten:
-            k = kurse.get(kid)
-            if k and k.name not in namen:
+        for k in je_zeile.get(z.id, []):
+            if k.name not in namen:
                 namen.append(k.name)
     return [PersonOut(id=p.id, name=p.name, niveau=p.niveau or "",
                       kurse=je_person.get(p.id, []), has_photo=p.has_photo) for p in leute]
@@ -279,7 +305,7 @@ async def auswertung(person_id: int, user: User = Depends(get_current_user),
     klassen = {c.id: c for c in (await db.execute(select(SchoolClass).where(
         SchoolClass.owner_id == user.id))).scalars().all()}
     kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
-        Kurs.owner_id == user.id))).scalars().all()}
+        Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)))).scalars().all()}
 
     aus = {"id": person.id, "name": person.name, "niveau": person.niveau or "",
            # Art. 9 — nur hier, bei EINEM Kind, nie in einer Liste (dieselbe
@@ -303,8 +329,28 @@ async def auswertung(person_id: int, user: User = Depends(get_current_user),
     # zweite Fassung waere eine zweite Wahrheit — derselbe Grund, aus dem
     # trash.py die Modul-Funktionen aufruft statt sie abzuschreiben.
     from .results import themenprofil as _themenstand
+
+    # EIN Teil je KURS, nicht je Listenzeile. Dieselbe Zeile ist oft in
+    # mehreren Kursen Mitglied — beim Entwickeln eines Kurses aus einem anderen
+    # entsteht genau das: die Zeile bleibt mit ihrer alten `kurs_id` stehen,
+    # dazu kommt nur eine Mitgliedschaft. Wer je Zeile EINEN Kurs bestimmt,
+    # zeigt hier deshalb weniger Kurse als die Liste eine Ebene darueber, und
+    # der neue Kurs „wird nicht angezeigt".
+    #
+    # Doppelte fallen weg: derselbe Kurs kann ueber zwei Zeilen der Person
+    # erreichbar sein (Fach-Klassen), gemeint ist er einmal. Eine Zeile ohne
+    # jeden Kurs behaelt ihren alten Platz mit dem Klassennamen.
+    je_zeile = await _kurse_je_zeile(db, zeilen, klassen, kurse)
+    paare, gesehen = [], set()
     for z in zeilen:
-        kurs = kurse.get(z.kurs_id) or kurse.get(getattr(klassen.get(z.class_id), "kurs_id", None))
+        for kurs in (je_zeile.get(z.id) or [None]):
+            marke = ("kurs", kurs.id) if kurs else ("klasse", z.class_id)
+            if marke in gesehen:
+                continue
+            gesehen.add(marke)
+            paare.append((z, kurs))
+
+    for z, kurs in paare:
         teil = {"student_id": z.id, "class_id": z.class_id,
                 # Die Kurs-ID gehoert dazu: an ihr haengen die
                 # Nachteilsausgleiche (mehr Zeit in Mathe heisst nicht dasselbe
@@ -327,8 +373,10 @@ async def auswertung(person_id: int, user: User = Depends(get_current_user),
             from .noten import _summarize
             for hj in ("1", "2"):
                 try:
+                    # Der Kurs DIESES Teils, nicht der an der Zeile: die Noten
+                    # sollen zu der Ueberschrift gehoeren, unter der sie stehen.
                     _sec, zeilen_ = await _summarize(db, user, z.class_id, hj,
-                                                     kurs_id=z.kurs_id or getattr(klassen.get(z.class_id), "kurs_id", None))
+                                                     kurs_id=kurs.id if kurs else None)
                 except Exception:
                     continue          # eine stumme Quelle darf die Sicht nicht kippen
                 # `_summarize` liefert StudentSummary-Objekte, keine Dicts —
