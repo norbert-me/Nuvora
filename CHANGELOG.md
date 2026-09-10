@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Deploy: der Lauf sagt jetzt im Kopf, WELCHER Stand hochgeht (Commit, Uhrzeit,
+  Warnung bei ungespeicherten oder ungepushten Änderungen). Und der Service
+  Worker wird nicht mehr gecacht — sonst wirkt ein Deploy stundenlang „gleich".
 - **Die App aktualisiert sich mit einem Klick.** „Jetzt aktualisieren" lädt die
   neue Fassung, legt sie über die alte und startet neu — kein Umweg mehr über
   GitHub, kein DMG zum Selberziehen.

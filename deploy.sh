@@ -197,6 +197,29 @@ echo "Server: $SERVER"
 echo "Pfad:   $REMOTE_DIR"
 echo "Port:   $PORT"
 echo "Build:  ${BUILD_SERVICES:-alle Services}"
+
+# ─── Welcher Stand geht da eigentlich hoch? ───
+#
+# rsync schickt das ARBEITSVERZEICHNIS, nicht den letzten Commit. Das ist
+# gewollt (man will auch mal etwas ausprobieren, ohne vorher zu committen), aber
+# hinterher sieht man dem Server nicht an, was auf ihm liegt: „ich habe doch
+# deployt, im Web ist nichts anders" ist genau dieser blinde Fleck — der Lauf
+# war in Ordnung, er lag nur vor den letzten Aenderungen. Deshalb steht hier
+# jetzt, WAS ausgeliefert wird: Commit, Uhrzeit, und ob daneben ungespeicherte
+# Aenderungen liegen oder Commits noch nicht gepusht sind.
+if git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  STAND_HASH="$(git -C "$DIR" log -1 --format='%h %s' 2>/dev/null || echo '?')"
+  STAND_ZEIT="$(git -C "$DIR" log -1 --format='%cd' --date=format:'%d.%m. %H:%M' 2>/dev/null || echo '?')"
+  echo "Stand:  $STAND_HASH ($STAND_ZEIT)"
+  if [ -n "$(git -C "$DIR" status --porcelain 2>/dev/null)" ]; then
+    ANZ="$(git -C "$DIR" status --porcelain | wc -l | tr -d ' ')"
+    echo "        ⚠ $ANZ Datei(en) mit ungespeicherten Änderungen — sie gehen MIT hoch."
+  fi
+  # Ohne `fetch` (der Deploy soll nicht am Netz zu GitHub haengen): verglichen
+  # wird mit dem zuletzt bekannten Stand des Remotes.
+  VORAUS="$(git -C "$DIR" rev-list --count '@{upstream}..HEAD' 2>/dev/null || echo 0)"
+  [ "${VORAUS:-0}" -gt 0 ] 2>/dev/null && echo "        ⚠ $VORAUS Commit(s) noch nicht gepusht."
+fi
 echo ""
 
 phase_start liefern "$PHASE1_ETAPPEN"

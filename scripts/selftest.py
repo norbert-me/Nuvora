@@ -123,6 +123,23 @@ def teste_system(api, b):
 
     b.pruefe("System", "Lernpfad wird nicht gecacht", lp_nicht_gecacht)
 
+    def sw_nicht_gecacht():
+        """Der Service-Worker entscheidet, was der Browser sieht.
+
+        Liegt eine alte Fassung im Cache, laeuft sie weiter — der Deploy ist
+        ausgeliefert und die Seite sieht trotzdem aus wie vorher. Browser
+        umgehen den Cache beim Update-Check erst ab max-age > 24 h; alles
+        darunter wird respektiert. Warnung und kein Fehler: den Kopf setzt oft
+        ein VORGESCHALTETER Proxy, an den diese Installation nicht herankommt.
+        """
+        api.call("GET", "/sw.js", erwartet=(200,), roh=True)
+        cc = (api.letzte_kopfe.get("cache-control") or "").lower()
+        if "no-cache" not in cc and "no-store" not in cc:
+            raise AssertionError(f"Cache-Control: {cc or '(fehlt)'} — ein Deploy wird bis zu so lange nicht sichtbar")
+        return f"Cache-Control: {cc}"
+
+    b.pruefe("System", "Service-Worker wird nicht gecacht", sw_nicht_gecacht, schwere="warnung")
+
 
 # ───────────────── 1b. Erreichbarkeit, Sicherheit, Web-Dateien ─────────────────
 
