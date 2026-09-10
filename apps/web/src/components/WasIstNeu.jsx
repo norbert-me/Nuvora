@@ -9,6 +9,35 @@ import { modalOverlay, modalPanel, overlayGuard, btnPrimary, btnSecondary } from
 // Der Text kommt als Markdown-Ausschnitt aus CHANGELOG.md. Gerendert wird nur,
 // was dort wirklich vorkommt — fette Zwischenüberschriften und Listenpunkte;
 // eine Markdown-Bibliothek für zwei Formen wäre 40 kB für nichts.
+/**
+ * Fett MITTEN in der Zeile.
+ *
+ * Die Punkte im CHANGELOG fangen fast alle so an: „- **CardVote erkennt die
+ * Karten im Geraet.** Der Scanner schickte bisher …" — der fette Anfang ist die
+ * Aussage, der Rest die Begruendung. Ohne diese Zerlegung stand im Dialog der
+ * Rohtext mit Sternchen, und die Liste las sich wie eine Textdatei.
+ *
+ * Exportiert, damit die Zerlegung geprueft werden kann (wasIstNeu.test.js) —
+ * eine Markdown-Bibliothek fuer eine Form waere 40 kB fuer nichts.
+ */
+export function teileFett(text) {
+  const teile = [];
+  const re = /\*\*(.+?)\*\*/g;
+  let zuletzt = 0;
+  let m;
+  while ((m = re.exec(text || "")) !== null) {
+    if (m.index > zuletzt) teile.push({ fett: false, text: text.slice(zuletzt, m.index) });
+    teile.push({ fett: true, text: m[1] });
+    zuletzt = m.index + m[0].length;
+  }
+  if (zuletzt < (text || "").length) teile.push({ fett: false, text: text.slice(zuletzt) });
+  return teile;
+}
+
+function Inline({ text }) {
+  return <>{teileFett(text).map((s, i) => (s.fett ? <strong key={i}>{s.text}</strong> : <span key={i}>{s.text}</span>))}</>;
+}
+
 function Zeilen({ text }) {
   const bloecke = [];
   let liste = null;
@@ -34,10 +63,10 @@ function Zeilen({ text }) {
         <div key={i} style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", margin: i ? "16px 0 6px" : "0 0 6px" }}>{b.text}</div>
       ) : b.art === "liste" ? (
         <ul key={i} style={{ margin: "0 0 4px", paddingLeft: 18, display: "grid", gap: 4 }}>
-          {b.punkte.map((p, j) => <li key={j} style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.5 }}>{p}</li>)}
+          {b.punkte.map((p, j) => <li key={j} style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.5 }}><Inline text={p} /></li>)}
         </ul>
       ) : (
-        <p key={i} style={{ fontSize: 13, color: "var(--text2)", margin: "0 0 8px" }}>{b.text}</p>
+        <p key={i} style={{ fontSize: 13, color: "var(--text2)", margin: "0 0 8px" }}><Inline text={b.text} /></p>
       ))}
     </>
   );
