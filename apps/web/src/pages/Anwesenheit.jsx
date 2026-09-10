@@ -105,11 +105,12 @@ export default function Anwesenheit() {
   // Entwurf — sonst zeigte die Liste die Status des vorigen Tages weiter.
   const frisch = useRef(false);
   const loadTag = useCallback(() => {
+    if (globalThis.__LOG) console.log("LOADTAG classId=", classId, "stunde=", stunde);
     if (!classId) return;
     // Bei gewählter Stunde diese Stunde laden (Server belegt sie aus der
     // vorherigen vor); Stunde 0 = ganzer Tag (stärkster Status).
     const p = stunde ? `&period=${stunde}` : "";
-    hol(`${API}/${classId}?date=${isoOf(datum)}${p}`, {}).then((d) => { frisch.current = true; setTag(d || {}); });
+    hol(`${API}/${classId}?date=${isoOf(datum)}${p}`, {}).then((d) => { if (globalThis.__LOG) console.log("LOADTAG-THEN", JSON.stringify(d)); frisch.current = true; setTag(d || {}); });
   }, [classId, datum, stunde]);
   const loadSumme = useCallback(() => {
     if (!classId) return;

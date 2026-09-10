@@ -465,6 +465,7 @@ async function lauf() {
     // ── 5. Menue und Fenster ──
     await menueProbe(app);
     await fensterProbe(app, seite);
+    await fassungProbe(seite);
     await updateProbe(seite);
 
     // ── 2. Anmeldung ueber das echte Formular ──
@@ -633,6 +634,22 @@ async function fensterProbe(app, seite) {
  * beibringen, das mit irgendeiner Adresse zu tun. Ein echter Lauf haette 100 MB
  * geladen und die laufende App ersetzt — das gehoert in keinen Testlauf.
  */
+async function fassungProbe(seite) {
+  const G = "Update";
+  // Die Huelle traegt ihre eigene Fassung (`apps/desktop/package.json`); der
+  // Release-Lauf schreibt sie aus dem Tag um, die Quelle hier nicht. Bleibt sie
+  // zurueck, haelt sich jede aus dem Quelltext gestartete App fuer veraltet:
+  // der Hinweis „neue Fassung" steht dauerhaft oben, und getestet wird eine
+  // Huelle, die es so nie gab. Verglichen wird mit `apps/api/VERSION` — der
+  // Fassung, die auch die Oberflaeche meldet.
+  const projekt = fs.readFileSync(path.resolve(HIER, "..", "apps", "api", "VERSION"), "utf-8").trim();
+  const huelle = await ruhigEvaluate(seite, () => window.nuvora?.appVersion || "", null, "");
+  notiere(G, "Fassung der Hülle", huelle === projekt,
+    huelle === projekt ? `${huelle}` :
+      `Hülle ${huelle || "unbekannt"}, Projekt ${projekt} — die App hält sich für veraltet und zeigt dauerhaft „neue Fassung"`,
+    huelle === projekt ? undefined : "hinweis");
+}
+
 async function updateProbe(seite) {
   const da = await ruhigEvaluate(seite, () => typeof window.nuvora?.updateInstall === "function", null, false);
   notiere("Update", "die Hülle kann die neue Fassung selbst einspielen", da === true,

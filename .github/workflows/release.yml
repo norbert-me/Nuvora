@@ -33,10 +33,11 @@ jobs:
         working-directory: apps/desktop
         run: npm ci
 
-      # Die Huelle traegt ihre eigene Fassung (0.1.0, "Phase 0") — die steht so
-      # im Dateinamen. An einem Release v4.0.2 haenge dann "Nuvora-0.1.0.dmg",
-      # und niemand wuesste, welche App zu welchem Stand gehoert. Hier nur im
-      # Lauf umgeschrieben, nicht im Repo: die Datei heisst nach dem Tag.
+      # Die Fassung im Dateinamen kommt aus dem TAG. Im Repo steht sie ebenfalls
+      # (angeglichen an apps/api/VERSION) — sonst haelt sich jede aus dem
+      # Quelltext gestartete App fuer veraltet und zeigt dauerhaft „neue
+      # Fassung". Hier wird sie trotzdem gesetzt: der Tag ist die Wahrheit des
+      # Releases, und `--allow-same-version` macht den Normalfall geraeuschlos.
       - name: Fassung aus dem Tag uebernehmen
         working-directory: apps/desktop
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
