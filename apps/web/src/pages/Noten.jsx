@@ -11,7 +11,7 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
-import { COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { COLORS as C, CONTROL_R, DialogKopf, Empty, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
@@ -1598,13 +1598,13 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, k
   const secName = sections.find((x) => x.id === bereich)?.name || "";
   return (
     <UiModal onClose={onClose} width={460} label={student.name}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-          <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{student.name}</h3>
-            <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{className}</p>
-          </div>
+        {/* Zu ist das Kreuz oben rechts (DialogKopf) — ein zweiter
+            „Schliessen"-Knopf unter einer langen Maske ist derselbe Weg,
+            nur weiter unten. */}
+        <DialogKopf titel={student.name} onClose={onClose} schliessenLabel={t("noten.close")} style={{ marginBottom: 4 }}>
           {onZeugnis && <button onClick={onZeugnis} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, whiteSpace: "nowrap" }} title={t("noten.zeugnisHint")}>{t("noten.zeugnis")}</button>}
-        </div>
+        </DialogKopf>
+        <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{className}</p>
 
         {/* Die Angaben zur Person stehen hier nicht nur, sie sind hier auch
             aenderbar — vorher lag E/G im Kurs und der Foerderschwerpunkt in der
@@ -1665,7 +1665,6 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, k
           </div>
         )}
 
-        <button onClick={onClose} style={btnSecondary}>{t("noten.close")}</button>
     </UiModal>
   );
 }

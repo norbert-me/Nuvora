@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Notenliste: der Schülerdialog schließt über das Kreuz oben rechts; der
+  „Schließen"-Knopf unter der Maske ist weg.
 - **Stundenplan: Pausen mit Uhrzeiten.** Zwischen den Stunden steht die Pause
   mit Anfang, Ende und Dauer — und lässt sich dort eintragen.
 - Kurs: der Sprung „Dieser Kurs in …" führt jetzt auch zu den Checklisten.
