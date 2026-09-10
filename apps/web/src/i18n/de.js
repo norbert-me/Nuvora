@@ -2199,6 +2199,7 @@ export default {
   "noten.verlaufPick": "Klicken: Verlauf für diesen Bereich anzeigen",
   "noten.verlaufRunningSection": "Jeder Punkt ist der Schnitt dieses Bereichs nach der jeweiligen Note.",
   "noten.verlaufSingleToggle": "Einzelne Noten",
+  "noten.verlaufZuWenig": "Für einen Verlauf braucht es mindestens zwei Noten.",
   "noten.colDefault": "Spalte {{n}}",
   "noten.colDate": "Datum der Leistung",
   "kurse.editYear": "Schuljahr und Vorjahr",

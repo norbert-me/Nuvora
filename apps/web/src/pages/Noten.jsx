@@ -1446,7 +1446,11 @@ function GradeChart({ series, t, titel, hinweis, rechts }) {
   // unzuverlaessig (und nur einzeilig, nach Verzoegerung). Hier steht es sofort
   // und mehrzeilig — Datum, Spalte, Note.
   const [zeigt, setZeigt] = useState(null);   // { x, y, text }
-  if (series.length < 2) return null;
+  // Zu wenig Punkte heisst NICHT „nichts anzeigen": der Umschalter
+  // Schnitt/Einzelnoten haengt an dieser Komponente, und wer beim Umschalten
+  // die ganze Karte verliert, verliert auch den Weg zurueck. Aus einem Punkt
+  // wird trotzdem keine Kurve — dann steht dort ein Satz statt einer Linie.
+  const zuWenig = series.length < 2;
   const W = 340, H = 170, padL = 26, padR = 12, padT = 12, padB = 20;
   const n = series.length;
   const x = (i) => padL + (n === 1 ? 0 : (i * (W - padL - padR)) / (n - 1));
@@ -1460,6 +1464,9 @@ function GradeChart({ series, t, titel, hinweis, rechts }) {
         {rechts}
       </div>
       {hinweis && <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>{hinweis}</div>}
+      {zuWenig ? (
+        <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("noten.verlaufZuWenig")}</p>
+      ) : (<>
       <div style={{ position: "relative" }}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }} role="img" aria-label={t("noten.verlauf")}
         onMouseLeave={() => setZeigt(null)}>
@@ -1500,6 +1507,7 @@ function GradeChart({ series, t, titel, hinweis, rechts }) {
       })()}
       </div>
       <div style={{ fontSize: 11, color: "var(--text3)", textAlign: "right", marginTop: 4 }}>{t("noten.verlaufAxis")}</div>
+      </>)}
     </div>
   );
 }

@@ -2214,6 +2214,7 @@ export default {
   "noten.verlaufPick": "Clic para ver la evolución de esta sección",
   "noten.verlaufRunningSection": "Cada punto es la media de esta sección tras esa nota.",
   "noten.verlaufSingleToggle": "Notas individuales",
+  "noten.verlaufZuWenig": "Para ver una evolución hacen falta al menos dos notas.",
   "noten.colDefault": "Columna {{n}}",
   "noten.colDate": "Fecha de la evaluación",
   "kurse.editYear": "Curso escolar y año anterior",

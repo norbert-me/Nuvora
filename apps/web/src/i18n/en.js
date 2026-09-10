@@ -2213,6 +2213,7 @@ export default {
   "noten.verlaufPick": "Click to show the history for this section",
   "noten.verlaufRunningSection": "Each point is this section's average after that grade.",
   "noten.verlaufSingleToggle": "Individual grades",
+  "noten.verlaufZuWenig": "A trend needs at least two grades.",
   "noten.colDefault": "Column {{n}}",
   "noten.colDate": "Date of the assessment",
   "kurse.editYear": "School year and previous year",
