@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Selbsttest: ein mit Strg-C abgebrochener Lauf meldet „abgebrochen" statt roter Scheinbefunde.
 - „Was ist neu?" zeigt fett hervorgehobene Stellen wieder fett statt mit Sternchen.
 - **Der Speichern-Knopf klebt jetzt wirklich — auf jeder Seite und in jedem
   Dialog.** In einem Dialog lag er hinter der Verdunklung, und hinter der

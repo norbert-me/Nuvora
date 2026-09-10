@@ -215,6 +215,9 @@ export function macheBericht({ gruppePraefix = () => "", zusatz = () => ({}) } =
   const ergebnisse = [];
   let letzteGruppe = null;
   const notiere = (gruppe, name, ok, detail = "", art = "pruefung") => {
+    // Nach Strg-C zaehlt nichts mehr: der Browser ist zu, und jede Probe, die
+    // noch anlaeuft, scheitert an ihm statt an der Seite.
+    if (_abgebrochen && !ok) { art = "hinweis"; detail = detail ? `abgebrochen — ${detail}` : "abgebrochen"; }
     ergebnisse.push({ gruppe, name, ok, detail, art, ...zusatz() });
     const kopf = `${gruppePraefix()}${gruppe}`;
     if (kopf !== letzteGruppe) {
@@ -254,6 +257,14 @@ export function druckeBericht(ergebnisse, {
   const pruefungen = ergebnisse.filter((e) => e.art !== "hinweis");
   const fehler = pruefungen.filter((e) => !e.ok);
   console.log("\n" + "=".repeat(40));
+  if (_abgebrochen) {
+    // Ein abgebrochener Lauf hat kein Ergebnis — weder gruen noch rot. Alles
+    // andere waere eine Aussage ueber Proben, die nie gelaufen sind.
+    console.log(`  ${FETT}${titel} ABGEBROCHEN${AUS} — ${pruefungen.length} ${einheitGruen} gelaufen, der Rest nicht.`);
+    if (fehler.length) console.log(`  ${ROT}${fehler.length} davon rot — die stehen oben.${AUS}`);
+    console.log("=".repeat(40));
+    return fehler.length > 0;
+  }
   if (!fehler.length) {
     console.log(`  ${GRUEN}${titel} ${gruenWort}${AUS} — ${pruefungen.length} ${einheitGruen} in ${seit().trim()}.`);
     if (zusatzzeile) console.log(`  ${GRAU}${zusatzzeile}${AUS}`);
@@ -294,6 +305,16 @@ export const bilanzJeMotor = (ergebnisse, motoren) => motoren.map((m) => {
 
 // ─────────────────────────── Abbruch ───────────────────────────
 
+// Ist Strg-C gedrueckt worden?
+//
+// Danach schliesst Playwright den Browser, und JEDE noch laufende Probe
+// scheitert mit „Target page, context or browser has been closed". Als rote
+// Zeilen gemeldet sah ein abgebrochener Lauf aus wie ein kaputter — und der
+// Schlussbericht sagte „ROT", obwohl niemand etwas geprueft hatte. Was nach dem
+// Abbruch kommt, ist deshalb ein Hinweis, kein Befund.
+let _abgebrochen = false;
+export const istAbgebrochen = () => _abgebrochen;
+
 /**
  * Bis zum fertigen Aufraeumen KEIN Prozessende durchlassen.
  *
@@ -311,6 +332,7 @@ export function abbruchBremse(aufraeumen, meldung = "räume auf …") {
     process.on(signal, () => {
       if (laeuft) return echterExit(130);
       laeuft = true;
+      _abgebrochen = true;
       console.error(`\n${ROT}Abbruch (${signal}) — ${meldung}${AUS}`);
       process.exit = () => {};
       const fertig = () => { process.exit = echterExit; echterExit(130); };
