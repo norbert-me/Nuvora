@@ -17,6 +17,13 @@ async function frischesModul() {
   vi.resetModules();
   // Kein localStorage in der node-Umgebung: die Saat bleibt leer, es gibt also
   // wirklich keinen Cache — genau der Fall des ersten Besuchs.
+  //
+  // Ein Token muss trotzdem liegen: ohne Anmeldung fragt `modules.js` gar nicht
+  // erst nach (`/api/modules` antwortet dann mit 401, und der zweite Versuch
+  // machte daraus zwei Konsolenfehler auf der Anmeldeseite). Hier geht es um
+  // den angemeldeten Fall.
+  const speicher = await import("./speicher.js");
+  speicher.schreib("token", "test-token");
   return import("./modules.js");
 }
 
@@ -60,5 +67,23 @@ describe("Modulstand", () => {
     const mods = await m.fetchModules({ frisch: true });
     expect(mods, "der letzte bekannte Stand ist besser als eine leere Liste").toEqual(MODULE);
     expect(m.modulstandBekannt()).toBe(true);
+  });
+
+
+  it("fragt ohne Anmeldung gar nicht erst", async () => {
+    // Die Landeseite und das Anmeldeformular liegen in derselben Anwendung.
+    // Wer dort steht, hat keinen Token — `/api/modules` antwortete mit 401, und
+    // der zweite Versuch machte daraus zwei Fehler in der Konsole, bei jedem
+    // Aufruf. Das verdeckt die Meldungen, auf die es ankommt.
+    vi.resetModules();
+    const speicher = await import("./speicher.js");
+    speicher.loesche("token");
+    const m = await import("./modules.js");
+    const rufe = vi.fn(async () => ({ ok: true, json: async () => MODULE }));
+    globalThis.fetch = rufe;
+    const aus = await m.fetchModules({ frisch: true });
+    expect(rufe).not.toHaveBeenCalled();
+    expect(aus).toEqual([]);
+    expect(m.modulstandBekannt()).toBe(false);
   });
 });

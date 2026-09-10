@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { renderToString } from "react-dom/server";
 import { useAktiv, MODUL_KEYS, fetchModules } from "./modules.js";
+import { schreib } from "./speicher.js";
 
 const MODULE = [
   { key: "cardvote", active: true },
@@ -30,6 +31,9 @@ function frage(...keys) {
 }
 
 beforeAll(async () => {
+  // Ohne Anmeldung fragt modules.js gar nicht erst nach (siehe dort) — hier
+  // geht es um den angemeldeten Fall, also liegt ein Token bereit.
+  schreib("token", "test-token");
   // Der Modul-Stand kommt vom Backend und wird im Modul gecacht; useModules
   // liest beim ersten Rendern genau diesen Cache.
   globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => MODULE }));

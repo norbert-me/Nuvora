@@ -5,6 +5,7 @@
 // Wahrheit benutzen und nicht jede Komponente einzeln nachfragt.
 import { useState, useEffect, useCallback } from "react";
 import { useLanguage } from "../i18n/index.jsx";
+import { lies } from "./speicher.js";
 
 // Erst-Stand aus localStorage: dann zeigt die Shell die Modul-Navigation sofort
 // beim Laden, ohne auf /api/modules zu warten. Wird bei jedem Fetch aktualisiert.
@@ -37,7 +38,23 @@ export function modulstandBekannt() {
   return _bekannt;
 }
 
+// Ohne Anmeldung gibt es keine Module — und keinen Grund zu fragen.
+//
+// Die Landeseite und das Anmeldeformular liegen in derselben Anwendung; wer
+// dort steht, hat keinen Token, und `/api/modules` antwortet mit 401. Der
+// zweite Versuch (siehe unten) machte daraus prompt zwei Fehler in der
+// Konsole, bei jedem Aufruf der Seite. Das ist kein Befund, sondern Laerm — er
+// verdeckt die Meldungen, auf die es ankommt.
+function _angemeldet() {
+  return !!lies("token");
+}
+
 async function _hole() {
+  if (!_angemeldet()) {
+    // Nicht "keine Module": nur "wir wissen es nicht". Sonst wuerde das
+    // ModuleGate nach dem Anmelden kurz auf /modules werfen.
+    return _cache || [];
+  }
   // Offline/Abbruch darf keine unbehandelte Ablehnung erzeugen — die Shell
   // arbeitet dann mit dem letzten bekannten Stand weiter.
   //
