@@ -33,14 +33,13 @@ def test_zuordnung_der_dateien(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_plattformen_ohne_datei_bleiben_sichtbar(monkeypatch):
-    """Windows, Android und iPhone haben (noch) keine Datei — und stehen
-    trotzdem in der Liste: die Seite soll auch „noch nicht" beantworten."""
+async def test_plattformen_ohne_datei_fallen_weg(monkeypatch):
+    """Was es nicht zu laden gibt, steht nicht in der Liste: eine Zeile
+    „In Vorbereitung" ist ein Versprechen, kein Handgriff."""
     monkeypatch.setattr("app.netz.hole", lambda *a, **k: ANTWORT)
     M._apps_cache["daten"] = None
     M._apps_cache["ts"] = 0.0
     out = await M.apps(user=object())
     keys = [p["key"] for p in out["plattformen"]]
-    assert keys == ["mac_arm", "mac_intel", "windows", "linux", "android", "ios"]
-    ohne = [p["key"] for p in out["plattformen"] if not p["datei"]]
-    assert ohne == ["windows", "linux", "android", "ios"]
+    assert keys == ["mac_arm", "mac_intel"]
+    assert all(p["datei"] for p in out["plattformen"])

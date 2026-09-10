@@ -958,11 +958,15 @@ def teste_kern(api, b, u):
         # erreichbar, steht hier eine leere Liste — das ist ein Befund, aber
         # keiner ueber die Seite: deshalb Warnung statt Fehler.
         out = api.call("GET", "/api/apps", erwartet=(200,))
-        keys = [p["key"] for p in out.get("plattformen", [])]
-        if "mac_arm" not in keys or "windows" not in keys:
-            raise AssertionError(f"Plattformliste unvollstaendig: {keys}")
-        mit = [p["key"] for p in out["plattformen"] if p.get("datei")]
-        return f"{len(keys)} Plattformen, {len(mit)} mit Datei (Stand {out.get('version') or '—'})"
+        plat = out.get("plattformen", [])
+        # Es stehen nur noch Plattformen mit Datei in der Liste — eine ohne
+        # waere eine Zeile, an der es nichts zu laden gibt.
+        ohne = [p["key"] for p in plat if not p.get("datei")]
+        if ohne:
+            raise AssertionError(f"Plattform ohne Datei in der Liste: {ohne}")
+        if not plat:
+            raise AssertionError("keine App zum Laden gemeldet (Release-Anbieter erreichbar?)")
+        return f"{len(plat)} Plattformen mit Datei (Stand {out.get('version') or '—'})"
 
     def was_ist_neu():
         # Die Aenderungsliste kommt aus CHANGELOG.md. Im Container ist sie ein

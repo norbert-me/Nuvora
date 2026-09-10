@@ -478,7 +478,6 @@ export default {
   "neu.ok": "Entendido",
   "neu.alle": "Todas las versiones",
   "profile.appsLaden": "Descargar",
-  "profile.appsBald": "En preparación",
   "profile.appsKeine": "Por ahora no hay ninguna app disponible.",
   "profile.appsIos": "Sin firmar: se instala mediante sideloading (AltStore, Sideloadly) o con una cuenta de desarrollador propia.",
   "profile.appsStand": "Versión {{version}} — la misma interfaz que en el navegador, en su propia ventana.",

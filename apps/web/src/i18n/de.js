@@ -479,7 +479,6 @@ export default {
   "neu.ok": "Verstanden",
   "neu.alle": "Alle Fassungen",
   "profile.appsLaden": "Laden",
-  "profile.appsBald": "In Vorbereitung",
   "profile.appsKeine": "Zurzeit steht keine App zum Laden bereit.",
   "profile.appsIos": "Nicht signiert — Installation nur per Sideloading (AltStore, Sideloadly) oder mit eigenem Entwicklerkonto.",
   "profile.appsStand": "Fassung {{version}} — dieselbe Oberfläche wie im Browser, in einem eigenen Fenster.",

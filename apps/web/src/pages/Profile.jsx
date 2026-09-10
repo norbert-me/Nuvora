@@ -466,29 +466,27 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
               style={btnSecondary}>{t("profile.appServerAendern")}</button>
           </Zeile>
         )}
+        {/* Der Server schickt nur noch Plattformen, fuer die es eine Datei
+            gibt — „In Vorbereitung" stand vorher als Zeile ohne Handgriff da. */}
         {(apps?.plattformen || []).map((p, i) => (
           <Zeile key={p.key} label={p.label} erste={i === 0 && !(typeof window !== "undefined" && window.Capacitor)}
-            hint={p.datei ? `${p.datei.name} · ${Math.round((p.datei.size || 0) / 1048576)} MB` : t("profile.appsBald")}>
-            {p.datei ? (
-              /* Die iOS-Datei ist unsigniert und laesst sich nicht einfach
-                 antippen — das sieht man ihr nicht an, deshalb steht es hier
-                 als ein Satz (siehe „Kein Erklaertext fuer Selbsterklaerendes":
-                 erlaubt ist, was man dem Bildschirm nicht ansieht). Nur bei
-                 iOS: bei den uebrigen Plattformen laedt man und startet. */
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <a href={p.datei.url} style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>
-                  {t("profile.appsLaden")}
-                </a>
-                {p.key === "ios" && (
-                  <span style={{ fontSize: 12, color: "var(--text3)", maxWidth: 360 }}>{t("profile.appsIos")}</span>
-                )}
-              </div>
-            ) : (
-              <span style={{ fontSize: 13, color: "var(--text3)" }}>—</span>
-            )}
+            hint={`${p.datei.name} · ${Math.round((p.datei.size || 0) / 1048576)} MB`}>
+            {/* Die iOS-Datei ist unsigniert und laesst sich nicht einfach
+                antippen — das sieht man ihr nicht an, deshalb steht es hier
+                als ein Satz (siehe „Kein Erklaertext fuer Selbsterklaerendes":
+                erlaubt ist, was man dem Bildschirm nicht ansieht). Nur bei
+                iOS: bei den uebrigen Plattformen laedt man und startet. */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <a href={p.datei.url} style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>
+                {t("profile.appsLaden")}
+              </a>
+              {p.key === "ios" && (
+                <span style={{ fontSize: 12, color: "var(--text3)", maxWidth: 360 }}>{t("profile.appsIos")}</span>
+              )}
+            </div>
           </Zeile>
         ))}
-        {apps && !apps.version && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 0" }}>{t("profile.appsKeine")}</p>}
+        {apps && !(apps.plattformen || []).length && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 0" }}>{t("profile.appsKeine")}</p>}
       </Abschnitt>
 
       {isAdmin && (

@@ -1377,10 +1377,14 @@ async def apps(user=Depends(get_current_user)):
         except Exception:
             pass  # alten Stand behalten; ohne Netz zeigt die Seite „noch nichts"
     d = _apps_cache["daten"] or {"version": "", "dateien": {}, "seite": ""}
+    # Nur Plattformen, fuer die es wirklich eine Datei gibt. Frueher standen
+    # die uebrigen als „In Vorbereitung" daneben — das war eine Liste aus
+    # Versprechen: vier Zeilen mit einem Gedankenstrich, an denen es nichts zu
+    # tun gibt. Was es gibt, gehoert auf die Seite; was geplant ist, nicht.
     return {
         "version": d["version"], "seite": d["seite"],
-        "plattformen": [{"key": k, "label": label, "datei": d["dateien"].get(k)}
-                        for k, label, _ in APP_PLATTFORMEN],
+        "plattformen": [{"key": k, "label": label, "datei": d["dateien"][k]}
+                        for k, label, _ in APP_PLATTFORMEN if d["dateien"].get(k)],
     }
 
 
