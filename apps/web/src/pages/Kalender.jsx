@@ -28,6 +28,7 @@ import { feiertage } from "../data/feiertage.js";
 // dieselben Zeilen lagen in Zufall, Sitzplan, Anwesenheit und feiertage.js.
 import { addDays, hmToMin, minToHm, isoDay, isoWeek, mondayOf, parseYmd, startOfDay, wochentagMo0, ymd } from "../core/datum.js";
 import { stundenZeit, stundenListe, slotGiltAm } from "../core/stunden";
+import { useZielFilter } from "../core/modules.js";
 
 // Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
 const BUNDESLAENDER = [
@@ -2371,6 +2372,9 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
   // Code-Detektiv ist ein Informatik-Werkzeug: die Rätsel-Auswahl nur zeigen, wenn
   // die gewählte Klasse eine Informatik-Stunde ist (bestehende Verknüpfung bleibt).
   const istInformatik = /informatik/i.test((classId && (classes.find((c) => c.id === Number(classId)) || {}).name) || "");
+  // Laeuft dieser TEIL des Moduls Orga? (Modul UND Option — eine Quelle.)
+  const zielDa = useZielFilter();
+  const orgaTeil = (option) => zielDa({ modul: "orga", option });
   // Bestehender Eintrag oeffnet zuerst als Ansicht; neuer direkt im Bearbeiten.
   const [edit, setEdit] = useState(!entry.id);
   // „Erweitert" startet offen, wenn dort schon etwas steht — sonst waere ein
@@ -2400,11 +2404,15 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
     // Er stand eine Zeit lang zweimal im Dialog — einmal hier in der Liste
     // „Öffnen", einmal als eigener Knopf darunter; derselbe Weg zweimal
     // untereinander sieht aus wie zwei verschiedene.
-    aktiv.orga && classId && { to: `/orga?tab=anwesenheit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}&date=${ymd(new Date(entry.date))}`, label: t("kalender.zurAnwesenheit"), kind: t("kalender.zurAnwesenheit") },
-    aktiv.orga && classId && { to: `/orga?tab=checklisten&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`, label: t("kalender.zurCheckliste"), kind: t("kalender.zurCheckliste") },
+    // Gefragt wird nach dem TEIL, nicht nach dem Modul: wer den Sitzplan in
+    // „Teile der Module" abgeschaltet hat, findet ihn in der Navigation nicht
+    // mehr — dann darf ihn der Kalender auch nicht anbieten. `useZielFilter`
+    // beantwortet beides auf einmal, wie in KursLinks.
+    orgaTeil("anwesenheit") && classId && { to: `/orga?tab=anwesenheit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}&date=${ymd(new Date(entry.date))}`, label: t("kalender.zurAnwesenheit"), kind: t("kalender.zurAnwesenheit") },
+    orgaTeil("checklisten") && classId && { to: `/orga?tab=checklisten&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`, label: t("kalender.zurCheckliste"), kind: t("kalender.zurCheckliste") },
     // Der Sitzplan gehoert in dieselbe Reihe: er ist die Ansicht, die waehrend
     // der Stunde offen ist, und man kommt aus dem Termin dieser Stunde.
-    aktiv.orga && classId && { to: `/orga?tab=sitzplan&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`, label: t("kalender.zumSitzplan"), kind: t("kalender.zumSitzplan") },
+    orgaTeil("sitzplan") && classId && { to: `/orga?tab=sitzplan&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`, label: t("kalender.zumSitzplan"), kind: t("kalender.zumSitzplan") },
   ].filter(Boolean);
   const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: 14 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
   return (
