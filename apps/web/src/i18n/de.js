@@ -2108,6 +2108,8 @@ export default {
   "bogen.naechstesKarten": "Dein nächster Schritt: Die Karteikarten zu diesen Themen sind wieder fällig.",
   "bogen.naechstesLernpfad": "Dein nächster Schritt: Zu diesen Themen liegen Übungsaufgaben für dich bereit.",
   "bogen.notiz": "Notiz",
+  "bogen.datum": "Datum",
+  "bogen.unterschrift": "Unterschrift der Erziehungsberechtigten",
   "bogen.rat.ansatz": "Der Weg zur Lösung war nicht der richtige. Lass dir die Aufgabenart noch einmal erklären, bevor du weiter übst.",
   "bogen.rat.rechnen": "Der Weg stimmte, das Rechnen nicht. Hier hilft Übung an kleinen Schritten.",
   "bogen.rat.fluechtig": "Du konntest es — es ist beim Lesen oder Abschreiben verrutscht. Nimm dir am Ende Zeit zum Prüfen.",

@@ -2122,6 +2122,8 @@ export default {
   "bogen.naechstesKarten": "Your next step: the flashcards for these topics are due again.",
   "bogen.naechstesLernpfad": "Your next step: practice tasks on these topics are waiting for you.",
   "bogen.notiz": "Note",
+  "bogen.datum": "Date",
+  "bogen.unterschrift": "Parent/guardian signature",
   "bogen.rat.ansatz": "The route to the answer was not the right one. Have the type of task explained again before you practise further.",
   "bogen.rat.rechnen": "The route was right, the arithmetic was not. Practice in small steps helps here.",
   "bogen.rat.fluechtig": "You could do it — it slipped while reading or copying. Take time at the end to check.",

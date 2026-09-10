@@ -95,6 +95,21 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
             <div style={{ borderBottom: "1px solid #999", height: 22 }} />
             <div style={{ borderBottom: "1px solid #999", height: 22 }} />
           </div>
+
+          {/* Kenntnisnahme: das Blatt geht nach Hause und kommt zurueck. Ohne
+              Linie schreibt die Unterschrift jemand quer ueber die Notiz — und
+              die Lehrkraft sieht spaeter nicht, ob es je jemand gelesen hat.
+              Datum daneben, weil „unterschrieben" ohne Tag nichts belegt. */}
+          <div style={{ marginTop: 28, display: "flex", gap: 24, alignItems: "flex-end" }}>
+            <div style={{ width: 120 }}>
+              <div style={{ borderBottom: "1px solid #999", height: 22 }} />
+              <div style={{ fontSize: 11, color: "#444", marginTop: 4 }}>{t("bogen.datum")}</div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ borderBottom: "1px solid #999", height: 22 }} />
+              <div style={{ fontSize: 11, color: "#444", marginTop: 4 }}>{t("bogen.unterschrift")}</div>
+            </div>
+          </div>
         </div>
       ))}
     </div>,

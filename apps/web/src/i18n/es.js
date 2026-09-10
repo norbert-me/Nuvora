@@ -2123,6 +2123,8 @@ export default {
   "bogen.naechstesKarten": "Tu siguiente paso: las tarjetas de estos temas vuelven a tocar.",
   "bogen.naechstesLernpfad": "Tu siguiente paso: hay ejercicios de estos temas esperándote.",
   "bogen.notiz": "Nota",
+  "bogen.datum": "Fecha",
+  "bogen.unterschrift": "Firma de la madre, el padre o el tutor",
   "bogen.rat.ansatz": "El camino hacia la solución no era el correcto. Pide que te expliquen otra vez este tipo de tarea antes de seguir practicando.",
   "bogen.rat.rechnen": "El camino estaba bien, el cálculo no. Aquí ayuda practicar en pasos pequeños.",
   "bogen.rat.fluechtig": "Sabías hacerlo — se escapó al leer o al copiar. Reserva tiempo al final para revisar.",
