@@ -126,6 +126,26 @@ async def _kurs_kanon(db, user, kurs_id, lese_ids):
 _RANK = {"fehlt": 3, "entsch": 2, "spaet": 1, "da": 0}
 
 
+def _sichtbar(r, kurs_id) -> bool:
+    """Gehoert dieser Eintrag in die Sicht DIESES Kurses?
+
+    **Anwesenheit ist immer pro Kurs** (entschieden am 10.09.2026). Vorher galt
+    sie tagesweit: wer in der ersten Stunde fehlte, war bis zum Abend in JEDEM
+    Kurs abwesend — auch in dem, in dem er nachmittags sass.
+
+    Zwei Zeilen zaehlen trotzdem ueberall mit, und das ist Absicht:
+
+      * `kurs_id IS NULL` — der Bestand von vor dem Umbau. Ihn auszublenden
+        hiesse, die Fehlzeiten waeren ueber Nacht verschwunden.
+      * `period IS NULL` — ohne Stunde erfasst heisst „ganzer Tag", egal welcher
+        Kurs beim Eintragen offen war. Genau so traegt die Lehrkraft „heute gar
+        nicht da" ein.
+    """
+    if kurs_id is None or r.kurs_id is None or r.period is None:
+        return True
+    return r.kurs_id == kurs_id
+
+
 def _tages_status(rows, zu_person=None):
     """Aus den Stunden-Eintraegen eines Tages den staerksten je PERSON.
 
@@ -144,13 +164,25 @@ def _tages_status(rows, zu_person=None):
 
 @router.get("/{class_id}")
 async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
+                  kurs_id: Optional[int] = None,
                   user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    """Status je Schueler an einem Tag. Ohne `period`: der staerkste Status des
-    Tages je Schueler (fuer Tagesansicht/Zufall/Kalender). Mit `period`: die
-    Eintraege genau dieser Stunde — fehlt einer, wird er automatisch aus der
-    letzten frueheren erfassten Stunde des Tages **uebernommen** (persistiert),
-    denn wer frueh fehlt, fehlt oft auch spaeter; die Lehrkraft prueft dann nur."""
+    """Status je Schueler an einem Tag — in der Sicht EINES Kurses.
+
+    Ohne `period`: der staerkste Status des Tages je Schueler (Tagesansicht,
+    Zufall, Kalender). Mit `period`: die Eintraege genau dieser Stunde; `kurs_id`
+    sagt, welcher Kurs gemeint ist (siehe `_sichtbar`).
+
+    Fehlt ein Eintrag, kommt ein **Vorschlag** aus einer frueheren Stunde
+    desselben Tages — egal aus welchem Kurs, denn wer morgens fehlt, fehlt
+    nachmittags meistens auch. Er traegt `vorschlag: true` und die Stunde, aus
+    der er stammt (`quelle`, None = tagesweiter Eintrag), und wird **nicht**
+    gespeichert: vorher legte dieser Zweig stillschweigend Kopien in die
+    Datenbank, und damit stand in der Statistik eine Abwesenheit, die niemand
+    bestaetigt hatte. Bestaetigt wird jetzt in der Oberflaeche (Speichern-Knopf).
+    """
     await _owned_class(db, user, class_id)
+    if kurs_id is not None:
+        await eigener_kurs(db, user, kurs_id)
     lo, hi = _day_bounds(date)
     lese_ids, to_canon, canon_back = await _kurs_maps(db, user, class_id)
     # Gelesen wird ueber ALLE Zeilen des Kurses und danach auf die Person
@@ -166,49 +198,43 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
     # Kanonische id -> student_id dieser Klasse fürs UI.
     back = lambda sid: canon_back.get(sid, sid)
 
+    # Was gehoert in die Sicht dieses Kurses? (Der Vorschlag unten sieht
+    # bewusst auf ALLE Zeilen — er fragt nach dem Vormittag, nicht nach dem Kurs.)
+    sicht = [r for r in rows if _sichtbar(r, kurs_id)]
+
     if not period:
-        best = _tages_status(rows, person)
+        best = _tages_status(sicht, person)
         return {str(back(sid)): out(r) for sid, r in best.items()}
 
-    exact = {person(r.student_id): r for r in rows if r.period == period}
-    neu = False
-    fehlend = {person(r.student_id) for r in rows if person(r.student_id) not in exact}
-    for sid in fehlend:
+    exact = {person(r.student_id): r for r in sicht if r.period == period}
+    aus = {str(back(sid)): out(r) for sid, r in exact.items()}
+    for sid in {person(r.student_id) for r in rows} - set(exact):
         vorher = [r for r in rows if person(r.student_id) == sid and r.period is not None and r.period < period]
-        if vorher:
-            quelle = max(vorher, key=lambda r: r.period)
-        else:
-            # Kein Eintrag aus einer frueheren STUNDE — dann zaehlt der Eintrag
-            # des ganzen TAGES (period = NULL). Ohne ihn wurde eine Verspaetung,
-            # die ohne gewaehlte Stunde erfasst wurde, in keine Folgestunde
-            # uebernommen: genau der Fall, in dem morgens jemand zu spaet kam und
-            # die Lehrkraft es am Tag statt an der Stunde eingetragen hat.
-            tages = [r for r in rows if r.student_id == sid and r.period is None]
-            if not tages:
-                continue
-            quelle = tages[0]
+        if not vorher:
+            # Keine fruehere STUNDE — dann zaehlt der Eintrag des ganzen TAGES
+            # (period = NULL). Ohne ihn bliebe eine Verspaetung, die ohne
+            # gewaehlte Stunde erfasst wurde, in jeder Folgestunde unsichtbar.
+            vorher = [r for r in rows if person(r.student_id) == sid and r.period is None]
+        if not vorher:
+            continue
+        # Der staerkste, bei Gleichstand der spaeteste: wer in der ersten Stunde
+        # fehlte und in der zweiten nur zu spaet kam, hat immer noch gefehlt.
+        quelle = max(vorher, key=lambda r: (_RANK.get(r.status, 0), r.period or 0))
         if quelle.status == "da":
             continue
-        # class_id der kanonischen Zeile behalten (gehört evtl. einer Fach-Klasse
-        # des Kurses); Anwesenheit ist ohnehin kursweit geteilt.
-        kopie = Attendance(owner_id=user.id, class_id=quelle.class_id, kurs_id=quelle.kurs_id, student_id=sid, date=lo,
-                           status=quelle.status, note=quelle.note, period=period)
-        db.add(kopie)
-        exact[sid] = kopie
-        neu = True
-    if neu:
-        await db.commit()
-    return {str(back(sid)): out(r) for sid, r in exact.items()}
+        aus[str(back(sid))] = {"status": quelle.status, "note": quelle.note, "period": period,
+                               "vorschlag": True, "quelle": quelle.period}
+    return aus
 
 
 async def _kurs_stunden(db, user, kurs_id, tage):
     """Welche Stundenplan-Stunden hat DIESER Kurs an diesen Tagen?
 
-    Damit beantwortet das Notenbuch die richtige Frage. „Hat gefehlt" ist
-    tagesweit gemeint: wer in der ersten Stunde fehlt, steht bis zum Abend als
-    abwesend — auch in einem Kurs, in dem er nachmittags anwesend war. Fuer eine
-    Notenspalte ist das falsch: die gehoert EINER Stunde, und wer dort da war,
-    darf nicht rot sein (entschieden am 10.09.2026).
+    Damit beantwortet das Notenbuch die richtige Frage. Eine Notenspalte gehoert
+    EINER Stunde, und wer dort da war, darf nicht rot sein (entschieden am
+    10.09.2026). Der Kurs am Eintrag (`_sichtbar`) beantwortet dasselbe von der
+    anderen Seite; beides zusammen, weil der Bestand noch keinen Kurs traegt und
+    ein gepflegter Stundenplan nicht vorausgesetzt werden darf.
 
     Gefragt wird der Stundenplan, nicht ein neues Feld: die Stunden tragen ihren
     Kurs bereits (`timetable_slots.kurs_id`), und die Eintraege tragen ihre
@@ -296,6 +322,8 @@ async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
         tag = _schul_tag(r.date)
         if tag not in gewuenscht:
             continue
+        if not _sichtbar(r, kurs_id):
+            continue    # Eintrag eines FREMDEN Kurses — nicht die Stunde dieser Spalte
         erlaubt = kurs_stunden.get(tag)
         if erlaubt is not None and r.period is not None and r.period not in erlaubt:
             continue
@@ -332,6 +360,11 @@ class MarkIn(BaseModel):
     status: str
     note: str = ""
     period: Optional[int] = None
+    # Der Kurs der gewaehlten Stunde. Die Oberflaeche kennt ihn (die Stundenwahl
+    # haengt am Stundenplan-Slot, und der traegt seinen Kurs) — ohne ihn bliebe
+    # „Anwesenheit ist immer pro Kurs" eine Absicht ohne Schluessel. Fehlt er,
+    # bleibt es beim alten Weg (`kurs_der_klasse`, mehrdeutig = None).
+    kurs_id: Optional[int] = None
 
 
 @router.put("/{class_id}")
@@ -341,15 +374,23 @@ async def mark(class_id: int, body: MarkIn, user: User = Depends(require_module)
     if body.status not in _STATUS:
         raise HTTPException(400, "Unbekannter Status")
     await in_klasse(db, body.student_id, class_id)
+    if body.kurs_id is not None:
+        await eigener_kurs(db, user, body.kurs_id)
     # Auf die kanonische Person des Kurses schreiben -> kursweit geteilt.
     _canon_ids, to_canon, _back = await _kurs_maps(db, user, class_id)
     canon_id = to_canon.get(body.student_id, body.student_id)
     lo, hi = _day_bounds(body.date)
     # Genau die Stunde treffen (period NULL = ganzer Tag), damit Stunden getrennt bleiben.
-    row = (await db.execute(select(Attendance).where(
+    kandidaten = (await db.execute(select(Attendance).where(
         Attendance.student_id == canon_id, Attendance.date >= lo, Attendance.date <= hi,
         Attendance.period == body.period,
-    ))).scalar_one_or_none()
+    ))).scalars().all()
+    # Geaendert wird nur, was in DIESER Sicht auch steht: die Zeile des eigenen
+    # Kurses, sonst die tagesweite/bestehende ohne Kurs. Eine Zeile eines
+    # FREMDEN Kurses bleibt unberuehrt — sie gehoert einer anderen Stunde, und
+    # sie hier zu ueberschreiben waere genau der Fehler, der abgestellt wird.
+    row = next((r for r in kandidaten if body.kurs_id is not None and r.kurs_id == body.kurs_id), None) \
+        or next((r for r in kandidaten if _sichtbar(r, body.kurs_id)), None)
     # "da" ist der Normalfall: kein Eintrag noetig -> vorhandenen loeschen.
     if body.status == "da" and not body.note.strip():
         if row:
@@ -365,8 +406,12 @@ async def mark(class_id: int, body: MarkIn, user: User = Depends(require_module)
         # Jede neue Zeile traegt ihren Kurs (Umbau vom 06.09.2026). Die
         # Startmigration holt nur den Bestand — ohne das hier entstuenden ab
         # morgen wieder Zeilen ohne Kurs.
-        kurs_id_neu = (canon.kurs_id if canon and canon.kurs_id
-                       else await kurs_der_klasse(db, canon.class_id if canon else class_id))
+        # Ohne Angabe der Kurs, in dem gearbeitet wird — gefragt wird die Klasse
+        # aus der ADRESSE, nicht die der kanonischen Zeile: die kann einer
+        # Geschwisterklasse gehoeren, die in einem ganz anderen Kurs liegt, und
+        # dann traegt der Eintrag den Kurs, in dem ihn niemand eingetragen hat.
+        kurs_id_neu = body.kurs_id or (canon.kurs_id if canon and canon.kurs_id
+                                       else await kurs_der_klasse(db, class_id))
         db.add(Attendance(owner_id=user.id, class_id=(canon.class_id if canon else class_id),
                           kurs_id=kurs_id_neu, student_id=canon_id,
                           date=lo, status=body.status, note=body.note.strip()[:500], period=body.period))

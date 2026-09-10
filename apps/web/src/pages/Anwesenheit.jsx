@@ -122,6 +122,13 @@ export default function Anwesenheit() {
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = cls?.students || [];
+  // Anwesenheit ist immer pro Kurs — und den Kurs kennt die STUNDE: der
+  // Stundenplan-Slot trägt ihn. Ohne gewählte Stunde gilt der ganze Tag, dann
+  // bleibt der Eintrag bewusst ohne Kurs („heute gar nicht da").
+  const kursId = useMemo(() => {
+    if (!stundenWahl) return null;
+    return (tagSlots.find((s) => s.period === stunde && s.class_id === classId) || {}).kurs_id || null;
+  }, [stundenWahl, tagSlots, stunde, classId]);
 
   // parseYmd statt new Date(): aus einem Datumsfeld kommt beim Tippen auch
   // Unfertiges, und toISOString() auf einem Invalid Date wirft.
@@ -131,11 +138,14 @@ export default function Anwesenheit() {
   const frisch = useRef(false);
   const loadTag = useCallback(() => {
     if (!classId) return;
-    // Bei gewählter Stunde diese Stunde laden (Server belegt sie aus der
-    // vorherigen vor); Stunde 0 = ganzer Tag (stärkster Status).
+    // Bei gewählter Stunde diese Stunde laden (der Server schlägt dabei den
+    // Status aus einer früheren Stunde vor); Stunde 0 = ganzer Tag (stärkster
+    // Status). `kurs_id` sagt, welcher Kurs gemeint ist — ein Eintrag aus einem
+    // anderen Kurs gehört nicht in diese Liste.
     const p = stunde ? `&period=${stunde}` : "";
-    hol(`${API}/${classId}?date=${isoOf(datum)}${p}`, {}).then((d) => { frisch.current = true; setTag(d || {}); });
-  }, [classId, datum, stunde]);
+    const k = kursId ? `&kurs_id=${kursId}` : "";
+    hol(`${API}/${classId}?date=${isoOf(datum)}${p}${k}`, {}).then((d) => { frisch.current = true; setTag(d || {}); });
+  }, [classId, datum, stunde, kursId]);
   const loadSumme = useCallback(() => {
     if (!classId) return;
     hol(`${API}/${classId}/summary`, {}).then((d) => setSumme(d || {}));
@@ -143,16 +153,26 @@ export default function Anwesenheit() {
   useEffect(() => { loadTag(); }, [loadTag]);
   useEffect(() => { if (view === "uebersicht") { loadSumme(); setOffen(null); } }, [view, loadSumme]);
 
-  const mark = (sid, status, dateIso, period = null) => fetch(`${API}/${classId}`, alsJson("PUT", { student_id: sid, date: dateIso, status, note: "", period }));
+  const mark = (sid, status, dateIso, period = null, kurs = null) => fetch(`${API}/${classId}`, alsJson("PUT", { student_id: sid, date: dateIso, status, note: "", period, kurs_id: kurs }));
 
   // ── Ein Entwurf für die ganze Tagesliste ──
   // Bisher schrieb jeder Klick sofort. Jetzt sammelt der Entwurf „Kind → Status"
   // (flach, damit ein Neuladen die Arbeitskopie wieder einholt), und die Leiste
   // unten schreibt alles auf einmal. Das kostet bei der Anwesenheit einen Klick
   // mehr am Ende der Runde — dafür ist danach sichtbar, dass es drin ist.
+  // Was WIRKLICH gespeichert ist. Ein Vorschlag des Servers gehört nicht dazu —
+  // sonst stünde er als bereits eingetragen da, ohne dass ihn jemand bestätigt
+  // hat (genau das tat der Server bis 10.09.2026 selbst).
   const basis = useMemo(() => {
     const o = {};
-    students.forEach((s) => { o[String(s.id)] = tag[String(s.id)]?.status || "da"; });
+    students.forEach((s) => { const e = tag[String(s.id)]; o[String(s.id)] = e && !e.vorschlag ? e.status : "da"; });
+    return o;
+  }, [students, tag]);
+  // Die Vorschläge — vorbelegt als offene Änderung, damit die Speicherleiste
+  // „nicht gespeichert" zeigt, bis die Lehrkraft sie bestätigt.
+  const vorschlaege = useMemo(() => {
+    const o = {};
+    students.forEach((s) => { const e = tag[String(s.id)]; if (e?.vorschlag && e.status !== "da") o[String(s.id)] = e.status; });
     return o;
   }, [students, tag]);
   // Wen hat die Lehrkraft in DIESER Runde selbst angefasst? Nur diese Kinder
@@ -162,7 +182,7 @@ export default function Anwesenheit() {
     for (const s of students) {
       const k = String(s.id);
       if (wert[k] === basis[k]) continue;
-      await mark(s.id, wert[k], isoOf(datum), stunde || null).catch(() => {});
+      await mark(s.id, wert[k], isoOf(datum), stunde || null, kursId).catch(() => {});
     }
     angefasst.current.clear();
     loadTag();
@@ -178,8 +198,10 @@ export default function Anwesenheit() {
     if (!frisch.current) return;
     frisch.current = false;
     const eigene = [...angefasst.current];
-    if (!eigene.length) { eTag.verwerfen(); return; }
-    eTag.setz((v) => { const o = { ...basis }; eigene.forEach((k) => { if (k in v) o[k] = v[k]; }); return o; });
+    // Vorschläge zählen wie eine eigene Eingabe: sie stehen offen in der Liste,
+    // bis jemand speichert.
+    if (!eigene.length && !Object.keys(vorschlaege).length) { eTag.verwerfen(); return; }
+    eTag.setz((v) => { const o = { ...basis, ...vorschlaege }; eigene.forEach((k) => { if (k in v) o[k] = v[k]; }); return o; });
   });
   // Klassen-/Tageswechsel mit offenen Änderungen: nachfragen statt still verwerfen.
   const wechseln = (fn) => {
@@ -196,6 +218,13 @@ export default function Anwesenheit() {
   };
 
   const statusOf = (sid) => eTag.wert[String(sid)] || tag[String(sid)]?.status || "da";
+  // Steht hier noch der Vorschlag des Servers? Dann sagt die Zeile das — sonst
+  // sähe ein „F" aus wie ein Eintrag, den jemand gemacht hat.
+  const vorschlagVon = (sid) => {
+    const e = tag[String(sid)];
+    if (!e?.vorschlag || angefasst.current.has(String(sid))) return null;
+    return eTag.wert[String(sid)] === e.status ? e : null;
+  };
   const setStatus = (sid, status) => { angefasst.current.add(String(sid)); eTag.setz({ [String(sid)]: status }); };
   const shift = (n) => { const d = new Date(datum + "T00:00:00"); d.setDate(d.getDate() + n); setDatum(ymd(d)); };
 
@@ -301,11 +330,18 @@ export default function Anwesenheit() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {students.map((s, i) => {
               const cur = statusOf(s.id);
+              const vor = vorschlagVon(s.id);
               return (
                 <div key={s.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px" }}>
                   <span style={{ color: "var(--text3)", fontSize: 12, width: 24, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
                   <Portrait student={s} size={26} />
                   <span style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+                  {vor && (
+                    <span style={{ fontSize: 11, color: "var(--text3)", flexShrink: 0 }}
+                      title={vor.quelle ? t("anwesenheit.vorschlagVon", { p: vor.quelle }) : t("anwesenheit.vorschlagTag")}>
+                      {t("anwesenheit.vorschlag")}
+                    </span>
+                  )}
                   <StatusWahl wert={cur} onWahl={(st) => setStatus(s.id, st)} />
                 </div>
               );

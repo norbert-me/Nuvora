@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Anwesenheit gehört dem Kurs, nicht dem Tag.** Wer in der ersten Stunde
+  fehlte, war bisher in jedem Kurs des Tages abwesend. Jetzt wird er in der
+  nächsten Stunde nur noch **vorgeschlagen** — bestätigt wird per Speichern.
+  Gezählt wird weiter je Tag, nicht je Kurs.
 - Selbsttest: ein mit Strg-C abgebrochener Lauf meldet „abgebrochen" statt roter Scheinbefunde.
 - „Was ist neu?" zeigt fett hervorgehobene Stellen wieder fett statt mit Sternchen.
 - **Der Speichern-Knopf klebt jetzt wirklich — auf jeder Seite und in jedem
