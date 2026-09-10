@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Kalender-Eintrag: Material wird im Bearbeiten-Modus hochgeladen; die Ansicht
+  zeigt die Dateien nur noch zum Nachschlagen.
+- Kalender-Eintrag: „Zum Sitzplan" steht neben Anwesenheit und Checkliste.
 - Kurs: das Feld „Jahrgang" ist weg — das Schuljahr sagt ihn.
 - **Sitzplan: zoomen mit zwei Fingern** (und mit der Zangengeste am Trackpad).
 - Textfelder zeigen die Ecke zum Größerziehen wieder — als kräftiger Keil in der

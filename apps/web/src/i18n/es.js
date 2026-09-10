@@ -1226,6 +1226,7 @@ export default {
   "kalender.deckReleaseHint": "Se publica automáticamente el día del calendario.",
   "kalender.zurAnwesenheit": "Asistencia",
   "kalender.zurCheckliste": "Lista de control",
+  "kalender.zumSitzplan": "Al plano de asientos",
   "kalender.openLinked": "Abrir vinculado",
   "kalender.planning": "Planificación",
   "kalender.entry": "Entrada",

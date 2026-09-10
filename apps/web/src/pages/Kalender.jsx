@@ -2402,6 +2402,9 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
     // untereinander sieht aus wie zwei verschiedene.
     aktiv.orga && classId && { to: `/orga?tab=anwesenheit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}&date=${ymd(new Date(entry.date))}`, label: t("kalender.zurAnwesenheit"), kind: t("kalender.zurAnwesenheit") },
     aktiv.orga && classId && { to: `/orga?tab=checklisten&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`, label: t("kalender.zurCheckliste"), kind: t("kalender.zurCheckliste") },
+    // Der Sitzplan gehoert in dieselbe Reihe: er ist die Ansicht, die waehrend
+    // der Stunde offen ist, und man kommt aus dem Termin dieser Stunde.
+    aktiv.orga && classId && { to: `/orga?tab=sitzplan&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`, label: t("kalender.zumSitzplan"), kind: t("kalender.zumSitzplan") },
   ].filter(Boolean);
   const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: 14 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
   return (
@@ -2508,8 +2511,12 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
               </div>
             )}
             {!clsName && !topName && !methName && !linkList.length && !notes && !verlauf.length && <p style={{ fontSize: 14, color: "var(--text3)", marginTop: 8 }}>{t("kalender.emptyEntry")}</p>}
-            {/* Material an dieser Stunde — nur beim gespeicherten Eintrag. */}
-            {entry.id && <div style={{ marginTop: 16 }}><MaterialPanel entryId={entry.id} /></div>}
+            {/* Material an dieser Stunde — nur beim gespeicherten Eintrag, und
+                in der Ansicht nur zum Nachschlagen: Hochladen und Loeschen
+                gehoeren in den Bearbeiten-Modus wie jede andere Aenderung am
+                Eintrag. Beim blossen Aufschlagen der Stunde stand sonst ein
+                Datei-Knopf zwischen den Angaben. */}
+            {entry.id && <div style={{ marginTop: 16 }}><MaterialPanel entryId={entry.id} nurLesen /></div>}
             <div style={{ display: "flex", gap: 8, marginTop: 24, alignItems: "center" }}>
               <button onClick={() => setEdit(true)} style={btnPrimary}>{t("common.edit")}</button>
               <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
@@ -2707,6 +2714,13 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
         <button onClick={addPhase} style={{ ...toolbarBtn, width: "100%", justifyContent: "center", gap: 6 }}>
           <Icon d={ICONS.plus} size={15} color="var(--accent)" /> {t("kalender.verlaufAdd")}
         </button>
+
+        {/* Material: hier wird es hochgeladen und geloescht. Die Dateien haengen
+            am gespeicherten Eintrag und gehen sofort zum Server — sie warten
+            nicht auf „Speichern", weil eine Datei kein Feld dieses Formulars
+            ist. Bei einem noch nicht gespeicherten Eintrag gibt es nichts, woran
+            sie haengen koennten. */}
+        {entry.id && <div style={{ marginTop: 16 }}><MaterialPanel entryId={entry.id} /></div>}
 
         </>)}
         <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, end_date: mehrtaegig ? (() => { const [y, m, d] = endVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : null, title, notes, start_time: mehrtaegig ? "" : (startTime || ""), end_time: mehrtaegig ? "" : (endTime || ""), location: ort, rrule: rruleBauen(), exdate: Array.isArray(entry.exdate) ? entry.exdate : [], verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>

@@ -1210,6 +1210,7 @@ export default {
   "kalender.deckReleaseHint": "Wird am Kalendertag automatisch freigeschaltet.",
   "kalender.zurAnwesenheit": "Anwesenheit",
   "kalender.zurCheckliste": "Checkliste",
+  "kalender.zumSitzplan": "Zum Sitzplan",
   "kalender.openLinked": "Verknüpftes öffnen",
   "kalender.planning": "Planung",
   "kalender.entry": "Eintrag",
