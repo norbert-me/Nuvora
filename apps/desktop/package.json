@@ -1,6 +1,6 @@
 {
   "name": "nuvora-desktop",
-  "version": "4.3.2",
+  "version": "4.3.3",
   "description": "Nuvora als native Mac-App (Phase 0: Fenster auf den Server, offline lesbar via Service-Worker).",
   "author": "Nuvora",
   "private": true,
