@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Stundenplan: Pausen mit Uhrzeiten.** Zwischen den Stunden steht die Pause
+  mit Anfang, Ende und Dauer — und lässt sich dort eintragen.
+- Kurs: der Sprung „Dieser Kurs in …" führt jetzt auch zu den Checklisten.
 - **Fehlzeiten stehen im Notenbuch am richtigen Tag.** Sie landeten eine Spalte
   zu früh und blieben dort. Verspätungen färben die Tabelle nicht mehr — das
   Kind war da.

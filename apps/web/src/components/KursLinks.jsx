@@ -51,6 +51,7 @@ export default function KursLinks({ kurs }) {
     an("karten") && { to: `/karten?tab=cards&${q}`, icon: ICONS.duplicate, label: t("kursLinks.karten") },
     an("cardvote") && { to: `/cardvote/class-evaluation/${classId}`, icon: ICONS.chart, label: t("kursLinks.cardvote") },
     an("lernpfad") && { to: `/lernpfad?${q}`, icon: ICONS.open, label: t("kursLinks.lernpfad") },
+    orgaAn("checklisten") && { to: `/orga?tab=checklisten&${q}`, icon: ICONS.check, label: t("orga.tabChecklists") },
     orgaAn("sitzplan") && { to: `/orga?tab=sitzplan&${q}`, icon: ICONS.grip, label: t("sitzplan.title") },
     orgaAn("anwesenheit") && { to: `/orga?tab=anwesenheit&${q}`, icon: ICONS.circle, label: t("anwesenheit.title") },
     orgaAn("ausleihe") && { to: `/orga?tab=ausleihe&${q}`, icon: ICONS.archive, label: t("ausleihe.title") },
