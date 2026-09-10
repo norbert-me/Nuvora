@@ -566,6 +566,12 @@ async def weak_review(class_id: Optional[int] = None, days: int = 7,
     # ausgerolltes Deck, dessen Karten mind. einmal gelernt wurden (CardReview
     # mit reps>0), ODER eine Lernpfad-Aufgabe zum Thema.
     from ..models import CardDeck, Exercise, Card, CardReview
+    # Je Quelle `is_active` (Regel 3) — wie eine Zeile weiter oben in
+    # `weak_topics_range`. Ohne die Pruefung stand hier „geuebt", obwohl das
+    # Kartenmodul abgeschaltet war: eine Aussage ueber ein Modul, das die
+    # Lehrkraft gar nicht benutzt, aus Daten, die sie nicht mehr sieht.
+    karten_an = await is_active(db, user.id, "karten")
+    lernpfad_an = await is_active(db, user.id, "lernpfad")
     deck_topics = set((await db.execute(
         select(CardDeck.topic_id)
         .join(Card, Card.deck_id == CardDeck.id)
@@ -573,10 +579,10 @@ async def weak_review(class_id: Optional[int] = None, days: int = 7,
         .where(CardDeck.owner_id == user.id, CardDeck.topic_id.in_(tids),
                CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None),
                CardReview.reps > 0)
-    )).scalars().all())
+    )).scalars().all()) if karten_an else set()
     ex_topics = set((await db.execute(
         select(Exercise.topic_id).where(Exercise.owner_id == user.id, Exercise.topic_id.in_(tids))
-    )).scalars().all())
+    )).scalars().all()) if lernpfad_an else set()
     out = []
     for t in topics:
         tid = t["topic_id"]
