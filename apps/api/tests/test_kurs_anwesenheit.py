@@ -174,3 +174,43 @@ async def test_tage_folgt_dem_kurs_des_aufrufers(s):
     mit = await an.get_tage(M.id, dates="2026-09-08", kanonisch=True, kurs_id=mathe.id, user=u, db=s)
     assert set(mit["2026-09-08"]) <= zeilen
     assert mit["2026-09-08"] == {str(m.id): "fehlt"}
+
+
+@pytest.mark.asyncio
+async def test_tage_zaehlt_nur_die_stunden_dieses_kurses(s):
+    """Eine Notenspalte gehoert EINER Stunde — nicht dem ganzen Tag.
+
+    „Hat gefehlt" ist tagesweit gemeint: wer in der ersten Stunde fehlt, gilt
+    bis zum Abend als abwesend. Fuer die Faerbung im Notenbuch ist das falsch,
+    sobald eine Klasse in zwei Kursen liegt: das Kind war in der ersten Stunde
+    (Kurs A) nicht da und in der fuenften (Kurs B) sehr wohl — trotzdem war
+    seine Zelle in BEIDEN Tabellen rot (gemeldet am 10.09.2026, an der
+    laufenden Installation nachgestellt).
+
+    Gefragt wird der Stundenplan: die Stunde traegt ihren Kurs, der Eintrag
+    seine Stunde.
+    """
+    from datetime import date as D
+    from app.models import Kurs, TimetableSlot
+
+    u, A, B, a, b = await _kurs_zwei_klassen(s)
+    kursA = (await s.execute(select(Kurs).where(Kurs.owner_id == u.id))).scalars().first()
+    kursB = Kurs(owner_id=u.id, name="Zweiter Kurs"); s.add(kursB); await s.flush()
+    # Montag, 20.07.2026: Kurs A hat die 1. Stunde, Kurs B die 5.
+    tag = D(2026, 7, 20)
+    s.add(TimetableSlot(owner_id=u.id, weekday=tag.weekday(), period=1, class_id=A.id, kurs_id=kursA.id))
+    s.add(TimetableSlot(owner_id=u.id, weekday=tag.weekday(), period=5, class_id=A.id, kurs_id=kursB.id))
+    await s.commit()
+
+    d = datetime(2026, 7, 20)
+    await an.mark(A.id, an.MarkIn(student_id=a.id, date=d, status="fehlt", period=1), user=u, db=s)
+
+    mitA = await an.get_tage(A.id, dates="2026-07-20", kanonisch=True, kurs_id=kursA.id, user=u, db=s)
+    assert mitA.get("2026-07-20"), "in der Stunde von Kurs A hat es gefehlt — das muss stehen"
+
+    mitB = await an.get_tage(A.id, dates="2026-07-20", kanonisch=True, kurs_id=kursB.id, user=u, db=s)
+    assert mitB == {}, "in der Stunde von Kurs B war es da — dort darf nichts rot sein"
+
+    # Ein Eintrag OHNE Stunde meint den ganzen Tag und gilt auch in Kurs B.
+    await an.mark(A.id, an.MarkIn(student_id=a.id, date=d, status="fehlt", period=None), user=u, db=s)
+    assert (await an.get_tage(A.id, dates="2026-07-20", kanonisch=True, kurs_id=kursB.id, user=u, db=s)).get("2026-07-20")

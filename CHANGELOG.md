@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Notenbuch: rot wird nur, wer in der Stunde DIESES Kurses gefehlt hat.**
+  Bisher zählte der ganze Tag — wer morgens fehlte, war auch im
+  Nachmittagskurs rot, in dem er saß.
 - Startseite: Suche und Einrichten-Knopf stehen in einer Zeile — die leere
   Zeile darüber ist weg.
 - Kalender-Eintrag: im Verlaufsplan ist die Phase markiert, in der man gerade

@@ -16,7 +16,7 @@ from ..kursmitglieder import eigener_kurs, kurs_der_klasse, member_student_ids, 
 from ..schueler import in_klasse, kanonisch, sortiert
 from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
-from ..models import Attendance, CalendarBreak, Student, User
+from ..models import Attendance, CalendarBreak, Student, TimetableSlot, User
 from ..zeit import SCHUL_TZ, schul_datum
 from .auth import rate_limit
 from .modules import modul_pflicht
@@ -201,6 +201,45 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
     return {str(back(sid)): out(r) for sid, r in exact.items()}
 
 
+async def _kurs_stunden(db, user, kurs_id, tage):
+    """Welche Stundenplan-Stunden hat DIESER Kurs an diesen Tagen?
+
+    Damit beantwortet das Notenbuch die richtige Frage. „Hat gefehlt" ist
+    tagesweit gemeint: wer in der ersten Stunde fehlt, steht bis zum Abend als
+    abwesend — auch in einem Kurs, in dem er nachmittags anwesend war. Fuer eine
+    Notenspalte ist das falsch: die gehoert EINER Stunde, und wer dort da war,
+    darf nicht rot sein (entschieden am 10.09.2026).
+
+    Gefragt wird der Stundenplan, nicht ein neues Feld: die Stunden tragen ihren
+    Kurs bereits (`timetable_slots.kurs_id`), und die Eintraege tragen ihre
+    Stunde (`attendance.period`). Rueckgabe: {"YYYY-MM-DD": {Stundennummern}}.
+    Ein Tag OHNE Stunde dieses Kurses steht nicht darin — dort gilt weiter der
+    ganze Tag (siehe Aufrufer): ohne gepflegten Stundenplan waere sonst nie
+    etwas markiert, und das waere schlechter als heute.
+    """
+    slots = (await db.execute(select(TimetableSlot).where(
+        TimetableSlot.owner_id == user.id, TimetableSlot.kurs_id == kurs_id,
+    ))).scalars().all()
+    if not slots:
+        return {}
+    aus = {}
+    for d in tage:
+        tag = d.date()
+        passend = {s.period for s in slots if s.weekday == tag.weekday() and _slot_gilt_am(s, tag)}
+        if passend:
+            aus[tag.strftime("%Y-%m-%d")] = passend
+    return aus
+
+
+def _slot_gilt_am(s, d):
+    """Gilt die (versionierte) Stunde an dem Tag? Dieselbe Regel wie im
+    Kalender — hier nachgebaut statt importiert, weil kein Modul am anderen
+    haengen darf (Regel 3); es sind drei Zeilen, kein Bauwerk."""
+    vf = s.valid_from.date() if isinstance(s.valid_from, datetime) else s.valid_from
+    vt = s.valid_to.date() if isinstance(s.valid_to, datetime) else s.valid_to
+    return not ((vf is not None and d < vf) or (vt is not None and d > vt))
+
+
 @router.get("/{class_id}/tage")
 async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
                    kurs_id: Optional[int] = None,
@@ -248,11 +287,19 @@ async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
         Attendance.date >= lo, Attendance.date <= hi,
     ))).scalars().all()
     gewuenscht = {d.strftime("%Y-%m-%d") for d in tage}
+    # Mit Kurs: nur die Eintraege SEINER Stunden zaehlen (siehe _kurs_stunden).
+    # Ein Eintrag ohne Stunde (`period` NULL) meint den ganzen Tag und zaehlt
+    # immer mit — so traegt die Lehrkraft „heute gar nicht da" ein.
+    kurs_stunden = await _kurs_stunden(db, user, kurs_id, tage) if kurs_id is not None else {}
     je_tag = {}
     for r in rows:
         tag = _schul_tag(r.date)
-        if tag in gewuenscht:
-            je_tag.setdefault(tag, []).append(r)
+        if tag not in gewuenscht:
+            continue
+        erlaubt = kurs_stunden.get(tag)
+        if erlaubt is not None and r.period is not None and r.period not in erlaubt:
+            continue
+        je_tag.setdefault(tag, []).append(r)
     def ziel(sid):
         """Unter welcher id steht die Person beim Aufrufer?"""
         if not kanonisch:
