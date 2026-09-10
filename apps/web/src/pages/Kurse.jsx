@@ -52,8 +52,8 @@ export default function Kurse() {
   const kurs = useEntwurf(kursBasis, (w) => kursSpeichern(w));
   const kursUebernehmen = (stand) => { setKursBasis(stand); kurs.setz(stand); };
   const [alleKurse, setAlleKurse] = useState([]);   // inkl. Archiv — das Vorjahr liegt meist dort
-  // Und welche Schuljahre — dieselbe Ueberlegung wie beim Jahrgang: „2025/26"
-  // tippt niemand jedes Mal neu, und ein Tippfehler macht aus einem Jahr zwei.
+  // Und welche Schuljahre: „2025/26" tippt niemand jedes Mal neu, und ein
+  // Tippfehler macht aus einem Jahr zwei.
   // Aus den eigenen Kursen, Archiv eingeschlossen (das Vorjahr liegt dort).
   const schuljahre = [...new Set([...kurse, ...alleKurse].map((k) => k.schuljahr).filter(Boolean))]
     .sort(nachJahrAbsteigend);
@@ -258,8 +258,8 @@ export default function Kurse() {
                 <div>
                   <div style={editLabel}>{t("kurse.editYear")}</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {/* Auswahl statt Freitext, wie beim Jahrgang: die Liste
-                        kommt aus den eigenen Kursen (Archiv eingeschlossen).
+                    {/* Auswahl statt Freitext: die Liste kommt aus den
+                        eigenen Kursen (Archiv eingeschlossen).
                         „andere …" bleibt der Weg fuer das erste Jahr und fuer
                         eins, das es hier noch nicht gibt — getippt wird ein
                         Schuljahr sonst jedes Mal neu, und „2025/26" neben

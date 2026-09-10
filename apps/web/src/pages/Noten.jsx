@@ -804,10 +804,9 @@ export default function Noten() {
                       ...cols.map((c, i) => {
                         const id = `${s.student_id}:${c.id}`;
                         const wert = noteVon(s.student_id, c.id);
-                        // Fehlend/verspaetet am Tag der Spalte: Toenung plus
-                        // Balken links. Eine Toenung allein sieht nach
-                        // Zebrastreifen aus, sobald zwei Spalten nebeneinander
-                        // markiert sind.
+                        // Abwesend am Tag der Spalte: Toenung plus Balken
+                        // links. Eine Toenung allein sieht nach Zebrastreifen
+                        // aus, sobald zwei Spalten nebeneinander markiert sind.
                         // Nur ABWESENHEIT faerbt. Eine Verspaetung erklaert
                         // keine Note — das Kind war da und hat mitgeschrieben;
                         // sie stand nur als dritte Farbe in der Tabelle.

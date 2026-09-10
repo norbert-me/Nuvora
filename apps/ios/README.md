@@ -121,8 +121,8 @@ Signatur gehört zur Apple-ID des Geräts.
 **Und die Alternative ohne all das:** Nuvora im Safari öffnen, *Teilen* → *Zum
 Home-Bildschirm*. Offline lesen und schreiben kommen vom Service Worker und der
 Outbox, also aus derselben Quelle wie in der App — Bedingung ist eine
-**https**-Adresse. Ob das auf einem Gerät wirklich steht, sagt in Nuvora das
-Profil unter „Offline-Bereitschaft".
+**https**-Adresse. Über `http://192.168.x.y:8090` gibt es im Safari gar keinen
+Service Worker, und damit kein Offline.
 
 ## Was hier NICHT hineingehört
 

@@ -55,6 +55,8 @@ export default function Personen() {
   // deshalb gehen sie an /api/personen, und der Name wandert von dort auf alle
   // Listenzeilen.
   const [nameEdit, setNameEdit] = useState(null);   // { id, wert }
+  // Zaehler, der die Portraits nach einem Foto-Wechsel neu laden laesst
+  // (der Browser haelt sonst das alte Bild unter derselben Adresse fest).
   const [fotoVer, setFotoVer] = useState(0);
   const [qr, setQr] = useState(null);               // { token, name }
   const [kurse, setKurse] = useState([]);
@@ -213,10 +215,10 @@ export default function Personen() {
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ ...sectionLabel, margin: "0 0 6px" }}>{t("personen.angaben")}</div>
                       {/* Niveau, Förderschwerpunkte und Notiz gehören der Person
-                          und stehen deshalb einmal oben. Die NACHTEILSAUSGLEICHE
-                          hängen am Kurs (mehr Zeit in Mathe heißt nicht dasselbe
-                          wie in Sport) — dafür ist unten je Kurs dieselbe Maske
-                          mit seiner kursId eingehängt. */}
+                          und stehen deshalb einmal oben — ohne `kursId`, damit
+                          die NACHTEILSAUSGLEICHE hier gar nicht erst auftauchen:
+                          die hängen am Kurs (mehr Zeit in Mathe heißt nicht
+                          dasselbe wie in Sport) und werden dort gepflegt. */}
                       <SchuelerAngaben studentId={stand.teile[0].student_id} ohneNiveau t={t} />
                     </div>
                   )}

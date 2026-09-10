@@ -39,7 +39,6 @@ export function kursName(v) {
   return name || (v.titel || "").trim();
 }
 
-// Der Jahrgang steckt vorn im Klassennamen („7.5" → „7", „10b" → „10").
 export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [], periods = 6 }) {
   const [hilfe, setHilfe] = useState(false);
   const { t } = useLanguage();
@@ -107,9 +106,9 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
         weekday: f.wd, period: f.p,
         kurs_id: w.startsWith("k") ? Number(w.slice(1)) : null,
         class_id: w.startsWith("c") ? Number(w.slice(1)) : null,
-        // „n<Name>" heisst: diesen Kurs gibt es noch nicht, leg ihn an. Fach
-        // und Jahrgang kommen aus Untis mit — sie verbinden den Kurs mit den
-        // Themen desselben Fachs.
+        // „n<Name>" heisst: diesen Kurs gibt es noch nicht, leg ihn an. Das
+        // Fach kommt aus Untis mit — es verbindet den Kurs mit den Themen
+        // desselben Fachs und stellt im Kalender das Etikett „Fach · Kurs".
         kurs_neu: w.startsWith("n") ? w.slice(1) : "",
         fach: w.startsWith("n") ? ((f.faecher || [])[0] || "") : "",
         // Der Untis-Titel bleibt als Beschriftung stehen, auch wenn ein Kurs
