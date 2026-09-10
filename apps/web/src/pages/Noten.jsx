@@ -197,11 +197,19 @@ export default function Noten() {
     // (kleinste id je Name). Ohne das antwortet die Anwesenheit mit den Zeilen
     // DIESER Klasse, und liegt die kanonische Zeile in einer anderen
     // Fach-Klasse, passt kein einziger Schluessel — die Faerbung blieb aus.
-    hol(`/api/anwesenheit/${classId}/tage?kanonisch=true&dates=${encodeURIComponent(tage.join(","))}`)
+    // `kurs_id`: die Zeilen dieser Tabelle sind die des KURSES (jeder
+    // Noten-Aufruf oben schickt ihn mit). Ohne ihn rechnet die Anwesenheit
+    // ueber die Geschwisterklassen — liegt die Klasse in zwei Kursen, ist das
+    // eine groessere Menge, die kanonische Zeile eine andere, und kein
+    // einziger Schluessel passt: die Tabelle blieb ohne Rot.
+    hol(`/api/anwesenheit/${classId}/tage?kanonisch=true&dates=${encodeURIComponent(tage.join(","))}${kp}`)
       .then((d) => { if (!ab) setFehlzeiten(d && typeof d === "object" ? d : {}); })
       .catch(() => { /* ohne Anwesenheit bleibt die Tabelle wie bisher */ });
     return () => { ab = true; };
-  }, [classId, sections, orgaAktiv]);
+    // `kursId` gehoert in die Abhaengigkeiten, weil er jetzt in der Adresse
+    // steht: ein Kurswechsel ohne neue Spalten holte sonst die Fehlzeiten des
+    // vorigen Kurses.
+  }, [classId, kursId, sections, orgaAktiv]);
   // Status eines Kindes an dem Tag, den die Spalte traegt ("" = war da / unbekannt).
   const statusVon = (studentId, cat) => {
     const tag = cat.date || (cat.created_at ? String(cat.created_at).slice(0, 10) : "");

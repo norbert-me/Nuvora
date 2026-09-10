@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Fehlzeiten färben die Notentabelle — jetzt wirklich.** Der Aufruf nannte
+  seinen Kurs nicht; liegt eine Klasse in zwei Kursen, passte kein Schlüssel und
+  es blieb bei einer Tabelle ohne Rot.
 - **Fehlzeiten färben die Notentabelle wieder.** Anwesenheit und Notenbuch
   meinten mit „dieselbe Person" verschiedene Zeilen, sobald ein Kurs aus
   mehreren Fach-Klassen besteht — dann passte kein Schlüssel und es wurde nichts

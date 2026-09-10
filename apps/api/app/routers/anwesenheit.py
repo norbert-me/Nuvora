@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import klasse_oder_403
-from ..kursmitglieder import kurs_der_klasse, sibling_class_ids
+from ..kursmitglieder import eigener_kurs, kurs_der_klasse, member_student_ids, sibling_class_ids
 from ..schueler import in_klasse, kanonisch, sortiert
 from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
@@ -92,6 +92,32 @@ async def _kurs_maps(db, user, class_id):
         if s.class_id == class_id:
             canon_back[canon.get(s.name.strip(), s.id)] = s.id
     return [s.id for s in kurs_studs], to_canon, canon_back
+
+
+async def _kurs_kanon(db, user, kurs_id, lese_ids):
+    """Kanonische Zeile je Person — aus Sicht DIESES Kurses.
+
+    `_kurs_maps` rechnet ueber die Geschwisterklassen der Klasse. Das ist die
+    richtige Sicht, solange die Klasse in genau einem Kurs liegt. Liegt sie in
+    zweien (dieselben Kinder in „WP7" und „Mathe"), ist die Menge groesser als
+    der Kurs, und `kanonisch` waehlt darin eine andere Zeile als das Notenbuch,
+    das seine Zeilen aus dem KURS zieht (`schueler.roster_kurs`). Dann passte
+    kein einziger Schluessel, und die Faerbung blieb aus — ohne Fehler und ohne
+    Hinweis, genau das Fehlerbild, das schon zweimal woanders gesucht wurde.
+
+    Deshalb sagt der Aufrufer, welchen Kurs er meint. Gelesen wird weiter ueber
+    alle Zeilen (die Anwesenheit liegt auf der Zeile, die beim Eintragen
+    kanonisch war), abgebildet wird auf die Zeile, die der Kurs fuehrt.
+
+    Liefert: (id -> kanonische id im Kurs, alle zu lesenden ids)
+    """
+    await eigener_kurs(db, user, kurs_id)
+    kurs_ids = await member_student_ids(db, kurs_id)
+    kurs_studs = await sortiert(db, Student.id.in_(list(kurs_ids) or [-1]))
+    canon = {s.name.strip(): s.id for s in kanonisch(kurs_studs)}
+    alle = set(lese_ids) | set(kurs_ids)
+    rows = await sortiert(db, Student.id.in_(list(alle) or [-1]))
+    return {s.id: canon[s.name.strip()] for s in rows if s.name.strip() in canon}, list(alle)
 
 
 # Schwere eines Status, um bei mehreren Stunden am Tag den „Tages-Status" zu
@@ -177,6 +203,7 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
 
 @router.get("/{class_id}/tage")
 async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
+                   kurs_id: Optional[int] = None,
                    user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Tages-Status je Schueler fuer MEHRERE Tage auf einmal.
 
@@ -209,6 +236,11 @@ async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
     if not tage:
         return {}
     lese_ids, to_canon, canon_back = await _kurs_maps(db, user, class_id)
+    # Der Aufrufer nennt seinen Kurs (das Notenbuch tut es): dann sind DESSEN
+    # Zeilen gemeint, nicht die der Geschwisterklassen.
+    kurs_map = None
+    if kurs_id is not None:
+        kurs_map, lese_ids = await _kurs_kanon(db, user, kurs_id, lese_ids)
     lo = min(tage).replace(hour=0, minute=0, second=0, microsecond=0)
     hi = max(tage).replace(hour=23, minute=59, second=59, microsecond=0)
     rows = (await db.execute(select(Attendance).where(
@@ -221,6 +253,12 @@ async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
         tag = _schul_tag(r.date)
         if tag in gewuenscht:
             je_tag.setdefault(tag, []).append(r)
+    def ziel(sid):
+        """Unter welcher id steht die Person beim Aufrufer?"""
+        if not kanonisch:
+            return canon_back.get(sid, sid)
+        return kurs_map.get(sid, sid) if kurs_map is not None else sid
+
     out = {}
     for tag, tagrows in je_tag.items():
         best = _tages_status(tagrows, lambda sid: to_canon.get(sid, sid))
@@ -234,7 +272,7 @@ async def get_tage(class_id: int, dates: str = "", kanonisch: bool = False,
         # Fach-Klasse liegt — und dann blieb die Faerbung dort einfach aus,
         # ohne Fehler und ohne Hinweis. Zwei Leser, zwei Sichten auf dieselbe
         # Person: der Aufrufer sagt, welche er braucht.
-        eintraege = {str(sid if kanonisch else canon_back.get(sid, sid)): r.status
+        eintraege = {str(ziel(sid)): r.status
                      for sid, r in best.items() if r.status != "da"}
         if eintraege:
             out[tag] = eintraege

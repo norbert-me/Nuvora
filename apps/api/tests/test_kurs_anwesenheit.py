@@ -118,3 +118,59 @@ async def test_bestand_auf_der_alten_zeile_bleibt_sichtbar(s):
     assert tag.get(str(a.id), {}).get("status") == "fehlt"
     assert (await an.summary(A.id, user=u, db=s)).get(str(a.id), {}).get("fehlt") == 1
     assert len(await an.student_history(A.id, a.id, user=u, db=s)) == 1
+
+
+# ─── Liegt die Klasse in ZWEI Kursen, ist „kanonisch" mehrdeutig ───
+#
+# `_kurs_maps` rechnet ueber die Geschwisterklassen: alle Klassen, die mit
+# dieser einen Kurs teilen. Bei zwei Kursen ist das eine groessere Menge als
+# der Kurs selbst — und `kanonisch` waehlt darin eine andere Zeile als das
+# Notenbuch, das seine Zeilen aus dem KURS zieht (`schueler.roster_kurs`).
+# Dann passte kein einziger Schluessel, und die Faerbung im Notenbuch blieb
+# aus: kein Fehler, keine Meldung, nur eine Tabelle ohne Rot. Deshalb nennt
+# der Aufrufer seinen Kurs.
+
+async def _klasse_in_zwei_kursen(s):
+    from app.models import KursTag
+    u = User(email="c@d.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    mathe = Kurs(owner_id=u.id, name="Mathe"); wp = Kurs(owner_id=u.id, name="WP")
+    s.add_all([mathe, wp]); await s.flush()
+    # Die WP-Klasse zuerst: kleinere id, gleiche position — sie gewinnt die
+    # Kanonisierung ueber die Geschwister und ist genau der falsche Schluessel.
+    W = SchoolClass(name="WP 7", owner_id=u.id); s.add(W)
+    M = SchoolClass(name="Mathe 7.5", owner_id=u.id); s.add(M); await s.flush()
+    s.add_all([KursTag(kurs_id=wp.id, class_id=W.id),
+               KursTag(kurs_id=mathe.id, class_id=M.id),
+               KursTag(kurs_id=wp.id, class_id=M.id)])
+    w = Student(card_id=1, name="Max", class_id=W.id, position=0); s.add(w)
+    m = Student(card_id=1, name="Max", class_id=M.id, position=0); s.add(m)
+    await s.flush(); await s.commit()
+    return u, mathe, M, m, w
+
+
+@pytest.mark.asyncio
+async def test_tage_folgt_dem_kurs_des_aufrufers(s):
+    """Die Schluessel muessen zu den ZEILEN DES NOTENBUCHS passen.
+
+    Gefragt wird deshalb nicht `roster_kurs` (das waere die Rechnung, die auch
+    der Fix benutzt — der Test prueefte sich selbst), sondern der Endpunkt, den
+    die Seite wirklich aufruft: `/api/noten/classes/{id}/summary?kurs_id=…`.
+    """
+    from app.routers import noten
+    u, mathe, M, m, w = await _klasse_in_zwei_kursen(s)
+    d = datetime(2026, 9, 8, 10, 0)
+    await an.mark(M.id, an.MarkIn(student_id=m.id, date=d, status="fehlt", period=1), user=u, db=s)
+
+    zeilen = {str(r.student_id) for r in await noten.summary(M.id, term="1", kurs_id=mathe.id, user=u, db=s)}
+
+    # Ohne Kurs rechnet die Anwesenheit ueber die Geschwisterklassen — und die
+    # sind hier groesser als der Kurs. Kein Schluessel passt, die Tabelle bleibt
+    # ohne Rot.
+    ohne = await an.get_tage(M.id, dates="2026-09-08", kanonisch=True, user=u, db=s)
+    assert set(ohne["2026-09-08"]) == {str(w.id)}, "sonst prueft der Test nichts"
+    assert not (set(ohne["2026-09-08"]) & zeilen), "sonst prueft der Test nichts"
+
+    # Mit Kurs: genau die Zeile, die das Notenbuch zeigt.
+    mit = await an.get_tage(M.id, dates="2026-09-08", kanonisch=True, kurs_id=mathe.id, user=u, db=s)
+    assert set(mit["2026-09-08"]) <= zeilen
+    assert mit["2026-09-08"] == {str(m.id): "fehlt"}
