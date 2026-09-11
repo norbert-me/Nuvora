@@ -8,7 +8,7 @@
 //
 // Die Server-Adresse wird pro Rechner in settings.json (userData) gemerkt.
 
-const { app, BrowserWindow, Menu, ipcMain, shell, dialog } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, session, shell, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -215,6 +215,43 @@ function buildMenu() {
           },
         },
         { label: "Zur App", click: () => loadTarget() },
+        { type: "separator" },
+        {
+          // Chromiums Service-Worker-Ablage kann in einem Profil haengenbleiben:
+          // `navigator.serviceWorker.getRegistrations()` antwortet dann NIE. Die
+          // App laeuft weiter (die Zusage bleibt einfach offen), aber offline
+          // liest sie nichts mehr — ohne jede Meldung. Der Ausweg war bisher,
+          // den Ordner „Service Worker" im Profilverzeichnis von Hand zu
+          // loeschen; das ist kein Handgriff fuer eine Lehrkraft. Hier steht er
+          // als Menueeintrag: verworfen wird ausschliesslich Zwischenspeicher —
+          // Anmeldung, Einstellungen und die Warteschlange der Outbox
+          // (IndexedDB, localStorage) bleiben unberuehrt.
+          label: "Offline-Speicher zurücksetzen …",
+          click: async () => {
+            const w = aktiv();
+            const { response } = await dialog.showMessageBox(w, {
+              type: "warning",
+              title: "Offline-Speicher zurücksetzen",
+              message: "Den Zwischenspeicher für das Offline-Lesen verwerfen?",
+              detail: "Hilft, wenn die App offline nichts mehr anzeigt. Angemeldet bleibst du; "
+                + "noch nicht gesendete Änderungen bleiben ebenfalls erhalten. "
+                + "Die Seiten werden beim nächsten Start neu geladen.",
+              buttons: ["Zurücksetzen", "Abbrechen"],
+              defaultId: 1,
+              cancelId: 1,
+            });
+            if (response !== 0) return;
+            try {
+              const ses = session.defaultSession;
+              // Nur die beiden Ablagen, die der Service-Worker benutzt.
+              await ses.clearStorageData({ storages: ["serviceworkers", "cachestorage"] });
+            } catch (e) {
+              console.error("Offline-Speicher zuruecksetzen fehlgeschlagen:", e);
+            }
+            app.relaunch();
+            app.exit(0);
+          },
+        },
       ],
     },
     { role: "editMenu" },

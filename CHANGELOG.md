@@ -16,7 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
-(noch nichts)
+- Desktop-App: „Server → Offline-Speicher zurücksetzen …" hilft, wenn die App
+  offline nichts mehr anzeigt. Angemeldet bleibt man, wartende Änderungen
+  bleiben erhalten.
 
 ## 4.3.4 — 11.09.2026
 

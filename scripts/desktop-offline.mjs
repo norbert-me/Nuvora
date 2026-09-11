@@ -338,18 +338,24 @@ async function offlineProbe(exe, user, lauf, profil) {
     // fertig wird).
     if (!sw) {
       notiere(G("Service-Worker"), "vorhanden", false,
-        "Der Renderer antwortet nicht mehr (Abfrage nach 60 s ohne Antwort) — in diesem Profil haengt der Service-Worker-Zugriff. "
-        + "Abhilfe: die App schliessen und im Profilverzeichnis den Ordner 'Service Worker' loeschen (reiner Cache), dann neu starten.");
+        "Der Renderer antwortet nicht mehr (Abfrage nach 60 s ohne Antwort) — in diesem Profil haengt Chromiums Service-Worker-Ablage. "
+        + "Abhilfe in der App: Menue „Server → Offline-Speicher zuruecksetzen …\" (verwirft nur Zwischenspeicher).");
+      // EIN Befund, nicht vier: die drei folgenden Proben sind Folge desselben
+      // haengenden Zugriffs. Als rote Zeilen sahen sie aus wie eigene Maengel
+      // und machten aus einer Ursache eine Liste — dieselbe Regel wie beim
+      // Abbruch mit Strg-C.
       for (const w of ["Offline lesen", "Deep-Link offline", "Inhaltsdaten offline"])
-        notiere(G(w), "entfällt", false, "ohne antwortenden Renderer gegenstandslos");
+        notiere(G(w), "uebersprungen", true, "ohne antwortenden Renderer nicht pruefbar", "hinweis");
       return;
     }
 
     if (!sw.vorhanden) {
       notiere(G("Service-Worker"), "vorhanden", false,
         `Es gibt auf dieser Adresse gar keinen Service-Worker (${sw.protokoll}//…, isSecureContext=${sw.secure}) — ohne ihn kann die App nichts offline lesen; alle folgenden Offline-Prüfungen sind damit gegenstandslos.`);
+      // Auch hier: der fehlende Service-Worker IST der Befund, die drei
+      // Folgeproben sind keine eigenen.
       for (const w of ["Offline lesen", "Deep-Link offline", "Inhaltsdaten offline"])
-        notiere(G(w), "entfällt", false, "ohne Service-Worker gegenstandslos");
+        notiere(G(w), "uebersprungen", true, "ohne Service-Worker nicht pruefbar", "hinweis");
       return;
     }
     notiere(G("Service-Worker"), "vorhanden", true, `isSecureContext=${sw.secure}, ${sw.protokoll}//…`);

@@ -599,6 +599,12 @@ async function menueProbe(app) {
   const kannAendern = (server?.unter || []).some((l) => /adresse/i.test(l || ""));
   notiere("Menü", "Server-Adresse änderbar", kannAendern,
     kannAendern ? "Eintrag „Server-Adresse ändern…“ ist da" : "kein Eintrag zum Ändern der Adresse");
+  // Der Ausweg, wenn Chromiums Service-Worker-Ablage in einem Profil haengt:
+  // ohne ihn bliebe nur „Ordner im Profilverzeichnis loeschen", und das ist
+  // kein Handgriff fuer eine Lehrkraft.
+  const kannZuruecksetzen = (server?.unter || []).some((l) => /offline-speicher/i.test(l || ""));
+  notiere("Menü", "Offline-Speicher zurücksetzbar", kannZuruecksetzen,
+    kannZuruecksetzen ? "Eintrag „Offline-Speicher zurücksetzen …“ ist da" : "fehlt — ein hängender Service-Worker wäre nur von Hand zu beheben");
 }
 
 /**
