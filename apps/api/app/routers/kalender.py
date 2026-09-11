@@ -1876,6 +1876,16 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
     u = (await db.execute(select(User).where(User.calendar_token == token))).scalar_one_or_none()
     if not u:
         raise HTTPException(404, "Kalender nicht gefunden")
+    # Ein Abo laesst sich nicht einsammeln: die Adresse liegt im Handy der
+    # Lehrkraft und wird von dort alle paar Stunden abgerufen. Also entscheidet
+    # der Server bei JEDEM Abruf neu, ob er noch etwas herausgeben darf —
+    # dieselbe Regel wie beim CalDAV-Zugang nebenan und beim QR-Zettel des
+    # Kindes. Ohne sie lieferte der Feed nach dem Abschalten des Moduls weiter
+    # Termine, Kurs- und Klassennamen aus.
+    # Dieselbe Meldung wie beim unbekannten Token: nach aussen darf nicht
+    # erkennbar sein, welche Module eine Lehrkraft nutzt.
+    if not await is_active(db, u.id, MODULE_KEY):
+        raise HTTPException(404, "Kalender nicht gefunden")
     entries = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == u.id).order_by(CalendarEntry.date))).scalars().all()
     breaks = (await db.execute(select(CalendarBreak).where(CalendarBreak.owner_id == u.id))).scalars().all()
     classes = {c.id: c.name for c in (await db.execute(select(SchoolClass).where(SchoolClass.owner_id == u.id))).scalars().all()}

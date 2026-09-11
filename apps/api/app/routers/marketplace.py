@@ -423,6 +423,11 @@ async def copy_quiz(quiz_id: int, body: Optional[CopyBody] = None, user: User = 
     qs = QuestionSet(
         name=quiz.title,
         folder_id=folder_id,
+        # owner_id: sonst fuer jedes Konto lesbar (ensure_set_access laesst
+        # owner-lose Sets als Altbestand durch). Beide anderen Uebernahmewege
+        # setzen ihn mit genau dieser Begruendung — hier fehlte er, und jede
+        # Uebernahme legte einen neuen besitzerlosen Datensatz an.
+        owner_id=user.id,
         shuffle_questions=data.get("shuffle_questions", False),
         shuffle_answers=data.get("shuffle_answers", False),
         niveau_aktiv=bool(data.get("niveau_aktiv", False)),

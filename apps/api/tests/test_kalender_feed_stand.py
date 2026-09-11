@@ -19,7 +19,7 @@ from datetime import datetime
 
 import pytest
 
-from app.models import User, CalendarEntry
+from app.models import User, CalendarEntry, UserModule
 from app.routers.kalender import ics_feed
 
 
@@ -33,6 +33,10 @@ class _Req:
 async def _user(s):
     u = User(email="feed@test.de", password_hash="x", calendar_token="tok123")
     s.add(u)
+    await s.flush()
+    # Der Feed verstummt mit dem Modul (Regel „ausgeteilte Zugaenge"),
+    # also muss es fuer den Abruf laufen.
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
     await s.commit()
     return u
 

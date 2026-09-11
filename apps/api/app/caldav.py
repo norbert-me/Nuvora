@@ -199,8 +199,17 @@ def fehler_xml(precondition: str) -> str:
 # ─── ICS lesen und schreiben ───
 
 def _ics_escape(text: str) -> str:
-    return (str(text or "").replace("\\", "\\\\").replace("\n", "\\n")
-            .replace(",", "\\,").replace(";", "\\;"))
+    r"""Text fuer eine ICS-Zeile entschaerfen — dieselbe Regel wie
+    `_ics_escape` in routers/kalender.py, und sie muss dieselbe bleiben.
+
+    Auch `\r` muss weg: ICS trennt Zeilen mit CRLF, ein Wagenruecklauf aus
+    einer Notiz, einem Titel oder einem Ort beendet den VEVENT mitten im Feld
+    und laesst den Rest als eigene Property gelten. Die Fassung hier hatte nur
+    `\n` — die beiden Kopien waren auseinandergelaufen, und die Begruendung
+    stand nur an der anderen.
+    """
+    return (str(text or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
+            .replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n"))
 
 
 def _ics_unescape(text: str) -> str:

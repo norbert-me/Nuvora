@@ -38,6 +38,9 @@ async def _konto(s, mail="todo-feed@test.de", *, modul=True, optionen=None):
     u = User(email=mail, password_hash="x", calendar_token=mail.split("@")[0])
     s.add(u)
     await s.flush()
+    # Der Feed verstummt mit dem Modul (Regel „ausgeteilte Zugaenge"),
+    # also muss es fuer den Abruf laufen.
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
     if modul:
         s.add(UserModule(user_id=u.id, module_key="notizbrett", optionen=optionen))
     await s.commit()

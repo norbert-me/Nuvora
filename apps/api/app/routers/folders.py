@@ -212,6 +212,7 @@ async def _eigene_fragen(db: AsyncSession, user: User, ids) -> None:
 @router.post("/question-sets", response_model=QuestionSetOut, status_code=201)
 async def create_question_set(body: QuestionSetCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("set_create", f"u{user.id}", 60, 60, "Zu viele Fragesets in kurzer Zeit. Bitte kurz warten.")
+    await eigener_ordner(db, user.id, body.folder_id)
     qs = QuestionSet(
         name=body.name, folder_id=body.folder_id, owner_id=user.id,
         shuffle_questions=body.shuffle_questions, shuffle_answers=body.shuffle_answers,
@@ -285,6 +286,7 @@ async def update_question_set(set_id: int, body: QuestionSetCreate, user: User =
     if not qs:
         raise HTTPException(404)
     await ensure_set_access(db, qs, user.id)
+    await eigener_ordner(db, user.id, body.folder_id)
     qs.name = body.name
     qs.folder_id = body.folder_id
     qs.shuffle_questions = body.shuffle_questions
@@ -350,6 +352,33 @@ async def delete_question_set(set_id: int, user: User = Depends(get_current_user
 
 
 # --- Helpers ---
+
+async def eigener_ordner(db: AsyncSession, user_id: int, folder_id):
+    """Gehoert dieser Zielordner dem Konto? Sonst 404.
+
+    Ein Frageset traegt seinen Ordner als blosse Zahl im Rumpf, und der Ordner
+    entscheidet spaeter ueber den Zugriff (`ensure_set_access` oben). Wer die
+    Zahl eines fremden Ordners einsetzt, legt sein Set damit in eine fremde
+    Ablage: es steht im Baum des anderen Kontos — samt Fragentext und richtiger
+    Antwort —, und das eigene Konto verliert zugleich den Zugriff darauf, weil
+    ab dann der fremde Ordner ueber ihn entscheidet.
+
+    `import_folder` in export_import.py hatte diese Pruefung als einzige Stelle
+    schon, mit derselben Begruendung. Sie steht jetzt hier, damit die vier
+    Stellen, an denen ein `folder_id` von aussen hereinkommt, dieselbe
+    benutzen statt drei davon zu vergessen.
+
+    `None` heisst „kein Ordner" und ist erlaubt — ein ordnerloses Set haengt
+    dann an `owner_id`.
+    """
+    if folder_id is None:
+        return None
+    f = await db.get(Folder, folder_id)
+    # Wie beim Altbestand ueberall sonst: ein Ordner ohne Besitzer gehoert allen.
+    if not f or (f.owner_id and f.owner_id != user_id):
+        raise HTTPException(404, "Ordner nicht gefunden")
+    return f.id
+
 
 async def ensure_set_access(db: AsyncSession, qs: QuestionSet, user_id: int):
     """403, wenn das Frageset einem fremden Ordner ODER (ordnerlos) einem fremden

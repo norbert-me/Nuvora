@@ -16,7 +16,7 @@ from datetime import date, timedelta
 import pytest
 
 import app.routers.kalender as K
-from app.models import User
+from app.models import User, UserModule
 
 
 def _ics(tage_ab_heute=3, uid="fremd-1", titel="Zahnarzt"):
@@ -31,6 +31,10 @@ async def _user(s, mit=False):
              external_calendars=[{"url": "https://example.org/x.ics", "color": "", "name": ""}],
              feed_external=mit)
     s.add(u)
+    await s.flush()
+    # Der Feed verstummt mit dem Modul (Regel „ausgeteilte Zugaenge"),
+    # also muss es fuer den Abruf laufen.
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
     await s.commit()
     return u
 

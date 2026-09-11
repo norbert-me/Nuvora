@@ -39,7 +39,7 @@ def strip_latex(text: str) -> str:
     return s.strip()
 
 from .modules import modul_pflicht
-from .folders import ensure_set_access
+from .folders import eigener_ordner, ensure_set_access
 from .noten import _grade_from_pct as _dezimalnote
 
 # Klassen-Export/-Import gehoeren dem Kern, Fragen/Sets/Sitzungen dem Modul.
@@ -320,6 +320,7 @@ async def import_questions_xlsx(name: str = "Neues Frageset", folder_id: Optiona
 
     # owner_id: sonst ist das importierte Set fuer JEDES Konto lesbar
     # (ensure_set_access laesst owner-lose Sets als Altbestand durch).
+    await eigener_ordner(db, user.id, folder_id)
     qs = QuestionSet(name=name, folder_id=folder_id, owner_id=user.id)
     db.add(qs)
     await db.flush()
@@ -451,6 +452,7 @@ async def import_question_set(body: dict, user: User = Depends(get_current_user)
     if isinstance(body.get("questions"), list) and len(body["questions"]) > 200:
         raise HTTPException(400, "Maximal 200 Fragen pro Set")
     daten = geprueft(ImportQuestionSetBody, body, "Fragendatei")
+    await eigener_ordner(db, user.id, daten.folder_id)
     qs = QuestionSet(
         name=daten.name,
         folder_id=daten.folder_id,

@@ -5,7 +5,7 @@ Plan zeigt Klassenname „7.5 LZ").
 """
 import pytest
 
-from app.models import User, SchoolClass, Kurs, KursTag
+from app.models import User, SchoolClass, Kurs, KursTag, UserModule
 from app.routers import kalender as KAL
 
 
@@ -101,6 +101,9 @@ async def test_ics_freie_uhrzeit(s):
     from datetime import datetime, timezone
     from app.models import CalendarEntry
     u = User(email="c@d.de", password_hash="x", name="L", calendar_token="tok123"); s.add(u); await s.flush()
+    # Der Feed verstummt mit dem Modul (Regel „ausgeteilte Zugaenge"),
+    # also muss es fuer den Abruf laufen.
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
     # 12:00-verankertes Datum (wie das Frontend jetzt sendet).
     s.add(CalendarEntry(owner_id=u.id, date=datetime(2025, 9, 3, 10, 0, tzinfo=timezone.utc),
                         title="Konferenz", start_time="07:55", end_time="12:40"))

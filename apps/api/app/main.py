@@ -1153,6 +1153,10 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                 continue
             if msg.get("type") == "auth":
                 is_owner = await _ws_is_session_owner(msg.get("token", ""), session_id)
+                # Erst jetzt in die Verteilerliste: wer sich nicht ausweist,
+                # hoert auch nicht mit (fremde Sitzungsnummer ist durchzaehlbar).
+                if is_owner:
+                    ws.freigeben(websocket)
                 continue
             # Steuerbefehle nur von der authentifizierten Besitzer-Person weiterreichen
             if not is_owner:
