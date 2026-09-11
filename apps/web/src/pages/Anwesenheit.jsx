@@ -20,6 +20,10 @@ import { alsJson, hol } from "../core/melden.js";
 const API = "/api/anwesenheit";
 const STATI = ["da", "fehlt", "spaet", "entsch"];
 const COL = { da: C.success, fehlt: C.danger, spaet: C.warning, entsch: C.info };
+// Ab wann der Name lieber eine eigene Zeile bekommt als abgeschnitten zu werden
+// (siehe die Liste unten). Keine Abstandsstufe, sondern eine Inhaltsbreite —
+// darunter steht von „Aleksandra" nichts Brauchbares mehr.
+const NAME_MIN = 120;
 
 export default function Anwesenheit() {
   const { t } = useLanguage();
@@ -332,10 +336,14 @@ export default function Anwesenheit() {
               const cur = statusOf(s.id);
               const vor = vorschlagVon(s.id);
               return (
-                <div key={s.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px" }}>
+                // Umbruch statt Quetschen: auf 320 px blieben vom Namen 23 px
+                // uebrig („Pla…"), weil die vier Status-Tasten daneben nicht
+                // schrumpfen. Mit `flexWrap` rutschen sie in die zweite Zeile,
+                // sobald der Name unter NAME_MIN faellt.
+                <div key={s.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", flexWrap: "wrap" }}>
                   <span style={{ color: "var(--text3)", fontSize: 12, width: 24, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
                   <Portrait student={s} size={26} />
-                  <span style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+                  <span style={{ flex: 1, fontWeight: 500, minWidth: NAME_MIN, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
                   {vor && (
                     <span style={{ fontSize: 11, color: "var(--text3)", flexShrink: 0 }}
                       title={vor.quelle ? t("anwesenheit.vorschlagVon", { p: vor.quelle }) : t("anwesenheit.vorschlagTag")}>

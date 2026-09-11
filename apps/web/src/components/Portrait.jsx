@@ -20,6 +20,18 @@ export function initialen(name) {
   return (erste + letzte).toUpperCase();
 }
 
+// Die Initialen wuchsen frei mit dem Bild (`size * 0.38`) — und landeten damit
+// neben der Schriftleiter: 9 px im Sitzplan-Chip, 10 px in der Anwesenheit,
+// 27 px im grossen Portraet. Gemessen fiel das als einzige Schrift unter 11 px
+// im ganzen Produkt auf. Also dieselbe Rechnung, aber auf die Leiter gerastet
+// (11/12/13/14/16/22, siehe Icons.jsx): die naechstkleinere Stufe, mindestens
+// die unterste. „P1" passt auch mit 11 px in einen 22-px-Kreis.
+const SCHRIFTLEITER = [22, 16, 14, 13, 12, 11];
+export function initialenGroesse(size) {
+  const roh = size * 0.38;
+  return SCHRIFTLEITER.find((x) => x <= roh) || 11;
+}
+
 /**
  * @param student  {id, name, has_photo}
  * @param size     Kantenlänge in Pixeln
@@ -45,7 +57,7 @@ export default function Portrait({ student, size = 32, zoomable = false, form = 
       <span aria-hidden="true" title={student?.name || ""}
         style={{ ...rund, display: "inline-flex", alignItems: "center", justifyContent: "center",
           background: "var(--bg2)", color: "var(--text3)",
-          fontSize: Math.max(9, Math.round(size * 0.38)), fontWeight: 700, letterSpacing: 0.2 }}>
+          fontSize: initialenGroesse(size), fontWeight: 700, letterSpacing: 0.2 }}>
         {initialen(student?.name)}
       </span>
     );

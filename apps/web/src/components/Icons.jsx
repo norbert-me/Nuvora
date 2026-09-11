@@ -358,6 +358,12 @@ export const selectStyle = {
   height: CONTROL_H, padding: "0 30px 0 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)",
   background: `var(--bg) url("${caretSvg}") no-repeat right 9px center`,
   color: "var(--text)", fontSize: 13, cursor: "pointer", lineHeight: 1.3, boxSizing: "border-box",
+  // Ein `select` ist so breit wie seine laengste Option — und schrumpft in
+  // einer Flex-Zeile nicht, weil Flex-Kinder `min-width: auto` haben. Auf
+  // 320 px schob die Klassenwahl („Beispielklasse (30 Karten)", 257 px) damit
+  // die ganze SEITE waagerecht ins Scrollen. Beides zusammen macht es
+  // schrumpffaehig; der Browser kuerzt den Text dann selbst.
+  minWidth: 0, maxWidth: "100%",
 };
 
 export const pageTitle = { fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 8 };
@@ -431,6 +437,12 @@ export const REIFE_COLORS = {
 export const inputStyle = {
   padding: "9px 12px", border: "1px solid var(--border2)", borderRadius: 10,
   fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box",
+  // Dasselbe wie beim `select` (siehe selectStyle): ein Feld schrumpft als
+  // Flex-Kind nicht unter seine Eigenbreite, und ein natives Datums- oder
+  // Zeitfeld bringt eine kraeftige mit — auf dem Handy noch mehr, weil iOS
+  // dort 16 px Schrift erzwingt. Im Kalender-Dialog stand das zweite
+  // Datumsfeld deshalb 68 px ausserhalb des Dialogs.
+  minWidth: 0, maxWidth: "100%",
 };
 
 // ─── Datums-Navigator: ‹ [Datum] › Heute ───

@@ -508,7 +508,10 @@ export default function Noten() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <label data-tour="noten-class" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
+        {/* `minWidth: 0`: ohne das ist die Beschriftung so breit wie die
+            laengste Klasse im Auswahlfeld und schrumpft als Flex-Kind nicht —
+            auf 320 px lief die ganze Seite dadurch waagerecht ueber. */}
+        <label data-tour="noten-class" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)", minWidth: 0 }}>
           {t("nav.classes")}
           <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />
         </label>
@@ -705,7 +708,18 @@ export default function Noten() {
                 <th rowSpan={2} style={{ ...th, minWidth: 40 }} title={t("noten.obsTitle")}>{t("noten.obs")}</th>
               </tr>
               <tr>
-                <th style={{ ...th2, ...stickyLh, textAlign: "left" }}>{cls?.name}</th>
+                {/* Der Klassenname bestimmt die Breite der klebenden Namensspalte
+                    (`th` ist `nowrap`). „Beispielklasse (30 Karten)" sind 232 px —
+                    auf einem 390-px-Handy blieben vom Rahmen 96 px fuer die Noten,
+                    also knapp eine Spalte. Gekuerzt statt umgebrochen: eine
+                    zweizeilige Kopfzeile verschoebe jede Zeile darunter. */}
+                <th style={{ ...th2, ...stickyLh, textAlign: "left" }} title={cls?.name}>
+                  {/* Die Grenze sitzt am `span`, nicht an der Zelle: bei
+                      `table-layout: auto` haelt sich keine Zelle an ein
+                      `max-width`, das unter ihrer Mindestbreite liegt — und
+                      `nowrap` macht den ganzen Namen zur Mindestbreite. */}
+                  <span style={{ display: "block", maxWidth: NAME_SPALTE_MAX, overflow: "hidden", textOverflow: "ellipsis" }}>{cls?.name}</span>
+                </th>
                 {secListe.map((sec) => {
                   const cols = catsVon(sec);
                   const bereich = (
@@ -1827,3 +1841,7 @@ const td = tdBasis;
 // liegen, sonst schiebt sich beim Scrollen eine Zeile darueber.
 // Die klebende erste Spalte kommt aus Icons.jsx (sechs Stellen hatten sie).
 const stickyL = klebtLinks, stickyLh = klebtLinksOben;
+// Breitengrenze der klebenden Namensspalte. Keine Abstandsstufe, sondern eine
+// Inhaltsbreite: darunter passt „Aleksandra Ivanović" nicht mehr, darueber
+// bleibt auf dem Handy kein Platz fuer die Noten daneben.
+const NAME_SPALTE_MAX = 180;

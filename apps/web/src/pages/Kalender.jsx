@@ -1260,7 +1260,10 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo
                     ) : (<>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <button onClick={() => onDayView(d)} title={t("kalender.toDay")} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text2)", padding: 0 }}>{d.getDate()}</button>
-                      <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")} aria-label={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
+                      {/* Keine eigene Polsterung: mit `padding: 0` war das Trefferfeld
+                          14 mal 14 px — auf dem Handy trifft das niemand. `iconBtn`
+                          bringt die Polsterung mit, die jeder andere Icon-Knopf hat. */}
+                      <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={iconBtn} title={t("kalender.add")} aria-label={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
                     </div>
                     {/* Siehe WeekView: frei blendet nur den Stundenplan aus. */}
                     {f && <FreiMarker label={f.label} t={t} />}
@@ -1294,7 +1297,7 @@ function WeekView({ extColor, range, byDay, extByDay, todoByDay, onTodo, slotsFo
           style={{ border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: 8, minHeight: 160, background: f ? "rgba(184,134,11,0.09)" : "var(--card)", minWidth: 90, cursor: "pointer" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <button onClick={() => onDayView(d)} title={t("kalender.toDay")} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text)", padding: 0 }}>{d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</button>
-            <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
+            <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={iconBtn} title={t("kalender.add")} aria-label={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
           </div>
           {/* Ferien blenden den STUNDENPLAN aus, nicht die Termine: in den
               Sommerferien lagen ein Vorbereitungstag und ein Teamtag im
@@ -2594,7 +2597,9 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
         {edit && (<>
         {entry.period == null && (<>
           <div style={lbl}>{t("kalender.extDate")}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* Umbruch: zwei native Datumsfelder nebeneinander sind breiter als
+              ein Handy-Dialog — auf 390 px ragte das zweite hinaus. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <input type="date" value={dateVal} onChange={(e) => { const d = parseYmd(e.target.value); if (d) setDateVal(ymd(d)); }} style={{ ...fld, width: "auto" }} />
             <span style={{ color: "var(--text3)" }}>–</span>
             {/* „bis" leer heisst eintaegig — das ist der Normalfall und braucht
@@ -2614,7 +2619,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
           <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("kalender.multiDayHint")}</div>
         ) : (<>
         <div style={lbl}>{t("kalender.entryTime")}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.start")} />
           <span style={{ color: "var(--text3)" }}>–</span>
           <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.end")} />
