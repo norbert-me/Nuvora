@@ -1432,4 +1432,35 @@ if ("serviceWorker" in navigator) {
       if (document.visibilityState === "visible") reg.update().catch(() => {});
     });
   }).catch(() => {});
+
+  // ── Haengt die Service-Worker-Ablage? ──
+  //
+  // Chromium kann sie in einem Profil festfahren: `getRegistrations()` antwortet
+  // dann NIE — keine Ablehnung, keine Meldung, die Zusage bleibt offen. Die App
+  // laeuft weiter und liest offline trotzdem nichts mehr. Genau so faellt es im
+  // Desktop-Test auf, und in der Hand einer Lehrkraft faellt es gar nicht auf.
+  //
+  // Deshalb fragen wir MIT FRIST. Antwortet nichts, verwirft die Huelle den
+  // Zwischenspeicher und startet neu (nur `serviceworkers`/`cachestorage` —
+  // Anmeldung und Warteschlange bleiben). Hoechstens einmal am Tag: waere die
+  // Ablage dauerhaft kaputt, liefe die App sonst in eine Neustartschleife.
+  const MARKE = "nuvora_sw_reparatur";
+  const FRIST_MS = 8000;
+  const TAG_MS = 24 * 60 * 60 * 1000;
+  setTimeout(() => {
+    let antwortete = false;
+    navigator.serviceWorker.getRegistrations().then(() => { antwortete = true; }).catch(() => { antwortete = true; });
+    setTimeout(async () => {
+      if (antwortete) return;
+      const huelle = window.nuvora;
+      if (!huelle || typeof huelle.offlineReset !== "function") return;   // im Browser gibt es den Weg nicht
+      let zuletzt = 0;
+      try { zuletzt = Number(localStorage.getItem(MARKE) || 0); } catch { /* egal */ }
+      if (Date.now() - zuletzt < TAG_MS) return;
+      try { localStorage.setItem(MARKE, String(Date.now())); } catch { /* egal */ }
+      await huelle.offlineReset().catch(() => {});
+    }, FRIST_MS);
+    // Erst nach dem Start fragen: waehrend des ersten Ladens ist die Ablage
+    // ohnehin beschaeftigt, und eine Frist darauf waere ein Fehlalarm.
+  }, 5000);
 }

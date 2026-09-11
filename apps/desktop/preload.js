@@ -12,6 +12,10 @@ const fassung = (process.argv.find((a) => a.startsWith("--nuvora-version=")) || 
 contextBridge.exposeInMainWorld("nuvora", {
   setUrl: (url) => ipcRenderer.invoke("nuvora:set-url", url),
   retry: () => ipcRenderer.invoke("nuvora:retry"),
+  // Haengt Chromiums Service-Worker-Ablage, merkt das nur die Seite. Sie darf
+  // den Zwischenspeicher deshalb selbst verwerfen lassen — ohne Argumente, es
+  // gibt nichts zu waehlen.
+  offlineReset: () => ipcRenderer.invoke("nuvora:offline-reset"),
   appVersion: fassung,
   platform: process.platform,
   // Neue Fassung DRUEBERLEGEN statt verlinken. Die Adresse wird im Haupt-

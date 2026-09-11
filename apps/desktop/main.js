@@ -241,15 +241,7 @@ function buildMenu() {
               cancelId: 1,
             });
             if (response !== 0) return;
-            try {
-              const ses = session.defaultSession;
-              // Nur die beiden Ablagen, die der Service-Worker benutzt.
-              await ses.clearStorageData({ storages: ["serviceworkers", "cachestorage"] });
-            } catch (e) {
-              console.error("Offline-Speicher zuruecksetzen fehlgeschlagen:", e);
-            }
-            app.relaunch();
-            app.exit(0);
+            await offlineSpeicherVerwerfen();
           },
         },
       ],
@@ -295,6 +287,31 @@ app.on("web-contents-created", (_e, contents) => {
 
 // Knopf "Erneut verbinden" auf offline.html.
 ipcMain.handle("nuvora:retry", () => { loadTarget(); });
+
+/**
+ * Den Zwischenspeicher des Service-Workers verwerfen und neu starten.
+ *
+ * NUR `serviceworkers` und `cachestorage`: Anmeldung, Einstellungen und die
+ * Warteschlange der Outbox liegen in localStorage und IndexedDB und bleiben
+ * unberuehrt — sonst waere die Selbsthilfe schlimmer als der Schaden.
+ */
+async function offlineSpeicherVerwerfen() {
+  try {
+    await session.defaultSession.clearStorageData({ storages: ["serviceworkers", "cachestorage"] });
+  } catch (e) {
+    console.error("Offline-Speicher zuruecksetzen fehlgeschlagen:", e);
+    return false;
+  }
+  app.relaunch();
+  app.exit(0);
+  return true;
+}
+
+// Dieselbe Selbsthilfe, von der SEITE ausgeloest: die merkt als Einzige, dass
+// Chromiums Service-Worker-Ablage haengt (`getRegistrations()` antwortet nie).
+// Die Huelle fragt nicht zurueck — wer hier landet, hat schon gewartet, und die
+// Seite sagt vorher, was passiert.
+ipcMain.handle("nuvora:offline-reset", () => offlineSpeicherVerwerfen());
 
 // ── Update: die neue Fassung wird DRUEBERGELEGT, nicht verlinkt ──
 //
