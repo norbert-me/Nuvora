@@ -893,10 +893,16 @@ function Nav({ user, onLogout }) {
           </button>
         )}
 
+        {/* `minWidth: 0` und Ellipse am Seitentitel: ohne sie schrumpft er
+            nicht unter seine Textbreite, und die Leiste wird breiter als das
+            Fenster — auf 320 px lief sie um bis zu 10 px ueber (gemessen auf
+            /zufall und /mathespiele). Schuld sah der Profil-Eintrag ganz rechts
+            aus, weil er als letzter herausragt; gegeben hat ihn der Titel. */}
         {showNav && (
           <span className="nav-page-title" style={{
             display: "none", fontSize: 16, fontWeight: 600, color: "var(--text)",
-            flex: 1, textAlign: "center",
+            flex: 1, minWidth: 0, textAlign: "center",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>
             {pageTitle}
           </span>

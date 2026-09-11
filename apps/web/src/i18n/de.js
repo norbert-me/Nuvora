@@ -96,6 +96,7 @@ export default {
   "undo.deleted": "{{name}} gelöscht",
   "undo.deletedGeneric": "Gelöscht",
   "common.delete": "Löschen",
+  "common.remove": "Entfernen",
   "common.edit": "Bearbeiten",
   "common.close": "Schließen",
   "common.loading": "Lädt…",

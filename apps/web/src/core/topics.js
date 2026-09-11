@@ -39,7 +39,7 @@ export function themenIndex(topics) {
  * Die Kern-Themen laden.
  *
  * Diese eine Zeile stand sechsmal wortgleich in Seiten (Methoden, Noten,
- * Dashboard, Klassenarbeit, Evaluation, lernpfad/Exercises) — direkt neben dem
+ * Dashboard, Klassenarbeit, Evaluation) — direkt neben dem
  * `themenIndex`, dessen Beschriftungsregel längst hier liegt. Geladen, nicht
  * gecacht: `swr` würde beim ersten Aufbau kurz den alten Stand zeigen, und
  * genau das tun heute nur die zwei Seiten, die es ausdrücklich so wollen

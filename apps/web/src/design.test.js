@@ -47,7 +47,7 @@ const SCHRIFT = new Set([11, 12, 13, 14, 16, 22]);
 // Zahl hier ein — das ist die halbe Minute, die den Rueckfall verhindert.
 const GRENZE = {
   fontSize: 13,
-  borderRadius: 33,
+  borderRadius: 31,
 };
 
 function dateien(dir) {

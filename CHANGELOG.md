@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Layout auf Handy und PC durchgemessen**: keine Seite scrollt mehr
+  waagerecht (auch nicht bei 320 px), Tippziele sind groß genug, Schriften
+  stehen wieder auf der Leiter, die Namensspalte im Notenbuch lässt den Noten
+  Platz.
 - **Startseite: „Heute" zeigt nur noch, was heute ist.** Ein Eintrag von
   gestern stand unter der Überschrift von heute.
 - **Anwesenheit gehört dem Kurs, nicht dem Tag.** Wer in der ersten Stunde

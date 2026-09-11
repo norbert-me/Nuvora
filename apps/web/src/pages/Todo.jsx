@@ -308,7 +308,7 @@ export default function Todo({ embedded } = {}) {
               </button>
             </>
           )}
-          <button onClick={() => { setDate(""); setTime(""); }} className="icon-btn" title={t("common.remove") || t("common.delete")} aria-label={t("common.remove") || t("common.delete")} style={toolbarIconBtn}>
+          <button onClick={() => { setDate(""); setTime(""); }} className="icon-btn" title={t("common.remove")} aria-label={t("common.remove")} style={toolbarIconBtn}>
             <Icon d={ICONS.close} size={15} color="var(--text3)" />
           </button>
         </>)}

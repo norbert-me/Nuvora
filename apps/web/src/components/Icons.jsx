@@ -268,7 +268,15 @@ export const btnSecondary = {
 };
 
 // Kleinere Variante fuer Knoepfe in Zeilen und Tabellen.
-export const btnSmall = { padding: "5px 12px", fontSize: 13 };
+// `minHeight` statt mehr Polster: die Knoepfe waren ueber ihr Polster 29 px
+// hoch — drei Pixel unter der Grenze, ab der ein Finger sicher trifft (32).
+// Mehr Polster haette sie auch breiter gemacht und die Werkzeugleisten
+// umgebrochen; die Mindesthoehe laesst die Breite, wie sie war.
+export const btnSmall = {
+  padding: "5px 12px", fontSize: 13,
+  minHeight: 32, boxSizing: "border-box",
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
+};
 
 // Textknopf, der wie ein Link aussieht: „Mehr ›", „Passwort ändern",
 // „Konto erstellen". Es gab ihn bisher nirgends, also hat ihn jede Seite selbst
