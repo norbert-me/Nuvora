@@ -990,7 +990,11 @@ function Nav({ user, onLogout }) {
   );
 }
 
-const footerLink = { color: "var(--text3)", textDecoration: "none", whiteSpace: "nowrap" };
+// Die Fusszeilen-Links sind 12 px gross und standen ohne Polster in einer
+// Zeile — gemessen 19 px hoch, auf dem Handy also vier Tippziele unter der
+// Groesse, die ein Finger sicher trifft. Das Polster hebt sie auf 32 px; der
+// senkrechte Abstand der Zeile bleibt, weil die Fusszeile ohnehin Luft hat.
+const footerLink = { color: "var(--text3)", textDecoration: "none", whiteSpace: "nowrap", display: "inline-block", padding: "7px 0" };
 const footerSep = { color: "var(--text3)" };
 
 function ContentWrapper({ children }) {

@@ -411,15 +411,33 @@ export default function NuvoraHome({ user }) {
         {/* Sucheinstieg: nicht jeder weiss, dass die Ausleihe unter Orga sitzt.
             Klick oder ⌘K oeffnet dieselbe Suche wie die Lupe in der Navigation
             (components/Suche.jsx) — hier steht nur der Knopf dazu. */}
+        {/* `flex: "1 1 520px"` statt `flex: 1`: der Abstandhalter darunter hat
+            ebenfalls `flex: 1`, und zwei gleich gierige Kinder teilen sich den
+            Platz haelftig. Auf einem schmalen Geraet blieben dem Suchfeld
+            dadurch 155 px — der Satz „Seite, Klasse oder Thema suchen …" stand
+            fuenfzeilig darin. Mit einer Basis von 520 wird beim Schrumpfen
+            proportional zur Basis gekuerzt: der Abstandhalter (Basis 0) gibt
+            alles her, das Suchfeld bekommt die volle Breite, und auf breiten
+            Bildschirmen bremst `maxWidth` es wie zuvor. */}
         <button onClick={() => window.dispatchEvent(new Event("nuvora:suche"))} data-suche="startseite"
-          style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, maxWidth: 520,
-            padding: "11px 14px", border: "1px solid var(--border2)", borderRadius: CONTROL_R, background: "var(--card)",
+          // Eine Hoehe, eine Form (CLAUDE.md): das Feld war ueber sein Polster
+          // 47 px hoch und stand neben einem 34 px hohen Icon-Knopf — elf Pixel
+          // Unterschied in einer Zeile aus zwei Elementen. `CONTROL_H` mit
+          // `border-box` bringt beide auf dieselbe Kante.
+          style={{ display: "flex", alignItems: "center", gap: 8, flex: "1 1 520px", minWidth: 0, maxWidth: 520,
+            height: CONTROL_H, boxSizing: "border-box", padding: "0 12px",
+            border: "1px solid var(--border2)", borderRadius: CONTROL_R, background: "var(--card)",
             color: "var(--text3)", cursor: "text", fontSize: 14, textAlign: "left" }}>
           <Icon d={ICONS.search} size={16} color="var(--text3)" />
-          <span style={{ flex: 1 }}>{t("suche.placeholder")}</span>
+          {/* Einzeilig mit Ellipse, wie ein echter `placeholder`: auf einem
+              schmalen Geraet stand „Seite, Klasse oder Thema suchen …" sonst
+              drei- bis fuenfzeilig IM Knopf, und der Knopf war dreimal so hoch
+              wie der Stift daneben. Abgeschnitten ist hier richtig — der Satz
+              sagt, was das Feld tut, er ist kein Inhalt. */}
+          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("suche.placeholder")}</span>
           <kbd style={{ ...chipStyle, fontWeight: 500, border: "1px solid var(--border2)" }}>⌘K</kbd>
         </button>
-        <span style={{ flex: 1 }} />
+        <span style={{ flex: "1 1 0" }} />
 
         {/* Der Knopf richtet jetzt auch die Widgets ein — er gehoert also auch
             dorthin, wo nur ein Modul laeuft. Vorher hing er an „mehr als eine

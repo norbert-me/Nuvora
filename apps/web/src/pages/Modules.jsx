@@ -2,7 +2,7 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
-import { badge, btnSecondary, btnSmall, cardStyle, COLORS as C, CONTROL_R, DialogKopf, Icon, ICONS, Modal, MODULE_ICONS, pageApp, pageIntro, pageTitle, panelStyle, sectionLabel, Segment, segmentBtn, StageBadge, Tabs, toolbarBtn, toolbarInput } from "../components/Icons.jsx";
+import { badge, btnSecondary, btnSmall, cardStyle, COLORS as C, CONTROL_R, DialogKopf, Icon, ICONS, linkBtn, Modal, MODULE_ICONS, pageApp, pageIntro, pageTitle, panelStyle, sectionLabel, Segment, segmentBtn, StageBadge, Tabs, toolbarBtn, toolbarInput } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 // Ausführlichere Erklärung je Modul für das Info-Popup in der Auswahl. Nutzt
@@ -117,7 +117,13 @@ export default function Modules() {
         {mods.map((m) => (
           <div
             key={m.key}
-            style={{ ...cardStyle, display: "flex", alignItems: "flex-start", gap: 16 }}
+            // `flexWrap` ist hier kein Zierrat: der Abschalten-Knopf gibt nicht
+            // nach, und bei 320 px blieben dem Textblock daneben 58 px — der
+            // Modulname stand abgeschnitten („Einstiege" als „Einstieg"), die
+            // Beschreibung in einer Spalte aus zwei Woertern. Mit Umbruch
+            // rutscht der Knopf unter den Text, statt ihn zu zerdruecken.
+            // Die Schwelle steht am Textblock darunter (`flex-basis`).
+            style={{ ...cardStyle, display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}
           >
             {MODULE_ICONS[m.key] && (
               <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: CONTROL_R, display: "flex", alignItems: "center", justifyContent: "center",
@@ -125,7 +131,7 @@ export default function Modules() {
                 <Icon d={MODULE_ICONS[m.key]} size={22} color="currentColor" />
               </div>
             )}
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: "1 1 170px", minWidth: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
                 {t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name}
                 {" "}<StageBadge stage={m.stage} title={m.stage === "beta" ? t("stage.betaHint") : t("stage.alphaHint")} />
@@ -151,7 +157,7 @@ export default function Modules() {
                 overflow: "hidden" }}>
                 {kurzOf(m)}
               </div>
-              <button onClick={() => setHelpMod(m)} style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>
+              <button onClick={() => setHelpMod(m)} style={{ ...linkBtn, whiteSpace: "nowrap" }}>
                 {t("modules.more")} ›
               </button>
             </div>

@@ -84,8 +84,11 @@ const Abschnitt = ({ id, titel, zu = true, kopf = null, children }) => {
   return (
     <div style={abschnitt}>
       <button type="button" onClick={um}
+        // Polster statt `padding: 0`: der Kopf war 20 px hoch und damit ein
+        // Tippziel unter der Fingerbreite, obwohl die ganze Karte darunter
+        // klickbar aussieht. Der negative Rand haelt die Optik, wie sie war.
         style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none",
-          border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
+          border: "none", cursor: "pointer", padding: "6px 0", margin: "-6px 0", textAlign: "left" }}>
         <Icon d={offen ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
         <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", flex: 1 }}>{titel}</span>
         {/* Was auch zugeklappt sichtbar bleiben muss (die eigene Adresse). */}
@@ -697,7 +700,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             const data = await res.json();
             showAlert(data.detail || t("login.genericError"));
           }
-        }} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: C.danger, fontSize: 13, cursor: "pointer" }}>
+        // Polster wie bei den uebrigen Textknoepfen: ohne es war „Konto
+        // löschen" 16 px hoch und stand neben dem 34 px hohen „Abmelden".
+        }} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: C.danger, fontSize: 13, cursor: "pointer", padding: "10px 0", margin: "-10px 0" }}>
           <TrashIcon size={14} /> {t("profile.deleteUser")}
         </button>
       </div>
@@ -716,8 +721,12 @@ const feldStyle = {
 
 
 
+// Wie `linkBtn` in Icons.jsx, nur eine Stufe kleiner (13 statt 14) — das
+// Polster ist dasselbe und aus demselben Grund da: ohne es war „Passwort
+// ändern" 16 px hoch.
 const linkBtn = {
-  background: "none", border: "none", color: "var(--accent)", fontSize: 13, fontWeight: 500, cursor: "pointer", padding: 0,
+  background: "none", border: "none", color: "var(--accent)", fontSize: 13, fontWeight: 500,
+  cursor: "pointer", padding: "8px 0", margin: "-8px 0", textAlign: "left",
 };
 
 // Kopf und Zelle müssen dieselbe Ausrichtung haben: `th`/`td` aus Icons.jsx

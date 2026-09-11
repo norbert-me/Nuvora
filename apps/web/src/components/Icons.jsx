@@ -270,6 +270,23 @@ export const btnSecondary = {
 // Kleinere Variante fuer Knoepfe in Zeilen und Tabellen.
 export const btnSmall = { padding: "5px 12px", fontSize: 13 };
 
+// Textknopf, der wie ein Link aussieht: „Mehr ›", „Passwort ändern",
+// „Konto erstellen". Es gab ihn bisher nirgends, also hat ihn jede Seite selbst
+// erfunden — und zwar jedes Mal mit `padding: 0`. Genau das ist der Mangel: die
+// Klickflaeche ist dann exakt eine Textzeile, auf dem Handy 16 bis 20 px hoch,
+// also die Haelfte dessen, was ein Finger sicher trifft. Gemessen wurden 18 px
+// bei „Mehr ›" auf /modules und 16 px bei „Passwort ändern" im Profil.
+//
+// Das Polster macht daraus 32 px, der negative Rand nimmt es optisch wieder
+// zurueck — die Zeile steht, wo sie vorher stand, nur der Finger trifft sie.
+// Wer eine Abweichung braucht (kleinere Schrift, andere Farbe), leitet per
+// Spread ab, statt den Knopf noch einmal zu bauen.
+export const linkBtn = {
+  background: "none", border: "none", cursor: "pointer", font: "inherit",
+  fontSize: 14, fontWeight: 600, color: "var(--accent)", textAlign: "left",
+  padding: "7px 0", margin: "-7px 0",
+};
+
 // Einheitliche Export-/Import-Knoepfe (Icon + Label) — moduluebergreifend
 // dasselbe Aussehen und Verhalten. Nie je Seite nachbauen.
 export function ExportButton({ label, onClick, style, iconOnly, ...props }) {
@@ -1035,7 +1052,7 @@ export function StageBadge({ stage, title }) {
   const beta = stage === "beta";
   return (
     <span title={title} style={{
-      display: "inline-block", fontSize: 10, fontWeight: 700, letterSpacing: "0.5px",
+      display: "inline-block", fontSize: 11, fontWeight: 700, letterSpacing: "0.5px",
       textTransform: "uppercase", padding: "2px 6px", borderRadius: 6, verticalAlign: "middle",
       background: beta ? "rgba(10,132,255,0.15)" : "rgba(184,134,11,0.18)",
       color: beta ? "var(--accent)" : COLORS.warning,

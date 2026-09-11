@@ -4,7 +4,7 @@ import { askConfirm } from "../core/dialog.jsx";
 import { useAktiv } from "../core/modules.js";
 import { istAdmin } from "../core/admin.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { Icon, ICONS, Modal, Tabs, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, toolbarInput, iconBtn, COLORS as C, pageApp } from "../components/Icons.jsx";
+import { Icon, ICONS, Modal, Tabs, btnPrimary, linkBtn, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, toolbarInput, iconBtn, COLORS as C, pageApp } from "../components/Icons.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import VerknuepfungDialog, { flachBaum, themenNamen } from "../components/Verknuepfung.jsx";
@@ -52,7 +52,11 @@ function Stars({ value, my, onRate, count, t }) {
               onMouseEnter={() => setHover(n)}
               onMouseLeave={() => setHover(0)}
               title={t("market.stars", { n })}
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }}
+              // Polster statt `padding: 0`: der Stern selbst ist 18 px, die
+              // Klickflaeche war es damit auch — fuenf davon nebeneinander
+              // trifft auf dem Handy niemand sicher. Der negative Rand haelt
+              // die Reihe so schmal, wie sie aussieht.
+              style={{ background: "none", border: "none", padding: 7, margin: -7, cursor: "pointer", lineHeight: 0 }}
             >
               {/* Roh statt <Icon>: ein Bewertungsstern muss GEFUELLT sein, und
                   `Icon` kann nur Striche zeichnen. Die Farbe kommt trotzdem
@@ -257,8 +261,13 @@ export default function Marketplace({ fixedKind }) {
       ) : (
         quizzes.map((q) => (
           <div key={q.id} style={{ ...cardStyle, padding: "16px 18px", marginBottom: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6 }}>
-              <div style={{ minWidth: 0 }}>
+            {/* `flexWrap` und eine Mindestbreite am Titelblock: ohne sie gab
+                  der Knopfblock (flexShrink 0, rund 210 px) auf schmalen
+                  Geraeten nicht nach, dem Titel blieben 95 px, und
+                  „Geografie-Challenge" brach dreizeilig um die Knoepfe herum.
+                  Mit Umbruch stehen die Knoepfe darunter. */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6, flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>
                   {q.title}
                   {/* Schon in der Übersicht sichtbar: das Quiz differenziert nach E/G. */}
@@ -277,7 +286,7 @@ export default function Marketplace({ fixedKind }) {
                   {countLabel(q)}{" "}
                   {q.author_id ? (
                     <button onClick={() => setAuthorFilter({ id: q.author_id, name: q.author_name || t("market.unknown") })}
-                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 12, fontWeight: 500 }}>
+                      style={{ ...linkBtn, fontSize: 12, fontWeight: 500, padding: "8px 0", margin: "-8px 0" }}>
                       {q.author_name || t("market.unknown")}
                     </button>
                   ) : (q.author_name || t("market.unknown"))}

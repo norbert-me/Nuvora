@@ -116,7 +116,7 @@ export default function Login({ onLogin }) {
           {mode === "login" && (
             <>
               <button onClick={() => { setMode("register"); setError(""); setMessage(""); }} style={linkBtn}>{t("login.createAccountLink")}</button>
-              <button onClick={() => { setMode("forgot"); setError(""); setMessage(""); }} style={{ ...linkBtn, fontSize: 13, color: "var(--text3)" }}>{t("login.forgotPassword")}</button>
+              <button onClick={() => { setMode("forgot"); setError(""); setMessage(""); }} style={{ ...linkBtn, fontSize: 13, color: "var(--text3)", padding: "8px 0", margin: "-8px 0" }}>{t("login.forgotPassword")}</button>
             </>
           )}
           {mode !== "login" && (
@@ -134,7 +134,10 @@ const inputStyle = { ...feld, display: "block", width: "100%", marginBottom: 12 
 
 const btnPrimary = { ...knopf, width: "100%", padding: 12, fontSize: 16 };
 
+// Polster wie beim Baustein in Icons.jsx: „Konto erstellen" war 18 px hoch,
+// „Passwort vergessen" 16 — beide auf dem Handy zu flach zum Treffen. Die
+// Zeile bleibt, wo sie war (die Reihe hat ihren eigenen `gap`).
 const linkBtn = {
   background: "none", border: "none", color: "var(--accent)", fontSize: 14,
-  cursor: "pointer", fontWeight: 500,
+  cursor: "pointer", fontWeight: 500, padding: "7px 0", margin: "-7px 0",
 };
