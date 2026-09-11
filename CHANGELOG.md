@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+(noch nichts)
+
+## 4.3.4 — 11.09.2026
+
 - **Layout auf Handy und PC durchgemessen**: keine Seite scrollt mehr
   waagerecht (auch nicht bei 320 px), Tippziele sind groß genug, Schriften
   stehen wieder auf der Leiter, die Namensspalte im Notenbuch lässt den Noten
