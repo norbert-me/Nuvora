@@ -189,7 +189,18 @@ function HeutePanel({ t }) {
     .filter((s) => !vorbei(slotEnde(s.period)))
     .sort((a, b) => a.period - b.period);
   const alleSlots = data.slots.filter((s) => s.weekday === wochentag() && activeToday(s));
+  // Liegt der Eintrag WIRKLICH heute? Das Fenster der Abfrage reicht dafuer
+  // nicht: `/entries` gibt Serienkoepfe (ihr Datum ist der erste Termin, oft
+  // Monate her) und mehrtaegige Eintraege mit heraus, die vor dem Fenster
+  // anfangen. Ohne diese Pruefung stand ein Eintrag vom Donnerstag unter der
+  // Ueberschrift „Freitag" — dieselbe Regel wie `byDay` im Kalender.
+  const amTag = (e) => {
+    const von = ymd(new Date(e.occ || e.date));
+    const bis = e.end_date ? ymd(new Date(e.end_date)) : von;
+    return heuteYmd >= von && heuteYmd <= bis;
+  };
   const extras = data.entries
+    .filter(amTag)
     .filter((e) => e.period == null || !alleSlots.some((s) => s.period === e.period))
     .filter((e) => !vorbei(hmToMin(e.end_time) ?? hmToMin(e.start_time)));
   if (slots.length === 0 && extras.length === 0 && !data.frei) return null;
@@ -203,7 +214,7 @@ function HeutePanel({ t }) {
   // timetable). Hier stand `from`/`to` — beides undefined, und deshalb blieb
   // die Zeile unter der Stundennummer immer leer.
   const zeit = (p) => { const w = stundenZeit(data.times, data.zero, p); return w && (w.start || w.end) ? `${w.start || ""}–${w.end || ""}` : ""; };
-  const eintrag = (p) => data.entries.find((e) => e.period === p);
+  const eintrag = (p) => data.entries.find((e) => e.period === p && amTag(e));
   // EINE Liste, nach der Uhr sortiert. Vorher standen erst alle Stunden und
   // darunter die Termine mit eigener Uhrzeit — der Elternabend um 8 Uhr kam
   // hinter der sechsten Stunde, und die Kachel beantwortete „was kommt als

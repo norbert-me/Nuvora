@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Startseite: „Heute" zeigt nur noch, was heute ist.** Ein Eintrag von
+  gestern stand unter der Überschrift von heute.
 - **Anwesenheit gehört dem Kurs, nicht dem Tag.** Wer in der ersten Stunde
   fehlte, war bisher in jedem Kurs des Tages abwesend. Jetzt wird er in der
   nächsten Stunde nur noch **vorgeschlagen** — bestätigt wird per Speichern.
