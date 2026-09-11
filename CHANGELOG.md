@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote: ein Quiz lässt sich als Excel sichern** — in denselben Spalten wie
+  die Vorlage, also auch wieder importierbar. Die JSON-Sicherung bleibt daneben:
+  nur sie trägt Bilder und die Quiz-Einstellungen.
+- Die JSON-Beispieldateien zeigen jetzt ebenfalls E/G.
 - **CardVote: die Excel-Vorlage hat eine Spalte für E/G.** Ein „E" in der Zeile
   macht die Frage zur Anforderung und schaltet die Unterscheidung im Quiz an;
   leer bleibt G.

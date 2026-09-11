@@ -286,6 +286,55 @@ async def import_class_xlsx(name: str = "Neue Klasse", file: UploadFile = File(.
     return {"id": sc.id, "name": sc.name, "count": count}
 
 
+@router.get("/export/question-set/{set_id}.xlsx", dependencies=[CARDVOTE])
+async def export_question_set_xlsx(set_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Ein Quiz als Excel — in genau den Spalten der Vorlage.
+
+    Bisher ging ein Quiz nur als JSON hinaus. Das ist richtig fuer den Weg
+    zurueck (es traegt Bilder, Layout und Reihenfolge), aber niemand oeffnet
+    eine JSON-Datei, um zwanzig Fragen durchzusehen oder einer Kollegin zu
+    schicken. Die Tabelle ist dafuer da — und weil sie dieselben Spalten hat wie
+    die Import-Vorlage, kommt sie auch wieder herein: aendern, hochladen, fertig.
+
+    Was die Tabelle NICHT kann, kann sie ehrlicherweise nicht: Bilder an Frage
+    oder Antwort, das Bild-Layout und die Feinheiten des Quiz (Mischen,
+    Minuspunkte) stehen nur im JSON. Deshalb bleibt der JSON-Weg daneben stehen,
+    statt ersetzt zu werden.
+    """
+    qs = await db.get(QuestionSet, set_id)
+    if not qs:
+        raise HTTPException(404)
+    await ensure_set_access(db, qs, user.id)
+    items = (await db.execute(
+        select(QuestionSetItem)
+        .options(selectinload(QuestionSetItem.question))
+        .where(QuestionSetItem.question_set_id == set_id)
+        .order_by(QuestionSetItem.position)
+    )).scalars().all()
+
+    headers = ["Frage", "Antwort A", "Antwort B", "Antwort C", "Antwort D",
+               "Richtig (z.B. A oder AB)", "Niveau (E oder leer = G)"]
+    wb, ws = _xlsx_template(qs.name[:28] or "Fragen", headers)
+    for zeile, it in enumerate(items, start=2):
+        q = it.question
+        auswahl = q.choices or {}
+        werte = [q.text, auswahl.get("A", ""), auswahl.get("B", ""), auswahl.get("C", ""),
+                 auswahl.get("D", ""), q.correct_answer or "", it.niveau or ""]
+        for spalte, wert in enumerate(werte, start=1):
+            ws.cell(row=zeile, column=spalte, value=wert)
+
+    ws.column_dimensions["A"].width = 30
+    for col in ["B", "C", "D", "E"]:
+        ws.column_dimensions[col].width = 18
+    ws.column_dimensions["F"].width = 22
+    ws.column_dimensions["G"].width = 22
+
+    # Der Dateiname traegt den Quiznamen — im Ordner „Downloads" liegen sonst
+    # fuenf Dateien, die alle gleich heissen.
+    sicher = "".join(c for c in qs.name if c.isalnum() or c in " -_").strip() or "Fragen"
+    return _xlsx_response(wb, f"{sicher}.xlsx")
+
+
 # --- Excel template for question set import ---
 
 @router.get("/import/questions-template.xlsx", dependencies=[CARDVOTE])

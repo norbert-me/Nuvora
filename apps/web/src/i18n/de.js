@@ -525,6 +525,8 @@ export default {
   "dash.importJsonItem": "Ordner/Set importieren (JSON)",
   "dash.jsonFolderExample": "Beispiel: Ordner (JSON)",
   "dash.jsonExample": "JSON-Beispiel",
+  "dash.exportJson": "Als JSON sichern (alles, auch Bilder)",
+  "dash.exportXlsx": "Als Excel sichern (zum Ansehen und Ändern)",
   "dash.deleteFolderConfirm": "Ordner und alle Inhalte löschen?",
   "dash.deleteSetConfirm": "Frageset löschen?",
   "dash.moveTo": "Ordner verschieben nach:",

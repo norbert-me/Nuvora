@@ -507,3 +507,51 @@ async def test_excel_import_ohne_niveau_bleibt_wie_bisher(s):
     assert qs.niveau_aktiv is False
     items = (await s.execute(_select(QuestionSetItem).where(QuestionSetItem.question_set_id == qs.id))).scalars().all()
     assert [i.niveau for i in items] == [""]
+
+
+@pytest.mark.asyncio
+async def test_excel_export_und_wieder_hinein(s):
+    """Ein Quiz als Tabelle hinaus — und dieselbe Datei wieder herein.
+
+    Der Weg ist nur dann etwas wert, wenn er zurueckfuehrt: aendern, hochladen,
+    fertig. Deshalb hat der Export genau die Spalten der Vorlage, Niveau
+    eingeschlossen.
+    """
+    import io as _io
+
+    from openpyxl import load_workbook
+    from sqlalchemy import select as _select
+
+    from app.models import QuestionSet, QuestionSetItem
+
+    u = await _lehrkraft(s)
+    # Erst ueber den Excel-Import anlegen (dieselbe Form wie in der Vorlage) …
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Frage", "A", "B", "C", "D", "Richtig", "Niveau"])
+    ws.append(["Was ist 2+2?", "3", "4", "5", "6", "B", ""])
+    ws.append(["Warum ist 0,5 = 1/2?", "a", "b", "c", "d", "A", "E"])
+    puffer = _io.BytesIO(); wb.save(puffer)
+    rein = await EXP.import_questions_xlsx(name="Hin und zurueck", file=_Datei(puffer.getvalue()), user=u, db=s)
+
+    # … dann hinaus.
+    antwort = await EXP.export_question_set_xlsx(rein["id"], user=u, db=s)
+    stuecke = []
+    async for teil in antwort.body_iterator:
+        stuecke.append(teil if isinstance(teil, bytes) else teil.encode())
+    datei = b"".join(stuecke)
+    blatt = load_workbook(_io.BytesIO(datei)).active
+    zeilen = [z for z in blatt.iter_rows(min_row=1, values_only=True)]
+    assert zeilen[0][6].startswith("Niveau"), "die Spalten muessen die der Vorlage sein"
+    assert zeilen[1][0] == "Was ist 2+2?" and (zeilen[1][6] or "") == ""
+    assert zeilen[2][6] == "E", "das Niveau muss mit hinaus"
+
+    # … und wieder herein: gleiche Fragen, gleiches Niveau, Schalter wieder an.
+    zurueck = await EXP.import_questions_xlsx(name="Zurueck", file=_Datei(datei), user=u, db=s)
+    qs = (await s.execute(_select(QuestionSet).where(QuestionSet.id == zurueck["id"]))).scalar_one()
+    assert qs.niveau_aktiv is True
+    items = (await s.execute(_select(QuestionSetItem)
+                             .where(QuestionSetItem.question_set_id == qs.id)
+                             .order_by(QuestionSetItem.position))).scalars().all()
+    assert [i.niveau for i in items] == ["", "E"]

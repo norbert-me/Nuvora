@@ -4,10 +4,18 @@
   "name": "Informatik Beispiel-Quiz",
   "shuffle_questions": false,
   "shuffle_answers": true,
+  "niveau_aktiv": true,
+  "minuspunkte": false,
   "questions": [
     {
+      "niveau": "",
       "text": "Wie viele Bits hat ein Byte?",
-      "choices": { "A": "4", "B": "8", "C": "16", "D": "10" },
+      "choices": {
+        "A": "4",
+        "B": "8",
+        "C": "16",
+        "D": "10"
+      },
       "correct_answer": "B",
       "image_url": null,
       "image_layout": "above",
@@ -15,8 +23,14 @@
       "choice_images": null
     },
     {
+      "niveau": "",
       "text": "Welche Zahl ist die Dezimalzahl 5 im Binärsystem?",
-      "choices": { "A": "101", "B": "110", "C": "011", "D": "100" },
+      "choices": {
+        "A": "101",
+        "B": "110",
+        "C": "011",
+        "D": "100"
+      },
       "correct_answer": "A",
       "image_url": null,
       "image_layout": "above",
@@ -24,8 +38,14 @@
       "choice_images": null
     },
     {
+      "niveau": "",
       "text": "Was berechnet $2^{10}$?",
-      "choices": { "A": "100", "B": "1000", "C": "1024", "D": "2048" },
+      "choices": {
+        "A": "100",
+        "B": "1000",
+        "C": "1024",
+        "D": "2048"
+      },
       "correct_answer": "C",
       "image_url": null,
       "image_layout": "above",
@@ -33,8 +53,14 @@
       "choice_images": null
     },
     {
+      "niveau": "E",
       "text": "Welche Aussage(n) zu Variablen in der Programmierung sind richtig? (Mehrfachauswahl)",
-      "choices": { "A": "Eine Variable speichert einen Wert unter einem Namen", "B": "Variablen können ihren Wert im Programmverlauf ändern", "C": "Eine Variable kann nie überschrieben werden", "D": "Jede Variable hat einen Datentyp" },
+      "choices": {
+        "A": "Eine Variable speichert einen Wert unter einem Namen",
+        "B": "Variablen können ihren Wert im Programmverlauf ändern",
+        "C": "Eine Variable kann nie überschrieben werden",
+        "D": "Jede Variable hat einen Datentyp"
+      },
       "correct_answer": "ABD",
       "image_url": null,
       "image_layout": "above",
@@ -42,8 +68,14 @@
       "choice_images": null
     },
     {
+      "niveau": "",
       "text": "Was ist eine Schleife (Loop) in der Programmierung?",
-      "choices": { "A": "Eine einmalige Berechnung", "B": "Ein wiederholt ausgeführter Codeblock", "C": "Ein Speicherort für Daten", "D": "Eine Fehlermeldung" },
+      "choices": {
+        "A": "Eine einmalige Berechnung",
+        "B": "Ein wiederholt ausgeführter Codeblock",
+        "C": "Ein Speicherort für Daten",
+        "D": "Eine Fehlermeldung"
+      },
       "correct_answer": "B",
       "image_url": null,
       "image_layout": "above",
@@ -51,8 +83,13 @@
       "choice_images": null
     },
     {
+      "niveau": "",
       "text": "Welches Protokoll wird zum Aufrufen von Webseiten verwendet?",
-      "choices": { "A": "HTTP", "B": "SMTP", "C": "FTP" },
+      "choices": {
+        "A": "HTTP",
+        "B": "SMTP",
+        "C": "FTP"
+      },
       "correct_answer": "A",
       "image_url": null,
       "image_layout": "above",
@@ -60,8 +97,12 @@
       "choice_images": null
     },
     {
+      "niveau": "",
       "text": "Ein Algorithmus muss eindeutig definiert sein.",
-      "choices": { "A": "Wahr", "B": "Falsch" },
+      "choices": {
+        "A": "Wahr",
+        "B": "Falsch"
+      },
       "correct_answer": "A",
       "image_url": null,
       "image_layout": "above",
@@ -69,8 +110,14 @@
       "choice_images": null
     },
     {
+      "niveau": "E",
       "text": "Welche Datenstruktur arbeitet nach dem Prinzip \"Last In, First Out\" (LIFO)?",
-      "choices": { "A": "Warteschlange (Queue)", "B": "Stapel (Stack)", "C": "Liste (Array)", "D": "Baum (Tree)" },
+      "choices": {
+        "A": "Warteschlange (Queue)",
+        "B": "Stapel (Stack)",
+        "C": "Liste (Array)",
+        "D": "Baum (Tree)"
+      },
       "correct_answer": "B",
       "image_url": null,
       "image_layout": "above",

@@ -66,6 +66,10 @@ export const ICONS = {
   // wechselt die Seite (raus = export, rein = import). IMMER dieses Paar für
   // Datei-Export/-Import verwenden — modulübergreifend einheitlich.
   export: ["M12 3h5v5", "M17 3L9 11", "M15 11v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5"],
+  // Tabelle — fuer den Weg „als Excel". Das Ausgangs-Sinnbild daneben sagt
+  // „hinaus", dieses sagt WOHIN; zwei gleiche Pfeile nebeneinander waeren die
+  // Frage, welcher welcher ist.
+  tabelle: ["M3 5h14v10H3z", "M3 9h14", "M8 5v10", "M13 5v10"],
   import: ["M9 6v5h5", "M17 3L9 11", "M15 11v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5"],
   // Pfeil nach oben auf eine Grundlinie — reines Hochladen (Datei o.ä.).
   // Fürs „Teilen/Veröffentlichen zum Marktplatz" gilt jetzt `share` (einheitlich).

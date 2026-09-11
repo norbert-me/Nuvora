@@ -794,7 +794,15 @@ export default function Dashboard() {
                   <Icon d={ICONS.share} size={18} color="var(--accent)" />
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); duplicateSet(qs.id); }} className="icon-btn" style={iconBtn} title={t("dash.duplicate")} aria-label={t("dash.duplicate")}><Icon d={ICONS.duplicate} size={18} /></button>
-                <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.json`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("classes.export")} aria-label={t("classes.export")}><Icon d={ICONS.export} size={18} /></button>
+                {/* Zwei Wege hinaus, und sie sind NICHT dasselbe: das JSON
+                    traegt alles (Bilder, Layout, Mischen, Minuspunkte) und
+                    kommt vollstaendig zurueck; die Tabelle laesst sich lesen,
+                    durchsehen und weiterreichen — und kommt ueber die
+                    Import-Vorlage ebenfalls zurueck, nur ohne Bilder. Deshalb
+                    steht das Sinnbild zweimal da statt in einem Menue: ein
+                    Menue fuer zwei Eintraege ist ein Klick mehr fuer nichts. */}
+                <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.json`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("dash.exportJson")} aria-label={t("dash.exportJson")}><Icon d={ICONS.export} size={18} /></button>
+                <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}.xlsx`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.xlsx`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("dash.exportXlsx")} aria-label={t("dash.exportXlsx")}><Icon d={ICONS.tabelle} size={18} /></button>
               </div>
             </div>
           ))}
