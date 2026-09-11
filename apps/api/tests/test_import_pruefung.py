@@ -444,3 +444,66 @@ async def test_eigene_felder_der_oberflaeche_bleiben_erlaubt(s):
     sess = await _session(s, u)
     await SES.save_eval_config(sess.id, {"irgendwas_neues": {"a": 1}}, user=u, db=s)
     assert (await s.get(TestSession, sess.id)).eval_config == {"irgendwas_neues": {"a": 1}}
+
+
+@pytest.mark.asyncio
+async def test_excel_import_nimmt_das_niveau_mit(s):
+    """E/G steht in der Vorlage — und wirkt.
+
+    Wer zwanzig Fragen aus einer Tabelle einliest, musste danach jede einzeln
+    als Anforderung markieren. Zwei Dinge muessen dafuer zusammenpassen: das
+    Niveau am SET-EINTRAG (dieselbe Frage kann anderswo Zusatz sein) und der
+    Schalter `niveau_aktiv` am Quiz — ohne ihn waere das Niveau gespeichert und
+    ohne Wirkung, und die Wertung rechnete stur ueber alle Fragen.
+    """
+    from openpyxl import Workbook
+    from sqlalchemy import select as _select
+    import io as _io
+
+    from app.models import QuestionSet, QuestionSetItem
+
+    u = await _lehrkraft(s)
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Frage", "Antwort A", "Antwort B", "Antwort C", "Antwort D", "Richtig", "Niveau"])
+    ws.append(["Was ist 2+2?", "3", "4", "5", "6", "B", ""])
+    ws.append(["Warum ist 0,5 = 1/2?", "a", "b", "c", "d", "A", "E"])
+    # Kleingeschrieben zaehlt auch; Unsinn gilt als G, statt den Import zu kippen.
+    ws.append(["Dritte Frage", "a", "b", "c", "d", "C", "e"])
+    ws.append(["Vierte Frage", "a", "b", "c", "d", "D", "x"])
+    puffer = _io.BytesIO()
+    wb.save(puffer)
+
+    aus = await EXP.import_questions_xlsx(name="Mit Niveau", file=_Datei(puffer.getvalue()), user=u, db=s)
+    assert aus["count"] == 4
+
+    qs = (await s.execute(_select(QuestionSet).where(QuestionSet.id == aus["id"]))).scalar_one()
+    assert qs.niveau_aktiv is True, "ein E in der Tabelle schaltet die Unterscheidung an"
+    items = (await s.execute(_select(QuestionSetItem)
+                             .where(QuestionSetItem.question_set_id == qs.id)
+                             .order_by(QuestionSetItem.position))).scalars().all()
+    assert [i.niveau for i in items] == ["", "E", "E", ""]
+
+
+@pytest.mark.asyncio
+async def test_excel_import_ohne_niveau_bleibt_wie_bisher(s):
+    """Eine Tabelle ohne die Spalte darf sich nicht anders verhalten als frueher."""
+    from openpyxl import Workbook
+    from sqlalchemy import select as _select
+    import io as _io
+
+    from app.models import QuestionSet, QuestionSetItem
+
+    u = await _lehrkraft(s)
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Frage", "Antwort A", "Antwort B", "Antwort C", "Antwort D", "Richtig"])
+    ws.append(["Was ist 2+2?", "3", "4", "5", "6", "B"])
+    puffer = _io.BytesIO()
+    wb.save(puffer)
+
+    aus = await EXP.import_questions_xlsx(name="Ohne Niveau", file=_Datei(puffer.getvalue()), user=u, db=s)
+    qs = (await s.execute(_select(QuestionSet).where(QuestionSet.id == aus["id"]))).scalar_one()
+    assert qs.niveau_aktiv is False
+    items = (await s.execute(_select(QuestionSetItem).where(QuestionSetItem.question_set_id == qs.id))).scalars().all()
+    assert [i.niveau for i in items] == [""]

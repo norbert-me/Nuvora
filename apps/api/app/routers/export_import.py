@@ -290,20 +290,36 @@ async def import_class_xlsx(name: str = "Neue Klasse", file: UploadFile = File(.
 
 @router.get("/import/questions-template.xlsx", dependencies=[CARDVOTE])
 async def questions_xlsx_template():
-    headers = ["Frage", "Antwort A", "Antwort B", "Antwort C", "Antwort D", "Richtig (z.B. A oder AB)"]
+    """Leere Fragen-Vorlage — mit einer Spalte fuer das Niveau.
+
+    E/G steht sonst nur in der Oberflaeche zur Verfuegung: wer zwanzig Fragen
+    aus einer Tabelle einliest, musste danach jede einzeln als Anforderung
+    markieren. Die Spalte ist optional und darf leer bleiben — leer heisst G,
+    genau wie in der Oberflaeche (`_niveau_vorgabe` bei den Karten, dieselbe
+    Regel). Erkannt wird auch „g"/„G"; alles andere gilt als G, statt den
+    Import abzulehnen: eine Zeile mit Tippfehler im Niveau ist eine Frage, die
+    man gleich sieht, kein Datenfehler.
+
+    Beispielzeilen zeigen beides — eine G- und eine E-Frage —, denn ein Beispiel
+    erklaert die Spalte besser als eine Kopfzeile.
+    """
+    headers = ["Frage", "Antwort A", "Antwort B", "Antwort C", "Antwort D",
+               "Richtig (z.B. A oder AB)", "Niveau (E oder leer = G)"]
     wb, ws = _xlsx_template("Fragen", headers)
 
-    ws.cell(row=2, column=1, value="Was ist 2+2?")
-    ws.cell(row=2, column=2, value="3")
-    ws.cell(row=2, column=3, value="4")
-    ws.cell(row=2, column=4, value="5")
-    ws.cell(row=2, column=5, value="6")
-    ws.cell(row=2, column=6, value="B")
+    beispiele = [
+        ("Was ist 2+2?", "3", "4", "5", "6", "B", ""),
+        ("Warum ist 0,5 dasselbe wie 1/2?", "…", "…", "…", "…", "A", "E"),
+    ]
+    for zeile, werte in enumerate(beispiele, start=2):
+        for spalte, wert in enumerate(werte, start=1):
+            ws.cell(row=zeile, column=spalte, value=wert)
 
     ws.column_dimensions["A"].width = 30
     for col in ["B", "C", "D", "E"]:
         ws.column_dimensions[col].width = 18
     ws.column_dimensions["F"].width = 22
+    ws.column_dimensions["G"].width = 22
 
     return _xlsx_response(wb, "CardVote_Fragen_Vorlage.xlsx")
 
@@ -326,6 +342,7 @@ async def import_questions_xlsx(name: str = "Neues Frageset", folder_id: Optiona
     await db.flush()
 
     pos = 0
+    mit_e = False
     for row in ws.iter_rows(min_row=2, values_only=True):
         if not row or not row[0] or not str(row[0]).strip():
             continue
@@ -343,14 +360,27 @@ async def import_questions_xlsx(name: str = "Neues Frageset", folder_id: Optiona
         elif not choices["D"]:
             num_choices = 3
 
+        # Niveau steht am SET-EINTRAG, nicht an der Frage: dieselbe Frage kann
+        # in einem Quiz Anforderung und in einem anderen Zusatz sein (siehe
+        # models.py). Leer oder Unbekanntes heisst G.
+        niveau = "E" if (len(row) > 6 and str(row[6] or "").strip().upper() == "E") else ""
+        if niveau:
+            mit_e = True
+
         q = Question(text=text, choices=choices, correct_answer=correct, num_choices=num_choices, owner_id=user.id)
         db.add(q)
         await db.flush()
-        db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos))
+        db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos, niveau=niveau))
         pos += 1
 
     if pos == 0:
         raise HTTPException(400, "Keine Fragen in der Excel-Datei gefunden")
+    # Steht in der Tabelle ein E, ist die Unterscheidung gemeint — sonst haette
+    # die Lehrkraft die Spalte leer gelassen. Ohne diesen Schalter waere das
+    # Niveau zwar gespeichert, aber ohne Wirkung (`niveau_aktiv` ist aus, bis
+    # jemand ihn anmacht), und die Wertung rechnete stur ueber alle Fragen.
+    if mit_e:
+        qs.niveau_aktiv = True
 
     await db.commit()
     return {"id": qs.id, "name": qs.name, "count": pos}

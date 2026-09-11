@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote: die Excel-Vorlage hat eine Spalte für E/G.** Ein „E" in der Zeile
+  macht die Frage zur Anforderung und schaltet die Unterscheidung im Quiz an;
+  leer bleibt G.
 - Kalender-Eintrag: die Uhrzeit steht nur noch im Kopf, nicht zusätzlich als
   eigene Zeile; im Verlaufsplan steht sie wieder an jeder Phase.
 - Desktop-App: „Server → Offline-Speicher zurücksetzen …" hilft, wenn die App
