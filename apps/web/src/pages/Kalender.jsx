@@ -2493,7 +2493,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
         <div style={{ padding: "6px 24px 22px" }}>
         {!edit && (
           <div>
-            {(clsName || topName || zeitText || ort || entry.rrule) && (
+            {(clsName || topName || ort || entry.rrule) && (
               <div style={{ marginTop: 4 }}>
                 {clsName && (
                   <div style={{ display: "flex", gap: 8, fontSize: 14, padding: "3px 0" }}>
@@ -2505,8 +2505,10 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
                   </div>
                 )}
                 {zeile(t("kalender.topic"), topName)}
-                {/* Einstieg (Methode) steht jetzt als anklickbarer Link unter „Öffnen". */}
-                {zeile(t("kalender.time"), zeitText)}
+                {/* Einstieg (Methode) steht jetzt als anklickbarer Link unter „Öffnen".
+                    Die Uhrzeit steht im KOPF des Dialogs („3. Stunde 10:40–11:40,
+                    Dienstag …") — hier stand sie ein zweites Mal, zwei Zeilen
+                    darunter, mit demselben Text. */}
                 {zeile(t("kalender.place"), ort)}
                 {zeile(t("kalender.repeat"), rrText)}
               </div>
@@ -2565,11 +2567,11 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
                       background: an ? "var(--accent-bg)" : undefined,
                       boxShadow: an ? "inset 3px 0 0 var(--accent)" : undefined,
                       opacity: aktiv >= 0 && i < aktiv ? 0.55 : 1 }}>
-                      {/* Keine Uhrzeiten in der Zeile: sie standen neben jeder
-                          Phase und mussten erst mit der eigenen Uhr verrechnet
-                          werden. Wo man steckt, sagt die Markierung — und wie
-                          lange die Phase dauert, die Dauer daneben. */}
+                      {/* Uhrzeit, Phase, Dauer. Die Zeit sagt, WANN die Phase
+                          dran ist — die Markierung nur, dass sie gerade laeuft;
+                          wer um 10:52 auf den Plan sieht, will beides. */}
                       <div style={{ minWidth: 120, flexShrink: 0, display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                        {zt[i] && <span style={{ fontSize: 12, color: an ? "var(--accent)" : "var(--text3)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{minToHm(zt[i].von)}{zt[i].bis != null ? `–${minToHm(zt[i].bis)}` : ""}</span>}
                         <span style={{ fontSize: 14, fontWeight: an ? 800 : 600 }}>{p.phase || "—"}</span>
                         {p.dauer && <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>{p.dauer} min</span>}
                       </div>

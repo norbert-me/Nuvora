@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Kalender-Eintrag: die Uhrzeit steht nur noch im Kopf, nicht zusätzlich als
+  eigene Zeile; im Verlaufsplan steht sie wieder an jeder Phase.
 - Desktop-App: „Server → Offline-Speicher zurücksetzen …" hilft, wenn die App
   offline nichts mehr anzeigt. Angemeldet bleibt man, wartende Änderungen
   bleiben erhalten.
