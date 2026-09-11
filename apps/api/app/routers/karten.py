@@ -25,7 +25,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import eigene_klasse, eigenes
-from ..kursmitglieder import class_kurs_ids, eigener_kurs, member_student_ids, student_kurs_ids
+from ..kursmitglieder import class_kurs_ids, eigener_kurs, student_kurs_ids
 from ..nebenlauf import mit_wiederholung
 from ..oeffentlich import basis as oeffentliche_basis
 from ..zeit import als_utc, jetzt, tagesbeginn

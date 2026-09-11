@@ -28,9 +28,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..besitz import eigene_klasse, eigenes
 from ..database import get_db
 from ..kursmitglieder import member_student_ids
-from ..models import Kurs, PapAbgabe, PapAufgabe, SchoolClass, Student, Topic, User
+from ..models import Kurs, PapAbgabe, PapAufgabe, Student, Topic, User
 from ..schueler import sortiert
-from .auth import get_current_user
 from .karten import _student_by_token
 from .modules import modul_pflicht
 

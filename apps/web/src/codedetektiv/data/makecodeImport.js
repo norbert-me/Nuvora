@@ -345,10 +345,6 @@ export function parseBlocksXml(xml) {
   return { solution: tops.flatMap(mapBlockList), variables };
 }
 
-// Backwards-compatible helper returning just the solution array.
-export function blocksXmlToSolution(xml) {
-  return parseBlocksXml(xml).solution;
-}
 
 // One-shot: .hex text → { title, solution, variables }.
 export async function importPuzzleFromHex(hexText) {

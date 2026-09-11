@@ -32,7 +32,7 @@ from ..database import get_db
 from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
 from ..importe import geprueft
 from ..models import (
-    GradeCategory, GradeEntry, GradeSection, GradeOverride, QuartalDivider, SchoolClass,
+    GradeCategory, GradeEntry, GradeSection, GradeOverride, QuartalDivider,
     Session as TestSession, Student, User, CodeSession,
 )
 from .auth import rate_limit

@@ -30,7 +30,6 @@ export const IconReset = ({ size = 16, ...p }) => <CdIcon d={ICONS.refresh} size
 export const IconBack = ({ size = 16, ...p }) => <CdIcon d={ICONS.arrowLeft} size={size} {...p} />;
 export const IconChevronLeft = ({ size = 16, ...p }) => <CdIcon d={ICONS.chevronLeft} size={size} {...p} />;
 export const IconChevronRight = ({ size = 16, ...p }) => <CdIcon d={ICONS.chevronRight} size={size} {...p} />;
-export const IconChevronDown = ({ size = 12, ...p }) => <CdIcon d={ICONS.chevronDown} size={size} {...p} />;
 
 // ── ebenfalls aus der gemeinsamen Quelle (frueher hier gezeichnet) ──────────
 export const IconPuzzle = ({ size = 24, ...p }) => <CdIcon d={ICONS.puzzle} size={size} {...p} />;

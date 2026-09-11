@@ -138,8 +138,6 @@ export function ladeErkennung() {
   return _laden;
 }
 
-/** Ist die Erkennung schon einsatzbereit? (ohne sie anzustossen) */
-export function istBereit() { return _detektor != null; }
 
 /**
  * Marker in einem Canvas erkennen. Liefert dieselbe Form wie der Server:

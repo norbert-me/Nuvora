@@ -56,11 +56,6 @@ export function speicherNutzbar() {
   return _nutzbar;
 }
 
-/** Nur fuer Tests: die gemerkte Antwort und das Ausweichlager verwerfen. */
-export function speicherVergessen() {
-  _nutzbar = null;
-  _arbeitsspeicher.clear();
-}
 
 /** Wert lesen. Nie ein Wurf, im Zweifel null. */
 export function lies(schluessel) {

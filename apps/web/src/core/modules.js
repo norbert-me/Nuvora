@@ -4,7 +4,6 @@
 // wird sie nur geholt und gecacht, damit Navbar und Startseite dieselbe
 // Wahrheit benutzen und nicht jede Komponente einzeln nachfragt.
 import { useState, useEffect, useCallback } from "react";
-import { useLanguage } from "../i18n/index.jsx";
 import { lies } from "./speicher.js";
 
 // Erst-Stand aus localStorage: dann zeigt die Shell die Modul-Navigation sofort

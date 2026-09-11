@@ -61,10 +61,6 @@ export function swr(key, url, onData) {
   return () => { alive = false; };
 }
 
-/** Cache gezielt verwerfen (z.B. nach dem Bearbeiten von Klassen/Themen). */
-export function bust(key) {
-  try { localStorage.removeItem(PREFIX + key); } catch { /* egal */ }
-}
 
 /** Gecachten Stand lesen, ohne zu laden (fuer sofortiges Erst-Rendern). */
 export function peek(key) { const e = readEntry(key); return e ? e.d : null; }

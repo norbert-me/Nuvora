@@ -134,7 +134,6 @@ export function classify(method, url, bodyObj, koerperOk = true) {
   return "write";
 }
 
-export function isQueueable(method, url, bodyObj) { return classify(method, url, bodyObj) !== null; }
 
 function notify() { count().then((n) => listeners.forEach((cb) => { try { cb(n, fehler().length); } catch { /* egal */ } })); }
 export function subscribe(cb) { listeners.add(cb); count().then((n) => cb(n, fehler().length)); return () => listeners.delete(cb); }
