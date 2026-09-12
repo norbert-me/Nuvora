@@ -1337,6 +1337,11 @@ function App() {
     // Auch die Ansichts-Einstellungen: der naechste Nutzer an diesem Browser
     // soll nicht die Startseite des vorigen sehen.
     ansichtenVergessen();
+    // Und der Anzeige-Cache der eingebetteten Lernpfad-App: unter `ll_schueler`
+    // liegen SCHUELERNAMEN. Sie ueberlebten das Abmelden — der eigene Knopf im
+    // Lernpfad raeumte sie, der hier oben nicht, und am geteilten Rechner ist
+    // das der Weg, auf dem Namen bei der naechsten Person landen.
+    ["ll_aufgaben", "ll_schueler", "ll_klassen", "ll_id_counter"].forEach(loesche);
     setUser(null);
   };
 

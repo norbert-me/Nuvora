@@ -16,6 +16,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: „Lernpfad nicht gefunden" bei vollem Browserspeicher.** Bei vielen
+  Aufgaben sprengte der Anzeige-Cache das Speicherlimit; das Laden brach mitten
+  im Vorgang ab. Jetzt räumt die App den Cache und arbeitet notfalls ohne ihn.
+- Beim Abmelden wird auch der Lernpfad-Cache geleert — dort standen
+  Schülernamen.
 - **CardVote: ein Quiz lässt sich als Excel sichern** — in denselben Spalten wie
   die Vorlage, also auch wieder importierbar. Die JSON-Sicherung bleibt daneben:
   nur sie trägt Bilder und die Quiz-Einstellungen.

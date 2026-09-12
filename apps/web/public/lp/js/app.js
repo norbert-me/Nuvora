@@ -284,8 +284,40 @@
     function loadNum(key) {
         return parseInt(localStorage.getItem(key)) || 0;
     }
+    // Der Speicher ist VOLL — und das darf die App nicht umwerfen.
+    //
+    // Der localStorage fasst rund 5 MB. Wer tausend Aufgaben hat, sprengt ihn:
+    // `setItem` wirft dann QuotaExceededError, und weil der Wurf mitten in
+    // `loadUserData` passierte, brach das Laden ab — die App stand mit leeren
+    // Listen da und meldete „Lernpfad nicht gefunden". Der Server hatte alles.
+    //
+    // Der localStorage ist hier nur ANZEIGE-CACHE (siehe CLAUDE.md: „der Server
+    // ist autoritativ"). Geht er nicht, wird er geraeumt und die App arbeitet
+    // ohne ihn weiter — langsamer beim naechsten Start, aber vollstaendig.
+    let cacheAus = false;
+    function cacheSetzen(key, wert) {
+        if (cacheAus) return false;
+        try {
+            localStorage.setItem(key, wert);
+            return true;
+        } catch (e) {
+            // Platz schaffen und EINMAL erneut versuchen: meist liegt der
+            // Grossteil in genau diesen drei Schluesseln.
+            try {
+                [STORAGE_KEYS.aufgaben, STORAGE_KEYS.schueler, STORAGE_KEYS.klassen]
+                    .forEach(k => localStorage.removeItem(k));
+                localStorage.setItem(key, wert);
+                return true;
+            } catch (e2) {
+                cacheAus = true;
+                console.warn('[Lernpfad] Anzeige-Cache aus: der Browserspeicher ist voll. Die Daten kommen weiter vom Server.');
+                return false;
+            }
+        }
+    }
+
     function save(key, data, opt) {
-        localStorage.setItem(key, JSON.stringify(data));
+        cacheSetzen(key, JSON.stringify(data));
         if (key === STORAGE_KEYS.aufgaben) syncAufgaben(data, opt);
         // schueler/klassen gehoeren dem Kern und werden unter /classes gepflegt —
         // von hier aus wird nichts zurueckgeschrieben.
@@ -364,7 +396,7 @@
             } else if (serverIds.size) {
                 console.warn('syncAufgaben: Loeschen uebersprungen —', serverIds.size, 'Server-Aufgaben nicht in lokaler Liste, aber Basis noch nicht vom Server geladen (Schutz vor Datenverlust)');
             }
-            localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(data));
+            cacheSetzen(STORAGE_KEYS.aufgaben, JSON.stringify(data));
         } catch(e) {
             // Bis hierher war der Fehler unsichtbar: die Oberflaeche zeigte den
             // lokalen Stand, der Server kannte ihn nicht.
@@ -399,7 +431,7 @@
             } catch (e) { console.warn('ensureAufgabenGesynct: Netzfehler bei', tid, e); fehlgeschlagen++; }
             await new Promise(res => setTimeout(res, 60));   // ~16/s, weit unter dem Limit
         }
-        localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
+        cacheSetzen(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
         if (fehlgeschlagen) toast(`${fehlgeschlagen} neue Aufgabe(n) konnten nicht angelegt werden — sie fehlen in der gespeicherten Lernleiter.`);
     }
 
@@ -786,9 +818,9 @@
         klassen = [...new Set(klassenRaw.map(kursOf))];
         await checkKartenModul();
         lernpfade = [];
-        localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
-        localStorage.setItem(STORAGE_KEYS.schueler, JSON.stringify(schueler));
-        localStorage.setItem(STORAGE_KEYS.klassen, JSON.stringify(klassen));
+        cacheSetzen(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
+        cacheSetzen(STORAGE_KEYS.schueler, JSON.stringify(schueler));
+        cacheSetzen(STORAGE_KEYS.klassen, JSON.stringify(klassen));
         overviewKlasse = '';
         renderAufgaben(); renderKlassen(); renderSchueler(); updateFilters();
         // Generator-Dropdowns nach dem Laden auffrischen — sonst blieb der
@@ -808,7 +840,16 @@
             if (el) el.textContent = (u && u.email) || '';
         } catch (e) { /* Anzeige ist nebensaechlich */ }
         hideAuth();
-        await loadUserData();
+        try {
+            await loadUserData();
+        } catch (e) {
+            // Bis hierher fuehrte jeder Fehler (voller Speicher, Netz weg) in
+            // eine unbehandelte Ablehnung: die App blieb leer stehen und meldete
+            // „Lernpfad nicht gefunden" — ein Satz ueber die Daten, obwohl es um
+            // das Laden ging.
+            console.error('[Lernpfad] Laden fehlgeschlagen:', e);
+            toast('Daten konnten nicht geladen werden — bitte neu laden.');
+        }
     }
 
     // Konto-Dropdown auf/zu
@@ -856,7 +897,7 @@
     // autoritativen Server-Daten noch nicht geladen. Ein syncAufgaben hier
     // wuerde bei leerem Cache ALLE Server-Aufgaben loeschen und fuer jedes
     // (noch nicht gecachte) Thema ein 409 provozieren.
-    localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
+    cacheSetzen(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
 
     if (aufgaben.length) {
         const maxNum = aufgaben.reduce((max, a) => {
@@ -864,7 +905,7 @@
             return m ? Math.max(max, parseInt(m[1])) : max;
         }, 0);
         const stored = loadNum(STORAGE_KEYS.idCounter);
-        if (maxNum > stored) localStorage.setItem(STORAGE_KEYS.idCounter, maxNum);
+        if (maxNum > stored) cacheSetzen(STORAGE_KEYS.idCounter, String(maxNum));
     }
 
     // ─── Tabs ───
@@ -1622,7 +1663,7 @@
                 if (data.aufgaben) { aufgaben = data.aufgaben; save(STORAGE_KEYS.aufgaben, aufgaben); }
                 if (data.schueler) { schueler = data.schueler; save(STORAGE_KEYS.schueler, schueler); }
                 if (data.klassen) { klassen = data.klassen; save(STORAGE_KEYS.klassen, klassen); }
-                if (data.idCounter) { localStorage.setItem(STORAGE_KEYS.idCounter, data.idCounter); }
+                if (data.idCounter) { cacheSetzen(STORAGE_KEYS.idCounter, String(data.idCounter)); }
                 renderAufgaben();
                 renderKlassen();
                 renderSchueler();

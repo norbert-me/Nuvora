@@ -162,7 +162,7 @@ Klassenname (Text)       <->  class_id   (Kern-Klassen)
 
 Wer an den Datenformen etwas ändert, ändert den Adapter — nicht die Oberfläche.
 
-`localStorage` ist nur noch Anzeige-Cache; der Server ist autoritativ. Der Tab „Klasse" zeigt nur an, gepflegt wird unter `/classes` (die Formulare sind per CSS versteckt, nicht entfernt: `app.js` hängt überall daran).
+`localStorage` ist nur noch Anzeige-Cache; der Server ist autoritativ. **Und ein voller Speicher darf die App nicht umwerfen**: bei rund tausend Aufgaben sprengt die Liste die 5 MB des Browsers, `setItem` wirft `QuotaExceededError` — mitten in `loadUserData`, also brach das Laden ab, die Listen blieben leer und die App meldete „Lernpfad nicht gefunden", obwohl der Server alles hatte. `cacheSetzen()` räumt deshalb bei einem Wurf die drei großen Schlüssel und versucht es einmal erneut; klappt es wieder nicht, läuft die App **ohne** Cache weiter (langsamer beim nächsten Start, aber vollständig). `checkAuth` fängt zusätzlich alles ab, was aus `loadUserData` kommt — vorher endete jeder Fehler dort als unbehandelte Ablehnung. **Beim Abmelden räumt Nuvora die Schlüssel mit** (`ll_aufgaben`, `ll_schueler`, `ll_klassen`, `ll_id_counter`): unter `ll_schueler` liegen Schülernamen, und der eigene Knopf im Lernpfad räumte sie, der in der Navigation nicht — am geteilten Rechner ist das der Weg, auf dem Namen bei der nächsten Person landen. Der Tab „Klasse" zeigt nur an, gepflegt wird unter `/classes` (die Formulare sind per CSS versteckt, nicht entfernt: `app.js` hängt überall daran).
 
 > **Fachbegriff:** Ein **Lernpfad** besteht aus mehreren **Lernleitern**. Das sind zwei Dinge, nicht alter und neuer Name — nicht zusammenführen. Nur die Produktmarke hieß früher „Lernleiter".
 
