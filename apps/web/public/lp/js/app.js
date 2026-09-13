@@ -1479,6 +1479,17 @@
      * die Zuweisungen haengen. Gezaehlt wird ueber alle Lernpfade, je Kind eine
      * Verwendung — dieselbe Aufgabe bei drei Kindern ist dreimal im Einsatz.
      */
+    // Die Lernpfade werden sonst erst beim Oeffnen ihres Reiters geladen — die
+    // Spalte „Verwendet" stand deshalb dauerhaft auf „–", obwohl die Aufgabe in
+    // Lernleitern steckte. Einmal je Sitzung nachladen und die Liste danach neu
+    // zeichnen; laeuft es schief, bleibt es beim Strich statt bei einer Schleife.
+    let verwendungGeladen = false;
+    function verwendungenSicherstellen(danach) {
+        if (verwendungGeladen || lernpfade.length) { verwendungGeladen = true; return; }
+        verwendungGeladen = true;
+        loadLernpfade().then(() => danach && danach()).catch(() => {});
+    }
+
     function verwendungen() {
         const zaehler = new Map();
         (lernpfade || []).forEach(p => (p.lernleitern || []).forEach(ll => (ll.schueler || []).forEach(sch => {
@@ -1540,6 +1551,7 @@
 
         const gesamt = filtered.length;
         const sichtbar = filtered.slice(0, aufgabenLimit);
+        verwendungenSicherstellen(() => renderAufgaben());
         const benutzt = verwendungen();
         tbody.innerHTML = sichtbar.map(a => {
             const kat = getKategorie(a);
