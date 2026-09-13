@@ -16,6 +16,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: „Lernpfad nicht gefunden" beim Anklicken eines Pfads ist behoben.**
+  Die angezeigte Liste konnte älter sein als die Daten; jetzt wird der Pfad über
+  den Namen und notfalls nach frischem Laden wiedergefunden.
+- Lernpfad: sehr große Listen wandern gar nicht erst in den Anzeige-Cache, statt
+  den Browserspeicher zu füllen und wieder zu leeren.
 - **Lernpfad: bei Gruppenbearbeitung steht je Gruppe nur noch EINE Leiter** — der
   Kopf nennt die Kinder, für die sie gilt.
 - **Lernpfad: der G-Kurs hat jetzt drei Anteile** (Basis / G / E, E steht auf 0 %)

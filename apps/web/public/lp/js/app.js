@@ -294,9 +294,21 @@
     // Der localStorage ist hier nur ANZEIGE-CACHE (siehe CLAUDE.md: „der Server
     // ist autoritativ"). Geht er nicht, wird er geraeumt und die App arbeitet
     // ohne ihn weiter — langsamer beim naechsten Start, aber vollstaendig.
+    //
+    // Und er wird gar nicht erst vollgeschrieben: was ueber CACHE_MAX liegt,
+    // wandert nicht hinein. Sonst raeumt ein einziger grosser Schluessel den
+    // ganzen Speicher leer (auch den der Shell nebenan), nur damit er beim
+    // naechsten Mal wieder nicht passt — ein Cache, der staendig alles
+    // wegwirft, ist keiner. Ein veralteter Eintrag desselben Schluessels wird
+    // dabei entfernt: lieber nichts als ein alter Stand.
     let cacheAus = false;
+    const CACHE_MAX = 1500000;   // Zeichen; localStorage fasst je nach Browser ~5 MB
     function cacheSetzen(key, wert) {
         if (cacheAus) return false;
+        if (wert.length > CACHE_MAX) {
+            try { localStorage.removeItem(key); } catch (e) { /* egal */ }
+            return false;
+        }
         try {
             localStorage.setItem(key, wert);
             return true;
@@ -2718,8 +2730,14 @@
                 lernpfade.push(pfad);
             }
         } else {
-            pfad = lernpfade.find(p => p._id === pfadId);
+            // Ueber id ODER Namen, notfalls nach frischem Laden: die Auswahlliste
+            // kann aelter sein als die Daten (Behelfs-id aus dem Anzeige-Cache).
+            const gewaehlt = document.getElementById('gen-pfad');
+            const zeilenName = gewaehlt.options[gewaehlt.selectedIndex]?.textContent?.trim() || '';
+            pfad = await pfadFinden(pfadId, zeilenName);
             if (!pfad) { toast('Lernpfad nicht gefunden'); return; }
+            renderGenPfade();   // Auswahlliste auf den frischen Stand bringen
+            gewaehlt.value = pfad._id;
         }
 
         if (!pfad.lernleitern) pfad.lernleitern = [];
@@ -4143,10 +4161,36 @@
         inp.click();
     }
 
+    /**
+     * Den Lernpfad zu einer Zeile finden — auch wenn die id inzwischen eine
+     * andere ist.
+     *
+     * „Lernpfad nicht gefunden" kam nicht daher, dass es den Pfad nicht gibt:
+     * die angezeigte Liste war aelter als die Daten. Eine offline oder aus dem
+     * Anzeige-Cache gezeichnete Zeile traegt eine Behelfs-id (`pfad_1757…`);
+     * sobald der Serverstand da ist, heisst derselbe Pfad anders, und ein Klick
+     * auf die alte Zeile lief ins Leere. Genau so sieht es aus, wenn der
+     * Browserspeicher voll ist und der Cache ausfaellt — der Pfad war nie weg.
+     *
+     * Deshalb drei Stufen: id, dann NAME (der ist je Konto eindeutig, savePfad
+     * verlaesst sich ohnehin darauf), dann einmal frisch vom Server holen und
+     * beides noch einmal versuchen. Erst danach ist „nicht gefunden" wahr.
+     */
+    async function pfadFinden(id, name) {
+        const suche = () => lernpfade.find(p => String(p._id) === String(id))
+            || (name ? lernpfade.find(p => (p.name || '') === name) : null);
+        let p = suche();
+        if (p) return p;
+        try { await loadLernpfade(); } catch (e) { /* offline: mit lokalem Stand weiter */ }
+        p = suche();
+        if (p) renderLernpfade();   // die Liste war veraltet — neu zeichnen
+        return p || null;
+    }
+
     function renderLernpfade() {
         const list = document.getElementById('pfade-list');
         list.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn small" id="btn-import-pfad">${ICON.import} Lernpfad/Lernleiter importieren</button></div>` + lernpfade.map(p => `
-            <div class="list-row" data-action="edit" data-id="${escAttr(p._id)}">
+            <div class="list-row" data-action="edit" data-id="${escAttr(p._id)}" data-name="${escAttr(p.name || '')}">
                 <div>
                     <strong>${esc(p.name)}</strong>
                     <span style="color:var(--text-muted)">– ${(p.lernleitern || []).length} Lernleitern</span>
@@ -4167,7 +4211,11 @@
         const impBtn = document.getElementById('btn-import-pfad');
         if (impBtn) impBtn.addEventListener('click', importPfadPicker);
 
-        const openPfad = id => editPfad(lernpfade.find(p => p._id === id));
+        const openPfad = async (id, name) => {
+            const p = await pfadFinden(id, name);
+            if (!p) { toast('Lernpfad nicht gefunden'); return; }
+            editPfad(p);
+        };
         const deletePfad = async id => {
             // Soft-Delete: 30 Tage im Papierkorb wiederherstellbar.
             if (!await confirmDlg('Pfad in den Papierkorb verschieben? 30 Tage wiederherstellbar.', { ok: 'In den Papierkorb' })) return;
@@ -4180,9 +4228,10 @@
         // Umbenennen. Der Name ist je Konto eindeutig — savePfad findet den Pfad
         // ueber ihn wieder —, deshalb geht das ueber den Server (PUT) und nicht
         // nur lokal: ein zweiter Pfad gleichen Namens waere sonst die Folge.
-        const renamePfad = async (id) => {
-            const p = lernpfade.find(x => x._id === id);
-            if (!p) return;
+        const renamePfad = async (id, zeilenName) => {
+            const p = await pfadFinden(id, zeilenName);
+            if (!p) { toast('Lernpfad nicht gefunden'); return; }
+            id = p._id;
             const neu = prompt('Name des Lernpfads:', p.name || '');
             if (neu == null) return;
             const name = neu.trim();
@@ -4201,7 +4250,7 @@
         };
         // Klick auf Balken öffnet; Icon-Buttons haben Vorrang via stopPropagation
         list.querySelectorAll('.list-row').forEach(row => {
-            row.addEventListener('click', () => openPfad(row.dataset.id));
+            row.addEventListener('click', () => openPfad(row.dataset.id, row.dataset.name));
         });
         // Export-Menü aufklappen darf den Pfad nicht öffnen.
         list.querySelectorAll('.export-menu > summary').forEach(sm => sm.addEventListener('click', e => e.stopPropagation()));
@@ -4209,9 +4258,10 @@
             btn.addEventListener('click', e => {
                 e.stopPropagation();
                 const act = btn.dataset.action;
-                if (act === 'export-full') exportPfad(lernpfade.find(p => p._id === btn.dataset.id), true);
-                else if (act === 'export-vorlage') exportPfad(lernpfade.find(p => p._id === btn.dataset.id), false);
-                else if (act === 'rename') renamePfad(btn.dataset.id);
+                const zeilenName = btn.closest('.list-row')?.dataset.name || '';
+                if (act === 'export-full') pfadFinden(btn.dataset.id, zeilenName).then(p => exportPfad(p, true));
+                else if (act === 'export-vorlage') pfadFinden(btn.dataset.id, zeilenName).then(p => exportPfad(p, false));
+                else if (act === 'rename') renamePfad(btn.dataset.id, zeilenName);
                 else if (act === 'delete') deletePfad(btn.dataset.id);
                 btn.closest('details')?.removeAttribute('open');   // Export-Menü nach Wahl schliessen
             });
