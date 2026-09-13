@@ -14,8 +14,10 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.3.5
 
+- Abhängigkeiten aktualisiert: pydantic 2.13.5, KaTeX 0.18.7, react-router-dom
+  7.18.3, @vitejs/plugin-react 6.1.1.
 - **Lernpfad: eine fertige Lernleiter lässt sich auf einen anderen Kurs
   übertragen.** Jedes Kind bekommt die Aufgaben der Gruppe, die seinem Niveau und
   seinen Förderschwerpunkten entspricht; gibt es die Gruppe dort nicht, greift das
