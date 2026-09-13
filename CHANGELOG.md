@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: eine neue Aufgabe wird nicht mehr doppelt angelegt.** Speichern und
+  Abgleich konnten dieselbe Aufgabe gleichzeitig anlegen — danach stand sie
+  zweimal mit derselben Nummer in der Liste.
 - **Lernpfad: „Basis 0 %" heißt jetzt wirklich null.** Ein auf 0 gestellter
   Regler wurde als „nicht gesetzt" gelesen und still durch die Vorgabe ersetzt —
   der E-Kurs bekam trotzdem Basisaufgaben.

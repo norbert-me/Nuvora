@@ -369,20 +369,15 @@
                 // Unveraendert seit dem letzten Spiegeln? Nichts tun — sonst PUTtet
                 // jeder Save die ganze Liste (429-Sturm) und loest Themen-POSTs (409) aus.
                 if (vorhanden && syncSigs[a.id] === aufgabeSig(a)) continue;
-                const preId = a._id;   // lokale (evtl. Temp-)id VOR dem Anlegen
-                const body = JSON.stringify(await zuKern(a));
-                const r = await api(vorhanden ? `${LP}/exercises/${a.id}` : `${LP}/exercises`,
-                                    { method: vorhanden ? 'PUT' : 'POST', body });
-                if (r.ok) {
-                    if (!vorhanden) {
-                        const neu = await r.json();
-                        a.id = neu.id; a._id = String(neu.id);
-                        // Temp-id -> echte id merken, damit Lernleiter-Zuweisungen,
-                        // die noch auf die Temp-id zeigen, übersetzt werden können.
-                        if (preId && String(preId) !== String(neu.id)) idRemap[String(preId)] = String(neu.id);
-                    }
-                    syncSigs[a.id] = aufgabeSig(a);
+                if (!vorhanden) {
+                    // Anlegen laeuft ueber die gemeinsame Sperre — sonst legt ein
+                    // gleichzeitiges ensureAufgabenGesynct dieselbe Aufgabe ein
+                    // zweites Mal an (Temp-id -> echte id merkt sie selbst).
+                    await legeAufgabeAn(a);
+                    continue;
                 }
+                const r = await api(`${LP}/exercises/${a.id}`, { method: 'PUT', body: JSON.stringify(await zuKern(a)) });
+                if (r.ok) syncSigs[a.id] = aufgabeSig(a);
             }
             // Was der Server noch hat, die Oberflaeche aber nicht mehr: loeschen —
             // ABER nur, wenn die Aufgaben diese Sitzung wirklich vom Server geladen
@@ -408,6 +403,35 @@
     // Nur die genannten (Temp-)Aufgaben serverseitig anlegen und Temp-id -> echte
     // id in idRemap eintragen. Gezielt statt Voll-Sync, um keinen Request-Sturm
     // (nginx/Abuse-Guard 429) auszuloesen. Kleiner Abstand zwischen den POSTs.
+    // Eine Aufgabe wird HOECHSTENS EINMAL angelegt — auch wenn zwei Wege es
+    // gleichzeitig versuchen.
+    //
+    // `syncAufgaben` (Voll-Abgleich) und `ensureAufgabenGesynct` (gezielt vor
+    // dem Speichern einer Lernleiter) POSTeten beide dieselbe frisch getippte
+    // Aufgabe, solange ihre Temp-id noch keine echte war: die Pruefung „hat
+    // schon eine Zahl als id" greift erst, wenn die ERSTE Antwort da ist.
+    // Ergebnis waren zwei Zeilen mit identischem Inhalt und identischem Code
+    // (gemeldet als „2x die gleiche Aufgabe in der Liste"). Die laufende
+    // Anfrage wird deshalb gemerkt, und der zweite Weg wartet auf sie.
+    const anlegenLaeuft = new Map();   // Temp-id -> Promise<echte id | null>
+
+    async function legeAufgabeAn(a) {
+        const tid = String(a._id);
+        if (/^\d+$/.test(String(a.id))) return String(a.id);   // schon echt
+        if (anlegenLaeuft.has(tid)) return anlegenLaeuft.get(tid);
+        const lauf = (async () => {
+            const r = await api(`${LP}/exercises`, { method: 'POST', body: JSON.stringify(await zuKern(a)) });
+            if (!r.ok) { console.warn('legeAufgabeAn: POST fehlgeschlagen (%s) für %s', r.status, tid); return null; }
+            const neu = await r.json();
+            a.id = neu.id; a._id = String(neu.id);
+            syncSigs[a.id] = aufgabeSig(a);
+            if (tid !== String(neu.id)) idRemap[tid] = String(neu.id);
+            return String(neu.id);
+        })().finally(() => anlegenLaeuft.delete(tid));
+        anlegenLaeuft.set(tid, lauf);
+        return lauf;
+    }
+
     async function ensureAufgabenGesynct(tempIds) {
         // Fehlschlaege zaehlen und EINMAL melden: was hier nicht angelegt wird,
         // faellt in savePfad aus den exercise_ids heraus — die Lernleiter waere
@@ -419,15 +443,9 @@
             if (!a) { console.warn('ensureAufgabenGesynct: Aufgabe zu Temp-id nicht gefunden:', tid); fehlgeschlagen++; continue; }
             if (/^\d+$/.test(String(a.id))) { idRemap[tid] = String(a.id); continue; }  // schon echt
             try {
-                const r = await api(`${LP}/exercises`, { method: 'POST', body: JSON.stringify(await zuKern(a)) });
-                if (r.ok) {
-                    const neu = await r.json();
-                    a.id = neu.id; a._id = String(neu.id); idRemap[tid] = String(neu.id);
-                    syncSigs[a.id] = aufgabeSig(a);
-                } else {
-                    console.warn('ensureAufgabenGesynct: POST fehlgeschlagen (%s) für Temp-id %s', r.status, tid);
-                    fehlgeschlagen++;
-                }
+                const echt = await legeAufgabeAn(a);
+                if (echt) idRemap[tid] = echt;
+                else fehlgeschlagen++;
             } catch (e) { console.warn('ensureAufgabenGesynct: Netzfehler bei', tid, e); fehlgeschlagen++; }
             await new Promise(res => setTimeout(res, 60));   // ~16/s, weit unter dem Limit
         }
