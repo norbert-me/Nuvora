@@ -1459,6 +1459,36 @@
         return sorted;
     }
 
+    /**
+     * Wie oft steht jede Aufgabe in einer Lernleiter?
+     *
+     * Die Frage stellt sich vor dem Loeschen („brauche ich die noch?") und beim
+     * Aufraeumen von Doppelten: von zwei gleichen Zeilen behaelt man die, an der
+     * die Zuweisungen haengen. Gezaehlt wird ueber alle Lernpfade, je Kind eine
+     * Verwendung — dieselbe Aufgabe bei drei Kindern ist dreimal im Einsatz.
+     */
+    function verwendungen() {
+        const zaehler = new Map();
+        (lernpfade || []).forEach(p => (p.lernleitern || []).forEach(ll => (ll.schueler || []).forEach(sch => {
+            (sch.aufgabenIds || []).forEach(id => {
+                const k = String(id);
+                zaehler.set(k, (zaehler.get(k) || 0) + 1);
+            });
+        })));
+        return zaehler;
+    }
+
+    /**
+     * Zwei Aufgaben sind vermutlich dieselbe, wenn Thema, Kategorie, Quelle und
+     * Operator uebereinstimmen — der Code zaehlt bewusst NICHT mit: ein Doppel
+     * kann auch zwei verschiedene Nummern tragen. Es bleibt ein VERDACHT, keine
+     * automatische Loeschung: was wirklich weg darf, entscheidet die Lehrkraft.
+     */
+    function dublettenSchluessel(a) {
+        return [a.thema, a.unterthema, getKategorie(a), a.quelle, a.operator,
+                (a.aufgabentext || '').trim(), (a.latex || '').trim()].join('|').toLowerCase();
+    }
+
     function renderAufgaben() {
         const tbody = document.querySelector('#aufgaben-tabelle tbody');
         const filterThema = document.getElementById('filter-thema').value;
@@ -1485,6 +1515,12 @@
             });
         }
 
+        if (document.getElementById('filter-doppelte')?.checked) {
+            const zahl = new Map();
+            aufgaben.forEach(a => { const k = dublettenSchluessel(a); zahl.set(k, (zahl.get(k) || 0) + 1); });
+            filtered = filtered.filter(a => zahl.get(dublettenSchluessel(a)) > 1);
+        }
+
         filtered = sortByKatThenQuelle(filtered);
         if (sortState.table === 'aufgaben-tabelle' && sortState.column && sortState.column !== 'kat') {
             filtered = applySort(filtered);
@@ -1492,6 +1528,7 @@
 
         const gesamt = filtered.length;
         const sichtbar = filtered.slice(0, aufgabenLimit);
+        const benutzt = verwendungen();
         tbody.innerHTML = sichtbar.map(a => {
             const kat = getKategorie(a);
             const hasDetail = a.bild || a.aufgabentext;
@@ -1505,6 +1542,7 @@
                 <td>${renderTags(a)}</td>
                 <td style="text-align:center">${a.lrs ? '<span class="lrs-check" title="LRS">✓</span>' : ''}</td>
                 <td>${a.loesung ? '<span class="icon-success" title="Lösung vorhanden">' + ICON.check + '</span>' : '–'}</td>
+                <td style="text-align:center">${benutzt.get(String(a.id)) || benutzt.get(String(a._id)) || '–'}</td>
                 <td>
                     <div class="btn-group">
                         <button class="btn icon" data-action="edit" data-id="${escAttr(a._id)}" title="Bearbeiten">${ICON.edit}</button>
@@ -1587,6 +1625,7 @@
     });
     document.getElementById('filter-unterthema').addEventListener('change', renderAufgabenReset);
     document.getElementById('filter-kategorie').addEventListener('change', renderAufgabenReset);
+    document.getElementById('filter-doppelte')?.addEventListener('change', renderAufgabenReset);
     document.getElementById('aufgaben-suche').addEventListener('input', renderAufgabenReset);
 
     // ─── JSON Import ───
@@ -2167,10 +2206,12 @@
                 totalG = Math.round(config.max * config.eG / pctTotal);
                 totalE = config.max - totalBasis - totalG;
             } else {
-                const pctTotal = (config.gBasis + config.gG) || 1;
+                // Auch im G-Kurs darf ein E-Anteil stehen (Vorgabe 0 %): der
+                // Griff nach oben ist der uebliche Weg, ein Kind zu fordern.
+                const pctTotal = (config.gBasis + config.gG + config.gE) || 1;
                 totalBasis = Math.round(config.max * config.gBasis / pctTotal);
-                totalG = config.max - totalBasis;
-                totalE = 0;
+                totalE = Math.round(config.max * config.gE / pctTotal);
+                totalG = config.max - totalBasis - totalE;
             }
 
             const tasks = [];
@@ -2210,6 +2251,10 @@
                 } else {
                     const selG = reihenfolge(utG).slice(0, Math.min(gNum, utG.length));
                     selG.forEach(a => tasks.push({ ...a, section: 'G-Niveau', selected: true }));
+                    if (eNum > 0) {
+                        const selE = reihenfolge(utE).slice(0, Math.min(eNum, utE.length));
+                        selE.forEach(a => tasks.push({ ...a, section: 'E-Niveau', selected: true }));
+                    }
                 }
             });
 
@@ -2235,7 +2280,7 @@
                 // auffaellt.
                 const anteil = s.niveau === 'E'
                     ? [[eAufgaben, config.eE], [gAufgaben, config.eG], [basisAufgaben, config.eBasis]]
-                    : [[gAufgaben, config.gG], [basisAufgaben, config.gBasis]];
+                    : [[gAufgaben, config.gG], [basisAufgaben, config.gBasis], [eAufgaben, config.gE]];
                 const passend = (a) => !usedIds.has(a._id) && utList.includes(a.unterthema || '');
                 const erlaubt = anteil.filter(([, pct]) => pct > 0).flatMap(([pool]) => pool.filter(passend));
                 const notnagel = anteil.filter(([, pct]) => !(pct > 0)).flatMap(([pool]) => pool.filter(passend));
@@ -2358,6 +2403,11 @@
     // sollen für die ganze Gruppe gelten, nicht nur einen Schüler.
     function groupKey(s) { return s.niveau + '|' + [...(s.foerder || [])].sort().join(','); }
     function groupEditOn() { const el = document.getElementById('gen-group-edit'); return !el || el.checked; }
+    /** Die Namen der Kinder, fuer die diese Leiter gilt. */
+    function gruppenNamen(entry) {
+        return groupEntries(entry).map(e => e.student.name);
+    }
+
     function groupEntries(entry) {
         if (!groupEditOn()) return [entry];
         const k = groupKey(entry.student);
@@ -2420,15 +2470,34 @@
             '<span style="color:var(--text-muted)">· unter „Zusatzaufgaben": über der Pflicht</span>';
         container.appendChild(legend);
 
-        previewData.forEach((entry, si) => {
+        // Bei eingeschalteter Gruppenbearbeitung steht je Gruppe EINE Leiter.
+        //
+        // Vorher stand dieselbe Leiter fuenfmal untereinander — einmal je Kind
+        // gleichen Niveaus —, und man musste raten, welche Karten zusammen
+        // gehoeren: geaendert wurde ja ohnehin immer die ganze Gruppe. Jetzt
+        // nennt der Kopf die Kinder, und darunter steht die Leiter, die fuer
+        // sie alle gilt. Ausgeschaltet bleibt es eine Karte je Kind.
+        const gezeigt = [];
+        const gesehen = new Set();
+        previewData.forEach(e => {
+            if (groupEditOn()) {
+                const k = groupKey(e.student);
+                if (gesehen.has(k)) return;
+                gesehen.add(k);
+            }
+            gezeigt.push(e);
+        });
+
+        gezeigt.forEach((entry, si) => {
             const s = entry.student;
+            const namen = groupEditOn() ? gruppenNamen(entry) : [s.name];
             const div = document.createElement('div');
             div.className = 'student-preview';
 
             const header = document.createElement('div');
             header.className = 'student-preview-header';
             header.innerHTML = `
-                <h3>${esc(s.name)}</h3>
+                <h3>${esc(namen.join(', '))}</h3>
                 <div>
                     <span class="badge badge-${s.niveau === 'E' ? 'e' : 'g'}">${esc(s.niveau)}-Kurs</span>
                     ${s.foerder.map(f => `<span class="badge badge-lrs">${esc(f)}</span>`).join(' ')}
@@ -2601,7 +2670,7 @@
                 });
             });
         }
-        body.innerHTML = `<h3 style="margin-bottom:1rem">Aufgabe hinzufügen für ${esc(entry.student.name)}</h3>
+        body.innerHTML = `<h3 style="margin-bottom:1rem">Aufgabe hinzufügen für ${esc(gruppenNamen(entry).join(', '))}</h3>
             <input type="text" id="picker-search" placeholder="Suche (ID, Quelle, Typ...)" class="search-input" style="margin-bottom:0.75rem">
             <div id="add-task-list"></div>`;
         renderPickerList('');
@@ -3575,10 +3644,10 @@
             <div class="cfg-block">
                 <div class="cfg-label">Aufgaben pro Schüler</div>
                 <div class="cfg-controls">
-                    <span class="cfg-slider-row">
-                        <input type="range" min="1" max="${Math.max(1, total)}" step="1" value="${defaultMax}" id="cfg-max" class="cfg-range">
+                    <span class="cfg-numwrap">
+                        <input type="number" min="1" max="${Math.max(1, total)}" step="1" value="${defaultMax}" id="cfg-max" class="cfg-num">
+                        <span class="cfg-hint">Aufgaben</span>
                     </span>
-                    <output class="cfg-range-val" id="cfg-max-val"></output>
                 </div>
                 <div class="cfg-warn" id="cfg-max-warn" style="display:none">Recht viele Aufgaben – eine Lernleiter mit mehr als 10 wird schnell unübersichtlich.</div>
             </div>`;
@@ -3598,13 +3667,20 @@
         // 3. G-Kurs Mischung
         html += `
             <div class="cfg-block">
-                <div class="cfg-label">Mischung für G-Kurs ${info('Anteile aus leichteren Basis- und mittleren G-Aufgaben.')}</div>
-                <div class="cfg-controls">
+                <div class="cfg-label">Mischung für G-Kurs ${info('Anteile aus Basis-, G- und E-Niveau. Summe immer 100%.')}</div>
+                <div class="cfg-controls cfg-controls-col">
                     <label class="cfg-slider-row">
-                        <span class="cfg-sl-name">Basis ↔ G</span>
+                        <span class="cfg-sl-name">Basis</span>
                         <input type="range" min="0" max="100" step="10" value="40" id="cfg-g-basis" class="cfg-range">
                     </label>
-                    <input type="hidden" id="cfg-g-g" value="60">
+                    <label class="cfg-slider-row">
+                        <span class="cfg-sl-name">G-Niveau</span>
+                        <input type="range" min="0" max="100" step="10" value="60" id="cfg-g-g" class="cfg-range">
+                    </label>
+                    <label class="cfg-slider-row">
+                        <span class="cfg-sl-name">E-Niveau</span>
+                        <input type="range" min="0" max="100" step="10" value="0" id="cfg-g-e" class="cfg-range">
+                    </label>
                     <span class="cfg-hint" id="cfg-g-hint"></span>
                 </div>
             </div>`;
@@ -3665,54 +3741,52 @@
         configBody.innerHTML = html;
         document.getElementById('gen-config').style.display = '';
 
-        // G-Kurs: ein Regler (Basis-Anteil), G-Niveau = Rest auf 100.
-        const gBasisInput = document.getElementById('cfg-g-basis');
-        const gGHidden = document.getElementById('cfg-g-g');
-        const gHint = document.getElementById('cfg-g-hint');
-        const updateGMix = () => {
-            const basis = Math.min(100, Math.max(0, parseInt(gBasisInput.value) || 0));
-            gGHidden.value = 100 - basis;
-            gHint.textContent = `Basis ${basis}% / G-Niveau ${100 - basis}%`;
-        };
-        gBasisInput.addEventListener('input', updateGMix);
-        updateGMix();
-
-        // E-Kurs: drei Regler (Basis/G/E), Summe immer 100. Der bewegte Regler
-        // behält seinen Wert; der Rest wird auf die beiden anderen verteilt –
-        // im Verhältnis ihrer bisherigen Werte (sind beide 0, hälftig).
-        const eInputs = { basis: document.getElementById('cfg-e-basis'), g: document.getElementById('cfg-e-g'), e: document.getElementById('cfg-e-e') };
-        const eHint = document.getElementById('cfg-e-hint');
+        // Drei Anteile, Summe immer 100 — dieselbe Mechanik fuer G- und E-Kurs.
+        //
+        // Der G-Kurs hatte lange nur EINEN Regler (Basis, Rest = G). Damit liess
+        // sich einem G-Kind keine einzige Anforderungsaufgabe geben, obwohl
+        // genau das der uebliche Griff nach oben ist; und zwei verschiedene
+        // Bedienformen fuer dieselbe Frage musste man zweimal verstehen.
+        // E-Niveau steht im G-Kurs auf 0 % — wer es nicht will, merkt nichts.
+        //
+        // Der bewegte Regler behaelt seinen Wert, der Rest verteilt sich auf die
+        // beiden anderen im Verhaeltnis ihrer bisherigen Werte (beide 0:
+        // haelftig).
         const roundTo10 = n => Math.round(n / 10) * 10;
-        const updateEMix = (moved) => {
-            const val = k => Math.min(100, Math.max(0, parseInt(eInputs[k].value) || 0));
-            if (moved) {
-                const keep = val(moved);
-                const others = ['basis', 'g', 'e'].filter(k => k !== moved);
-                const rest = 100 - keep;
-                let a = val(others[0]), b = val(others[1]);
-                const sum = a + b;
-                if (sum === 0) { a = roundTo10(rest / 2); b = rest - a; }
-                else { a = roundTo10(rest * a / sum); b = rest - a; }
-                eInputs[others[0]].value = a;
-                eInputs[others[1]].value = b;
-            }
-            const basis = val('basis'), g = val('g'), e = val('e');
-            eHint.textContent = `Basis ${basis}% / G-Niveau ${g}% / E-Niveau ${e}%`;
-        };
-        eInputs.basis.addEventListener('input', () => updateEMix('basis'));
-        eInputs.g.addEventListener('input', () => updateEMix('g'));
-        eInputs.e.addEventListener('input', () => updateEMix('e'));
-        updateEMix();
+        function mischung(ids, hintId, beschriftung) {
+            const inputs = { basis: document.getElementById(ids.basis), g: document.getElementById(ids.g), e: document.getElementById(ids.e) };
+            const hint = document.getElementById(hintId);
+            const val = k => Math.min(100, Math.max(0, parseInt(inputs[k].value) || 0));
+            const update = (moved) => {
+                if (moved) {
+                    const keep = val(moved);
+                    const others = ['basis', 'g', 'e'].filter(k => k !== moved);
+                    const rest = 100 - keep;
+                    let a = val(others[0]), b = val(others[1]);
+                    const sum = a + b;
+                    if (sum === 0) { a = roundTo10(rest / 2); b = rest - a; }
+                    else { a = roundTo10(rest * a / sum); b = rest - a; }
+                    inputs[others[0]].value = a;
+                    inputs[others[1]].value = b;
+                }
+                hint.textContent = beschriftung(val('basis'), val('g'), val('e'));
+            };
+            ['basis', 'g', 'e'].forEach(k => inputs[k].addEventListener('input', () => update(k)));
+            update();
+        }
+
+        mischung({ basis: 'cfg-g-basis', g: 'cfg-g-g', e: 'cfg-g-e' }, 'cfg-g-hint',
+                 (b, g, e) => `Basis ${b}% / G-Niveau ${g}% / E-Niveau ${e}%`);
+        mischung({ basis: 'cfg-e-basis', g: 'cfg-e-g', e: 'cfg-e-e' }, 'cfg-e-hint',
+                 (b, g, e) => `Basis ${b}% / G-Niveau ${g}% / E-Niveau ${e}%`);
 
         // Hinweis nur bei >10 Aufgaben pro Schüler
         const maxInput = document.getElementById('cfg-max');
         const maxWarn = document.getElementById('cfg-max-warn');
         const pflichtInput = document.getElementById('cfg-pflicht');
         const pflichtHint = document.getElementById('cfg-pflicht-hint');
-        const maxVal = document.getElementById('cfg-max-val');
         const checkMax = () => {
             const max = parseInt(maxInput.value) || 0;
-            maxVal.textContent = max + ' Aufgaben';
             maxWarn.style.display = max > 10 ? '' : 'none';
             // Pflicht-Regler an Gesamtzahl koppeln: Bereich 0..max, ganze Aufgaben.
             pflichtInput.max = max;
@@ -3730,7 +3804,12 @@
         setzGeneratorPrefs();
         // Jede Änderung an den Reglern sofort merken, damit sie den Reload
         // überlebt — nicht erst beim Generieren.
-        ['cfg-max', 'cfg-pflicht', 'cfg-g-basis', 'cfg-g-g', 'cfg-e-basis', 'cfg-e-g', 'cfg-e-e', 'cfg-erkl', 'cfg-wdh'].forEach(id => {
+        const gruppe = document.getElementById('gen-group-edit');
+        if (gruppe && !gruppe.dataset.gebunden) {
+            gruppe.dataset.gebunden = '1';
+            gruppe.addEventListener('change', () => { if (previewData && previewData.length) renderPreview(); });
+        }
+        ['cfg-max', 'cfg-pflicht', 'cfg-g-basis', 'cfg-g-g', 'cfg-g-e', 'cfg-e-basis', 'cfg-e-g', 'cfg-e-e', 'cfg-erkl', 'cfg-wdh'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.addEventListener('input', () => saveGenPrefs());
         });
@@ -3755,6 +3834,7 @@
             pflicht,
             gBasis: reglerWert('cfg-g-basis', 40),
             gG: reglerWert('cfg-g-g', 60),
+            gE: reglerWert('cfg-g-e', 0),
             eBasis: reglerWert('cfg-e-basis', 30),
             eG: reglerWert('cfg-e-g', 30),
             eE: reglerWert('cfg-e-e', 40),
@@ -3802,7 +3882,7 @@
         };
         set('cfg-max', cfg.max);
         set('cfg-pflicht', cfg.pflicht);
-        set('cfg-g-basis', cfg.gBasis); set('cfg-g-g', cfg.gG);
+        set('cfg-g-basis', cfg.gBasis); set('cfg-g-g', cfg.gG); set('cfg-g-e', cfg.gE);
         set('cfg-e-basis', cfg.eBasis); set('cfg-e-g', cfg.eG); set('cfg-e-e', cfg.eE);
         set('cfg-erkl', cfg.erkl);
         set('cfg-wdh', cfg.wdh);

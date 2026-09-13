@@ -16,6 +16,13 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: bei Gruppenbearbeitung steht je Gruppe nur noch EINE Leiter** — der
+  Kopf nennt die Kinder, für die sie gilt.
+- **Lernpfad: der G-Kurs hat jetzt drei Anteile** (Basis / G / E, E steht auf 0 %)
+  — dieselbe Bedienung wie beim E-Kurs.
+- Lernpfad: „Aufgaben pro Schüler" ist ein Zahlenfeld statt eines Schiebers.
+- **Lernpfad: die Aufgabenliste zeigt, wie oft eine Aufgabe in Lernleitern steht**,
+  und ein Filter zeigt nur die mutmaßlichen Doppelten.
 - **Lernpfad: eine Aufgabe wird aus der Leiter entfernt statt abgewählt.** Rechts
   an der Stufe steht jetzt ein Mülleimer; die abgewählte, durchgestrichene Zeile
   gibt es nicht mehr.

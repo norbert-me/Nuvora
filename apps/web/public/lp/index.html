@@ -271,6 +271,10 @@
                     <option value="E-Niveau">E-Niveau</option>
                     <option value="Erklärung">Erklärung</option>
                 </select>
+                <label class="chip" style="display:inline-flex;align-items:center;gap:6px">
+                    <input type="checkbox" id="filter-doppelte">
+                    Nur mögliche Doppelte
+                </label>
                 <button type="button" class="btn small" id="btn-export-aufgaben-tab" title="Alle Aufgaben als Vorlage exportieren (ohne Schülerdaten)">Vorlage exportieren</button>
             </div>
             <div id="bulk-bar" class="bulk-bar" style="display:none">
@@ -296,6 +300,7 @@
                             <th>Tags</th>
                             <th>LRS</th>
                             <th>Lösung</th>
+                            <th title="In wie vielen Lernleitern die Aufgabe steht">Verwendet</th>
                             <th>Aktionen</th>
                         </tr>
                     </thead>
