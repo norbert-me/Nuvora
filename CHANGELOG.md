@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: „Basis 0 %" heißt jetzt wirklich null.** Ein auf 0 gestellter
+  Regler wurde als „nicht gesetzt" gelesen und still durch die Vorgabe ersetzt —
+  der E-Kurs bekam trotzdem Basisaufgaben.
 - **Lernpfad: Aufgaben in der Vorschau lassen sich ziehen.** Eine nachträglich
   hinzugefügte Aufgabe blieb für immer Zusatzaufgabe; jetzt zieht man sie über
   den Trenner, und sie zählt zur Pflicht. Bei Gruppen gilt der Zug für alle

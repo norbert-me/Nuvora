@@ -2141,12 +2141,15 @@
             seedRng(getStudentSeed(s.niveau, s.foerder));
             let totalBasis, totalG, totalE;
             if (s.niveau === 'E') {
-                const pctTotal = config.eBasis + config.eG + config.eE;
+                // Alle Regler auf 0: es gibt keinen Anteil, an dem man teilen
+                // koennte — dann entscheidet das Auffuellen, und das haelt sich
+                // an dieselbe Reihenfolge (E vor G vor Basis).
+                const pctTotal = (config.eBasis + config.eG + config.eE) || 1;
                 totalBasis = Math.round(config.max * config.eBasis / pctTotal);
                 totalG = Math.round(config.max * config.eG / pctTotal);
                 totalE = config.max - totalBasis - totalG;
             } else {
-                const pctTotal = config.gBasis + config.gG;
+                const pctTotal = (config.gBasis + config.gG) || 1;
                 totalBasis = Math.round(config.max * config.gBasis / pctTotal);
                 totalG = config.max - totalBasis;
                 totalE = 0;
@@ -3712,22 +3715,33 @@
         });
     }
 
+    // Einen Regler auslesen — 0 ist ein WERT, kein fehlender Eintrag.
+    //
+    // Vorher stand hier ueberall `parseInt(...) || vorgabe`, und weil 0 in
+    // JavaScript falsch ist, wurde aus „Basis 0 %" die Vorgabe 30 %: ein E-Kurs
+    // bekam trotz Null-Einstellung Basisaufgaben („e hat trotzdem basis drin").
+    // Die Vorgabe gilt nur, wenn wirklich nichts Lesbares dasteht.
+    function reglerWert(id, vorgabe) {
+        const n = parseInt(document.getElementById(id)?.value, 10);
+        return Number.isFinite(n) ? n : vorgabe;
+    }
+
     function getGenConfig() {
-        const max = parseInt(document.getElementById('cfg-max')?.value) || 8;
-        const pflicht = Math.min(max, Math.max(0, parseInt(document.getElementById('cfg-pflicht')?.value) || 0));
+        const max = reglerWert('cfg-max', 8) || 8;   // 0 Aufgaben waere keine Leiter
+        const pflicht = Math.min(max, Math.max(0, reglerWert('cfg-pflicht', 0)));
         return {
             max,
             pflicht,
-            gBasis: parseInt(document.getElementById('cfg-g-basis')?.value) || 40,
-            gG: parseInt(document.getElementById('cfg-g-g')?.value) || 60,
-            eBasis: parseInt(document.getElementById('cfg-e-basis')?.value) || 30,
-            eG: parseInt(document.getElementById('cfg-e-g')?.value) || 30,
-            eE: parseInt(document.getElementById('cfg-e-e')?.value) || 40,
-            erkl: parseInt(document.getElementById('cfg-erkl')?.value) || 0,
+            gBasis: reglerWert('cfg-g-basis', 40),
+            gG: reglerWert('cfg-g-g', 60),
+            eBasis: reglerWert('cfg-e-basis', 30),
+            eG: reglerWert('cfg-e-g', 30),
+            eE: reglerWert('cfg-e-e', 40),
+            erkl: reglerWert('cfg-erkl', 0),
             // Wie viele Wiederholungsaufgaben vorne stehen. Die Zahl stand fest
             // auf zwei — an einer Doppelstunde zu wenig, an einer Randstunde zu
             // viel, und beides entscheidet die Lehrkraft besser als der Code.
-            wdh: Math.max(0, parseInt(document.getElementById('cfg-wdh')?.value ?? WDH_MAX))
+            wdh: Math.max(0, reglerWert('cfg-wdh', WDH_MAX))
         };
     }
 
