@@ -3210,8 +3210,11 @@
         // Vorher stand der Text 1.5 mm tiefer als die Kaestchen und die Zeile
         // klebte am Trennstrich darueber.
         const MITTE_11PT = 1.3;
-        const cbX = marginL;
-        const numX = marginL + cbSize + 3;
+        // Die Spalte „erledigt" ist entfallen: dass eine Aufgabe fertig ist,
+        // sagen die beiden Spalten rechts („Lösung geprüft", „korrigiert")
+        // ohnehin — ein drittes Kaestchen fuer dieselbe Aussage kostet nur
+        // Platz und laesst das Blatt nach Verwaltung aussehen.
+        const numX = marginL;
         const textX = numX + 10;
         // Die Selbsteinschätzung per Smiley ist entfallen: sie wurde nie
         // ausgewertet (Papier), und was die Lernenden können, zeigt der Test.
@@ -3268,7 +3271,6 @@
         // schneidet nicht ab, es schreibt weiter. Also kuerzere Woerter, sobald
         // der Platz knapp wird.
         const eng = contentW < 150;
-        doc.text('erledigt', cbX, y);
         doc.text(eng ? 'wie war\'s?' : 'wie lief\'s?', smileyX, y);
         doc.text(eng ? 'geprüft' : 'Lösung geprüft', pruefX, y);
         doc.text(eng ? 'korr.' : 'korrigiert', korrX, y);
@@ -3339,7 +3341,6 @@
 
             doc.setDrawColor(0);
             doc.setLineWidth(0.4);
-            doc.rect(cbX, y - cbSize / 2, cbSize, cbSize);
 
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);

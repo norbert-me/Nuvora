@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Lernpfad: die Spalte „erledigt" auf dem Blatt ist weg — „Lösung geprüft" und
+  „korrigiert" sagen dasselbe.
 - **Lernpfad: die Suche findet Wörter, nicht Zeichenketten.** „13 4" findet jetzt
   „Schulbuch [S.13 Nr.4 links]" — in der Aufgabenliste und beim Hinzufügen in der
   Lernleiter, dort auch nach der angezeigten Nummer (#000026).
