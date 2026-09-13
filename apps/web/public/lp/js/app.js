@@ -554,6 +554,37 @@
     // gescopeten Stile greifen; Buttons nutzen die vorhandenen .btn-Klassen.
     // confirmDlg gibt ein Promise<boolean> zurück.
     function lpDialogHost() { return document.getElementById('lp-app') || document.body; }
+    /**
+     * Eine Auswahl aus einer Liste — dieselbe Bauform wie confirmDlg, nur mit
+     * Auswahlfeld. `prompt()` waere hier falsch: die Lehrkraft muesste den
+     * Kursnamen abtippen, und ein Tippfehler sieht aus wie „Kurs leer".
+     */
+    function waehleDlg(titel, optionen, { ok = 'Übernehmen', cancel = 'Abbrechen', hinweis = '' } = {}) {
+        return new Promise(resolve => {
+            const ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);padding:16px';
+            const panel = document.createElement('div');
+            panel.style.cssText = 'background:var(--card,#fff);color:var(--text,#111);border:1px solid var(--border,#ddd);border-radius:14px;max-width:420px;width:100%;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.25)';
+            panel.innerHTML = `<h3 style="margin:0 0 12px;font-size:16px">${esc(titel)}</h3>
+                <select style="width:100%;padding:8px;border-radius:10px">${optionen.map(o => `<option value="${escAttr(o)}">${esc(o)}</option>`).join('')}</select>
+                ${hinweis ? `<p style="font-size:13px;opacity:.8;margin:10px 0 0">${esc(hinweis)}</p>` : ''}
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
+                    <button class="btn" data-x="ab">${esc(cancel)}</button>
+                    <button class="btn primary" data-x="ok">${esc(ok)}</button>
+                </div>`;
+            ov.append(panel);
+            const sel = panel.querySelector('select');
+            const close = (val) => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(val); };
+            ov.addEventListener('click', e => { if (e.target === ov) close(null); });
+            panel.querySelector('[data-x="ab"]').addEventListener('click', () => close(null));
+            panel.querySelector('[data-x="ok"]').addEventListener('click', () => close(sel.value));
+            const onKey = e => { if (e.key === 'Escape') close(null); else if (e.key === 'Enter') close(sel.value); };
+            document.addEventListener('keydown', onKey);
+            document.body.appendChild(ov);
+            sel.focus();
+        });
+    }
+
     function confirmDlg(msg, { ok = 'OK', cancel = 'Abbrechen', danger = true } = {}) {
         return new Promise(resolve => {
             const ov = document.createElement('div');
@@ -4381,6 +4412,7 @@
                             <button class="btn small" data-ll-id="${ll._id}" data-action="export-vorlage" title="Ohne Schülerdaten (teilbar)">${ICON.download} Vorlage</button>
                         </div>
                     </details>
+                    <button class="btn icon" data-ll-id="${ll._id}" data-action="uebertragen" title="Auf einen anderen Kurs übertragen">${ICON.import}</button>
                     <button class="btn icon" data-ll-id="${ll._id}" data-action="share" title="Im Marktplatz teilen">${ICON.share}</button>
                     <button class="btn icon danger" data-ll-id="${ll._id}" data-action="delete" title="Entfernen">${ICON.delete}</button>
                 </div>
@@ -4454,6 +4486,10 @@
                     exportLernleiter(currentPfad, currentPfad.lernleitern[idx], false);
                     return;
                 }
+                if (action === 'uebertragen') {
+                    await uebertrageLernleiter(currentPfad, currentPfad.lernleitern[idx]);
+                    return;
+                }
                 if (action === 'share') {
                     // ll._id ist die Server-Ladder-id (siehe loadLernpfade). Der
                     // Marktplatz nimmt daraus den Aufgabenpool (ohne Schülerbezug).
@@ -4501,6 +4537,120 @@
                 renderPfadLernleitern();
             });
         });
+    }
+
+    /**
+     * Eine fertige Lernleiter auf einen ANDEREN Kurs uebertragen.
+     *
+     * Der Gedanke dahinter ist derselbe wie bei der Gruppenbearbeitung: die
+     * Zuweisung haengt nicht am einzelnen Kind, sondern an seiner GRUPPE
+     * (Niveau + Foerderschwerpunkte). Wer im alten Kurs „E, LRS" war, bekam
+     * dort eine bestimmte Leiter — und das gilt fuer ein „E, LRS"-Kind im neuen
+     * Kurs genauso. Die Arbeit einer Stunde ist damit nicht an einen Kurs
+     * gebunden, und das war der teuerste Teil der Vorbereitung.
+     *
+     * Drei Stufen beim Zuordnen, damit niemand leer ausgeht:
+     *   1. exakt dieselbe Gruppe (Niveau + Schwerpunkte),
+     *   2. sonst dasselbe NIVEAU (Schwerpunkte sind selten deckungsgleich),
+     *   3. sonst die haeufigste Leiter der Quelle — besser eine Leiter zum
+     *      Anpassen als ein leeres Blatt.
+     *
+     * Uebertragen wird in die VORSCHAU, nicht direkt gespeichert: was am Ende
+     * auf dem Blatt steht, entscheidet die Lehrkraft — Aufgaben ziehen,
+     * entfernen, ergaenzen, dann speichern. Ein stilles Anlegen waere eine
+     * Lernleiter, die niemand angesehen hat.
+     */
+    async function uebertrageLernleiter(pfad, ll) {
+        if (!ll || !(ll.schueler || []).some(x => (x.aufgabenIds || []).length)) {
+            toast('Diese Lernleiter hat noch keine zugewiesenen Aufgaben.');
+            return;
+        }
+        const kurse = [...new Set(schueler.map(s => s.klasse).filter(Boolean))].sort()
+            .filter(k => k !== (ll.klasse || ''));
+        if (!kurse.length) { toast('Kein anderer Kurs mit Kindern vorhanden.'); return; }
+
+        const ziel = await waehleDlg('Lernleiter auf welchen Kurs übertragen?', kurse,
+            { hinweis: 'Jedes Kind bekommt die Aufgaben der Gruppe, die seinem Niveau und seinen Förderschwerpunkten entspricht. Die Übertragung landet in der Vorschau — gespeichert wird erst auf Knopfdruck.' });
+        if (!ziel) return;
+
+        // Quelle nach Gruppen ordnen. Mehrere Kinder derselben Gruppe haben
+        // dieselbe Leiter (das sichert die Gruppenbearbeitung zu); kommt es doch
+        // einmal auseinander, gilt die erste — irgendeine muss es sein, und die
+        // Lehrkraft sieht sie gleich darauf.
+        const proGruppe = new Map();
+        const proNiveau = new Map();
+        const zaehler = new Map();
+        (ll.schueler || []).forEach(sch => {
+            const ids = sch.aufgabenIds || [];
+            if (!ids.length) return;
+            const st = schueler.find(x => String(x.id) === String(sch.id) || String(x._id) === String(sch._id))
+                || (sch.name && schueler.find(x => x.name === sch.name));
+            const k = st ? groupKey(st) : ('?' + sch._id);
+            if (!proGruppe.has(k)) proGruppe.set(k, ids);
+            const niv = st ? (st.niveau || '') : '';
+            if (!proNiveau.has(niv)) proNiveau.set(niv, ids);
+            const sig = ids.join(',');
+            zaehler.set(sig, (zaehler.get(sig) || 0) + 1);
+        });
+        const haeufigste = [...zaehler.entries()].sort((a, b) => b[1] - a[1])[0];
+        const notnagel = haeufigste ? haeufigste[0].split(',').filter(Boolean) : [];
+
+        const zielKinder = schueler.filter(s => s.klasse === ziel);
+        if (!zielKinder.length) { toast('Dieser Kurs hat keine Kinder.'); return; }
+
+        let exakt = 0, ueberNiveau = 0, notfalls = 0;
+        const neuePreview = zielKinder.map(st => {
+            let ids = proGruppe.get(groupKey(st));
+            if (ids) exakt++;
+            else if ((ids = proNiveau.get(st.niveau || ''))) ueberNiveau++;
+            else { ids = notnagel; notfalls++; }
+            const tasks = ids.map(id => aufgaben.find(a => String(a.id) === String(id) || String(a._id) === String(id)))
+                .filter(Boolean)
+                .map(a => {
+                    const k = getKategorie(a);
+                    // Wiederholung ist nicht gespeichert, sondern erkennbar: eine
+                    // Aufgabe aus einem FREMDEN Thema wiederholt (dieselbe Regel
+                    // wie beim Oeffnen einer gespeicherten Leiter).
+                    const wdh = k !== 'Erklärung' && ll.thema && a.thema && a.thema !== ll.thema;
+                    const section = k === 'Erklärung' ? 'Erklärung' : wdh ? 'Wiederholung'
+                        : k === 'Basis' ? 'Basis' : k === 'E-Niveau' ? 'E-Niveau' : 'G-Niveau';
+                    return { ...a, section, selected: true };
+                });
+            pflichtZusatzNeu(tasks, (ll.config && ll.config.pflicht != null) ? ll.config.pflicht : Infinity);
+            return { student: st, tasks, thema: ll.thema, unterthema: ll.unterthema || '' };
+        });
+
+        // Als NEUE Lernleiter im Generator zeigen: editingLlId leeren, sonst
+        // ueberschriebe das Speichern die Vorlage, von der wir gerade abgeschrieben
+        // haben.
+        editingLlId = null;
+        previewData = neuePreview;
+        document.querySelector('.tab[data-tab="generator"]').click();
+        const setzen = () => {
+            const pfadSel = document.getElementById('gen-pfad');
+            if (pfadSel) pfadSel.value = pfad._id;
+            const themaSel = document.getElementById('gen-thema');
+            if (themaSel) { themaSel.disabled = false; themaSel.value = ll.thema || ''; }
+            refreshGenUnterthemen();
+            const uts = (ll.unterthema || '').split(',').map(x => x.trim()).filter(Boolean);
+            document.querySelectorAll('.gen-ut-cb').forEach(cb => { cb.checked = uts.includes(cb.value); });
+            const anyCb = document.querySelector('.gen-ut-cb');
+            if (anyCb) anyCb.dispatchEvent(new Event('change'));
+            const klasseSel = document.getElementById('gen-klasse');
+            if (klasseSel) klasseSel.value = ziel;
+            updateGenConfig();
+            if (ll.config) setGenConfig(ll.config);
+            renderPreview();
+            const bereich = document.getElementById('preview-area');
+            if (bereich) bereich.style.display = '';
+        };
+        setzen();
+        setTimeout(setzen, 200);   // die Dropdowns bauen sich asynchron neu auf
+
+        const teile = [`${exakt} über die Gruppe`];
+        if (ueberNiveau) teile.push(`${ueberNiveau} über das Niveau`);
+        if (notfalls) teile.push(`${notfalls} ohne Entsprechung`);
+        toast(`Auf „${ziel}" übertragen: ${teile.join(', ')}. Prüfen und speichern.`);
     }
 
     // Gespeicherte Lernleiter im Generator oeffnen: die GESICHERTEN Zuweisungen

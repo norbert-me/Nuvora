@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: eine fertige Lernleiter lässt sich auf einen anderen Kurs
+  übertragen.** Jedes Kind bekommt die Aufgaben der Gruppe, die seinem Niveau und
+  seinen Förderschwerpunkten entspricht; gibt es die Gruppe dort nicht, greift das
+  Niveau. Die Übertragung landet in der Vorschau — gespeichert wird auf Knopfdruck.
 - Lernpfad: die Spalte „erledigt" auf dem Blatt ist weg — „Lösung geprüft" und
   „korrigiert" sagen dasselbe.
 - **Lernpfad: die Suche findet Wörter, nicht Zeichenketten.** „13 4" findet jetzt
