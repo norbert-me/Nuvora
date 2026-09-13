@@ -16,6 +16,14 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: Aufgaben in der Vorschau lassen sich ziehen.** Eine nachträglich
+  hinzugefügte Aufgabe blieb für immer Zusatzaufgabe; jetzt zieht man sie über
+  den Trenner, und sie zählt zur Pflicht. Bei Gruppen gilt der Zug für alle
+  Leitern der Gruppe.
+- **Lernpfad: ein E-Kurs bekommt keine Basisaufgaben mehr, wenn Basis auf 0 %
+  steht.** Beim Auffüllen wurden vorher alle Töpfe gemischt.
+- Lernpfad: die Farbe steht nur noch an der Ziffer — der getönte Hintergrund und
+  die doppelte Legende sind weg.
 - **Lernpfad: „Lernpfad nicht gefunden" bei vollem Browserspeicher.** Bei vielen
   Aufgaben sprengte der Anzeige-Cache das Speicherlimit; das Laden brach mitten
   im Vorgang ab. Jetzt räumt die App den Cache und arbeitet notfalls ohne ihn.

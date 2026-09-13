@@ -2199,13 +2199,37 @@
             const usedIds = new Set(tasks.map(t => t._id));
             let fehlt = config.max - tasks.filter(t => regularSections.includes(t.section)).length;
             if (fehlt > 0) {
-                const erlaubt = s.niveau === 'E'
-                    ? [...basisAufgaben, ...gAufgaben, ...eAufgaben]
-                    : [...basisAufgaben, ...gAufgaben];
-                const rest = erlaubt.filter(a =>
-                    !usedIds.has(a._id) && utList.includes(a.unterthema || ''));
-                const nach = reihenfolge(rest).slice(0, Math.min(fehlt, rest.length));
-                nach.forEach(a => tasks.push({ ...a, section: getKategorie(a) === 'Basis' ? 'Basis' : (getKategorie(a) === 'E-Niveau' ? 'E-Niveau' : 'G-Niveau'), selected: true }));
+                // Nachgelegt wird in der Reihenfolge der EINGESTELLTEN Mischung.
+                //
+                // Vorher warf das Auffuellen alle Pools zusammen: stand „Basis
+                // 0 %" fuer den E-Kurs, landeten trotzdem Basis-Aufgaben in der
+                // Leiter, sobald ein Pool nicht reichte — gemeldet als „E hat
+                // trotzdem Basis drin". Ein Regler, der sich uebergehen laesst,
+                // ist keiner.
+                //
+                // Was auf 0 steht, kommt erst zum Zug, wenn die erlaubten Pools
+                // leer sind: eine kurze Leiter waere schlechter als eine, die
+                // einmal eine Stufe tiefer greift — und das faellt beim
+                // Durchsehen auf, waehrend eine fehlende Aufgabe niemandem
+                // auffaellt.
+                const anteil = s.niveau === 'E'
+                    ? [[eAufgaben, config.eE], [gAufgaben, config.eG], [basisAufgaben, config.eBasis]]
+                    : [[gAufgaben, config.gG], [basisAufgaben, config.gBasis]];
+                const passend = (a) => !usedIds.has(a._id) && utList.includes(a.unterthema || '');
+                const erlaubt = anteil.filter(([, pct]) => pct > 0).flatMap(([pool]) => pool.filter(passend));
+                const notnagel = anteil.filter(([, pct]) => !(pct > 0)).flatMap(([pool]) => pool.filter(passend));
+                const nachlegen = (liste) => {
+                    if (fehlt <= 0 || !liste.length) return;
+                    const nach = reihenfolge(liste).slice(0, Math.min(fehlt, liste.length));
+                    nach.forEach(a => {
+                        usedIds.add(a._id);
+                        const k = getKategorie(a);
+                        tasks.push({ ...a, section: k === 'Basis' ? 'Basis' : (k === 'E-Niveau' ? 'E-Niveau' : 'G-Niveau'), selected: true });
+                    });
+                    fehlt -= nach.length;
+                };
+                nachlegen(erlaubt);
+                nachlegen(notnagel.filter(passend));
             }
 
             // Reihenfolge im Ladder: NIE nach id. Sektion bleibt (Wiederholung,
@@ -2319,19 +2343,59 @@
         return previewData.filter(e => groupKey(e.student) === k);
     }
 
+    // Pflicht oder Zusatz entscheidet die POSITION, nicht die Herkunft.
+    //
+    // Eine per „+" hinzugefuegte Aufgabe landete am Ende und blieb damit fuer
+    // immer Zusatz — hochziehen ging nicht, weil die Leiter gar nicht zu
+    // sortieren war. Jetzt laesst sie sich ziehen, und danach zaehlt wieder
+    // dieselbe Regel wie beim Erzeugen: die ersten `pflicht` regulaeren
+    // Aufgaben sind Pflicht (Wiederholung und Erklaerung zaehlen nie mit).
+    const REG_SEKTIONEN = ['Basis', 'G-Niveau', 'E-Niveau'];
+    function pflichtZusatzNeu(tasks, pflichtCount) {
+        let regIdx = 0;
+        tasks.forEach(t => {
+            if (REG_SEKTIONEN.includes(t.section)) { t.zusatz = regIdx >= pflichtCount; regIdx++; }
+        });
+    }
+
+    /**
+     * Eine Aufgabe an eine andere Stelle ziehen — in DIESER Leiter und, wenn die
+     * Gruppenbearbeitung an ist, in allen Leitern der Gruppe. Sonst haetten die
+     * Kinder einer Gruppe stillschweigend verschiedene Reihenfolgen, und genau
+     * das soll die Gruppe verhindern.
+     */
+    function verschiebeAufgabe(entry, vonId, zielId, davor) {
+        const pflichtCount = (typeof getGenConfig === 'function' ? getGenConfig().pflicht : Infinity);
+        groupEntries(entry).forEach(e => {
+            const von = e.tasks.findIndex(t => t._id === vonId);
+            if (von < 0) return;
+            const [bewegt] = e.tasks.splice(von, 1);
+            let ziel = e.tasks.findIndex(t => t._id === zielId);
+            if (ziel < 0) ziel = e.tasks.length;           // Ziel gibt es hier nicht: ans Ende
+            else if (!davor) ziel += 1;
+            e.tasks.splice(ziel, 0, bewegt);
+            pflichtZusatzNeu(e.tasks, pflichtCount);
+        });
+        renderPreview();
+    }
+
     function renderPreview() {
         const container = document.getElementById('preview-students');
         container.innerHTML = '';
 
-        // Farb-Legende: erklaert die Einfaerbung der Stufen (v.a. das lila = Wiederholung).
+        // Farb-Legende — sie erklaert die FARBE DER ZIFFER, sonst nichts.
+        // Vorher stand die Farbe doppelt an jeder Stufe: einmal als Ziffer,
+        // einmal als getoenter Hintergrund. Zwei Anzeigen fuer dieselbe
+        // Aussage, und die Leiter sah bunter aus, als sie Information trug.
         const legend = document.createElement('div');
         legend.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px;font-size:0.78rem;color:var(--text-muted)';
-        const chip = (color, label, dashed) => `<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:12px;height:12px;border-radius:3px;border-left:3px ${dashed ? 'dashed' : 'solid'} ${color};background:${color}22"></span>${label}</span>`;
+        const chip = (color, label) => `<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:12px;height:12px;border-radius:50%;background:${color}"></span>${label}</span>`;
         legend.innerHTML =
             chip('#7c3aed', 'Wiederholung') +
-            chip('#dc2626', 'Erklärung', true) +
+            chip('#dc2626', 'Erklärung') +
             chip('#2563eb', 'Basis') +
-            chip('#059669', 'G-/E-Niveau') +
+            chip('#d97706', 'G-Niveau') +
+            chip('#059669', 'E-Niveau') +
             '<span style="color:var(--text-muted)">· unter „Zusatzaufgaben": über der Pflicht</span>';
         container.appendChild(legend);
 
@@ -2400,6 +2464,41 @@
                 if (task.quelleTyp === 'latex' && task.latex && window.katex) {
                     renderLatex(step.querySelector('.step-source'), task.latex);
                 }
+
+                // Ziehen: die Aufgabe traegt ihre id, das Ziel entscheidet die
+                // Haelfte, ueber der man loslaesst (obere Haelfte = davor).
+                step.draggable = true;
+                step.title = 'Ziehen, um die Reihenfolge zu ändern';
+                step.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', String(task._id));
+                    e.dataTransfer.effectAllowed = 'move';
+                    step.classList.add('ladder-step-zieht');
+                });
+                step.addEventListener('dragend', () => {
+                    step.classList.remove('ladder-step-zieht');
+                    ladder.querySelectorAll('.ladder-step').forEach(x => x.classList.remove('ladder-step-ueber-oben', 'ladder-step-ueber-unten'));
+                });
+                step.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    // Die Linie zeigt, wo es landet — ohne sie zielt man blind
+                    // (dieselbe Regel wie bei jedem anderen Ziehen in Nuvora).
+                    const oben = (e.clientY - step.getBoundingClientRect().top) < step.offsetHeight / 2;
+                    step.classList.toggle('ladder-step-ueber-oben', oben);
+                    step.classList.toggle('ladder-step-ueber-unten', !oben);
+                });
+                step.addEventListener('dragleave', () => {
+                    step.classList.remove('ladder-step-ueber-oben', 'ladder-step-ueber-unten');
+                });
+                step.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    step.classList.remove('ladder-step-ueber-oben', 'ladder-step-ueber-unten');
+                    const vonId = e.dataTransfer.getData('text/plain');
+                    if (!vonId || vonId === String(task._id)) return;
+                    const davor = (e.clientY - step.getBoundingClientRect().top) < step.offsetHeight / 2;
+                    verschiebeAufgabe(entry, vonId, String(task._id), davor);
+                });
 
                 step.querySelector('.step-checkbox').addEventListener('click', (e) => {
                     e.stopPropagation();

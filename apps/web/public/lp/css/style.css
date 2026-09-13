@@ -661,9 +661,9 @@ tr:hover td { background: #f9fafb; }
 .step-g .step-number { background: #d97706; }
 .step-e .step-number { background: #059669; }
 .step-erklaerung .step-number { background: #dc2626; }
-.step-erklaerung { border-left: 3px dashed #dc2626; background: #fef2f2; }
+.step-erklaerung { border-left: 3px dashed #dc2626; }
 .step-wiederholung .step-number { background: #7c3aed; }
-.step-wiederholung { border-left: 3px solid #7c3aed; background: #f5f3ff; }
+.step-wiederholung { border-left: 3px solid #7c3aed; }
 
 .step-content { flex: 1; min-width: 0; }
 .step-content .step-id {
@@ -1200,3 +1200,9 @@ html.dark .chip { background: #2c2c2e; }
 #klasse-form-panel .form-row,
 #schueler-panel,
 .klasse-chip .chip-delete { display: none !important; }
+
+/* Ziehen in der Lernleiter: die Linie zeigt, wo die Aufgabe landet.
+   Ohne sie zielt man blind — dieselbe Regel wie bei jedem Ziehen in Nuvora. */
+.ladder-step-zieht { opacity: 0.4; }
+.ladder-step-ueber-oben { box-shadow: inset 0 3px 0 0 var(--primary); }
+.ladder-step-ueber-unten { box-shadow: inset 0 -3px 0 0 var(--primary); }
