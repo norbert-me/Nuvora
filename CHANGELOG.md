@@ -16,6 +16,13 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: die Suche findet Wörter, nicht Zeichenketten.** „13 4" findet jetzt
+  „Schulbuch [S.13 Nr.4 links]" — in der Aufgabenliste und beim Hinzufügen in der
+  Lernleiter, dort auch nach der angezeigten Nummer (#000026).
+- **Lernpfad: der Trenner „Zusatzaufgaben" bleibt stehen, auch wenn nichts
+  dahintersteht** — dorthin gezogen wird eine Aufgabe zur Zusatzaufgabe. Auf dem
+  gedruckten Blatt erscheint die Überschrift nur, wenn es wirklich welche gibt.
+- Lernpfad: der Knopf heißt „Automatisch generieren".
 - **Lernpfad: „Lernpfad nicht gefunden" beim Anklicken eines Pfads ist behoben.**
   Die angezeigte Liste konnte älter sein als die Daten; jetzt wird der Pfad über
   den Namen und notfalls nach frischem Laden wiedergefunden.

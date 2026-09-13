@@ -33,7 +33,7 @@ async def _welt(s):
 
 @pytest.mark.asyncio
 async def test_gleiche_person_in_zwei_listen_wird_eine(s):
-    u, a, b = await _welt(s)
+    u, a, _b = await _welt(s)   # die zweite Liste wird nur angelegt, nicht gelesen
     neu = await uebernahme_personen(s)
     assert neu == 2, "Anna und Ben — nicht vier Zeilen, vier Personen"
 

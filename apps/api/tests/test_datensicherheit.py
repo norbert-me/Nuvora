@@ -7,8 +7,7 @@ import json
 
 import pytest
 
-from app.models import (CalendarEntry, Folder, QuestionSet, SchoolClass, Student,
-                        User, UserModule)
+from app.models import CalendarEntry, Folder, QuestionSet, User, UserModule
 
 
 # ── 1) Der ICS-Feed verstummt mit dem Modul ──────────────────────────────────

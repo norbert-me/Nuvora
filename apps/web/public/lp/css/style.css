@@ -1207,3 +1207,10 @@ html.dark .chip { background: #2c2c2e; }
 .ladder-step-zieht { opacity: 0.4; }
 .ladder-step-ueber-oben { box-shadow: inset 0 3px 0 0 var(--primary); }
 .ladder-step-ueber-unten { box-shadow: inset 0 -3px 0 0 var(--primary); }
+
+/* Der Zusatz-Trenner ist auch Ablegeflaeche: was hierher gezogen wird, ist
+   Zusatzaufgabe. Ohne Rueckmeldung zielt man blind. */
+.ladder-zusatz-ueber {
+    border-top-color: var(--primary);
+    color: var(--primary);
+}

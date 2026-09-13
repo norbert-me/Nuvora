@@ -29,7 +29,7 @@ from ..database import get_db
 from ..importe import geprueft
 from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, WorkAnalysis, Session as TestSession
 # Optimistisches Sperren (siehe app/versionierung.py).
-from ..versionierung import VersionOut, pruefe, stand
+from ..versionierung import VersionOut, pruefe
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht, option_an
 # Die Auswahl der datierten To-dos gehoert dem Notizbrett; der Kalender

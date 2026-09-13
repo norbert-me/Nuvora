@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { useModules, useAktiv, useZielFilter } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { lokal, sichern } from "../core/ansichten.js";
-import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLORS as C, pageApp, pageTitle, cardStyle, chipStyle, badge, btnSmall, CONTROL_H, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
+import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLORS as C, pageApp, cardStyle, chipStyle, badge, btnSmall, CONTROL_H, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson, hol } from "../core/melden.js";
 import { WIDGETS } from "../components/Widgets.jsx";

@@ -20,7 +20,7 @@ export default function Tests() {
   }, []);
   const { t, lang } = useLanguage();
   const [sessions, setSessions] = useState([]);
-  const [classes, setClasses] = useState([]);
+  const [, setClasses] = useState([]);   // nur zum Aufwaermen des Caches — gelesen wird es nicht
   const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState(false);
 

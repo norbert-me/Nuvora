@@ -50,14 +50,25 @@
   // Schon eingerichtet? Dann sofort weiter — ausser die Seite wurde
   // ausdruecklich zum Aendern geoeffnet (?setup=1, siehe Profil in Nuvora).
   const aendern = new URLSearchParams(location.search).get("setup") === "1";
-  if (vorhanden && !aendern) location.replace(vorhanden);
+  if (vorhanden && !aendern) { const z = geprueft(vorhanden); if (z) location.replace(z); }
   if (vorhanden) feld.value = vorhanden;
 
+  // Die eingetippte Adresse wird GEPARST, nicht nur angeschaut: ein blosser
+  // Anfangs-Test laesst "https://" in einer sonst kaputten Zeichenkette durch,
+  // und hier wird damit navigiert. `new URL` entscheidet, das Schema wird
+  // gegen eine feste Liste geprueft, und weiter geht es mit der normalisierten
+  // Form (href) statt mit der Eingabe.
+  function geprueft(roh) {
+    let url;
+    try { url = new URL(roh); } catch { return null; }
+    return (url.protocol === "http:" || url.protocol === "https:") ? url.href.replace(/\/+$/, "") : null;
+  }
+
   document.getElementById("go").addEventListener("click", () => {
-    const u = feld.value.trim().replace(/\/+$/, "");
-    if (!/^https?:\/\//i.test(u)) { fehler.textContent = "Bitte mit http:// oder https:// beginnen."; return; }
-    try { localStorage.setItem(KEY, u); } catch { /* privater Modus: dann eben nur diese Sitzung */ }
-    location.replace(u);
+    const ziel = geprueft(feld.value.trim());
+    if (!ziel) { fehler.textContent = "Bitte mit http:// oder https:// beginnen."; return; }
+    try { localStorage.setItem(KEY, ziel); } catch { /* privater Modus: dann eben nur diese Sitzung */ }
+    location.replace(ziel);
   });
   feld.addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("go").click(); });
 </script>

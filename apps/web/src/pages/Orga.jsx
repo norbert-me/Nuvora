@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { undoDelete } from "../core/undo.jsx";
 import { askConfirm } from "../core/dialog.jsx";
-import { AddButton, COLORS as C, CONTROL_R, ICONS, Icon, cardStyle, iconBtn, klebtLinks, pageApp, td, th as thBase, toolbarInput } from "../components/Icons.jsx";
+import { AddButton, COLORS as C, CONTROL_R, cardStyle, klebtLinks, pageApp, td, th as thBase, toolbarInput } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";

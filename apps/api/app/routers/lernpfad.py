@@ -25,7 +25,7 @@ from ..database import get_db
 from ..kursmitglieder import kurs_der_klasse
 from ..models import Exercise, LearningLadder, LearningPath, SchoolClass, Topic, User
 # Optimistisches Sperren (siehe app/versionierung.py).
-from ..versionierung import VersionOut, pruefe, stand
+from ..versionierung import VersionOut, pruefe
 from .auth import rate_limit
 from .modules import modul_pflicht
 

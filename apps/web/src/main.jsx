@@ -203,11 +203,6 @@ setKonfliktFrage(async (eintrag, stand) => {
 // aus der letzten Sitzung) und beim Übergang offline→online, der über die
 // API-Aufrufe erkannt wird. flush nutzt den Original-fetch (keine Endlosschleife).
 let _wasOffline = false;
-// Den Datensparen-Schalter beim Start in den Worker-Cache schreiben: der
-// Service-Worker liest ihn beim Installieren von dort (core/sparsam.js), und
-// nach einem Wechsel der Cache-Fassung waere er sonst verloren.
-setzeSparsam(sparsamAn());
-
 const _flush = () => flushOutbox(_origFetch);
 window.addEventListener("online", _flush);
 window.addEventListener("cardvote:offline", () => { _wasOffline = true; });
@@ -236,6 +231,13 @@ import WasIstNeu from "./components/WasIstNeu.jsx";
 import { notiereAufruf, notiereSeite, protokollStarten } from "./core/protokoll.js";
 import { btnPrimary, btnSecondary, btnSmall, Skeleton, Modal, pageForm, pageTitle, pageIntro,
   COLORS as C, Icon, ICONS, iconBtn, cardStyle, chipStyle, menuRow, popoverPanel, SHADOW, CONTROL_R } from "./components/Icons.jsx";
+
+// Den Datensparen-Schalter beim Start in den Worker-Cache schreiben: der
+// Service-Worker liest ihn beim Installieren von dort (core/sparsam.js), und
+// nach einem Wechsel der Cache-Fassung waere er sonst verloren. Steht hier und
+// nicht weiter oben: ein Aufruf VOR seinem Import laeuft nur durch das Hoisten
+// der Module und liest sich wie ein Fehler (CodeQL js/use-before-declaration).
+setzeSparsam(sparsamAn());
 
 // Alle uebrigen Seiten kommen erst beim Aufruf ueber die Leitung. Vorher lag
 // jedes Modul im selben Bundle: wer nur den Kalender oeffnet, lud auch Scanner,

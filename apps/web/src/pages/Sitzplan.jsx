@@ -565,7 +565,6 @@ export default function Sitzplan() {
     }
   };
 
-  const entfernen = (sid) => { snapshot(); persist(seats.filter((s) => s.sid !== sid)); };
 
   // Ein Klick auf ein Kind schreibt eine Bemerkung ins Notenbuch.
   //

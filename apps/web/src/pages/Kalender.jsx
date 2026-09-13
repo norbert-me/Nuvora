@@ -2354,9 +2354,6 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
     if (teile.COUNT) return `${grund} (${teile.COUNT}×)`;
     return grund;
   })();
-  const zeitText = (startTime || endTime)
-    ? `${startTime || "?"}–${endTime || "?"}`
-    : ((stundeVon || stundeBis) ? `${stundeVon || "?"}–${stundeBis || "?"}` : null);
   const [dateVal, setDateVal] = useState(entry.date ? ymd(new Date(entry.date)) : ymd(new Date()));
   // Letzter Tag eines mehrtaegigen Termins (Schulfahrt, Projektwoche). Leer =
   // eintaegig. Mehrtaegig ist immer ganztaegig — eine Uhrzeit gilt fuer einen

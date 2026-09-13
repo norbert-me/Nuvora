@@ -1512,6 +1512,22 @@
                 (a.aufgabentext || '').trim(), (a.latex || '').trim()].join('|').toLowerCase();
     }
 
+    /**
+     * Sucht nach WOERTERN, nicht nach einer Zeichenkette.
+     *
+     * „13 4" findet „Schulbuch [S.13 Nr.4 links]", „bruch 7" findet
+     * „Bruchrechnung (7)". Vorher musste die Eingabe genau so im Text stehen —
+     * wer die Quelle aus dem Kopf tippt, schreibt aber „13 4" und nicht
+     * „[S.13 Nr.4". Jedes Wort muss vorkommen (UND), die Reihenfolge zaehlt
+     * nicht; ein fuehrendes „#" faellt weg, damit „#26" und „26" dasselbe
+     * finden. Dieselbe Regel wie bei SuchSelect im Rahmen.
+     */
+    function trifftSuche(heuhaufen, suche) {
+        const heu = String(heuhaufen).toLowerCase();
+        return String(suche).toLowerCase().split(/\s+/).filter(Boolean)
+            .every(w => heu.includes(w) || heu.includes(w.replace(/^#/, '')));
+    }
+
     function renderAufgaben() {
         const tbody = document.querySelector('#aufgaben-tabelle tbody');
         const filterThema = document.getElementById('filter-thema').value;
@@ -1527,14 +1543,13 @@
             // Auch nach der ANGEZEIGTEN ID (#000043) suchbar, nicht nur nach der
             // rohen Server-id — sonst findet die Suche nach dem sichtbaren Code
             // nichts. "#" wird zusaetzlich weggelassen, damit "43" ebenso trifft.
-            const s2 = search.replace(/^#/, '');
             filtered = filtered.filter(a => {
                 const code = fmtId(a.code || a.id);
                 const haystack = [
                     code, code.replace('#', ''), a.code, a.id, a.thema, a.unterthema, getKategorie(a), a.quelle,
                     a.operator, a.kompetenz, a.methode, a.loesung
-                ].filter(Boolean).join(' ').toLowerCase();
-                return haystack.includes(search) || haystack.includes(s2);
+                ].filter(Boolean).join(' ');
+                return trifftSuche(haystack, search);
             });
         }
 
@@ -2541,16 +2556,38 @@
             let stepNum = 0;
             let zusatzDivDone = false;
 
+            // Der Trenner „Zusatzaufgaben" steht IMMER — auch wenn dahinter
+            // nichts liegt. Er ist die Grenze, an der Pflicht aufhoert, und
+            // zugleich die Ablegeflaeche: eine Aufgabe dorthin gezogen wird zur
+            // Zusatzaufgabe. Verschwand er beim Loeschen der letzten
+            // Zusatzaufgabe, liess sich keine mehr hinunterziehen. Auf dem
+            // gedruckten Blatt bleibt er weg, solange nichts dahintersteht —
+            // eine Ueberschrift ohne Inhalt sagt dem Kind nichts.
+            const zusatzTrenner = () => {
+                zusatzDivDone = true;
+                const divider = document.createElement('div');
+                divider.className = 'ladder-zusatz-divider';
+                divider.textContent = 'Zusatzaufgaben';
+                divider.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    divider.classList.add('ladder-zusatz-ueber');
+                });
+                divider.addEventListener('dragleave', () => divider.classList.remove('ladder-zusatz-ueber'));
+                divider.addEventListener('drop', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    divider.classList.remove('ladder-zusatz-ueber');
+                    const vonId = e.dataTransfer.getData('text/plain');
+                    // Ans Ende: hinter dem Trenner faengt der Zusatzteil an.
+                    if (vonId) verschiebeAufgabe(entry, vonId, null, false);
+                });
+                ladder.appendChild(divider);
+            };
+
             entry.tasks.forEach((task, ti) => {
                 stepNum++;
 
-                if (task.zusatz && !zusatzDivDone) {
-                    zusatzDivDone = true;
-                    const divider = document.createElement('div');
-                    divider.className = 'ladder-zusatz-divider';
-                    divider.textContent = 'Zusatzaufgaben';
-                    ladder.appendChild(divider);
-                }
+                if (task.zusatz && !zusatzDivDone) zusatzTrenner();
 
                 const step = document.createElement('div');
                 step.className = 'ladder-step step-' + sectionCssClass(task.section);
@@ -2635,6 +2672,8 @@
                 ladder.appendChild(step);
             });
 
+            if (!zusatzDivDone) zusatzTrenner();   // leer, aber sichtbar — siehe oben
+
             const finish = document.createElement('div');
             finish.className = 'ladder-finish';
             finish.textContent = 'Ziel erreicht!';
@@ -2669,7 +2708,15 @@
         }
         function renderPickerList(filter) {
             const q = (filter || '').toLowerCase();
-            const filtered = q ? pool.filter(a => [a.id, a.quelle, a.operator, getKategorie(a), a.unterthema].filter(Boolean).join(' ').toLowerCase().includes(q)) : pool;
+            // Auch nach der ANGEZEIGTEN Nummer suchbar (#000026, 000026, 26) —
+            // vorher stand hier nur die rohe Server-id, und genau die sieht man
+            // nirgends. Dieselbe Regel wie in der Aufgabenliste.
+            const filtered = q ? pool.filter(a => {
+                const code = fmtId(a.code || a.id);
+                const heu = [code, code.replace('#', ''), a.code, a.id, a.quelle, a.operator,
+                             getKategorie(a), a.unterthema, a.thema].filter(Boolean).join(' ');
+                return trifftSuche(heu, q);
+            }) : pool;
             const list = document.getElementById('add-task-list');
             list.innerHTML = filtered.length ? filtered.map(a => {
                 const kat = getKategorie(a);
@@ -2722,7 +2769,7 @@
     }
 
     async function saveToPfadIntern() {
-        if (!previewData || !previewData.length) { toast('Erst Vorschau generieren'); return; }
+        if (!previewData || !previewData.length) { toast('Erst automatisch generieren'); return; }
         // Nicht leer speichern: klar melden statt still eine leere Lernleiter anzulegen.
         if (!previewData.some(p => p.tasks.some(t => t.selected))) { toast('Keine Aufgaben ausgewählt — nichts zu speichern'); return; }
         if (!previewData[0].thema) { toast('Kein Thema gesetzt — nicht gespeichert'); return; }
@@ -3049,7 +3096,7 @@
     }
 
     async function generatePDF(mode) {
-        if (!previewData || !previewData.length) { toast('Erst Vorschau generieren'); return; }
+        if (!previewData || !previewData.length) { toast('Erst automatisch generieren'); return; }
         if (window.katex) await prerenderLatex();
 
         const { jsPDF } = window.jspdf;
