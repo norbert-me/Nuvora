@@ -552,17 +552,6 @@
 /* Staircase / Ladder */
 #lp-app .ladder {
     position: relative;
-    padding-left: 40px;
-}
-#lp-app .ladder::before {
-    content: '';
-    position: absolute;
-    left: 18px;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: linear-gradient(to bottom, #2563eb, #16a34a);
-    border-radius: 2px;
 }
 
 #lp-app .ladder-section-header {
@@ -634,15 +623,6 @@
     text-decoration: line-through;
 }
 
-#lp-app .ladder-step::before {
-    content: '';
-    position: absolute;
-    left: -26px;
-    top: 50%;
-    width: 12px;
-    height: 2px;
-    background: var(--border);
-}
 
 #lp-app .step-number {
     display: flex;

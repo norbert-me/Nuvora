@@ -29,7 +29,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - **Lernpfad: ein E-Kurs bekommt keine Basisaufgaben mehr, wenn Basis auf 0 %
   steht.** Beim Auffüllen wurden vorher alle Töpfe gemischt.
 - Lernpfad: die Farbe steht nur noch an der Ziffer — getönter Hintergrund,
-  Farbbalken am Rand und die doppelte Legende sind weg.
+  Farbbalken am Rand, die Schiene links und die doppelte Legende sind weg.
 - **Lernpfad: „Lernpfad nicht gefunden" bei vollem Browserspeicher.** Bei vielen
   Aufgaben sprengte der Anzeige-Cache das Speicherlimit; das Laden brach mitten
   im Vorgang ab. Jetzt räumt die App den Cache und arbeitet notfalls ohne ihn.

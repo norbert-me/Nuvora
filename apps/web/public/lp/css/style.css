@@ -553,17 +553,6 @@ tr:hover td { background: #f9fafb; }
 /* Staircase / Ladder */
 .ladder {
     position: relative;
-    padding-left: 40px;
-}
-.ladder::before {
-    content: '';
-    position: absolute;
-    left: 18px;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: linear-gradient(to bottom, #2563eb, #16a34a);
-    border-radius: 2px;
 }
 
 .ladder-section-header {
@@ -635,15 +624,6 @@ tr:hover td { background: #f9fafb; }
     text-decoration: line-through;
 }
 
-.ladder-step::before {
-    content: '';
-    position: absolute;
-    left: -26px;
-    top: 50%;
-    width: 12px;
-    height: 2px;
-    background: var(--border);
-}
 
 .step-number {
     display: flex;
