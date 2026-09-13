@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: eine Aufgabe wird aus der Leiter entfernt statt abgewählt.** Rechts
+  an der Stufe steht jetzt ein Mülleimer; die abgewählte, durchgestrichene Zeile
+  gibt es nicht mehr.
 - **Lernpfad: eine neue Aufgabe wird nicht mehr doppelt angelegt.** Speichern und
   Abgleich konnten dieselbe Aufgabe gleichzeitig anlegen — danach stand sie
   zweimal mit derselben Nummer in der Liste.

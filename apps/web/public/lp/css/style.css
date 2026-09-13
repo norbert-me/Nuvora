@@ -687,6 +687,29 @@ tr:hover td { background: #f9fafb; }
     background: var(--surface);
     transition: background 0.15s, border-color 0.15s;
 }
+
+/* Entfernen-Knopf am rechten Rand der Stufe. Ruhig grau, rot erst unter dem
+   Zeiger: er steht an dreissig Zeilen untereinander, und dreissig rote Symbole
+   waeren ein Warnband statt einer Liste. */
+.step-weg {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.step-weg:hover {
+    color: #dc2626;
+    border-color: #dc2626;
+    background: #fef2f2;
+}
 .ladder-step:not(.deselected) .step-checkbox {
     background: var(--primary);
     border-color: var(--primary);

@@ -686,6 +686,27 @@
     background: var(--surface);
     transition: background 0.15s, border-color 0.15s;
 }
+
+/* Entfernen-Knopf am rechten Rand der Stufe (siehe style.css). */
+#lp-app .step-weg {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+#lp-app .step-weg:hover {
+    color: #dc2626;
+    border-color: #dc2626;
+    background: #fef2f2;
+}
 #lp-app .ladder-step:not(.deselected) .step-checkbox {
     background: var(--primary);
     border-color: var(--primary);

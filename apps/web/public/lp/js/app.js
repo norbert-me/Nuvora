@@ -2479,7 +2479,7 @@
                         ${tags.length ? '<div class="step-tags">' + tags.join('') + '</div>' : ''}
                         ${hasLRS && task.lrs ? '<div class="lrs-hint">Sonderaufgabe – siehe separates Blatt</div>' : ''}
                     </div>
-                    <div class="step-checkbox"></div>
+                    <button type="button" class="step-weg" title="Aus dieser Lernleiter entfernen" aria-label="Aus dieser Lernleiter entfernen">${ICON.delete}</button>
                 `;
 
                 if (task.quelleTyp === 'latex' && task.latex && window.katex) {
@@ -2521,13 +2521,16 @@
                     verschiebeAufgabe(entry, vonId, String(task._id), davor);
                 });
 
-                step.querySelector('.step-checkbox').addEventListener('click', (e) => {
+                // Entfernen statt Abwaehlen: eine abgewaehlte Aufgabe stand
+                // durchgestrichen weiter in der Leiter und zaehlte die Nummern
+                // mit — gefragt war „weg damit". Wie beim Anwaehlen vorher gilt
+                // der Griff fuer die ganze Gruppe (oder nur dieses Kind).
+                step.querySelector('.step-weg').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const newState = !task.selected;
-                    // auf ganze Gruppe (oder nur diesen Schüler) anwenden
+                    const pflichtCount = getGenConfig().pflicht;
                     groupEntries(entry).forEach(ge => {
-                        const t = ge.tasks.find(x => x._id === task._id);
-                        if (t) t.selected = newState;
+                        ge.tasks = ge.tasks.filter(t => t._id !== task._id);
+                        pflichtZusatzNeu(ge.tasks, pflichtCount);
                     });
                     renderPreview();
                 });
