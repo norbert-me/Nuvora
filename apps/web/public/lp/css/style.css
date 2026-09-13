@@ -661,9 +661,7 @@ tr:hover td { background: #f9fafb; }
 .step-g .step-number { background: #d97706; }
 .step-e .step-number { background: #059669; }
 .step-erklaerung .step-number { background: #dc2626; }
-.step-erklaerung { border-left: 3px dashed #dc2626; }
 .step-wiederholung .step-number { background: #7c3aed; }
-.step-wiederholung { border-left: 3px solid #7c3aed; }
 
 .step-content { flex: 1; min-width: 0; }
 .step-content .step-id {

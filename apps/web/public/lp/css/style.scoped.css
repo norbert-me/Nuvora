@@ -660,9 +660,7 @@
 #lp-app .step-g .step-number { background: #d97706; }
 #lp-app .step-e .step-number { background: #059669; }
 #lp-app .step-erklaerung .step-number { background: #dc2626; }
-#lp-app .step-erklaerung { border-left: 3px dashed #dc2626; }
 #lp-app .step-wiederholung .step-number { background: #7c3aed; }
-#lp-app .step-wiederholung { border-left: 3px solid #7c3aed; }
 
 #lp-app .step-content { flex: 1; min-width: 0; }
 #lp-app .step-content .step-id {
