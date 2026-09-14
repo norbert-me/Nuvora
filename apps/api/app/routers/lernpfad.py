@@ -21,7 +21,7 @@ from sqlalchemy.orm import selectinload
 
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
-from ..besitz import eigenes
+from ..besitz import eigenes, gehoert_optional
 from ..database import get_db
 from ..kursmitglieder import kurs_der_klasse
 from ..models import Exercise, LearningLadder, LearningPath, SchoolClass, Topic, User
@@ -39,21 +39,11 @@ require_module = modul_pflicht(MODULE_KEY)
 
 
 async def _check_topic(db: AsyncSession, user: User, topic_id: Optional[int]) -> None:
-    if topic_id is None:
-        return
-    result = await db.execute(select(Topic.id).where(Topic.id == topic_id, Topic.owner_id == user.id))
-    if not result.scalar_one_or_none():
-        raise HTTPException(400, "Thema nicht gefunden")
+    await gehoert_optional(db, Topic, topic_id, user.id, pflicht=True, code=400, name="Thema nicht gefunden")
 
 
 async def _check_class(db: AsyncSession, user: User, class_id: Optional[int]) -> None:
-    if class_id is None:
-        return
-    result = await db.execute(
-        select(SchoolClass.id).where(SchoolClass.id == class_id, SchoolClass.owner_id == user.id)
-    )
-    if not result.scalar_one_or_none():
-        raise HTTPException(400, "Klasse nicht gefunden")
+    await gehoert_optional(db, SchoolClass, class_id, user.id, pflicht=True, code=400, name="Klasse nicht gefunden")
 
 
 # ─── Aufgaben ───

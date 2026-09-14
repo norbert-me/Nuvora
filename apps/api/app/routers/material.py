@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
-from ..besitz import eigenes
+from ..besitz import eigenes, gehoert_optional
 from ..database import get_db
 from ..models import Material, Topic, CalendarEntry, Method, WorkAnalysis, User
 from sqlalchemy import func
@@ -42,12 +42,7 @@ class MaterialOut(BaseModel):
 
 
 async def _check_topic(db: AsyncSession, user_id: int, topic_id: Optional[int]) -> Optional[int]:
-    if topic_id is None:
-        return None
-    ok = (await db.execute(select(Topic.id).where(Topic.id == topic_id, Topic.owner_id == user_id))).scalar_one_or_none()
-    if not ok:
-        raise HTTPException(404, "Thema nicht gefunden")
-    return topic_id
+    return await gehoert_optional(db, Topic, topic_id, user_id, pflicht=True, name="Thema nicht gefunden")
 
 
 async def _check_entry(db: AsyncSession, user_id: int, entry_id: Optional[int]) -> Optional[int]:

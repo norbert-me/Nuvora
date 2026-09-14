@@ -21,7 +21,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..besitz import eigene_klasse, eigenes, kurs_oder_klasse
+from ..besitz import eigene_klasse, eigenes, gehoert_optional, kurs_oder_klasse
 from ..uploads import anhang_kopf
 from ..scoring import note_aus_pct
 from ..kursmitglieder import eigener_kurs, member_student_ids, sibling_class_ids, kurs_der_klasse
@@ -354,11 +354,8 @@ def _parse_date(v: Optional[str]):
 
 async def _check_topic(db: AsyncSession, user_id: int, topic_id: Optional[int]) -> Optional[int]:
     """Themenbindung nur aufs eigene Thema; fremdes/unbekanntes -> None."""
-    if topic_id is None:
-        return None
     from ..models import Topic
-    ok = (await db.execute(select(Topic.id).where(Topic.id == topic_id, Topic.owner_id == user_id))).scalar_one_or_none()
-    return ok
+    return await gehoert_optional(db, Topic, topic_id, user_id, pflicht=False)
 
 
 @router.post("/categories", response_model=CategoryOut, status_code=201)

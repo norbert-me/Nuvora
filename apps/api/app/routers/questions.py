@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..besitz import nur_eigenes
+from ..besitz import gehoert_optional, nur_eigenes
 from ..database import get_db
 from ..models import Question, Topic, User
 from ..uploads import bildtyp
@@ -76,13 +76,7 @@ class QuestionOut(BaseModel):
 
 async def _check_topic(db: AsyncSession, user: User, topic_id):
     """Themen gehoeren dem Kern und der Lehrkraft — kein Fremdthema anhaengen."""
-    if topic_id is None:
-        return
-    result = await db.execute(
-        select(Topic.id).where(Topic.id == topic_id, Topic.owner_id == user.id)
-    )
-    if not result.scalar_one_or_none():
-        raise HTTPException(400, "Thema nicht gefunden")
+    await gehoert_optional(db, Topic, topic_id, user.id, pflicht=True, code=400, name="Thema nicht gefunden")
 
 
 @router.post("", response_model=QuestionOut, status_code=201)

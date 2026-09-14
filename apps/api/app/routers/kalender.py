@@ -23,7 +23,7 @@ from ..oeffentlich import basis as oeffentliche_basis
 from ..felder import ohne_leer, ohne_none
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
-from ..besitz import eigenes
+from ..besitz import eigenes, gehoert_optional
 from ..kursmitglieder import class_kurs_ids, eigener_kurs
 from ..database import get_db
 from ..importe import geprueft
@@ -51,27 +51,15 @@ require_module = modul_pflicht(MODULE_KEY)
 
 
 async def _check_class(db: AsyncSession, user: User, class_id: Optional[int]) -> None:
-    if class_id is None:
-        return
-    r = await db.execute(select(SchoolClass.id).where(SchoolClass.id == class_id, SchoolClass.owner_id == user.id))
-    if not r.scalar_one_or_none():
-        raise HTTPException(404, "Klasse nicht gefunden")
+    await gehoert_optional(db, SchoolClass, class_id, user.id, pflicht=True, name="Klasse nicht gefunden")
 
 
 async def _check_topic(db: AsyncSession, user: User, topic_id: Optional[int]) -> None:
-    if topic_id is None:
-        return
-    r = await db.execute(select(Topic.id).where(Topic.id == topic_id, Topic.owner_id == user.id))
-    if not r.scalar_one_or_none():
-        raise HTTPException(404, "Thema nicht gefunden")
+    await gehoert_optional(db, Topic, topic_id, user.id, pflicht=True, name="Thema nicht gefunden")
 
 
 async def _check_kurs(db: AsyncSession, user: User, kurs_id: Optional[int]) -> None:
-    if kurs_id is None:
-        return
-    r = await db.execute(select(Kurs.id).where(Kurs.id == kurs_id, Kurs.owner_id == user.id))
-    if not r.scalar_one_or_none():
-        raise HTTPException(404, "Kurs nicht gefunden")
+    await gehoert_optional(db, Kurs, kurs_id, user.id, pflicht=True, name="Kurs nicht gefunden")
 
 
 # ─── Wiederholungen (Serien) ───

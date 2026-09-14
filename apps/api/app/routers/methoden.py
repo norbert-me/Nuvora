@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
-from ..besitz import eigenes
+from ..besitz import eigenes, gehoert_optional
 from ..felder import ohne_leer, ohne_none
 from ..database import get_db
 from ..importe import geprueft
@@ -27,10 +27,7 @@ MODULE_KEY = "unterrichtsplanung"
 
 async def _check_topic(db: AsyncSession, user_id: int, topic_id: Optional[int]) -> Optional[int]:
     """Themen-Bindung nur auf eigenes Thema. Fremdes/unbekanntes wird verworfen (None)."""
-    if topic_id is None:
-        return None
-    ok = (await db.execute(select(Topic.id).where(Topic.id == topic_id, Topic.owner_id == user_id))).scalar_one_or_none()
-    return ok
+    return await gehoert_optional(db, Topic, topic_id, user_id, pflicht=False)
 
 
 require_module = modul_pflicht(MODULE_KEY)

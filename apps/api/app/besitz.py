@@ -122,3 +122,34 @@ def kurs_oder_klasse(model, user, class_id, kurs_id):
     if kurs_id is not None:
         return [model.owner_id == user.id, model.kurs_id == kurs_id]
     return [model.owner_id == user.id, model.class_id == class_id, model.kurs_id.is_(None)]
+
+
+async def gehoert_optional(db, model, obj_id, owner_id, *, pflicht: bool,
+                           code: int = 404, name: str = "Nicht gefunden"):
+    """Eine optionale Verknuepfung aufs eigene Konto pruefen — eine Quelle fuer
+    die Handvoll `_check_topic`/`_check_class`/`_check_kurs`, die in sechs
+    Routern fast wortgleich standen.
+
+    `None` bleibt `None` (die Bindung ist ueberall optional). Sonst zwei Formen,
+    und der Unterschied ist Absicht, nicht Zufall:
+
+    * `pflicht=False` — Fremdes oder Unbekanntes wird **still verworfen**
+      (Rueckgabe `None`). So halten es die Anzeige-Bindungen (Material, Noten,
+      Einstiege): ein Tippfehler in einer topic_id soll den ganzen Vorgang
+      nicht abbrechen.
+    * `pflicht=True` — Fremdes oder Unbekanntes wird **abgelehnt** (`code`,
+      Vorgabe 404; manche Aufrufer wollen 400). Fuer Wege, an denen die Bindung
+      zur Kernsache gehoert.
+
+    Rueckgabe bei Treffer: die id selbst (die Aufrufer setzen sie zurueck ins Feld).
+    """
+    if obj_id is None:
+        return None
+    ok = (await db.execute(
+        select(model.id).where(model.id == obj_id, model.owner_id == owner_id)
+    )).scalar_one_or_none()
+    if ok is not None:
+        return obj_id
+    if pflicht:
+        raise HTTPException(code, name)
+    return None
