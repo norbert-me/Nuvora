@@ -352,7 +352,9 @@ function MethodView({ m, t, onEdit, onPublish, onClose }) {
         {sec(t("methoden.idee"), m.description)}
         {sec(t("methoden.ablauf"), m.ablauf)}
         {sec(t("methoden.material"), m.material)}
-        {m.id && <div style={{ marginTop: 16 }}><MaterialPanel methodId={m.id} /></div>}
+        {/* Nur ansehen: die Bilder/Dateien sind eingebunden, hochgeladen wird
+            im Bearbeiten-Dialog. */}
+        {m.id && <div style={{ marginTop: 16 }}><MaterialPanel methodId={m.id} nurLesen /></div>}
         {linked.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div style={{ ...sectionLabel, marginBottom: 4 }}>{t("methoden.linkedLessons")}</div>
