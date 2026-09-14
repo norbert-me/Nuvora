@@ -1503,14 +1503,24 @@ async function lpAufgabeLoeschen(kontext) {
     if (!beleg.includes(LP_MARKE))
       return { ok: false, detail: `Zeile ohne Marke („${beleg.slice(0, 60)}") — nicht gelöscht` };
 
-    const geloescht = seite.waitForResponse(
-      (r) => /\/api\/lernpfad\/exercises\/\d+$/.test(new URL(r.url()).pathname) && r.request().method() === "DELETE",
-      { timeout: 25000 }).catch(() => null);
+    // ZWEI gueltige Wege, und beide zaehlen: die App loescht einzeln
+    // (`DELETE …/exercises/<id>`) oder ueber den Sammelweg
+    // (`POST …/exercises/loeschen`) — den nimmt `syncAufgaben`, seit hundert
+    // einzelne DELETEs in die Bremse des Proxys liefen. Auf genau einen davon
+    // zu horchen hiess, den Test bei jedem Umbau des Abgleichs rot zu faerben,
+    // obwohl die Aufgabe sauber verschwindet. Der Beweis steht ohnehin
+    // darunter: nach dem Neuladen darf sie nicht mehr da sein.
+    const geloescht = seite.waitForResponse((r) => {
+      const pfad = new URL(r.url()).pathname;
+      const m = r.request().method();
+      return (/\/api\/lernpfad\/exercises\/\d+$/.test(pfad) && m === "DELETE")
+          || (pfad === "/api/lernpfad/exercises/loeschen" && m === "POST");
+    }, { timeout: 25000 }).catch(() => null);
     await zeile.locator("[data-action='delete']").click();
     await lpBestaetigen(seite, /^Löschen$/);
     const antwort = await geloescht;
-    if (!antwort) return { ok: false, detail: `kein DELETE …/exercises/<id> nach dem Löschen${await lpToast(seite)}` };
-    if (antwort.status() >= 400) return { ok: false, detail: `DELETE …/exercises/<id> → HTTP ${antwort.status()}` };
+    if (!antwort) return { ok: false, detail: `kein Löschaufruf an den Server nach dem Löschen${await lpToast(seite)}` };
+    if (antwort.status() >= 400) return { ok: false, detail: `Löschen → HTTP ${antwort.status()}` };
 
     await lpOeffnen(seite, "/lernpfad");
     const uebrig = await lpSuche(seite, LP_THEMA);
