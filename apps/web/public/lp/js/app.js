@@ -351,7 +351,31 @@
     }
 
     // Aufgaben zum Kern spiegeln: anlegen, aendern, geloeschte entfernen.
-    async function syncAufgaben(data, opt) {
+    // Nur EIN Abgleich zur Zeit.
+    //
+    // Jeder `save()` stoesst einen an, und beim Aufraeumen fallen mehrere
+    // dicht hintereinander an. Zwei gleichzeitige Laeufe lesen dieselbe
+    // Server-Liste, errechnen dieselbe Loesch-Menge — und der zweite schickt
+    // DELETE fuer Aufgaben, die der erste gerade entfernt hat: eine Wand aus
+    // „404" in der Konsole, die aussieht wie ein kaputter Server. Der naechste
+    // Lauf haengt sich deshalb an den laufenden an; mehrere Wartende werden zu
+    // EINEM (der letzte Stand gewinnt, und der ist der richtige).
+    let syncLaeuft = null, syncWartet = null;
+    function syncAufgaben(data, opt) {
+        if (syncLaeuft) {
+            syncWartet = { data, opt };
+            return syncLaeuft;
+        }
+        syncLaeuft = syncAufgabenIntern(data, opt).finally(() => {
+            syncLaeuft = null;
+            const naechster = syncWartet;
+            syncWartet = null;
+            if (naechster) syncAufgaben(naechster.data, naechster.opt);
+        });
+        return syncLaeuft;
+    }
+
+    async function syncAufgabenIntern(data, opt) {
         try {
             const listRes = await api(`${LP}/exercises`);
             // Konnte der Server-Stand gerade NICHT geladen werden (Netz/Fehler),
@@ -401,7 +425,10 @@
             // wuerde sonst alle fehlenden Server-Aufgaben massenhaft loeschen.
             if (aufgabenVomServer) {
                 for (const weg of serverIds) {
-                    await api(`${LP}/exercises/${weg}`, { method: 'DELETE' });
+                    // 404 heisst „gibt es dort nicht mehr" — genau das wollten
+                    // wir. Nur echte Fehler sind welche.
+                    const r = await api(`${LP}/exercises/${weg}`, { method: 'DELETE' }).catch(() => null);
+                    if (r && !r.ok && r.status !== 404) console.warn('syncAufgaben: DELETE %s -> %s', weg, r.status);
                     delete syncSigs[weg];
                 }
             } else if (serverIds.size) {
@@ -1555,6 +1582,19 @@
      * ueberarbeitete Fassung sein, und mehrere verwendete Zeilen wegzuraeumen
      * hiesse, fremde Lernleitern umzuhaengen — das ist kein Aufraeumen mehr.
      */
+    /** Wie viele wuerde `dubAuto` entfernen? Dieselbe Regel, nur gezaehlt. */
+    function dubAutoZaehlen() {
+        const benutzt = verwendungen();
+        const zahl = (x) => benutzt.get(String(x.id)) || benutzt.get(String(x._id)) || 0;
+        let n = 0;
+        dubGruppen().forEach(gruppe => {
+            if (!dubIdentisch(gruppe)) return;
+            if (gruppe.filter(a => zahl(a) > 0).length > 1) return;
+            n += gruppe.length - 1;
+        });
+        return n;
+    }
+
     function dubAuto() {
         const benutzt = verwendungen();
         const zahl = (x) => benutzt.get(String(x.id)) || benutzt.get(String(x._id)) || 0;
@@ -1607,14 +1647,28 @@
     let dubIndex = 0;
     const dubModal = document.getElementById('dubletten-modal');
 
-    function dubStart() {
+    async function dubStart() {
         if (!dubGruppen().length) { toast('Keine doppelten Aufgaben gefunden'); return; }
-        // Erst das Eindeutige weg - was danach noch dasteht, braucht wirklich
-        // eine Entscheidung.
-        const auto = dubAuto();
-        if (auto) toast(auto + ' eindeutige Kopie' + (auto === 1 ? '' : 'n') + ' automatisch entfernt');
-        renderAufgaben();
-        if (!dubGruppen().length) { toast('Fertig - es bleiben keine doppelten Aufgaben'); return; }
+        // Erst das Eindeutige weg — aber NICHT still.
+        //
+        // „Automatisch" hiess einmal: der Knopf raeumt los, und wie viel, sieht
+        // man erst hinterher an der Liste. Bei einer zu groben Erkennung ist
+        // das Datenverlust in einem Klick, und Aufgaben lassen sich nicht aus
+        // dem Papierkorb holen. Also steht die Zahl VORHER da — bei einer
+        // einzigen Kopie ebenso wie bei vierzig.
+        const wuerde = dubAutoZaehlen();
+        if (wuerde) {
+            const ok = await confirmDlg(
+                wuerde + ' Aufgabe' + (wuerde === 1 ? '' : 'n') + ' sind in allem gleich (Text, Nummer, Lösung) '
+                + 'und stehen in keiner oder genau einer Lernleiter. Diese Kopien entfernen?',
+                { ok: 'Kopien entfernen', cancel: 'Lieber einzeln ansehen', danger: true });
+            if (ok) {
+                const auto = dubAuto();
+                if (auto) toast(auto + ' Kopie' + (auto === 1 ? '' : 'n') + ' entfernt');
+                renderAufgaben();
+            }
+        }
+        if (!dubGruppen().length) { toast('Fertig — es bleiben keine doppelten Aufgaben'); return; }
         dubIndex = 0;
         dubModal.style.display = '';
         dubZeichne();
@@ -1694,7 +1748,12 @@
         document.getElementById('dub-vorschlag').addEventListener('click', () => dubLoeschen(weg._id));
         document.getElementById('dub-skip').addEventListener('click', weiter);
         const alleFrei = document.getElementById('dub-alle-frei');
-        if (alleFrei) alleFrei.addEventListener('click', () => {
+        if (alleFrei) alleFrei.addEventListener('click', async () => {
+            const wieviele = dubUnbenutztGruppen().reduce((k, g) => k + g.length - 1, 0);
+            if (!await confirmDlg(
+                wieviele + ' Aufgabe' + (wieviele === 1 ? '' : 'n') + ' entfernen? Sie stehen in keiner Lernleiter; '
+                + 'behalten wird je Paar die vollständigere Fassung. Das lässt sich nicht rückgängig machen.',
+                { ok: 'Entfernen', cancel: 'Abbrechen', danger: true })) return;
             const n = dubAutoUnbenutzt();
             if (n) toast(n + ' Aufgabe' + (n === 1 ? '' : 'n') + ' ohne Zuordnung entfernt');
             dubIndex = 0;
@@ -1883,8 +1942,14 @@
      * „Verwendet" sagt, welche der beiden Zeilen gebraucht wird.
      */
     function dublettenSchluessel(a) {
-        const quelle = (a.quelle || '').trim().toLowerCase();
-        if (quelle) return 'q|' + quelle;
+        // Die Quelle zaehlt nur MIT Angabe: „Schulbuch" allein ist keine
+        // Aufgabe, sondern eine Herkunft — ohne den Teil in Klammern („S.16
+        // Nr.4 links") landeten sonst ALLE Schulbuch-Aufgaben ohne Angabe in
+        // einer einzigen Gruppe. Das war kein Doppel-Verdacht mehr, das war
+        // eine Liste.
+        const detail = (a.quelleDetail || '').trim().toLowerCase()
+            || ((a.quelle || '').match(/\[([^\]]+)\]/) || [])[1]?.trim().toLowerCase() || '';
+        if (detail) return 'q|' + (a.quelleTyp || '') + '|' + detail;
         const text = ((a.aufgabentext || '') + ' ' + (a.latex || '')).trim().toLowerCase();
         return text ? 't|' + text : '';
     }

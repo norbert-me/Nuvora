@@ -16,6 +16,12 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: „Doppelte aufräumen" fragt, bevor es löscht** — mit der Zahl. Und
+  es erkennt Doppelte nur noch an einer echten Quellenangabe: „Schulbuch" ohne
+  Seite und Nummer ist eine Herkunft, keine Aufgabe, und warf vorher alle solchen
+  Aufgaben in eine Gruppe.
+- Lernpfad: keine „404"-Flut mehr in der Konsole — zwei gleichzeitige Abgleiche
+  schickten dieselben Löschungen zweimal.
 - **Tafel: der Warnton der Lautstärke-Anzeige kommt jetzt wirklich.** Er lief in
   einem Tonkanal, den der Browser stumm hält, weil ihn kein Klick eröffnet hat.
   Dazu ein Knopf „Ton testen" — man will vor der lauten Stunde wissen, ob er da
