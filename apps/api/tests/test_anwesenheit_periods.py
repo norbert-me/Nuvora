@@ -68,8 +68,51 @@ async def test_da_loescht_nur_diese_stunde(s):
     await an.mark(c.id, an.MarkIn(student_id=st.id, date=d, status="fehlt", period=1), user=u, db=s)
     await an.mark(c.id, an.MarkIn(student_id=st.id, date=d, status="fehlt", period=3), user=u, db=s)
     await an.mark(c.id, an.MarkIn(student_id=st.id, date=d, status="da", period=3), user=u, db=s)
-    # Nur P3 weg, P1 bleibt.
-    assert await _zeilen(s) == 1
+    # P1 bleibt „fehlt"; P3 steht auf „da" und ist damit nicht mehr abwesend.
+    rows = (await s.execute(select(Attendance))).scalars().all()
+    nach_stunde = {r.period: r.status for r in rows}
+    assert nach_stunde[1] == "fehlt"
+    assert nach_stunde.get(3) == "da", "die Ablehnung bleibt stehen (siehe unten)"
+
+
+@pytest.mark.asyncio
+async def test_abgelehnter_vorschlag_kommt_nicht_wieder(s):
+    """Der Grund fuer die ausdrueckliche „da"-Zeile.
+
+    Wer den Vorschlag ablehnt („das Kind ist in MEINER Stunde da"), soll ihn
+    nicht beim naechsten Aufschlagen erneut bekommen. Ohne die Zeile blieb vom
+    „nein" nichts uebrig, und derselbe Vorschlag stand wieder da.
+    """
+    u, c, st = await _seed(s)
+    d = datetime(2026, 7, 22)
+    await an.mark(c.id, an.MarkIn(student_id=st.id, date=d, status="fehlt", period=1), user=u, db=s)
+    assert (await an.get_day(c.id, date=d, period=4, user=u, db=s))[str(st.id)]["vorschlag"] is True
+
+    await an.mark(c.id, an.MarkIn(student_id=st.id, date=d, status="da", period=4), user=u, db=s)
+    m = await an.get_day(c.id, date=d, period=4, user=u, db=s)
+    assert m.get(str(st.id), {}).get("vorschlag") is not True, "abgelehnt heisst abgelehnt"
+    assert m[str(st.id)]["status"] == "da"
+
+
+@pytest.mark.asyncio
+async def test_da_ohne_vorschlag_legt_keine_zeile_an(s):
+    """Der Normalfall bleibt zeilenlos: ohne fruehere Abwesenheit gibt es
+    nichts abzulehnen, und eine „da"-Zeile je Kind und Stunde waere Ballast."""
+    u, c, st = await _seed(s)
+    d = datetime(2026, 7, 23)
+    await an.mark(c.id, an.MarkIn(student_id=st.id, date=d, status="da", period=2), user=u, db=s)
+    assert await _zeilen(s) == 0
+
+
+@pytest.mark.asyncio
+async def test_abgelehnter_vorschlag_zaehlt_nicht_als_fehltag(s):
+    """Die „da"-Zeile darf in keiner Zaehlung auftauchen."""
+    u, c, st = await _seed(s)
+    d = datetime(2026, 7, 24)
+    await an.mark(c.id, an.MarkIn(student_id=st.id, date=d, status="fehlt", period=1), user=u, db=s)
+    await an.mark(c.id, an.MarkIn(student_id=st.id, date=d, status="da", period=2), user=u, db=s)
+    zus = await an.summary(c.id, user=u, db=s)
+    assert zus[str(st.id)]["fehlt"] == 1, "ein Fehltag, nicht zwei und nicht null"
 
 
 @pytest.mark.asyncio

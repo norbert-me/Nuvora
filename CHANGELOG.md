@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Anwesenheit: ein abgelehnter Vorschlag kommt nicht wieder.** Wer „das Kind ist
+  in meiner Stunde da" sagt und speichert, bekommt denselben Vorschlag beim
+  nächsten Aufschlagen nicht erneut. Gezählt wird er nirgends.
 - **Kalender: die Stunde führt jetzt auch ins Notenbuch** — neben Anwesenheit,
   Checkliste und Sitzplan.
 - **Kalender: das Material des Themas steht an der Stunde** (nur zum Nachschlagen;

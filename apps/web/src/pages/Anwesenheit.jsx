@@ -185,7 +185,12 @@ export default function Anwesenheit() {
   const eTag = useEntwurf(basis, async (wert) => {
     for (const s of students) {
       const k = String(s.id);
-      if (wert[k] === basis[k]) continue;
+      // Unveraendert? Dann nichts schicken — sonst schriebe jedes Speichern
+      // dreissig Zeilen. EINE Ausnahme: steht hier ein Vorschlag und die
+      // Lehrkraft hat ihn auf „da" gestellt, ist das eine ENTSCHEIDUNG und
+      // sieht nur zufaellig aus wie „nichts geaendert". Ungesendet kam
+      // derselbe Vorschlag beim naechsten Aufschlagen wieder.
+      if (wert[k] === basis[k] && !(k in vorschlaege)) continue;
       await mark(s.id, wert[k], isoOf(datum), stunde || null, kursId).catch(() => {});
     }
     angefasst.current.clear();

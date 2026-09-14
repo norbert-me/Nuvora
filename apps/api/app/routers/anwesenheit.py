@@ -146,6 +146,23 @@ def _sichtbar(r, kurs_id) -> bool:
     return r.kurs_id == kurs_id
 
 
+async def _hat_frueheren_vorschlag(db, canon_id, lo, hi, period) -> bool:
+    """Wuerde `get_day` fuer diese Stunde eine Abwesenheit vorschlagen?
+
+    Dieselbe Frage wie dort, nur als Ja/Nein: gibt es am selben Tag eine
+    frueher erfasste Abwesenheit (oder eine tagesweite ohne Stunde), aus der
+    ein Vorschlag entstuende? Ohne Stunde gibt es keinen Vorschlag, also auch
+    nichts abzulehnen.
+    """
+    if period is None:
+        return False
+    rows = (await db.execute(select(Attendance).where(
+        Attendance.student_id == canon_id, Attendance.date >= lo, Attendance.date <= hi,
+    ))).scalars().all()
+    frueher = [r for r in rows if r.status != "da" and (r.period is None or r.period < period)]
+    return bool(frueher)
+
+
 def _tages_status(rows, zu_person=None):
     """Aus den Stunden-Eintraegen eines Tages den staerksten je PERSON.
 
@@ -392,7 +409,37 @@ async def mark(class_id: int, body: MarkIn, user: User = Depends(require_module)
     row = next((r for r in kandidaten if body.kurs_id is not None and r.kurs_id == body.kurs_id), None) \
         or next((r for r in kandidaten if _sichtbar(r, body.kurs_id)), None)
     # "da" ist der Normalfall: kein Eintrag noetig -> vorhandenen loeschen.
+    #
+    # EINE Ausnahme, und sie ist der Grund, warum es diesen Zweig ueberhaupt
+    # zweimal gibt: liegt aus einer FRUEHEREN Stunde desselben Tages eine
+    # Abwesenheit vor, schlaegt `get_day` sie fuer diese Stunde vor. Loescht man
+    # hier nur, bleibt vom „nein, das Kind ist da" nichts uebrig — und beim
+    # naechsten Aufschlagen steht derselbe Vorschlag wieder da. Die Lehrkraft
+    # lehnt ihn ab, er kommt zurueck, sie lehnt ihn wieder ab.
+    #
+    # Deshalb wird ein abgelehnter Vorschlag als ausdrueckliche "da"-Zeile
+    # festgehalten. Das bleibt die Ausnahme (es braucht eine fruehere
+    # Abwesenheit), also entstehen nicht dreissig Zeilen je Stunde; gezaehlt
+    # wird sie nirgends (`status != "da"` in Summe, Verlauf und Druck), und im
+    # Tagesstatus steht sie ganz unten im Rang.
     if body.status == "da" and not body.note.strip():
+        if await _hat_frueheren_vorschlag(db, canon_id, lo, hi, body.period):
+            if row:
+                row.status = "da"
+                row.note = ""
+                row.period = body.period
+            else:
+                canon = await db.get(Student, canon_id)
+                # Kurs wie unten beim regulaeren Anlegen — eine Zeile ohne Kurs
+                # waere in der Sicht jedes Kurses sichtbar (`_sichtbar`).
+                kurs_ab = body.kurs_id or (canon.kurs_id if canon and canon.kurs_id
+                                           else await kurs_der_klasse(db, class_id))
+                db.add(Attendance(
+                    owner_id=user.id, student_id=canon_id, class_id=(canon.class_id if canon else class_id),
+                    kurs_id=kurs_ab, date=lo, status="da", note="", period=body.period,
+                ))
+            await db.commit()
+            return {"ok": True, "abgelehnt": True}
         if row:
             await db.delete(row)
         await db.commit()
