@@ -79,9 +79,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   Niveau. Die Übertragung landet in der Vorschau — gespeichert wird auf Knopfdruck.
 - Lernpfad: die Spalte „erledigt" auf dem Blatt ist weg — „Lösung geprüft" und
   „korrigiert" sagen dasselbe.
-- **Lernpfad: die Suche findet Wörter, nicht Zeichenketten.** „13 4" findet jetzt
-  „Schulbuch [S.13 Nr.4 links]" — in der Aufgabenliste und beim Hinzufügen in der
-  Lernleiter, dort auch nach der angezeigten Nummer (#000026).
+- **Lernpfad: die Suche findet Wörter, und eine Zahl sucht eine Zahl.** „16 4
+  links" findet „Schulbuch [S.16 Nr.4 links]" — nicht mehr auch Nr.5 und Nr.7,
+  weil irgendwo in der Nummer eine 4 stand. „26" findet weiterhin #000026.
 - **Lernpfad: der Trenner „Zusatzaufgaben" bleibt stehen, auch wenn nichts
   dahintersteht** — dorthin gezogen wird eine Aufgabe zur Zusatzaufgabe. Auf dem
   gedruckten Blatt erscheint die Überschrift nur, wenn es wirklich welche gibt.

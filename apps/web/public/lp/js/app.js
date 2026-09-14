@@ -1544,19 +1544,50 @@
     }
 
     /**
-     * Sucht nach WOERTERN, nicht nach einer Zeichenkette.
+     * Sucht nach WOERTERN, und eine ZAHL sucht eine Zahl — keine Ziffernfolge.
      *
-     * „13 4" findet „Schulbuch [S.13 Nr.4 links]", „bruch 7" findet
-     * „Bruchrechnung (7)". Vorher musste die Eingabe genau so im Text stehen —
-     * wer die Quelle aus dem Kopf tippt, schreibt aber „13 4" und nicht
-     * „[S.13 Nr.4". Jedes Wort muss vorkommen (UND), die Reihenfolge zaehlt
-     * nicht; ein fuehrendes „#" faellt weg, damit „#26" und „26" dasselbe
-     * finden. Dieselbe Regel wie bei SuchSelect im Rahmen.
+     * „13 4" soll „Schulbuch [S.13 Nr.4 links]" finden und sonst nichts. Die
+     * erste Fassung verglich jedes Wort gegen einen Topf aus allem, Nummer
+     * inklusive — und dann fand „16 4 links" auch „S.16 Nr.5 links", weil
+     * irgendwo in der id oder im Code eine 4 stand. Eine Suche, die mehr
+     * ausgibt, als man eintippt, ist keine.
+     *
+     * Deshalb zwei Toepfe und drei Regeln:
+     *   • Wort mit Buchstaben  -> Teilzeichenkette im TEXT ("links", "kürze").
+     *   • Reine Zahl           -> im Text nur an ZIFFERN-GRENZEN ("4" trifft
+     *                             „Nr.4", nicht „Nr.45" und nicht „000054"),
+     *   •                         oder sie IST die Nummer der Aufgabe (Code
+     *                             oder id) — „26" findet #000026.
+     * Alle Woerter muessen zutreffen, die Reihenfolge zaehlt nicht.
      */
-    function trifftSuche(heuhaufen, suche) {
-        const heu = String(heuhaufen).toLowerCase();
-        return String(suche).toLowerCase().split(/\s+/).filter(Boolean)
-            .every(w => heu.includes(w) || heu.includes(w.replace(/^#/, '')));
+    function sucheFelder(a) {
+        const code = fmtId(a.code || a.id);
+        return {
+            text: [a.quelle, a.operator, getKategorie(a), a.thema, a.unterthema,
+                   a.kompetenz, a.methode, a.loesung, code].filter(Boolean).join(' ').toLowerCase(),
+            zahlen: [codeNum(a), Number(a.id)].filter(n => Number.isFinite(n)),
+        };
+    }
+
+    /** Steht `wort` im Text, ohne dass links oder rechts eine Ziffer klebt? */
+    function zahlImText(text, wort) {
+        for (let i = text.indexOf(wort); i >= 0; i = text.indexOf(wort, i + 1)) {
+            const vor = i > 0 ? text[i - 1] : '';
+            const nach = text[i + wort.length] || '';
+            if (!/\d/.test(vor) && !/\d/.test(nach)) return true;
+        }
+        return false;
+    }
+
+    function trifftSuche(felder, suche) {
+        const worte = String(suche).toLowerCase().split(/\s+/).filter(Boolean);
+        return worte.every(w => {
+            const zahl = w.replace(/^#/, '');
+            if (/^\d+$/.test(zahl)) {
+                return felder.zahlen.includes(Number(zahl)) || zahlImText(felder.text, zahl);
+            }
+            return felder.text.includes(w);
+        });
     }
 
     function renderAufgaben() {
@@ -1574,14 +1605,7 @@
             // Auch nach der ANGEZEIGTEN ID (#000043) suchbar, nicht nur nach der
             // rohen Server-id — sonst findet die Suche nach dem sichtbaren Code
             // nichts. "#" wird zusaetzlich weggelassen, damit "43" ebenso trifft.
-            filtered = filtered.filter(a => {
-                const code = fmtId(a.code || a.id);
-                const haystack = [
-                    code, code.replace('#', ''), a.code, a.id, a.thema, a.unterthema, getKategorie(a), a.quelle,
-                    a.operator, a.kompetenz, a.methode, a.loesung
-                ].filter(Boolean).join(' ');
-                return trifftSuche(haystack, search);
-            });
+            filtered = filtered.filter(a => trifftSuche(sucheFelder(a), search));
         }
 
         if (document.getElementById('filter-doppelte')?.checked) {
@@ -2742,12 +2766,7 @@
             // Auch nach der ANGEZEIGTEN Nummer suchbar (#000026, 000026, 26) —
             // vorher stand hier nur die rohe Server-id, und genau die sieht man
             // nirgends. Dieselbe Regel wie in der Aufgabenliste.
-            const filtered = q ? pool.filter(a => {
-                const code = fmtId(a.code || a.id);
-                const heu = [code, code.replace('#', ''), a.code, a.id, a.quelle, a.operator,
-                             getKategorie(a), a.unterthema, a.thema].filter(Boolean).join(' ');
-                return trifftSuche(heu, q);
-            }) : pool;
+            const filtered = q ? pool.filter(a => trifftSuche(sucheFelder(a), q)) : pool;
             const list = document.getElementById('add-task-list');
             list.innerHTML = filtered.length ? filtered.map(a => {
                 const kat = getKategorie(a);
