@@ -115,13 +115,29 @@ async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] 
         raise HTTPException(400, "Datei ist leer")
     if len(data) > MAX_BYTES:
         raise HTTPException(413, "Datei zu groß (max. 15 MB)")
-    used = (await db.execute(select(func.coalesce(func.sum(Material.size), 0)).where(Material.owner_id == user.id))).scalar_one()
-    if used + len(data) > QUOTA_BYTES:
-        raise HTTPException(413, "Speicher voll (max. 200 MB je Konto). Bitte alte Dateien löschen.")
+    import hashlib
+    pruef = hashlib.sha256(data).hexdigest()
+    # Liegt genau dieser Inhalt schon einmal in diesem Konto? Dann NICHT die
+    # Bytes doppelt ablegen, sondern auf die vorhandene, Bytes-tragende Zeile
+    # zeigen (quelle_id). „In diesem Konto" ist die Grenze: fremde Ablagen
+    # bleiben getrennt (Mandantentrennung), sonst haetten zwei Konten einen
+    # gemeinsamen Blob und das Loeschen des einen risse dem anderen die Datei weg.
+    quelle = (await db.execute(select(Material.id).where(
+        Material.owner_id == user.id, Material.sha256 == pruef,
+        Material.quelle_id.is_(None), Material.data.is_not(None)))).scalars().first()
+    # Speicherzaehler nur ueber die Bytes-tragenden Zeilen: ein zweiter Upload
+    # desselben Bildes kostet keinen Platz und darf das Konto nicht naeher an
+    # die Grenze bringen.
+    if quelle is None:
+        used = (await db.execute(select(func.coalesce(func.sum(Material.size), 0)).where(
+            Material.owner_id == user.id, Material.quelle_id.is_(None)))).scalar_one()
+        if used + len(data) > QUOTA_BYTES:
+            raise HTTPException(413, "Speicher voll (max. 200 MB je Konto). Bitte alte Dateien löschen.")
     m = Material(owner_id=user.id, topic_id=topic_id, entry_id=entry_id, method_id=method_id,
                  work_id=work_id, rolle=rolle if rolle in ROLLEN else "",
                  filename=(file.filename or "datei")[:255], mime=(file.content_type or "")[:120],
-                 size=len(data), data=data)
+                 size=len(data), sha256=pruef, quelle_id=quelle,
+                 data=None if quelle is not None else data)
     db.add(m)
     await db.commit()
     await db.refresh(m)
@@ -144,6 +160,17 @@ def _cache_kopf(etag: str) -> dict:
 def _unveraendert(request, etag: str) -> bool:
     roh = request.headers.get("if-none-match", "")
     return any(teil.strip().lstrip("W/") == etag for teil in roh.split(",") if teil.strip())
+
+
+async def _bytes_quelle(db, m):
+    """Die Zeile, die die Bytes wirklich traegt — m selbst oder die, auf die es
+    per `quelle_id` zeigt. Ausliefern (Vorschau, Download, PDF) liest von hier.
+    Faellt die Quelle wider Erwarten weg, bleibt es bei m (dann fehlt data und
+    der Aufrufer antwortet 404 statt zu krachen)."""
+    if m.quelle_id is None:
+        return m
+    src = await db.get(Material, m.quelle_id)
+    return src or m
 
 
 @router.get("/{material_id}/vorschau")
@@ -170,12 +197,15 @@ async def vorschau_material(material_id: int, request: Request,
     from starlette.concurrency import run_in_threadpool
 
     from ..uploads import vorschaubild
-    klein = await run_in_threadpool(vorschaubild, m.data)
+    q = await _bytes_quelle(db, m)
+    if not q.data:
+        raise HTTPException(404, "Kein Bild")
+    klein = await run_in_threadpool(vorschaubild, q.data)
     if not klein:
         # Umwandlung ausgefallen (kaputte Datei, exotisches Format): lieber das
         # Original ausliefern als gar nichts — ein Daumennagel ist kein Grund
         # fuer einen Fehler.
-        return Response(content=m.data, media_type=m.mime,
+        return Response(content=q.data, media_type=m.mime,
                         headers={"X-Content-Type-Options": "nosniff", **_cache_kopf(etag)})
     return Response(content=klein, media_type="image/jpeg",
                     headers={"X-Content-Type-Options": "nosniff", **_cache_kopf(etag)})
@@ -193,7 +223,10 @@ async def download_material(material_id: int, request: Request, user: User = Dep
     # nicht im eigenen Origin ausgefuehrt wird (SVG kann Skript tragen).
     inline_ok = {"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"}
     disp = "inline" if (m.mime in inline_ok) else "attachment"
-    return Response(content=m.data, media_type=m.mime or "application/octet-stream",
+    q = await _bytes_quelle(db, m)
+    if not q.data:
+        raise HTTPException(404, "Material nicht gefunden")
+    return Response(content=q.data, media_type=m.mime or "application/octet-stream",
                     headers={"Content-Disposition": anhang_kopf(m.filename, disp),
                              "X-Content-Type-Options": "nosniff", **_cache_kopf(etag)})
 
@@ -311,29 +344,30 @@ async def material_als_pdf(material_id: int, request: Request, user: User = Depe
     """
     from starlette.concurrency import run_in_threadpool
     from sqlalchemy.orm import undefer
-    from sqlalchemy import func as _func
 
     # Erst nur die Kenndaten holen: liegt die Ansichtsfassung schon bereit und
     # hat der Browser sie, ist hier Schluss — ohne die Bytes ueberhaupt aus der
     # Datenbank zu lesen.
-    kopf = (await db.execute(select(Material.owner_id, Material.size,
-                                    _func.length(Material.pdf_data))
+    kopf = (await db.execute(select(Material.owner_id, Material.quelle_id)
                              .where(Material.id == material_id))).first()
     if not kopf or kopf[0] != user.id:
         raise HTTPException(404, "Material nicht gefunden")
-    # Kennung auch OHNE gebaute Ansichtsfassung: ein PDF unter der
-    # Verkleinerungsgrenze wird unveraendert durchgereicht, `pdf_data` bleibt
-    # dann leer — und genau dafuer gab es vorher nie ein 304. Die Laenge des
-    # Originals ist hier die richtige Kennung, weil genau das ausgeliefert wird.
-    fertig = kopf[2] or 0
-    etag = f'"p{material_id}-{fertig}"' if fertig else f'"o{material_id}-{kopf[1]}"'
-    if _unveraendert(request, etag):
-        return Response(status_code=304, headers=_cache_kopf(etag))
-
+    # Die Bytes (und die einmal gebaute PDF-Fassung) liegen auf der QUELLE:
+    # zeigt diese Zeile auf eine andere, wird dort gelesen und gecacht, damit
+    # alle Verweise auf denselben Inhalt dieselbe Ansicht teilen.
+    quelle_id = kopf[1] or material_id
     m = (await db.execute(select(Material).options(undefer(Material.pdf_data))
-                          .where(Material.id == material_id))).scalar_one_or_none()
+                          .where(Material.id == quelle_id))).scalar_one_or_none()
     if not m or m.owner_id != user.id:
         raise HTTPException(404, "Material nicht gefunden")
+    # Kennung auch OHNE gebaute Ansichtsfassung: ein PDF unter der
+    # Verkleinerungsgrenze wird unveraendert durchgereicht, `pdf_data` bleibt
+    # dann leer. Die Kennung haengt an der QUELLE, sonst passt sie nicht ueber
+    # mehrere Verweise hinweg.
+    fertig = len(m.pdf_data) if m.pdf_data else 0
+    etag = f'"p{quelle_id}-{fertig}"' if fertig else f'"o{quelle_id}-{m.size}"'
+    if _unveraendert(request, etag):
+        return Response(status_code=304, headers=_cache_kopf(etag))
 
     if m.pdf_data:
         pdf = m.pdf_data                     # schon gebaute Ansichtsfassung
@@ -365,12 +399,33 @@ async def material_als_pdf(material_id: int, request: Request, user: User = Depe
                              "X-Content-Type-Options": "nosniff",
                              # Dieselbe Kennung wie oben — sonst passt der
                              # zweite Abruf nie auf den ersten.
-                             **_cache_kopf(f'"p{material_id}-{len(pdf)}"' if m.pdf_data
-                                           else f'"o{material_id}-{m.size}"')})
+                             **_cache_kopf(f'"p{quelle_id}-{len(pdf)}"' if m.pdf_data
+                                           else f'"o{quelle_id}-{m.size}"')})
 
 
 @router.delete("/{material_id}", status_code=204)
 async def delete_material(material_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy.orm import undefer
     m = await eigenes(db, Material, material_id, user, "Material nicht gefunden")
+    # Traegt diese Zeile die Bytes und zeigen andere darauf, darf das Loeschen
+    # die Datei nicht mit wegnehmen: eine abhaengige Zeile wird zur neuen Quelle
+    # BEFOERDERT (sie erbt Bytes und PDF-Fassung), die uebrigen zeigen fortan
+    # auf sie. Der Fremdschluessel-SET-NULL ist nur der Rueckfall, falls dieser
+    # Weg je umgangen wird.
+    if m.quelle_id is None:
+        abhaengig = (await db.execute(select(Material).options(undefer(Material.pdf_data))
+                                      .where(Material.quelle_id == m.id))).scalars().all()
+        if abhaengig:
+            # `m` mit seinen Bytes laden (pdf_data ist deferred).
+            quelle = (await db.execute(select(Material).options(undefer(Material.pdf_data))
+                                       .where(Material.id == m.id))).scalar_one()
+            erbe = abhaengig[0]
+            erbe.data = quelle.data
+            erbe.pdf_data = quelle.pdf_data
+            erbe.sha256 = quelle.sha256
+            erbe.quelle_id = None
+            for d in abhaengig[1:]:
+                d.quelle_id = erbe.id
+            await db.flush()   # umhaengen VOR dem Loeschen, sonst greift SET NULL
     await db.delete(m)
     await db.commit()

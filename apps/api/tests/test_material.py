@@ -146,3 +146,61 @@ def test_vorschau_nur_fuer_rasterbilder():
     erlaubt = {"image/png", "image/jpeg", "image/gif", "image/webp"}
     assert "image/svg+xml" not in erlaubt
     assert "application/pdf" not in erlaubt
+
+
+@pytest.mark.asyncio
+async def test_gleicher_inhalt_wird_nicht_doppelt_gespeichert(s):
+    """Zweiter Upload desselben Bildes legt die Bytes nicht erneut ab, sondern
+    zeigt auf die erste Zeile — und zaehlt nicht gegen das Speicherkonto."""
+    u, tp = await _setup(s)
+    bild = b"\x89PNG\r\n\x1a\n" + b"derselbe inhalt" * 100
+
+    a = await M.upload_material(file=_upload("foto.png", bild), topic_id=tp.id, entry_id=None,
+                                method_id=None, work_id=None, rolle="", user=u, db=s)
+    b = await M.upload_material(file=_upload("nochmal.png", bild), topic_id=tp.id, entry_id=None,
+                                method_id=None, work_id=None, rolle="", user=u, db=s)
+
+    ra = (await s.execute(select(Material).where(Material.id == a.id))).scalar_one()
+    rb = (await s.execute(select(Material).where(Material.id == b.id))).scalar_one()
+    assert ra.quelle_id is None and ra.data == bild, "die erste Zeile traegt die Bytes"
+    assert rb.quelle_id == a.id and rb.data is None, "die zweite zeigt nur darauf"
+    assert rb.size == len(bild), "die Groesse wird ehrlich angezeigt"
+
+    # Speicherzaehler zaehlt die Bytes nur einmal.
+    from sqlalchemy import func
+    belegt = (await s.execute(select(func.coalesce(func.sum(Material.size), 0)).where(
+        Material.owner_id == u.id, Material.quelle_id.is_(None)))).scalar_one()
+    assert belegt == len(bild)
+
+    # Beide Verweise liefern denselben Inhalt aus.
+    for mid in (a.id, b.id):
+        resp = await M.download_material(mid, _Anfrage(), user=u, db=s)
+        assert resp.body == bild
+
+
+@pytest.mark.asyncio
+async def test_loeschen_der_quelle_befoerdert_einen_verweis(s):
+    """Wer die Bytes-tragende Zeile loescht, darf den Verweisen die Datei nicht
+    wegnehmen: eine abhaengige Zeile wird zur neuen Quelle befoerdert."""
+    u, tp = await _setup(s)
+    bild = b"\x89PNG\r\n\x1a\n" + b"x" * 500
+    a = await M.upload_material(file=_upload("a.png", bild), topic_id=tp.id, entry_id=None,
+                                method_id=None, work_id=None, rolle="", user=u, db=s)
+    b = await M.upload_material(file=_upload("b.png", bild), topic_id=tp.id, entry_id=None,
+                                method_id=None, work_id=None, rolle="", user=u, db=s)
+    c = await M.upload_material(file=_upload("c.png", bild), topic_id=tp.id, entry_id=None,
+                                method_id=None, work_id=None, rolle="", user=u, db=s)
+
+    # Die Quelle (a) loeschen.
+    await M.delete_material(a.id, user=u, db=s)
+
+    # Ueber Spalten lesen statt ORM-Objekte (kein Lazy-Load im Test).
+    rb = (await s.execute(select(Material.quelle_id, Material.data).where(Material.id == b.id))).first()
+    rc = (await s.execute(select(Material.quelle_id, Material.data).where(Material.id == c.id))).first()
+    # b ist befoerdert (traegt jetzt die Bytes), c zeigt auf b.
+    assert rb[0] is None and rb[1] == bild
+    assert rc[0] == b.id and rc[1] is None
+    # Beide sind weiterhin auslieferbar.
+    for mid in (b.id, c.id):
+        resp = await M.download_material(mid, _Anfrage(), user=u, db=s)
+        assert resp.body == bild

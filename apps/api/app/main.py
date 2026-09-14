@@ -362,6 +362,8 @@ def _ensure_columns(sync_conn):
         ("materials", "method_id", "INTEGER"),
         ("materials", "work_id", "INTEGER"),
         ("materials", "pdf_data", "BYTEA"),
+        ("materials", "sha256", "VARCHAR(64) DEFAULT '' NOT NULL"),
+        ("materials", "quelle_id", "INTEGER"),
         ("work_analyses", "source_id", "INTEGER"),
         ("school_classes", "archived_at", "TIMESTAMPTZ"),
         ("students", "position", "INTEGER DEFAULT 0 NOT NULL"),
