@@ -664,7 +664,7 @@ export default {
   "session.openScanner": "Open scanner",
   "session.timeUp": "Time's up",
   "session.absent": "Absent today — no card expected",
-  "session.absentNote": "({n} absent today)",
+  "session.absentNote": "({{n}} absent today)",
   "session.endGame": "End game",
   "session.noAnswerField": "Not an answer option",
   "session.leaderboard": "Leaderboard",

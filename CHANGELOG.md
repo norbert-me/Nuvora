@@ -51,8 +51,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   statt erst ab zwei. Bei nur einer E-Frage im Quiz hebt sie höchstens um eine
   halbe Notenstufe (ein Zufallstreffer soll keine volle Stufe wert sein).
 - **Live-Session: die Frage bekommt den Platz.** Kursname und Fehler-Knopf sind
-  weg, Frage und Antworten sind enger gesetzt, „x / y erfasst" steht jetzt bei den
-  Namen, und „Aufdecken" steht darunter — dort, wo man hinschaut.
+  weg, „Aufdecken" und „Weiter" stehen oben in der Leiste neben der Frage-Zahl,
+  Frage und Antworten füllen ihre Felder aus, „x / y erfasst" steht bei den Namen
+  — und die Namen sind größer.
 - **CardVote: die zwei Export-Knöpfe am Quiz sind ein Menü**, wie beim Import
   daneben: „Als JSON sichern" und „Als Excel sichern" stehen als Sätze da.
 

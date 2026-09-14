@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   ANTWORT_COLORS, COLORS as C, Icon, ICONS, PODIUM_COLORS, Tabs, chipStyle, panelStyle,
-  sectionLabel, selectStyle, th as thBasis, toolbarIconBtn, cardStyle, CONTROL_R,
+  sectionLabel, selectStyle, th as thBasis, toolbarBtn, toolbarIconBtn, cardStyle, CONTROL_R,
   btnPrimary as btnPrimaryKern, btnSecondary as btnSecondaryKern, btnSmall,
 } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
@@ -759,6 +759,31 @@ export default function Session() {
             <span style={{ color: "var(--text3)", fontSize: "clamp(13px, 1.8vh, 16px)", fontWeight: 600 }}>
               {t("session.question", { i: questionIndex + 1, n: questions.length })}
             </span>
+            {/* Aufdecken und Weiter stehen in der Leiste neben der Frage-Zahl,
+                nicht als eigene Reihe unter der Namensliste: sie kosteten dort
+                eine ganze Zeile Hoehe, die am Beamer der Frage fehlt. Es sind
+                die ein bis zwei Haupthandgriffe der Seite — sie duerfen als
+                Einzige ihren Namen tragen (siehe Icons.jsx). */}
+            {question && (
+              <button onClick={revealed ? hideResults : revealResults} style={{
+                ...toolbarBtn, fontWeight: 700,
+                background: revealed ? "var(--bg2)" : "var(--text)",
+                color: revealed ? "var(--text)" : "var(--bg)",
+                borderColor: revealed ? "var(--border2)" : "var(--text)",
+              }}>
+                {revealed ? t("scanner.hide") : t("scanner.reveal")}
+              </button>
+            )}
+            {question && revealed && !isLastQuestion && (
+              <button onClick={nextQuestion} style={{ ...toolbarBtn, fontWeight: 700, background: "var(--text)", color: "var(--bg)", borderColor: "var(--text)" }}>
+                {t("scanner.next")}
+              </button>
+            )}
+            {question && revealed && isLastQuestion && (
+              <button onClick={finishSession} style={{ ...toolbarBtn, fontWeight: 700, background: C.danger, color: C.aufAkzent, borderColor: C.danger, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                {gameMode ? <><Icon d={ICONS.trophy} size={15} color={C.aufAkzent} /> {t("session.endGame")}</> : t("scanner.finishTest")}
+              </button>
+            )}
             {/* Der Sitzungscode als Chip — im Spielmodus in der Antwortfarbe B
                 (Violett) statt eines eigenen Farbverlaufs aus zwei festen
                 Hexwerten. */}
@@ -856,7 +881,11 @@ export default function Session() {
                     background: isExtra ? "var(--bg2)" : isCorrect ? C.success : isWrong ? "var(--bg2)" : "var(--card)",
                     color: isCorrect ? C.aufAkzent : "var(--text)",
                     borderRadius: cardStyle.borderRadius,
-                    fontSize: "clamp(20px, 4vh, 44px)",
+                    // Die Antwort fuellt ihr Feld aus: sie steht meistens
+                    // allein darin, und aus der letzten Reihe zaehlt jede
+                    // Stufe. Der Text nimmt die Restbreite (minWidth 0, sonst
+                    // schrumpft ein Flex-Kind nie unter seinen Inhalt).
+                    fontSize: "clamp(22px, 4.8vh, 54px)",
                     border: isExtra ? "3px dashed var(--border2)" : isCorrect ? `3px solid ${C.success}` : "3px solid var(--border3)",
                     opacity: isExtra ? 0.45 : isWrong ? 0.5 : 1,
                     transition: "all 0.3s",
@@ -865,8 +894,10 @@ export default function Session() {
                     animation: "nqIn 0.22s ease both",
                     animationDelay: `${140 * (i + 1)}ms`,
                   }}>
-                    <strong style={{ fontSize: "clamp(24px, 4.5vh, 48px)", marginRight: 10 }}>{key}</strong>
-                    {isExtra ? <span style={{ fontSize: "clamp(14px, 2.5vh, 22px)", color: "var(--text3)", fontStyle: "italic" }}>{t("session.noAnswerField")}</span> : <Latex>{question.choices[key] || "–"}</Latex>}
+                    <strong style={{ fontSize: "clamp(26px, 5vh, 54px)", marginRight: 14, flexShrink: 0 }}>{key}</strong>
+                    {isExtra
+                      ? <span style={{ fontSize: "clamp(14px, 2.5vh, 22px)", color: "var(--text3)", fontStyle: "italic" }}>{t("session.noAnswerField")}</span>
+                      : <span style={{ flex: 1, minWidth: 0 }}><Latex>{question.choices[key] || "–"}</Latex></span>}
                     {!isExtra && question.choice_images?.[key] && <img src={question.choice_images[key]} alt="" style={{ display: "block", marginTop: 8, maxHeight: 100, borderRadius: CONTROL_R }} />}
                     {revealed && count > 0 && (
                       <span style={{
@@ -895,7 +926,7 @@ export default function Session() {
                   </span>
                 )}
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {[...studentList].sort((a, b) => {
                   // Wer fehlt, steht ganz hinten: die Liste beantwortet „auf
                   // wen warte ich noch?", und dort gehoert niemand hin, der
@@ -913,8 +944,11 @@ export default function Session() {
                   const showColor = revealed && scanned && showAnswers;
                   return (
                     <div key={student.card_id} title={weg ? t("session.absent") : undefined} style={{
-                      ...chipStyle, padding: "5px 12px", fontSize: 13,
-                      fontWeight: scanned ? 600 : 400,
+                      // Groesser als die 13 px von vorher: die Liste ist das,
+                      // worauf waehrend des Scannens alle schauen — aus der
+                      // letzten Reihe soll man den eigenen Namen finden.
+                      ...chipStyle, padding: "7px 14px", fontSize: "clamp(14px, 2vh, 19px)",
+                      fontWeight: scanned ? 700 : 500,
                       background: showColor ? ANTWORT_COLORS[answer] : scanned ? "var(--text)" : "var(--bg2)",
                       color: scanned ? "var(--bg)" : "var(--text3)",
                       // Abwesend: blass und durchgestrichen — dieselbe Anzeige
@@ -961,29 +995,6 @@ export default function Session() {
             )}
           </div>
 
-          {/* Die Handgriffe stehen UNTER den Namen: waehrend des Scannens
-              schaut man auf die Liste — wer fehlt noch? —, und erst wenn sie
-              voll ist, wird aufgedeckt. Darueber lag der Knopf im Blick, den
-              man gerade nicht braucht. */}
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: "1.5vh" }}>
-            <button onClick={revealed ? hideResults : revealResults} style={{
-              ...btnPrimary, padding: "12px 28px", fontSize: 16,
-              background: revealed ? "var(--bg2)" : "var(--text)",
-              color: revealed ? "var(--text)" : "var(--bg)",
-            }}>
-              {revealed ? t("scanner.hide") : t("scanner.reveal")}
-            </button>
-            {revealed && !isLastQuestion && (
-              <button onClick={nextQuestion} style={{ ...btnPrimary, padding: "12px 28px", fontSize: 16, background: "var(--text)", color: "var(--bg)" }}>
-                {t("scanner.next")}
-              </button>
-            )}
-            {revealed && isLastQuestion && (
-              <button onClick={finishSession} style={{ ...btnPrimary, padding: "12px 28px", fontSize: 16, background: C.danger, color: C.aufAkzent, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                {gameMode ? <><Icon d={ICONS.trophy} size={16} color={C.aufAkzent} /> {t("session.endGame")}</> : t("scanner.finishTest")}
-              </button>
-            )}
-          </div>
         </>
       )}
     </div>

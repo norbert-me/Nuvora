@@ -666,7 +666,7 @@ export default {
   "session.openScanner": "Scanner öffnen",
   "session.timeUp": "Zeit abgelaufen",
   "session.absent": "Fehlt heute — Karte wird nicht erwartet",
-  "session.absentNote": "({n} fehlen heute)",
+  "session.absentNote": "({{n}} fehlen heute)",
   "session.endGame": "Spiel beenden",
   "session.noAnswerField": "Kein Antwortfeld",
   "session.leaderboard": "Bestenliste",

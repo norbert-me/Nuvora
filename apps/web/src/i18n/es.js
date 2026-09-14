@@ -665,7 +665,7 @@ export default {
   "session.openScanner": "Abrir escáner",
   "session.timeUp": "Tiempo agotado",
   "session.absent": "Ausente hoy — no se espera su tarjeta",
-  "session.absentNote": "({n} ausentes hoy)",
+  "session.absentNote": "({{n}} ausentes hoy)",
   "session.endGame": "Terminar juego",
   "session.noAnswerField": "No es una opción de respuesta",
   "session.leaderboard": "Clasificación",
