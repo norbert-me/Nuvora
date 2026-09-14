@@ -1507,6 +1507,8 @@ export default {
   "tafel.addLaerm": "Lautstärke",
   "tafel.laermStart": "Messen starten",
   "tafel.laermStop": "Messen beenden",
+  "tafel.laermTest": "Ton testen",
+  "tafel.laermTestHint": "Einmal hören, wie die Warnung klingt",
   "tafel.laermSchwelle": "ab {{n}}",
   "tafel.laermStrenger": "Früher warnen",
   "tafel.laermLockerer": "Später warnen",

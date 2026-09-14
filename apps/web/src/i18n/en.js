@@ -1528,6 +1528,8 @@ export default {
   "tafel.addLaerm": "Volume",
   "tafel.laermStart": "Start measuring",
   "tafel.laermStop": "Stop measuring",
+  "tafel.laermTest": "Test sound",
+  "tafel.laermTestHint": "Hear once what the warning sounds like",
   "tafel.laermSchwelle": "from {{n}}",
   "tafel.laermStrenger": "Warn earlier",
   "tafel.laermLockerer": "Warn later",

@@ -311,6 +311,10 @@ export default function Tafel() {
                 <button onClick={() => patch(selItem.id, { schwelle: Math.min(95, (selItem.schwelle ?? 55) + 5) })} style={leistenBtn}
                   title={t("tafel.laermLockerer")} aria-label={t("tafel.laermLockerer")}><Icon d={ICONS.plus} size={13} color="var(--text2)" /></button>
               </>)}
+              {selItem.type === "laerm" && !selItem.muted && (
+                <button onClick={() => warnton()} style={{ ...leistenBtn, fontWeight: 500 }}
+                  title={t("tafel.laermTestHint")}>{t("tafel.laermTest")}</button>
+              )}
               {(selItem.type === "timer" || selItem.type === "laerm") && (
                 <button onClick={() => patch(selItem.id, { muted: !selItem.muted })} style={{ ...leistenBtn, gap: 4, fontWeight: 500 }}>
                   <Icon d={selItem.muted ? ICONS.volumeOff : ICONS.volume} size={15} color="var(--text2)" />
@@ -328,29 +332,39 @@ export default function Tafel() {
   );
 }
 
-function beep() {
+/**
+ * Toene auf der Tafel — und der Grund, warum sie einen Kontext MITBRINGEN
+ * duerfen.
+ *
+ * Ein frisch gebauter `AudioContext` startet im Zustand „suspended", wenn ihn
+ * keine Nutzergeste ausgeloest hat; er spielt dann still vor sich hin. Beim
+ * Timer faellt das kaum auf (der Start-Klick liegt Sekunden zurueck), beim
+ * Laermwarner dagegen immer: die Warnung kommt Minuten spaeter und von selbst.
+ * Deshalb reicht die Laerm-Anzeige ihren eigenen Kontext herein — der wurde im
+ * Klick auf „Messen starten" gebaut und laeuft. `resume()` steht zusaetzlich
+ * da, weil der Browser einen laufenden Kontext zwischendurch anhalten darf.
+ */
+function tonAus(ctx, { typ, hz, mal, an, aus, laut }) {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination); o.type = "sine"; o.frequency.value = 880;
-    let ti = ctx.currentTime; o.start();
-    for (let i = 0; i < 3; i++) { g.gain.setValueAtTime(0.3, ti); g.gain.setValueAtTime(0.0001, ti + 0.15); ti += 0.3; }
+    const c = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    if (c.state === "suspended") c.resume().catch(() => {});
+    const o = c.createOscillator(); const g = c.createGain();
+    o.connect(g); g.connect(c.destination); o.type = typ; o.frequency.value = hz;
+    let ti = c.currentTime; o.start();
+    for (let i = 0; i < mal; i++) { g.gain.setValueAtTime(laut, ti); g.gain.setValueAtTime(0.0001, ti + an); ti += an + aus; }
     o.stop(ti + 0.05);
   } catch { /* Ton optional */ }
+}
+
+function beep(ctx) {
+  tonAus(ctx, { typ: "sine", hz: 880, mal: 3, an: 0.15, aus: 0.15, laut: 0.3 });
 }
 
 // Warnton bei zu viel Laerm — bewusst ANDERS als der Timer-Ton: tiefer und
 // zweimal kurz. Beide auf derselben Tafel muessen sich unterscheiden lassen,
 // ohne hinzusehen („ist die Zeit um oder sind wir zu laut?").
-function warnton() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination); o.type = "triangle"; o.frequency.value = 330;
-    let ti = ctx.currentTime; o.start();
-    for (let i = 0; i < 2; i++) { g.gain.setValueAtTime(0.25, ti); g.gain.setValueAtTime(0.0001, ti + 0.22); ti += 0.34; }
-    o.stop(ti + 0.05);
-  } catch { /* Ton optional */ }
+function warnton(ctx) {
+  tonAus(ctx, { typ: "triangle", hz: 330, mal: 2, an: 0.22, aus: 0.12, laut: 0.3 });
 }
 
 /**
@@ -440,7 +454,7 @@ function TafelLaerm({ item, onPatch, t }) {
             ueber.current = 0;
             setWarnt(true);
             setTimeout(() => setWarnt(false), 4000);
-            if (!stummRef.current) warnton();
+            if (!stummRef.current) warnton(technik.current && technik.current.ctx);
           }
         } else {
           ueber.current = 0;
@@ -492,11 +506,22 @@ function TafelTimer({ item, onPatch, t }) {
   const [running, setRunning] = useState(false);
   const [flash, setFlash] = useState(false); // Aufblitzen am Ende
   const tick = useRef(null);
+  // Ein im START-Klick gebauter Tonkontext. Ein erst beim Ablauf erzeugter
+  // startet je nach Browser „suspended" und bleibt still — genau der Fehler,
+  // der beim Laermwarner auffiel (dort immer, hier nur manchmal).
+  const tonCtx = useRef(null);
+  useEffect(() => () => { if (tonCtx.current) tonCtx.current.close().catch(() => {}); }, []);
+  const tonBereit = () => {
+    if (!tonCtx.current) {
+      try { tonCtx.current = new (window.AudioContext || window.webkitAudioContext)(); } catch { /* ohne Ton */ }
+    }
+    if (tonCtx.current && tonCtx.current.state === "suspended") tonCtx.current.resume().catch(() => {});
+  };
   useEffect(() => { setRemaining(total); setRunning(false); setFlash(false); }, [total]);
   useEffect(() => {
     if (!running) return;
     tick.current = setInterval(() => setRemaining((r) => {
-      if (r <= 1) { setRunning(false); if (!item.muted) beep(); setFlash(true); setTimeout(() => setFlash(false), 3000); return 0; }
+      if (r <= 1) { setRunning(false); if (!item.muted) beep(tonCtx.current); setFlash(true); setTimeout(() => setFlash(false), 3000); return 0; }
       return r - 1;
     }), 1000);
     return () => clearInterval(tick.current);
@@ -518,7 +543,7 @@ function TafelTimer({ item, onPatch, t }) {
       </div>
       <div style={{ display: "flex", gap: 12 }}>
         {!running
-          ? <button onClick={() => { if (!done) setRunning(true); }} disabled={done} style={{ ...miniBtn, opacity: done ? 0.5 : 1 }} title={t("tafel.timerStart")} aria-label={t("tafel.timerStart")}><Icon d={ICONS.play} size={30} color="var(--text)" /></button>
+          ? <button onClick={() => { if (!done) { tonBereit(); setRunning(true); } }} disabled={done} style={{ ...miniBtn, opacity: done ? 0.5 : 1 }} title={t("tafel.timerStart")} aria-label={t("tafel.timerStart")}><Icon d={ICONS.play} size={30} color="var(--text)" /></button>
           : <button onClick={() => setRunning(false)} style={{ ...miniBtn }} title={t("tafel.timerPause")} aria-label={t("tafel.timerPause")}><Icon d={ICONS.pause} size={30} color="var(--text)" /></button>}
         <button onClick={() => { setRunning(false); setRemaining(total); }} style={{ ...miniBtn }} title={t("tafel.timerReset")} aria-label={t("tafel.timerReset")}><Icon d={ICONS.refresh} size={30} color="var(--text)" /></button>
       </div>

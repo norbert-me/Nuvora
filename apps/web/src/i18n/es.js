@@ -1529,6 +1529,8 @@ export default {
   "tafel.addLaerm": "Volumen",
   "tafel.laermStart": "Empezar a medir",
   "tafel.laermStop": "Detener",
+  "tafel.laermTest": "Probar sonido",
+  "tafel.laermTestHint": "Escuchar una vez cómo suena el aviso",
   "tafel.laermSchwelle": "desde {{n}}",
   "tafel.laermStrenger": "Avisar antes",
   "tafel.laermLockerer": "Avisar después",

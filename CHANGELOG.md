@@ -14,6 +14,13 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- **Tafel: der Warnton der Lautstärke-Anzeige kommt jetzt wirklich.** Er lief in
+  einem Tonkanal, den der Browser stumm hält, weil ihn kein Klick eröffnet hat.
+  Dazu ein Knopf „Ton testen" — man will vor der lauten Stunde wissen, ob er da
+  ist. Der Timer-Ton hatte dasselbe Problem in klein.
+
 ## 4.3.7
 
 - **Tafel: eine Lautstärke-Anzeige mit Warnton.** Balken mit Schwelle, Warnton
