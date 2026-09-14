@@ -7,7 +7,7 @@ import { AddButton, badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipSt
 import { dublettenZahlen, findeDubletten, istInSammlung } from "../core/dubletten.js";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
-import ImportMenu from "../components/ImportMenu.jsx";
+import DateiMenu from "../components/DateiMenu.jsx";
 import VerknuepfungDialog, { flachBaum } from "../components/Verknuepfung.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
@@ -513,6 +513,22 @@ export default function Dashboard() {
     setEditingSet(null); load();
   };
 
+  // Ein Quiz als Datei sichern. Beide Wege holen ueber `fetch` (der Token
+  // haengt am Interceptor, ein blosser Link traegt ihn nicht) und laden das
+  // Ergebnis als Blob herunter — vorher stand dieselbe Zeile zweimal
+  // nebeneinander, einmal je Dateiform.
+  const sichern = async (qs, form) => {
+    const url = form === "xlsx" ? `${API}/export/question-set/${qs.id}.xlsx` : `${API}/export/question-set/${qs.id}`;
+    const r = await fetch(url).catch(() => null);
+    if (!r || !r.ok) return;
+    const b = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    a.download = `${qs.name}.${form}`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   const duplicateSet = async (id) => {
     const res = await fetch(`${API}/question-sets/${id}/duplicate`, { method: "POST" });
     const qs = await res.json();
@@ -798,11 +814,18 @@ export default function Dashboard() {
                     traegt alles (Bilder, Layout, Mischen, Minuspunkte) und
                     kommt vollstaendig zurueck; die Tabelle laesst sich lesen,
                     durchsehen und weiterreichen — und kommt ueber die
-                    Import-Vorlage ebenfalls zurueck, nur ohne Bilder. Deshalb
-                    steht das Sinnbild zweimal da statt in einem Menue: ein
-                    Menue fuer zwei Eintraege ist ein Klick mehr fuer nichts. */}
-                <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.json`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("dash.exportJson")} aria-label={t("dash.exportJson")}><Icon d={ICONS.export} size={18} /></button>
-                <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}.xlsx`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.xlsx`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("dash.exportXlsx")} aria-label={t("dash.exportXlsx")}><Icon d={ICONS.tabelle} size={18} /></button>
+                    Import-Vorlage ebenfalls zurueck, nur ohne Bilder.
+                    Nebeneinander waren es zwei aehnliche Sinnbilder, die man
+                    nur ueber den Tooltip auseinanderhielt; als Menue steht der
+                    Unterschied als Satz da, wie beim Import daneben. */}
+                <DateiMenu
+                  icon={ICONS.export}
+                  label={t("dash.exportLabel")}
+                  gruppen={[[
+                    { label: t("dash.exportJson"), icon: ICONS.export, onClick: () => sichern(qs, "json") },
+                    { label: t("dash.exportXlsx"), icon: ICONS.tabelle, onClick: () => sichern(qs, "xlsx") },
+                  ]]}
+                />
               </div>
             </div>
           ))}
@@ -833,15 +856,18 @@ export default function Dashboard() {
             </>)}
           </span>
         )}
-        <ImportMenu
-          importItems={[
-            { label: t("dash.importJsonItem"), onClick: importFolder },
-            ...(currentFolder ? [{ label: t("classes.importExcel"), onClick: importXlsx }] : []),
-          ]}
-          templateItems={[
-            { label: t("classes.templateExcel"), href: `${API}/import/questions-template.xlsx` },
-            { label: t("dash.jsonExample"), href: "/beispiel-frageset.json" },
-            { label: t("dash.jsonFolderExample"), href: "/beispiel-ordner.json" },
+        <DateiMenu
+          label={t("importMenu.label")}
+          gruppen={[
+            [
+              { label: t("dash.importJsonItem"), onClick: importFolder },
+              ...(currentFolder ? [{ label: t("classes.importExcel"), onClick: importXlsx }] : []),
+            ],
+            [
+              { label: t("classes.templateExcel"), href: `${API}/import/questions-template.xlsx` },
+              { label: t("dash.jsonExample"), href: "/beispiel-frageset.json" },
+              { label: t("dash.jsonFolderExample"), href: "/beispiel-ordner.json" },
+            ],
           ]}
         />
       </Werkzeugleiste>

@@ -4,6 +4,8 @@ Die Regeln stehen doppelt — hier in Python, im Frontend in core/scoring.js.
 Dieser Test hält die Python-Seite fest; wer sie ändert, muss die JS-Seite
 mitziehen.
 """
+import pytest
+
 from app.scoring import DEFAULT_SCALE, bewerte, gefehlt_von, naechste_stufe, status_of
 
 # 4 Fragen der Anforderung (G) + 3 Zusatzfragen (E), alle richtig = "A".
@@ -27,10 +29,33 @@ def test_e_kurs_zaehlt_alle_fragen():
     assert w["bonus_pct"] == 0.0    # kein Bonus, alles ist Anforderung
 
 
-def test_bonus_erst_ab_zwei_richtigen_e_antworten():
-    nur_eine = {**ANTWORTEN, 6: "B"}
-    assert bewerte(QUESTIONS, nur_eine, niveau="G", niveau_aktiv=True)["bonus_pct"] == 0.0
-    assert bewerte(QUESTIONS, ANTWORTEN, niveau="G", niveau_aktiv=True)["bonus_pct"] > 0
+def test_eine_richtige_e_antwort_zaehlt_schon_anteilig():
+    """Frueher lag hier eine harte Schwelle bei zwei richtigen — wer eine von
+    drei Anforderungsfragen konnte, bekam denselben Bonus wie jemand, der keine
+    konnte. Jetzt zaehlt sie anteilig."""
+    eine = {1: "A", 2: "A", 3: "A", 4: "B", 5: "A"}   # 1 von 3 E richtig, keine falsch
+    w = bewerte(QUESTIONS, eine, niveau="G", niveau_aktiv=True)
+    assert w["bonus_pct"] > 0
+    voll = bewerte(QUESTIONS, {1: "A", 2: "A", 3: "A", 4: "B", 5: "A", 6: "A", 7: "A"},
+                   niveau="G", niveau_aktiv=True)
+    # Anteilig heisst: ein Drittel der Fragen ergibt ein Drittel des Bonus.
+    assert w["bonus_pct"] == pytest.approx(voll["bonus_pct"] / 3, abs=0.2)
+
+
+def test_eine_einzige_e_frage_hebt_nur_eine_halbe_stufe():
+    """Der Ratefall: bei genau EINER Anforderungsfrage waere ein voller
+    Notenstufen-Sprung zu viel — eine A-D-Frage ist zu einem Viertel geraten.
+    Geteilt wird deshalb durch mindestens zwei."""
+    fragen = ([{"id": i, "correct_answer": "A", "niveau": ""} for i in range(1, 5)]
+              + [{"id": 5, "correct_answer": "A", "niveau": "E"}])
+    w = bewerte(fragen, {1: "A", 2: "A", 3: "A", 4: "B", 5: "A"}, niveau="G", niveau_aktiv=True)
+    stufe = naechste_stufe(w["base_pct"], DEFAULT_SCALE)
+    assert w["bonus_pct"] == pytest.approx(stufe / 2, abs=0.2)
+
+
+def test_mehr_falsche_als_richtige_e_antworten_geben_keinen_bonus():
+    keine = {**ANTWORTEN, 6: "B"}   # 1 richtig, 2 falsch -> netto 0
+    assert bewerte(QUESTIONS, keine, niveau="G", niveau_aktiv=True)["bonus_pct"] == 0.0
 
 
 def test_bonus_hebt_hoechstens_eine_notenstufe():

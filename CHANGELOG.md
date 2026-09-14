@@ -14,6 +14,17 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- **CardVote: schon EINE richtige Anforderungsfrage bringt Bonus** — anteilig
+  statt erst ab zwei. Bei nur einer E-Frage im Quiz hebt sie höchstens um eine
+  halbe Notenstufe (ein Zufallstreffer soll keine volle Stufe wert sein).
+- **Live-Session: die Frage bekommt den Platz.** Kursname und Fehler-Knopf sind
+  weg, Frage und Antworten sind enger gesetzt, „x / y erfasst" steht jetzt bei den
+  Namen, und „Aufdecken" steht darunter — dort, wo man hinschaut.
+- **CardVote: die zwei Export-Knöpfe am Quiz sind ein Menü**, wie beim Import
+  daneben: „Als JSON sichern" und „Als Excel sichern" stehen als Sätze da.
+
 ## 4.3.5
 
 - Abhängigkeiten aktualisiert: pydantic 2.13.5, KaTeX 0.18.7, react-router-dom

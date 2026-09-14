@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { useLanguage } from "../i18n/index.jsx";
 import { Icon, ICONS, menuRow, Popover, toolbarIconBtn } from "./Icons.jsx";
 
-// item: { label, onClick } für Importieren, oder { label, href } für Vorlagen-Downloads
+// item: { label, onClick } für Aktionen, { label, href } für Downloads.
+// `icon` überschreibt das Sinnbild der Zeile — sonst entscheidet es die Form:
+// ein href lädt herunter (export), ein onClick holt etwas herein (import).
 function MenuRow({ item, onClose }) {
   const isDownload = !!item.href;
   const Tag = isDownload ? "a" : "button";
@@ -15,18 +16,26 @@ function MenuRow({ item, onClose }) {
       onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg2)")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
     >
-      <Icon d={isDownload ? ICONS.export : ICONS.import} size={14} />
+      <Icon d={item.icon || (isDownload ? ICONS.export : ICONS.import)} size={14} />
       {item.label}
     </Tag>
   );
 }
 
 /**
- * Sammelt "Importieren"- und "Vorlage herunterladen"-Aktionen in einem Dropdown
- * statt vieler einzelner Buttons in der Werkzeugleiste.
+ * Ein Menü für Datei-Handgriffe — hinein (Import, Vorlagen) wie hinaus (Export).
+ *
+ * Es war zuerst nur das Import-Menü. Beim Export standen daneben zwei
+ * Sinnbilder nebeneinander (JSON, Tabelle), die man auseinanderhalten musste,
+ * indem man auf den Tooltip wartete — zwei Knöpfe für eine Frage („wie
+ * hinaus?"). Eine zweite, fast gleiche Komponente dafür wäre die Stelle
+ * gewesen, an der die beiden nach dem ersten Umbau auseinanderlaufen; deshalb
+ * eine Komponente mit Sinnbild und Beschriftung als Angabe.
+ *
+ * `gruppen` ist eine Liste von Listen: zwischen zwei Gruppen steht ein Strich.
+ * Leere Gruppen fallen heraus, damit ein Strich nie am Rand steht.
  */
-export default function ImportMenu({ importItems = [], templateItems = [] }) {
-  const { t } = useLanguage();
+export default function DateiMenu({ icon = ICONS.import, label, gruppen = [] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -42,11 +51,13 @@ export default function ImportMenu({ importItems = [], templateItems = [] }) {
     };
   }, [open]);
 
+  const echte = gruppen.filter((g) => g && g.length);
+
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
       <button
         onClick={() => setOpen((v) => !v)}
-        title={t("importMenu.label")} aria-label={t("importMenu.label")} aria-expanded={open}
+        title={label} aria-label={label} aria-expanded={open}
         className="icon-btn"
         // Nur das Symbol, wie bei jedem anderen Knopf einer Werkzeugleiste: die
         // Beschriftung steht im `title`. Ein Knopf mit Text UND zwei Symbolen
@@ -54,16 +65,17 @@ export default function ImportMenu({ importItems = [], templateItems = [] }) {
         // die zweite Zeile.
         style={{ ...toolbarIconBtn, color: open ? "var(--accent)" : "var(--text3)" }}
       >
-        <Icon d={ICONS.import} size={17} />
+        <Icon d={icon} size={17} />
       </button>
 
       {open && (
         <Popover style={{ minWidth: 230, padding: 4 }}>
-          {importItems.map((item, i) => <MenuRow key={`i${i}`} item={item} onClose={() => setOpen(false)} />)}
-          {importItems.length > 0 && templateItems.length > 0 && (
-            <div style={{ height: 1, background: "var(--border3)", margin: "4px" }} />
-          )}
-          {templateItems.map((item, i) => <MenuRow key={`t${i}`} item={item} onClose={() => setOpen(false)} />)}
+          {echte.map((gruppe, gi) => (
+            <div key={gi}>
+              {gi > 0 && <div style={{ height: 1, background: "var(--border3)", margin: "4px" }} />}
+              {gruppe.map((item, i) => <MenuRow key={i} item={item} onClose={() => setOpen(false)} />)}
+            </div>
+          ))}
         </Popover>
       )}
     </div>

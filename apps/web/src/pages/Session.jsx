@@ -705,10 +705,10 @@ export default function Session() {
     <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100vh - 120px)" }}>
       <style>{`@keyframes nqIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}`}</style>
       {/* Top bar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1vh" }}>
-        <h2 style={{ margin: 0, fontSize: "clamp(18px, 2.5vh, 26px)", fontWeight: 700, color: "var(--text)" }}>
-          {gameMode && <><Icon d={ICONS.gamepad} size={16} color="var(--text3)" />{" "}</>}{selectedClass?.name}
-        </h2>
+      {/* Der Kursname stand hier als Ueberschrift — am Beamer beantwortet er
+          keine Frage: die Klasse weiss, welche sie ist, und die Zeile kostete
+          Hoehe, die der Frage fehlt. Die Leiste rueckt dafuer nach rechts. */}
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "1vh" }}>
         {/* Eine Werkzeugleiste wie ueberall: was gerade laeuft (Frage, Code)
             steht links, der eine Alltagsgriff (Ton) sichtbar, alles Seltene und
             das gefaehrliche „Beenden" im Menue. Vorher standen hier sechs
@@ -716,6 +716,7 @@ export default function Session() {
         <Werkzeugleiste
           style={{ marginBottom: 0, flex: "0 1 auto", justifyContent: "flex-end" }}
           links={<>
+            {gameMode && <Icon d={ICONS.gamepad} size={16} color="var(--text3)" />}
             <span style={{ color: "var(--text3)", fontSize: "clamp(13px, 1.8vh, 16px)", fontWeight: 600 }}>
               {t("session.question", { i: questionIndex + 1, n: questions.length })}
             </span>
@@ -762,12 +763,11 @@ export default function Session() {
         </div>
       )}
 
-      {/* Timer + scan count */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5vh" }}>
-        <span style={{ fontSize: "clamp(12px, 1.6vh, 15px)", color: "var(--text3)", fontWeight: 600 }}>
-          {t("cv.scanned", { n: scannedStudents.length, total: studentList.length })}
-        </span>
-        {timeLeft !== null && (
+      {/* Nur noch der Countdown. „x / y erfasst" steht jetzt bei den Namen —
+          es ist eine Aussage UEBER die Namensliste, und oben ueber der Frage
+          las man sie waehrend des Scannens ohnehin nicht. */}
+      {timeLeft !== null && (
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "1.5vh" }}>
           <span style={{
             // Countdown: aus zehn Metern lesbar, in den letzten Sekunden groesser.
             fontSize: timeLeft <= 5 ? 28 : 22, fontWeight: 800, fontFamily: "monospace",
@@ -776,14 +776,17 @@ export default function Session() {
           }}>
             {timeLeft > 0 ? mmss(timeLeft) : t("session.timeUp")}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {question && (
         <>
           {/* Question text — large, full width */}
           <div key={`q${question.id}`} style={{
-            fontSize: "clamp(28px, 5.5vh, 64px)", fontWeight: 600, marginBottom: "2vh", padding: "clamp(20px, 3.5vh, 44px) clamp(24px, 3vw, 48px)",
+            // Weniger Polster, groessere Schrift: der Kasten war zur Haelfte
+            // leer, waehrend die Frage aus der letzten Reihe klein wirkte. Die
+            // gewonnene Hoehe geht an die Frage selbst, nicht an den Rand.
+            fontSize: "clamp(30px, 6.5vh, 72px)", fontWeight: 600, marginBottom: "1.5vh", padding: "clamp(10px, 1.6vh, 22px) clamp(20px, 2.5vw, 40px)",
             background: "var(--bg2)", borderRadius: cardStyle.borderRadius, color: "var(--text)", lineHeight: 1.4,
             animation: "nqIn 0.22s ease both",
           }}>
@@ -808,7 +811,9 @@ export default function Session() {
                 const count = counts[key] || 0;
                 return (
                   <div key={`${question.id}-${key}`} style={{
-                    padding: "clamp(12px, 2.5vh, 28px) clamp(16px, 2vw, 28px)",
+                    // Flacher als zuvor: die Antwort ist meistens eine Zeile,
+                    // und die Hoehe fehlte oben bei der Frage.
+                    padding: "clamp(8px, 1.4vh, 18px) clamp(16px, 2vw, 28px)",
                     background: isExtra ? "var(--bg2)" : isCorrect ? C.success : isWrong ? "var(--bg2)" : "var(--card)",
                     color: isCorrect ? C.aufAkzent : "var(--text)",
                     borderRadius: cardStyle.borderRadius,
@@ -839,31 +844,13 @@ export default function Session() {
             })()}
           </div>
 
-          {/* Action buttons */}
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: "1.5vh" }}>
-            <button onClick={revealed ? hideResults : revealResults} style={{
-              ...btnPrimary, padding: "12px 28px", fontSize: 16,
-              background: revealed ? "var(--bg2)" : "var(--text)",
-              color: revealed ? "var(--text)" : "var(--bg)",
-            }}>
-              {revealed ? t("scanner.hide") : t("scanner.reveal")}
-            </button>
-            {revealed && !isLastQuestion && (
-              <button onClick={nextQuestion} style={{ ...btnPrimary, padding: "12px 28px", fontSize: 16, background: "var(--text)", color: "var(--bg)" }}>
-                {t("scanner.next")}
-              </button>
-            )}
-            {revealed && isLastQuestion && (
-              <button onClick={finishSession} style={{ ...btnPrimary, padding: "12px 28px", fontSize: 16, background: C.danger, color: C.aufAkzent, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                {gameMode ? <><Icon d={ICONS.trophy} size={16} color={C.aufAkzent} /> {t("session.endGame")}</> : t("scanner.finishTest")}
-              </button>
-            )}
-          </div>
-
           {/* Student sidebar + game leaderboard */}
           <div style={{ display: "flex", gap: 24 }}>
             {/* Student list */}
             <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "clamp(12px, 1.6vh, 15px)", color: "var(--text3)", fontWeight: 600, marginBottom: 6 }}>
+                {t("cv.scanned", { n: scannedStudents.length, total: studentList.length })}
+              </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                 {[...studentList].sort((a, b) => {
                   const aScanned = scannedIds.has(a.card_id);
@@ -917,6 +904,30 @@ export default function Session() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* Die Handgriffe stehen UNTER den Namen: waehrend des Scannens
+              schaut man auf die Liste — wer fehlt noch? —, und erst wenn sie
+              voll ist, wird aufgedeckt. Darueber lag der Knopf im Blick, den
+              man gerade nicht braucht. */}
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: "1.5vh" }}>
+            <button onClick={revealed ? hideResults : revealResults} style={{
+              ...btnPrimary, padding: "12px 28px", fontSize: 16,
+              background: revealed ? "var(--bg2)" : "var(--text)",
+              color: revealed ? "var(--text)" : "var(--bg)",
+            }}>
+              {revealed ? t("scanner.hide") : t("scanner.reveal")}
+            </button>
+            {revealed && !isLastQuestion && (
+              <button onClick={nextQuestion} style={{ ...btnPrimary, padding: "12px 28px", fontSize: 16, background: "var(--text)", color: "var(--bg)" }}>
+                {t("scanner.next")}
+              </button>
+            )}
+            {revealed && isLastQuestion && (
+              <button onClick={finishSession} style={{ ...btnPrimary, padding: "12px 28px", fontSize: 16, background: C.danger, color: C.aufAkzent, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                {gameMode ? <><Icon d={ICONS.trophy} size={16} color={C.aufAkzent} /> {t("session.endGame")}</> : t("scanner.finishTest")}
+              </button>
             )}
           </div>
         </>

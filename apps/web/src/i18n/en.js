@@ -523,6 +523,7 @@ export default {
   "dash.importJsonItem": "Import folder/set (JSON)",
   "dash.jsonFolderExample": "Example: folder (JSON)",
   "dash.jsonExample": "JSON example",
+  "dash.exportLabel": "Save to file",
   "dash.exportJson": "Save as JSON (everything, images included)",
   "dash.exportXlsx": "Save as Excel (to read and edit)",
   "dash.deleteFolderConfirm": "Delete folder and all contents?",

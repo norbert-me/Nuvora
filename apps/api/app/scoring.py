@@ -9,8 +9,9 @@ Die Regeln:
 
 * **E/G-Differenzierung** (Quiz-Flag): alle sehen dieselben Fragen. Für ein Kind
   im G-Kurs zählen nur die G-Fragen als 100 %; richtige E-Fragen geben Bonus
-  obendrauf. Der Bonus greift erst ab zwei richtigen E-Antworten und hebt
-  höchstens um eine Notenstufe. Falsche E-Antworten zehren nur den Bonus auf
+  obendrauf — anteilig ab der ERSTEN richtigen, geteilt durch die Zahl der
+  E-Fragen (mindestens aber durch zwei, damit ein einzelner Zufallstreffer nie
+  eine volle Notenstufe hebt), und höchstens um eine Notenstufe. Falsche E-Antworten zehren nur den Bonus auf
   (bis 0), nie die Basispunkte. Für ein Kind im E-Kurs zählen alle Fragen
   regulär.
 * **Minuspunkte** (Quiz-Flag): eine falsche Antwort kostet ihr Gewicht, die
@@ -181,9 +182,23 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
     e_richtig = sum(1 for q in extra if richtig(q))
     e_falsch = sum(1 for q in extra if beantwortet(q) and not richtig(q))
     bonus_pct = 0.0
-    if extra and e_richtig >= 2:
-        netto = max(0, e_richtig - e_falsch)
-        anteil = netto / len(extra)
+    # SCHON EINE richtige Anforderungsfrage zaehlt — anteilig.
+    #
+    # Vorher lag hier eine harte Schwelle bei zwei richtigen. Sie sollte den
+    # Zufallstreffer abfangen (eine A-D-Frage ist zu einem Viertel geraten),
+    # erzeugte aber eine Klippe: wer eine von zwei E-Fragen konnte, bekam
+    # denselben Bonus wie jemand, der keine konnte — naemlich keinen. Und bei
+    # Quizzen mit nur einer einzigen E-Frage war der Bonus gar nicht erreichbar,
+    # der Schalter also wirkungslos.
+    #
+    # Statt einer Schwelle ein Nenner-Mindestwert: geteilt wird durch die Zahl
+    # der Anforderungsfragen, mindestens aber durch ZWEI. Damit gilt weiterhin
+    # „eine einzelne richtige Antwort hebt nie um eine volle Notenstufe" (der
+    # Ratefall), aber sie zaehlt: eine von einer ergibt eine halbe Stufe, eine
+    # von fuenf ein Fuenftel. Falsche Antworten zehren den Bonus wie bisher auf.
+    netto = max(0, e_richtig - e_falsch)
+    if extra and netto >= 1:
+        anteil = netto / max(len(extra), 2)
         bonus_pct = anteil * naechste_stufe(base_pct, scale)
 
     return {

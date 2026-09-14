@@ -524,6 +524,7 @@ export default {
   "dash.importJsonItem": "Importar carpeta/banco (JSON)",
   "dash.jsonFolderExample": "Ejemplo: carpeta (JSON)",
   "dash.jsonExample": "Ejemplo JSON",
+  "dash.exportLabel": "Guardar en archivo",
   "dash.exportJson": "Guardar como JSON (todo, también imágenes)",
   "dash.exportXlsx": "Guardar como Excel (para ver y editar)",
   "dash.deleteFolderConfirm": "¿Eliminar la carpeta y todo su contenido?",

@@ -15,7 +15,7 @@ import { useAktiv } from "../core/modules.js";
 import { swr } from "../core/cache.js";
 import { useKlasseMerken, useKlassenListe } from "../core/klassenwahl.js";
 import PublishModal from "../components/PublishModal.jsx";
-import ImportMenu from "../components/ImportMenu.jsx";
+import DateiMenu from "../components/DateiMenu.jsx";
 import VerknuepfungDialog, { themenNamen } from "../components/Verknuepfung.jsx";
 import Latex from "../components/Latex.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
@@ -400,8 +400,10 @@ export default function Karten() {
                 </>)}
               </div>
             )}
-            <ImportMenu importItems={[{ label: t("karten.importDeck"), onClick: importDeck }]}
-              templateItems={[{ label: t("karten.jsonTemplate"), href: "/beispiel-karten.json" }]} />
+            <DateiMenu label={t("importMenu.label")} gruppen={[
+              [{ label: t("karten.importDeck"), onClick: importDeck }],
+              [{ label: t("karten.jsonTemplate"), href: "/beispiel-karten.json" }],
+            ]} />
           </Werkzeugleiste>
 
           {/* Unterordner des aktuellen Ordners — per Drag&Drop verschiebbar. */}

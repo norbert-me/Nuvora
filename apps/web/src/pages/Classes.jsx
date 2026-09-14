@@ -14,7 +14,7 @@ import { undoDelete } from "../core/undo.jsx";
 import { useSearchParams } from "react-router-dom";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { AddButton, COLORS as C, CONTROL_R, ICONS, Icon, Tabs, btnSecondary, btnSmall, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, pageApp, pageTitle, toolbarBtn } from "../components/Icons.jsx";
-import ImportMenu from "../components/ImportMenu.jsx";
+import DateiMenu from "../components/DateiMenu.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { FOERDER } from "../core/foerderung.js";
@@ -584,13 +584,14 @@ export default function Classes() {
         style={{ marginBottom: 16 }}
       >
         {!archiv && <AddButton onClick={startNew} title={t("classes.new")} />}
-        <ImportMenu
-          importItems={[
-            { label: t("classes.importExcel"), onClick: importXlsx },
-            { label: t("classes.importJson"), onClick: importJson },
-          ]}
-          templateItems={[
-            { label: t("classes.templateExcel"), href: `${API}/import/class-template.xlsx` },
+        <DateiMenu
+          label={t("importMenu.label")}
+          gruppen={[
+            [
+              { label: t("classes.importExcel"), onClick: importXlsx },
+              { label: t("classes.importJson"), onClick: importJson },
+            ],
+            [{ label: t("classes.templateExcel"), href: `${API}/import/class-template.xlsx` }],
           ]}
         />
       </Werkzeugleiste>

@@ -39,10 +39,28 @@ describe("E/G-Differenzierung", () => {
     expect(w.bonusPct).toBe(0);
   });
 
-  it("gibt Bonus erst ab zwei richtigen E-Antworten", () => {
-    const nurEine = { ...ANTWORTEN, 6: "B" };
-    expect(bewerte(QUESTIONS, nurEine, { niveau: "G", niveauAktiv: true }).bonusPct).toBe(0);
-    expect(bewerte(QUESTIONS, ANTWORTEN, { niveau: "G", niveauAktiv: true }).bonusPct).toBeGreaterThan(0);
+  it("zaehlt schon EINE richtige E-Antwort — anteilig", () => {
+    const eine = { 1: "A", 2: "A", 3: "A", 4: "B", 5: "A" };   // 1 von 3 E, keine falsch
+    const w = bewerte(QUESTIONS, eine, { niveau: "G", niveauAktiv: true });
+    const voll = bewerte(QUESTIONS, { 1: "A", 2: "A", 3: "A", 4: "B", 5: "A", 6: "A", 7: "A" },
+                         { niveau: "G", niveauAktiv: true });
+    expect(w.bonusPct).toBeGreaterThan(0);
+    expect(w.bonusPct).toBeCloseTo(voll.bonusPct / 3, 0);
+  });
+
+  it("hebt bei einer EINZIGEN E-Frage nur um eine halbe Stufe (Ratefall)", () => {
+    const fragen = [
+      ...[1, 2, 3, 4].map((id) => ({ id, correct_answer: "A", niveau: "" })),
+      { id: 5, correct_answer: "A", niveau: "E" },
+    ];
+    const w = bewerte(fragen, { 1: "A", 2: "A", 3: "A", 4: "B", 5: "A" },
+                      { niveau: "G", niveauAktiv: true });
+    expect(w.bonusPct).toBeCloseTo(naechsteStufe(w.basePct, undefined) / 2, 0);
+  });
+
+  it("gibt keinen Bonus, wenn mehr E-Antworten falsch als richtig sind", () => {
+    const keine = { ...ANTWORTEN, 6: "B" };   // 1 richtig, 2 falsch -> netto 0
+    expect(bewerte(QUESTIONS, keine, { niveau: "G", niveauAktiv: true }).bonusPct).toBe(0);
   });
 
   it("hebt hoechstens um eine Notenstufe", () => {

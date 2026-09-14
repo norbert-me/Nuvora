@@ -4,8 +4,8 @@
 // ändert, ändert es dort mit.
 //
 // E/G: alle sehen dieselben Fragen. Für ein Kind im G-Kurs zählen nur G-Fragen
-// als 100 %; richtige E-Fragen geben Bonus — erst ab zwei richtigen, höchstens
-// eine Notenstufe. Falsche E-Antworten zehren nur den Bonus auf, nie die Basis.
+// als 100 %; richtige E-Fragen geben Bonus — anteilig ab der ersten richtigen
+// (Nenner mindestens zwei, gegen den Zufallstreffer), höchstens eine Notenstufe. Falsche E-Antworten zehren nur den Bonus auf, nie die Basis.
 // Für ein Kind im E-Kurs zählt alles regulär.
 //
 // Minuspunkte: falsche Antwort kostet ihr Gewicht, nie unter 0. Karte unten
@@ -64,9 +64,12 @@ export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, 
   const eRichtig = extra.filter(richtig).length;
   const eFalsch = extra.filter((q) => gegeben(q) && !richtig(q)).length;
   let bonusPct = 0;
-  if (extra.length && eRichtig >= 2) {
-    const netto = Math.max(0, eRichtig - eFalsch);
-    bonusPct = (netto / extra.length) * naechsteStufe(basePct, s);
+  // Schon EINE richtige Anforderungsfrage zaehlt — anteilig, geteilt durch
+  // mindestens zwei. Begruendung siehe app/scoring.py (die Regel steht doppelt
+  // und muss zusammen geaendert werden).
+  const netto = Math.max(0, eRichtig - eFalsch);
+  if (extra.length && netto >= 1) {
+    bonusPct = (netto / Math.max(extra.length, 2)) * naechsteStufe(basePct, s);
   }
 
   return {

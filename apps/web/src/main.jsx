@@ -1397,7 +1397,10 @@ function Wurzel() {
             Angemeldete: die Meldung braucht ein Konto — das IST der
             Spam-Schutz, und die Schuelerseiten hinter dem QR-Code sollen
             keinen Melde-Knopf tragen. */}
-        {user && <Fehlermelder />}
+        {/* Nicht in der laufenden Sitzung: dort haengt der Knopf ueber dem
+            Beamerbild, und gemeldet wird ohnehin nichts, waehrend eine Klasse
+            zuschaut. */}
+        {user && !ort.pathname.startsWith("/cardvote/session") && <Fehlermelder />}
         {/* Nach einem Update: die Aenderungsliste beim ersten Anmelden danach. */}
         {user && <WasIstNeu />}
         {/* Nur auf dem iPhone in Safari und nur, solange Nuvora dort noch im
