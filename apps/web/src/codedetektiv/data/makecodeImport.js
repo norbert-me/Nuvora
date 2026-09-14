@@ -6,17 +6,26 @@
 // JSON header, then an LZMA-compressed blob holding meta JSON + files JSON.
 // files["main.blocks"] is the Blockly XML we map here.
 
-import lzmaSrc from 'lzma/src/lzma-d-min.js?raw';
+// Die Bibliothek haengt ihren Export an `this` (Worker bzw. globales Objekt).
+// Hier stand deshalb einmal ein `new Function(quelltext)` — und das ist unter
+// unserer CSP (`script-src 'self' 'wasm-unsafe-eval'`, kein `unsafe-eval`)
+// schlicht tot: der MakeCode-Import scheiterte in Produktion still, obwohl er
+// in der Entwicklungsumgebung lief.
+//
+// Stattdessen laeuft sie da, wofuer sie gebaut ist: in einem Web Worker
+// (`worker-src 'self'`, vom Build mitgebracht). Das Nachrichtenformat ist ihr
+// eigenes — Aktion 2 heisst entpacken, `cbn` ist die Nummer, unter der die
+// Antwort zurueckkommt. Nebenbei blockiert das Entpacken so auch nicht mehr
+// die Oberflaeche.
+import LzmaWorker from 'lzma/src/lzma_worker.js?worker';
 
-// The lib assigns its export onto `this` (worker/global). Evaluate it in a
-// scratch scope and grab the decompressor. Done once, lazily.
-let _lzma = null;
-function getLzma() {
-  if (!_lzma) {
-    // eslint-disable-next-line no-new-func
-    _lzma = new Function(lzmaSrc + '\nreturn this.LZMA_WORKER || this.LZMA;').call({});
-  }
-  return _lzma;
+const AKTION_ENTPACKEN = 2;
+let _worker = null;
+let _cbn = 0;
+
+function lzmaWorker() {
+  if (!_worker) _worker = new LzmaWorker();
+  return _worker;
 }
 
 const SOURCE_MAGIC = '41140e2fb82fa2bb';
@@ -45,12 +54,21 @@ function readUInt16LE(bytes, off) {
 // (If it ever returns a raw byte array instead, decode that as UTF-8.)
 function lzmaDecompress(compressed) {
   return new Promise((resolve, reject) => {
-    getLzma().decompress(Array.from(compressed), (result, err) => {
-      if (err) return reject(err);
-      resolve(typeof result === 'string'
-        ? result
-        : new TextDecoder('utf-8').decode(Uint8Array.from(result, b => b & 0xff)));
-    });
+    const w = lzmaWorker();
+    const cbn = ++_cbn;
+    const fertig = (e) => {
+      const d = e.data || {};
+      // Fortschrittsmeldungen (Aktion 3) tragen dieselbe Nummer — nur das
+      // Ergebnis zaehlt.
+      if (d.cbn !== cbn || d.action !== AKTION_ENTPACKEN) return;
+      w.removeEventListener('message', fertig);
+      if (d.error) return reject(d.error);
+      resolve(typeof d.result === 'string'
+        ? d.result
+        : new TextDecoder('utf-8').decode(Uint8Array.from(d.result, (b) => b & 0xff)));
+    };
+    w.addEventListener('message', fertig);
+    w.postMessage({ action: AKTION_ENTPACKEN, data: Array.from(compressed), cbn });
   });
 }
 
