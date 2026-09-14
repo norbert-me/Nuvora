@@ -248,7 +248,11 @@
                     _id: String(a.student_id),
                     id: a.student_id,
                     name: st ? st.name : '?',
-                    aufgabenIds: a.exercise_ids || []
+                    aufgabenIds: a.exercise_ids || [],
+                    // Teilaufgaben je Aufgabe: { "<exercise_id>": "a, b" }.
+                    // Steht im selben JSON wie die Zuweisung, weil es zu ihr
+                    // gehoert — „Nr. 4" heisst fuer dieses Kind „Nr. 4 a, b".
+                    teile: a.teile || {}
                 };
             })
         };
@@ -2606,7 +2610,7 @@
 
             const tasks = [];
             const wdh = selectWiederholung(s, vorherigeLl, config.wdh);
-            wdh.forEach(a => tasks.push({ ...a, section: 'Wiederholung', selected: true }));
+            wdh.forEach(a => tasks.push({ ...a, section: 'Wiederholung', selected: true, teil: '' }));
 
             // Eine Aufgabe, die schon als Wiederholung oben steht, darf unten
             // nicht nochmal als reguläre Aufgabe auftauchen.
@@ -2957,6 +2961,14 @@
                     <div class="step-content">
                         <span class="step-id step-id-link" title="Details anzeigen">${esc(fmtId(task.code || task.id))}</span>
                         <span class="step-source">${task.quelleTyp === 'latex' && task.latex ? '' : esc(task.quelle)}</span>
+                        <!-- Teilaufgaben: „Nr. 4" heisst fuer dieses Kind
+                             vielleicht nur „a) und b)". Das Feld steht an der
+                             Stufe, weil es zu DIESER Zuweisung gehoert und
+                             nicht zur Aufgabe — dieselbe Aufgabe kann beim
+                             Nachbarn ganz drankommen. -->
+                        <input type="text" class="step-teil" maxlength="40" placeholder="nur a, b …"
+                               title="Teilaufgaben — leer heißt: die ganze Aufgabe"
+                               value="${escAttr(task.teil || '')}">
                         ${tags.length ? '<div class="step-tags">' + tags.join('') + '</div>' : ''}
                         ${hasLRS && task.lrs ? '<div class="lrs-hint">Sonderaufgabe – siehe separates Blatt</div>' : ''}
                     </div>
@@ -3006,6 +3018,23 @@
                 // durchgestrichen weiter in der Leiter und zaehlte die Nummern
                 // mit — gefragt war „weg damit". Wie beim Anwaehlen vorher gilt
                 // der Griff fuer die ganze Gruppe (oder nur dieses Kind).
+                // Das Feld gehoert der Stufe, nicht dem Zug: ein Klick darf die
+                // Aufgabe weder oeffnen noch verschieben.
+                const teilFeld = step.querySelector('.step-teil');
+                teilFeld.addEventListener('click', (e) => e.stopPropagation());
+                teilFeld.addEventListener('mousedown', (e) => e.stopPropagation());
+                teilFeld.addEventListener('dragstart', (e) => { e.preventDefault(); e.stopPropagation(); });
+                teilFeld.addEventListener('input', () => {
+                    // Ohne Neuzeichnen — sonst verliert das Feld bei jedem
+                    // Tastendruck den Fokus. Fuer die ganze Gruppe, wie jeder
+                    // andere Griff an der Leiter.
+                    const wert = teilFeld.value;
+                    groupEntries(entry).forEach(ge => {
+                        const t = ge.tasks.find(x => x._id === task._id);
+                        if (t) t.teil = wert;
+                    });
+                });
+
                 step.querySelector('.step-weg').addEventListener('click', (e) => {
                     e.stopPropagation();
                     const pflichtCount = getGenConfig().pflicht;
@@ -3080,7 +3109,7 @@
                     const section = kat === 'Basis' ? 'Basis' : kat === 'G-Niveau' ? 'G-Niveau' : kat === 'Erklärung' ? 'Erklärung' : 'E-Niveau';
                     // in ganze Gruppe (oder nur diesen Schüler) einfügen
                     groupEntries(entry).forEach(ge => {
-                        if (!ge.tasks.some(t => t._id === a._id)) ge.tasks.push({ ...a, section, selected: true });
+                        if (!ge.tasks.some(t => t._id === a._id)) ge.tasks.push({ ...a, section, selected: true, teil: '' });
                     });
                     modal.style.display = 'none';
                     renderPreview();
@@ -3166,7 +3195,10 @@
             schueler: previewData.map(p => ({
                 _id: p.student._id,
                 name: p.student.name,
-                aufgabenIds: p.tasks.filter(t => t.selected).map(t => t._id)
+                aufgabenIds: p.tasks.filter(t => t.selected).map(t => t._id),
+                teile: Object.fromEntries(p.tasks
+                    .filter(t => t.selected && (t.teil || '').trim())
+                    .map(t => [String(t._id), t.teil.trim()])),
             }))
         };
 
@@ -3288,10 +3320,21 @@
 
             let pos = 0;
             for (const ll of (pfad.lernleitern || [])) {
-                const assignments = (ll.schueler || []).map(sch => ({
-                    student_id: parseInt(sch.id || sch._id) || null,
-                    exercise_ids: (sch.aufgabenIds || []).map(x => remap(x)).filter(istEchte).map(Number)
-                })).filter(a => a.student_id);
+                const assignments = (ll.schueler || []).map(sch => {
+                    // Die Teilaufgaben haengen an den Aufgaben-ids und muessen
+                    // dieselbe Umschluesselung mitmachen (Temp-id -> echte id),
+                    // sonst zeigen sie nach dem ersten Sync ins Leere.
+                    const teile = {};
+                    Object.entries(sch.teile || {}).forEach(([roh, wert]) => {
+                        const echt = remap(roh);
+                        if (istEchte(echt) && String(wert || '').trim()) teile[String(Number(echt))] = String(wert).trim();
+                    });
+                    return {
+                        student_id: parseInt(sch.id || sch._id) || null,
+                        exercise_ids: (sch.aufgabenIds || []).map(x => remap(x)).filter(istEchte).map(Number),
+                        ...(Object.keys(teile).length ? { teile } : {}),
+                    };
+                }).filter(a => a.student_id);
                 // Uebersetzung (thema/unterthema -> topic_id, Kurs-Name -> class_id)
                 // macht der Adapter; hier wird nur noch geschickt und diagnostiziert.
                 const kern = await ladderZuKern(ll, pos++, assignments);
@@ -3716,7 +3759,11 @@
                 const hmm = 7, wmm = hmm * (latexImg.w / latexImg.h);
                 doc.addImage(latexImg.url, 'PNG', textX, y - hmm / 2, wmm, hmm);
             } else {
-                doc.text(task.quelle, textX, y + MITTE_11PT);
+                // Teilaufgaben direkt an die Quelle: „S.13 Nr.4 — nur a, b".
+                // Als eigene Zeile darunter uebersieht man sie, und dann ist
+                // die Einschraenkung genau da wirkungslos, wo sie gedacht war.
+                const quelleText = task.quelle + ((task.teil || '').trim() ? '  — nur ' + task.teil.trim() : '');
+                doc.text(quelleText, textX, y + MITTE_11PT);
             }
 
             // Ankreuzfelder: Lösung geprüft + korrigiert
@@ -3827,7 +3874,7 @@
                 doc.setFont('helvetica', 'normal');
                 doc.setFontSize(9);
                 doc.setTextColor(80);
-                doc.text(task.quelle, marginL + idW, y);
+                doc.text(task.quelle + ((task.teil || '').trim() ? '  — nur ' + task.teil.trim() : ''), marginL + idW, y);
                 doc.setTextColor(0);
                 y += lineH;
 
@@ -4929,7 +4976,7 @@
                     const wdh = k !== 'Erklärung' && ll.thema && a.thema && a.thema !== ll.thema;
                     const section = k === 'Erklärung' ? 'Erklärung' : wdh ? 'Wiederholung'
                         : k === 'Basis' ? 'Basis' : k === 'E-Niveau' ? 'E-Niveau' : 'G-Niveau';
-                    return { ...a, section, selected: true };
+                    return { ...a, section, selected: true, teil: '' };
                 });
             pflichtZusatzNeu(tasks, (ll.config && ll.config.pflicht != null) ? ll.config.pflicht : Infinity);
             return { student: st, tasks, thema: ll.thema, unterthema: ll.unterthema || '' };
@@ -5071,8 +5118,15 @@
             // gespeicherten Aufgaben ungefiltert zeigen — die Zuweisung IST die
             // Lernleiter; nichts anzuzeigen ist schlechter als eine evtl. Wiederholung.
             if (istErste && eigen && gefiltert.length === 0 && resolved.length) gefiltert = resolved;
+            // Die Teilaufgaben liegen am gespeicherten Eintrag (siehe
+            // ladderVonKern) und haengen an der Aufgaben-id.
+            const teile = sch.teile || {};
             const tasks = gefiltert
-                .map(a => { themenGezeigt.add(a.thema || '∅'); return { ...a, section: sektVon(a), selected: true }; });
+                .map(a => {
+                    themenGezeigt.add(a.thema || '∅');
+                    const teil = teile[String(a.id)] || teile[String(a._id)] || '';
+                    return { ...a, section: sektVon(a), selected: true, teil };
+                });
             dShown += tasks.length;
             // NICHT neu sortieren: die gespeicherte Reihenfolge (aufgabenIds) IST
             // die Lernleiter, wie sie erzeugt und dem Schüler gezeigt wurde. Ein

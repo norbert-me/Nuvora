@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: Teilaufgaben je Kind.** An jeder Stufe steht ein Feld — „nur a, b"
+  —, und genau das steht dann auf dem Blatt und im Lösungsblatt. Leer heißt wie
+  bisher: die ganze Aufgabe.
 - **Lernpfad: „Doppelte aufräumen" geht sie mit dir durch.** Eindeutige Kopien
   (in allem gleich, keine oder genau eine in Lernleitern) verschwinden von selbst;
   der Rest kommt paarweise nebeneinander, mit Vorschlag und markierten

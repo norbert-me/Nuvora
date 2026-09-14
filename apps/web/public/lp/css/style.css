@@ -1233,3 +1233,21 @@ html.dark .chip { background: #2c2c2e; }
     max-height: 90vh;
     overflow: auto;
 }
+
+/* Teilaufgaben an der Stufe: schmal und zurueckhaltend — es steht an jeder
+   Zeile und darf die Quelle nicht ueberstrahlen. */
+.step-teil {
+    width: 7.5em;
+    margin-left: 0.5rem;
+    padding: 2px 6px;
+    font-size: 0.78rem;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+}
+.step-teil:focus {
+    border-style: solid;
+    border-color: var(--primary);
+    outline: none;
+}
