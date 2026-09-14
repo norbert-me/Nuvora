@@ -50,5 +50,10 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 # ist hier vertretbar, weil NUR der proxy-Container einen Port veroeffentlicht
 # (docker-compose.yml) — die API ist von aussen nicht direkt erreichbar. Wer
 # das aendert, muss diese Zeile mit aendern.
+# --no-access-log: uvicorn schreibt sonst die volle Adresse jeder Anfrage —
+# samt Schueler-Token und Kalender-Abo-Adresse, also Zugangsdaten im Klartext,
+# in jeder Zeile, dauerhaft. Ein Zugriffsprotokoll gibt es weiterhin, nur eine
+# Ebene davor: der Proxy fuehrt es mit maskierten Geheimnissen (nginx.conf).
+# Fehler und Ausnahmen der Anwendung stehen davon unberuehrt weiter im Log.
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", \
-     "--proxy-headers", "--forwarded-allow-ips", "*"]
+     "--proxy-headers", "--forwarded-allow-ips", "*", "--no-access-log"]

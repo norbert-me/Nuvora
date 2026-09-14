@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -86,12 +87,10 @@ def hole(url: str, *, daten: bytes = None, kopfzeilen: dict = None,
     """
     host, port, infos = _pruefe_ziel(url)
 
-    _echtes_gai = socket.getaddrinfo
-
     def _festgenagelt(h, p, *a, **k):
         if h == host and p == port:
             return infos
-        return _echtes_gai(h, p, *a, **k)
+        return _ECHTES_GAI(h, p, *a, **k)
 
     handler = [_KeineWeiterleitung()]
     if cookie_jar is not None:
@@ -100,12 +99,28 @@ def hole(url: str, *, daten: bytes = None, kopfzeilen: dict = None,
     kopf = {"User-Agent": "Nuvora"}
     kopf.update(kopfzeilen or {})
     req = urllib.request.Request(url, data=daten, headers=kopf)
-    socket.getaddrinfo = _festgenagelt
-    try:
-        with opener.open(req, timeout=timeout) as r:
-            return r.read(max_bytes).decode("utf-8", "replace")
-    finally:
-        socket.getaddrinfo = _echtes_gai
+    # Der Nagel haelt prozessweit — deshalb EIN Schloss darum.
+    #
+    # Die Abrufe laufen im Threadpool (`run_in_executor` im Kalender). Ohne das
+    # Schloss sicherte sich ein zweiter Thread die BEREITS gepatchte Funktion
+    # als „echte" und stellte am Ende genau die wieder her: die Pin-Closure des
+    # ersten Abrufs blieb dauerhaft in `socket.getaddrinfo` stehen und
+    # beantwortete fortan jede Aufloesung dieses Hosts aus alten Daten.
+    # Nacheinander statt gleichzeitig ist hier billig: ein Kalenderabruf dauert
+    # Sekunden, und es sind eine Handvoll Feeds.
+    with _NAGEL_SCHLOSS:
+        socket.getaddrinfo = _festgenagelt
+        try:
+            with opener.open(req, timeout=timeout) as r:
+                return r.read(max_bytes).decode("utf-8", "replace")
+        finally:
+            socket.getaddrinfo = _ECHTES_GAI
+
+
+# Die echte Aufloesung, EINMAL beim Import gesichert — und das Schloss dazu
+# (siehe `hole`).
+_ECHTES_GAI = socket.getaddrinfo
+_NAGEL_SCHLOSS = threading.Lock()
 
 
 # Wie viele Weiterleitungen wir mitgehen. Drei reichen fuer jeden echten Fall

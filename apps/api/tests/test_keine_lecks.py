@@ -455,6 +455,28 @@ async def _daten_anlegen(Sitzung, user_id: int) -> dict:
         if r.status == 201:
             veroeffentlicht.append(r.json()["id"])
     ids["marktplatz"] = veroeffentlicht
+
+    # Tafel, PAP-Aufgabe und eine Materialdatei: ohne diese drei IDs liefen
+    # `/api/tafel/{id}`, die PAP-Abgabenliste und die beiden Material-Wege NIE
+    # durch den Rundlauf — und das fiel nicht auf, weil nur die Summe zaehlte.
+    r = await _ruf("POST", "/api/tafel", {"name": "ZZ-Leck Tafel", "elemente": []})
+    if r.status in (200, 201):
+        ids["tafel_id"] = r.json().get("id")
+    r = await _ruf("POST", "/api/pap/aufgaben", {"title": "ZZ-Leck PAP", "beschreibung": "Ablauf zeichnen",
+                                                 "class_id": ids["class_id"]})
+    if r.status in (200, 201):
+        ids["aufgabe_id"] = r.json().get("id")
+    # Material laedt per multipart hoch — hier direkt in die Datenbank, das
+    # Hochladen selbst prueft `test_material.py`.
+    if ids.get("topic_id"):
+        from app.models import Material as _Material
+        async with Sitzung() as s:
+            m = _Material(owner_id=user_id, topic_id=ids["topic_id"], filename="ZZ-Leck.png",
+                          mime="image/png", size=8, data=b"\x89PNG\r\n\x1a\n")
+            s.add(m)
+            await s.commit()
+            ids["material_id"] = m.id
+    ids["user_id"] = user_id
     if veroeffentlicht:
         ids["quiz_id"] = veroeffentlicht[0]
 
@@ -462,7 +484,8 @@ async def _daten_anlegen(Sitzung, user_id: int) -> dict:
     # hart nachfragen statt hoffen: fehlt eins der Stücke, sagt der Test das,
     # statt einen halben Rundlauf als Erfolg zu melden.
     fehlt = [name for name in ("topic_id", "folder_id", "deck_id", "token", "ladder_id",
-                               "method_id", "category_id", "work_id", "cd_code", "ics_token")
+                               "method_id", "category_id", "work_id", "cd_code", "ics_token",
+                               "tafel_id", "aufgabe_id", "material_id")
              if not ids.get(name)]
     assert not fehlt, f"Aufbau unvollständig, diese Testdaten fehlen: {fehlt}"
     assert len(veroeffentlicht) == 4, (
@@ -471,6 +494,25 @@ async def _daten_anlegen(Sitzung, user_id: int) -> dict:
     )
 
     return ids
+
+
+# Routen, fuer die der Aufbau bewusst keine ID hat — je mit Grund. Kurz halten:
+# jeder Eintrag ist eine Route, die dieser Test nicht mehr bewacht.
+OHNE_TEST_ID = {
+    # CalDAV meldet sich mit Basic-Auth und einem GERAETE-Passwort an, nicht mit
+    # dem Token dieser Testwelt — hier kaeme nur 401 heraus. Die Wege prueft
+    # `tests/test_caldav.py` ueber die echte ASGI-Anwendung.
+    "/api/caldav/p/{user_id}/",
+    "/api/caldav/p/{user_id}/kalender/{name}",
+    # Eine Sicherungsdatei auf der Platte, nur fuer die Administration. Sie
+    # entsteht nicht im Aufbau, und ihr Inhalt ist per Entwurf die ganze
+    # Datenbank — ein Rundlauf darueber prueft nichts.
+    "/api/admin/backup/{name}",
+    # Der Anhang einer Fehlermeldung ist eine vom Melder AUSGESUCHTE Datei; er
+    # traegt per Entwurf Inhalte (Bildschirmfoto) und wird nur von der
+    # Administration geoeffnet. Ein Rundlauf ueber ihn prueft nichts.
+    "/api/admin/bugreports/{report_id}/anhang",
+}
 
 
 # ── Der Rundlauf über alle GET-Routen ────────────────────────────────────────
@@ -548,13 +590,18 @@ async def test_keine_get_route_gibt_art9_daten_heraus(welt):
     Maßnahmen oder Notizen mitliefert, bekommt hier einen roten Test — statt
     dass es erst jemandem auffällt, dem die Daten in die Hände fallen.
     """
-    lecks, ohne_inhalt, geprueft, mit_inhalt = [], [], 0, 0
+    lecks, ohne_inhalt, ungeprueft, geprueft, mit_inhalt = [], [], [], 0, 0
     for route in _routen():
         if route.path in NICHT_AUTOMATISCH:
             continue
         ziel = _pfad_fuellen(route.path, welt)
         if ziel is None:
-            ohne_inhalt.append(f"keine ID {route.path}")
+            # Eine Route, fuer die es keine Test-ID gibt, wird NIE aufgerufen —
+            # und faellt trotzdem nicht auf, weil nur die Summe geprueft wurde.
+            # Genau so blieben CalDAV, Tafel, Material und die PAP-Abgabenliste
+            # jahrelang ausserhalb des Rundlaufs. Deshalb steht sie jetzt
+            # einzeln in `ungeprueft` und muss dort abgearbeitet werden.
+            ungeprueft.append(route.path)
             continue
         query = QUERY.get(route.path, "").format(**{k: v for k, v in welt.items() if isinstance(v, (int, str))})
         antwort = await _ruf("GET", ziel, query=query)
@@ -578,6 +625,16 @@ async def test_keine_get_route_gibt_art9_daten_heraus(welt):
         f"Nur {mit_inhalt} von {geprueft} Routen lieferten Inhalt — dann prüft "
         f"der Rundlauf überwiegend Fehlerseiten: {ohne_inhalt}"
     )
+    # Und die zweite Haelfte: eine Route ohne Test-ID wird nie aufgerufen. Als
+    # blosse Zeile in einer Sammelliste faellt das niemandem auf.
+    offen = sorted(p for p in ungeprueft if p not in OHNE_TEST_ID)
+    assert not offen, (
+        "Fuer diese Routen gibt es keine Test-ID — sie laufen NIE durch den "
+        "Rundlauf und koennten alles herausgeben:\n  " + "\n  ".join(offen)
+        + "\nEntweder im Aufbau (`welt`) eine ID dafuer anlegen oder mit "
+          "Begruendung in OHNE_TEST_ID eintragen."
+    )
+
     assert not lecks, (
         "Diese Routen geben besonders schützenswerte Schülerdaten heraus "
         "(DSGVO Art. 9 — Förderschwerpunkt, Nachteilsausgleich, Notiz):\n  "
