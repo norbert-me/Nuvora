@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Selbsttest: hängt Chromiums Offline-Ablage im Profil, wendet der Desktop-Test
+  den dokumentierten Handgriff selbst an („Offline-Speicher zurücksetzen") und
+  prüft erneut — rot wird es erst, wenn das nichts hilft.
 - **Lernpfad: „Doppelte aufräumen" fragt, bevor es löscht** — mit der Zahl. Und
   es erkennt Doppelte nur noch an einer echten Quellenangabe: „Schulbuch" ohne
   Seite und Nummer ist eine Herkunft, keine Aufgabe, und warf vorher alle solchen

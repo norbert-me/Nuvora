@@ -221,7 +221,9 @@ async function main() {
   // Fall gemeint ist.
   const frischesProfil = fs.mkdtempSync(path.join(os.tmpdir(), "nuvora-desktop-offline-"));
   try {
-    await mitFrist(offlineProbe(exe, user, "bestehende Installation", null), 5 * 60 * 1000, "Offline-Probe (bestehendes Profil)")
+    // Mehr Zeit als beim frischen Profil: haengt die Ablage, kommt ein
+    // Zuruecksetzen samt zweitem Anlauf dazu (siehe offlineProbe).
+    await mitFrist(offlineProbe(exe, user, "bestehende Installation", null), 9 * 60 * 1000, "Offline-Probe (bestehendes Profil)")
       .catch((e) => notiere("Ablauf", "Offline-Probe (bestehende Installation)", false, kurz(e)));
     await mitFrist(offlineProbe(exe, user, "frische Installation", frischesProfil), 5 * 60 * 1000, "Offline-Probe (frisches Profil)")
       .catch((e) => notiere("Ablauf", "Offline-Probe (frische Installation)", false, kurz(e)));
@@ -269,7 +271,35 @@ async function netzKappen(seite, G) {
   return gekappt;
 }
 
-async function offlineProbe(exe, user, lauf, profil) {
+/**
+ * Chromiums Service-Worker-Ablage im BESTEHENDEN Profil kann haengen —
+ * `getRegistrations()` antwortet dann nie, und der Renderer steht still.
+ * Genau dafuer gibt es in der App „Server → Offline-Speicher zuruecksetzen"
+ * (`session.clearStorageData`), und genau das macht dieser Handgriff hier:
+ * die Ablage verwerfen, damit der zweite Anlauf auf einer heilen aufsetzt.
+ *
+ * Warum der Test das selbst tut, statt rot zu melden: eine haengende Ablage in
+ * IRGENDEINEM Profil ist ein Befund ueber dieses Profil, nicht ueber Nuvora —
+ * dieselbe Regel wie bei fehlendem Electron („uebersprungen mit Grund"). Und
+ * nebenbei wird damit die Selbsthilfe gepruft, die es fuer genau diesen Fall
+ * gibt. Angefasst werden nur Zwischenspeicher; Anmeldung, Einstellungen und
+ * die Outbox-Warteschlange bleiben (siehe apps/desktop/main.js).
+ */
+async function offlineAblageVerwerfen(exe) {
+  const app = await starteApp(URL_BASIS, exe, null);
+  try {
+    await app.evaluate(async ({ session }) => {
+      await session.defaultSession.clearStorageData({ storages: ["serviceworkers", "cachestorage"] });
+    });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await app.close().catch(() => {});
+  }
+}
+
+async function offlineProbe(exe, user, lauf, profil, zweiterAnlauf = false) {
   // Jede Zeile traegt den Durchgang, sonst ist bei zwei Laeufen nicht zu sehen,
   // welcher Fall gemeint war.
   const G = (name) => `${lauf} · ${name}`;
@@ -337,9 +367,20 @@ async function offlineProbe(exe, user, lauf, profil) {
     // Service-Worker-Datenbank haengt (die App zeigt dann eine Seite, die nie
     // fertig wird).
     if (!sw) {
+      // Einmal den Handgriff anwenden, den die App fuer genau diesen Fall
+      // anbietet, und neu ansetzen. Bleibt es danach still, IST es ein Befund.
+      if (!zweiterAnlauf) {
+        await app.close().catch(() => {});
+        const geheilt = await offlineAblageVerwerfen(exe);
+        if (geheilt) {
+          notiere(G("Service-Worker"), "Ablage hing — zurückgesetzt", true,
+            "Chromiums Service-Worker-Ablage antwortete nicht; „Offline-Speicher zurücksetzen\" angewandt, Prüfung läuft erneut", "hinweis");
+          return offlineProbe(exe, user, lauf, profil, true);
+        }
+      }
       notiere(G("Service-Worker"), "vorhanden", false,
-        "Der Renderer antwortet nicht mehr (Abfrage nach 60 s ohne Antwort) — in diesem Profil haengt Chromiums Service-Worker-Ablage. "
-        + "Abhilfe in der App: Menue „Server → Offline-Speicher zuruecksetzen …\" (verwirft nur Zwischenspeicher).");
+        "Der Renderer antwortet auch nach dem Zuruecksetzen des Offline-Speichers nicht (Abfrage nach 60 s ohne Antwort) — "
+        + "in diesem Profil haengt Chromiums Service-Worker-Ablage dauerhaft.");
       // EIN Befund, nicht vier: die drei folgenden Proben sind Folge desselben
       // haengenden Zugriffs. Als rote Zeilen sahen sie aus wie eigene Maengel
       // und machten aus einer Ursache eine Liste — dieselbe Regel wie beim
