@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Gelöschte Aufgaben lassen sich aus einer Sicherung zurückholen** — einzeln
+  und ohne den Rest der Installation zurückzusetzen
+  (`apps/api/aufgaben_zurueckholen.py`). Sie stehen danach wieder in ihren
+  Lernleitern.
 - **Lernpfad: „ohne Zuordnung aufräumen" löschte auch verwendete Aufgaben.**
   Waren die Lernpfade noch nicht geladen, galt jede Aufgabe als unbenutzt. Jetzt
   wird vorher nachgesehen — und ohne Antwort wird nichts gelöscht.
