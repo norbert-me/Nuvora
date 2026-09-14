@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Personen und Kurs: der Speichern-Knopf steht am unteren Bildschirmrand**,
+  sobald etwas offen ist — die Maske klappt in einer langen Namensliste auf, und
+  der Knopf lag sonst irgendwo dazwischen.
 - **Personen lassen sich löschen** — solange sie in keinem Kurs mehr stehen; die
   Absage nennt die Kurse.
 - **Kurs: Förderschwerpunkte, Klassenleitung und Notiz werden nicht mehr dort

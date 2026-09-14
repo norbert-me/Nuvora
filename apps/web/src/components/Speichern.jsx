@@ -149,7 +149,29 @@ function _oberste() { return _schwebende[_schwebende.length - 1]; }
  * ausgegrauter Knopf ist Möblierung, kein Hinweis. `immer` zeigt sie trotzdem
  * (für Formulare, in denen der Knopf am festen Platz stehen soll).
  */
-export default function Speicherleiste({ entwurf, immer = false, style, klein = false, angeheftet = true }) {
+/**
+ * Schwebt die Leiste gerade — und zeigt sie dann NUR noch unten?
+ *
+ * Zwei Faelle, und der Unterschied ist eine Entscheidung der Seite:
+ *
+ *   normal      – angeheftet wird erst, wenn die eigentliche Leiste aus dem
+ *                 Bild gescrollt ist. Solange sie zu sehen ist, waeren zwei
+ *                 Speichern-Knoepfe die Frage, welcher der richtige ist.
+ *   immerUnten  – die Leiste steht von Anfang an am unteren Rand, und die
+ *                 inline-Fassung faellt dafuer weg. Fuer Masken, die in einer
+ *                 langen Liste aufklappen (Personen, Kinder im Kurs): dort
+ *                 liegt der Knopf sonst irgendwo zwischen dreissig Zeilen, und
+ *                 „ist das jetzt gespeichert?" beantwortet ihn niemand.
+ *
+ * Als reine Funktion, damit sie ohne Browser pruefbar ist (siehe
+ * speichern.test.js) — dieselbe Bauform wie `zeigenNoetig` im Installhinweis.
+ */
+export function sollSchweben({ angeheftet = true, geaendert, immerUnten = false, imBild = true }) {
+  return !!(angeheftet && geaendert && (immerUnten || !imBild));
+}
+
+export default function Speicherleiste({ entwurf, immer = false, style, klein = false, angeheftet = true,
+                                         immerUnten = false }) {
   const { t } = useLanguage();
   useVerlassenWarnung(entwurf.geaendert, t("speichern.verlassen"));
   // Steht die Leiste noch im Bild? Sonst wandert sie an den unteren
@@ -173,7 +195,7 @@ export default function Speicherleiste({ entwurf, immer = false, style, klein = 
   // Schweben soll sie, wenn etwas offen und die eigentliche Leiste nicht zu
   // sehen ist. Ob sie es DARF, entscheidet das Register oben — sichtbar ist
   // immer nur die oberste.
-  const willSchweben = angeheftet && entwurf.geaendert && !imBild;
+  const willSchweben = sollSchweben({ angeheftet, geaendert: entwurf.geaendert, immerUnten, imBild });
   const id = useId();
   useEffect(() => {
     if (!willSchweben) return undefined;
@@ -200,9 +222,14 @@ export default function Speicherleiste({ entwurf, immer = false, style, klein = 
     </>
   );
   const schwebt = willSchweben && oberste === id;
+  // Bei `immerUnten` steht die Leiste unten — dann darf sie hier nicht noch
+  // einmal stehen. Solange nichts offen ist, bleibt die Zeile an ihrem Platz
+  // (sie ist dann ohnehin leer oder zeigt die abgeblendeten Knoepfe bei
+  // `immer`), damit die Maske nicht bei jedem Tastendruck springt.
+  const inlineAus = immerUnten && schwebt;
   return (
     <>
-      <span ref={anker} style={{ display: "inline-flex", alignItems: "center", gap: 8, ...style }}>
+      <span ref={anker} style={{ display: inlineAus ? "none" : "inline-flex", alignItems: "center", gap: 8, ...style }}>
         {knoepfe}
       </span>
       {schwebt && typeof document !== "undefined" && createPortal(

@@ -224,7 +224,10 @@ export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau =
         style={{ ...inputStyle, width: "100%", maxWidth: "100%", fontSize: 13, resize: "vertical", overflowX: "hidden", overflowWrap: "anywhere", whiteSpace: "pre-wrap" }} />
       </>)}
 
-      <Speicherleiste entwurf={e} style={{ marginTop: 8 }} klein />
+      {/* Unten am Bildschirm, nicht mitten in der Liste: diese Maske klappt in
+          einer Liste aus dreissig Namen auf, und der Knopf lag sonst irgendwo
+          dazwischen. */}
+      <Speicherleiste entwurf={e} style={{ marginTop: 8 }} klein immerUnten />
     </div>
   );
 }
