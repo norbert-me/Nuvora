@@ -6,7 +6,7 @@ import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import "@fontsource/inter/800.css";
-import { LanguageProvider, useLanguage } from "./i18n/index.jsx";
+import { LanguageProvider, useLanguage, uebersetze } from "./i18n/index.jsx";
 import { enqueue, classify, newTmp, flush as flushOutbox, setKonfliktFrage, leeren as outboxLeeren, count as outboxCount } from "./core/outbox.js";
 import { raeumeBrowser } from "./core/abmelden.js";
 // Optimistisches Sperren: gelesene Staende merken, beim Schreiben mitschicken
@@ -176,8 +176,9 @@ async function konfliktKlaeren(res, input, init, url) {
   if (stand.fehler !== "konflikt") return res;
   const { askChoice } = await import("./core/dialog.jsx");
   const wahl = await askChoice(
-    "Diese Daten wurden inzwischen an anderer Stelle geändert (anderes Gerät oder zweites Fenster). Was gilt?",
-    [{ key: "meine", label: "Meine Änderung übernehmen" }, { key: "server", label: "Anderen Stand behalten" }],
+    uebersetze("konflikt.frage"),
+    [{ key: "meine", label: uebersetze("konflikt.meine") },
+     { key: "server", label: uebersetze("konflikt.server") }],
   );
   if (wahl !== "meine") {
     window.dispatchEvent(new CustomEvent("nuvora:konflikt-verworfen"));
@@ -192,10 +193,11 @@ async function konfliktKlaeren(res, input, init, url) {
 // wirklich NEUER ist als die eigene Offline-Aenderung (siehe outbox.js).
 setKonfliktFrage(async (eintrag, stand) => {
   const { askChoice } = await import("./core/dialog.jsx");
-  const wann = stand.geaendert_at ? new Date(stand.geaendert_at).toLocaleString() : "";
+  const zeit = stand.geaendert_at ? new Date(stand.geaendert_at).toLocaleString() : "";
   const wahl = await askChoice(
-    `Eine Änderung aus dem Offline-Betrieb trifft auf einen neueren Stand${wann ? ` (geändert am ${wann})` : ""}. Was gilt?`,
-    [{ key: "server", label: "Neueren Stand behalten" }, { key: "meine", label: "Meine Änderung übernehmen", danger: true }],
+    uebersetze("konflikt.offline", { wann: zeit ? uebersetze("konflikt.offlineWann", { zeit }) : "" }),
+    [{ key: "server", label: uebersetze("konflikt.neuer") },
+     { key: "meine", label: uebersetze("konflikt.meine"), danger: true }],
   );
   return wahl === "meine";
 });
@@ -324,9 +326,9 @@ class LadeFehler extends React.Component {
     return (
       <div style={{ padding: "48px 16px", textAlign: "center" }}>
         <p style={{ fontSize: 14, color: "var(--text2)", marginBottom: 16, lineHeight: 1.6 }}>
-          Diese Seite konnte nicht geladen werden. Meist liegt es an einer neuen Version oder einer kurzen Netzstörung.
+          {uebersetze("ladefehler.text")}
         </p>
-        <button onClick={() => { try { sessionStorage.removeItem("nuvora_chunk_reload"); } catch { /* egal */ } window.location.reload(); }} style={btnPrimary}>Neu laden</button>
+        <button onClick={() => { try { sessionStorage.removeItem("nuvora_chunk_reload"); } catch { /* egal */ } window.location.reload(); }} style={btnPrimary}>{uebersetze("ladefehler.reload")}</button>
       </div>
     );
   }
@@ -540,14 +542,10 @@ function ModuleGate({ moduleKey, children }) {
 function ModulstandUnklar() {
   return (
     <div style={{ ...pageForm, textAlign: "center", padding: "40px 0" }}>
-      <h1 style={{ ...pageTitle, marginBottom: 10 }}>Modulliste nicht erreichbar</h1>
-      <p style={{ ...pageIntro, marginBottom: 18 }}>
-        Ob dieses Modul für dich eingeschaltet ist, lässt sich gerade nicht
-        feststellen — die Verbindung zum Server hat nicht geantwortet. Deine
-        Einstellungen sind davon nicht betroffen.
-      </p>
+      <h1 style={{ ...pageTitle, marginBottom: 10 }}>{uebersetze("modulstand.title")}</h1>
+      <p style={{ ...pageIntro, marginBottom: 18 }}>{uebersetze("modulstand.text")}</p>
       <button onClick={() => window.location.reload()} style={btnPrimary}>
-        Erneut versuchen
+        {uebersetze("modulstand.retry")}
       </button>
     </div>
   );
@@ -558,14 +556,11 @@ function ModulstandUnklar() {
 function NurAdministration() {
   return (
     <div style={{ ...pageForm, textAlign: "center", padding: "40px 0" }}>
-      <h1 style={{ ...pageTitle, marginBottom: 10 }}>Nur für die Administration</h1>
-      <p style={{ ...pageIntro, marginBottom: 18 }}>
-        Dieser Bereich gehört der Administration dieser Installation. Mit deinem
-        Konto ist er nicht zugänglich — an deinen eigenen Daten ändert das nichts.
-      </p>
+      <h1 style={{ ...pageTitle, marginBottom: 10 }}>{uebersetze("nuradmin.title")}</h1>
+      <p style={{ ...pageIntro, marginBottom: 18 }}>{uebersetze("nuradmin.text")}</p>
       {/* Als Link abgeleitet, nicht neu gebaut: `btnPrimary` ist fuer <button>
           gedacht, ein <a> braucht zusaetzlich inline-block. */}
-      <Link to="/" style={{ ...btnPrimary, display: "inline-block", textDecoration: "none" }}>Zur Startseite</Link>
+      <Link to="/" style={{ ...btnPrimary, display: "inline-block", textDecoration: "none" }}>{uebersetze("nuradmin.home")}</Link>
     </div>
   );
 }
@@ -668,9 +663,7 @@ function ConnectionMonitor() {
 
   if (online) return null;
 
-  const text = reason === "db"
-    ? "Datenbank nicht erreichbar — Neuversuch läuft…"
-    : "Keine Verbindung — Neuversuch läuft…";
+  const text = uebersetze(reason === "db" ? "offline.db" : "offline.weg");
 
   return (
     <div style={{
@@ -1238,9 +1231,9 @@ function UpdateBanner() {
       ...cardStyle, padding: 12, boxShadow: SHADOW.schwebend,
       fontSize: 13, color: "var(--text2)",
     }}>
-      <span style={{ flex: 1, minWidth: 160 }}>Eine neue Version steht bereit.</span>
-      <button onClick={reload} style={{ ...btnPrimary, ...btnSmall }}>Neu laden</button>
-      <button onClick={() => setReady(false)} style={{ ...btnSecondary, ...btnSmall }}>Später</button>
+      <span style={{ flex: 1, minWidth: 160 }}>{uebersetze("update.ready")}</span>
+      <button onClick={reload} style={{ ...btnPrimary, ...btnSmall }}>{uebersetze("update.reload")}</button>
+      <button onClick={() => setReady(false)} style={{ ...btnSecondary, ...btnSmall }}>{uebersetze("update.later")}</button>
     </div>
   );
 }

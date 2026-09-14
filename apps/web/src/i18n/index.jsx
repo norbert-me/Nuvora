@@ -19,6 +19,23 @@ function detectLang() {
 
 const LanguageContext = createContext(null);
 
+/**
+ * Uebersetzen OHNE React-Kontext.
+ *
+ * Ein paar Stellen liegen ausserhalb des Providers und koennen `useLanguage`
+ * nicht rufen: der globale fetch-Interceptor (Konfliktdialog), die
+ * Auffangseite als Klassenkomponente, der Offline-Balken, der Update-Hinweis.
+ * Genau die erscheinen JEDEM Nutzer, egal welche Sprache er gewaehlt hat — und
+ * standen deshalb als einzige noch auf Deutsch in einer englischen Oberflaeche.
+ * Dieselbe Rueckfallregel wie im Hook: fehlt der Schluessel, gilt Deutsch.
+ */
+export function uebersetze(key, vars) {
+  const lang = detectLang();
+  let str = DICTS[lang]?.[key] ?? DICTS[DEFAULT_LANG][key] ?? key;
+  if (vars) for (const [k, v] of Object.entries(vars)) str = str.split(`{{${k}}}`).join(v);
+  return str;
+}
+
 export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState(detectLang);
 

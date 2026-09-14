@@ -17,7 +17,7 @@ export default function ConfirmEmailChange() {
     fetch(`${API}/auth/confirm-email-change`, alsJson("POST", { token })).then(async (r) => {
       if (r.ok) { setState("ok"); return; }
       const d = await r.json().catch(() => ({}));
-      setError(d.detail || "Bestätigung fehlgeschlagen.");
+      setError(d.detail || t("emailchange.failedGeneric"));
       setState("error");
     }).catch(() => setState("error"));
   }, [token]);

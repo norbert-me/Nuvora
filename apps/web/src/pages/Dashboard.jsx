@@ -1177,11 +1177,11 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         >
           {!searching && (isTouch ? (
             <span style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
-              <button onClick={() => moveQuestion(idx, -1)} disabled={idx === 0} title="Nach oben" aria-label="Frage nach oben"
+              <button onClick={() => moveQuestion(idx, -1)} disabled={idx === 0} title="Nach oben" aria-label={t("dash.frageHoch")}
                 style={{ border: "none", background: "none", padding: "1px 2px", color: "var(--text3)", display: "flex", lineHeight: 1, opacity: idx === 0 ? 0.25 : 1, cursor: idx === 0 ? "default" : "pointer" }}>
                 <Icon d={ICONS.chevronUp} size={18} color="currentColor" />
               </button>
-              <button onClick={() => moveQuestion(idx, 1)} disabled={idx === base.length - 1} title="Nach unten" aria-label="Frage nach unten"
+              <button onClick={() => moveQuestion(idx, 1)} disabled={idx === base.length - 1} title="Nach unten" aria-label={t("dash.frageRunter")}
                 style={{ border: "none", background: "none", padding: "1px 2px", color: "var(--text3)", display: "flex", lineHeight: 1, opacity: idx === base.length - 1 ? 0.25 : 1, cursor: idx === base.length - 1 ? "default" : "pointer" }}>
                 <Icon d={ICONS.chevronDown} size={18} color="currentColor" />
               </button>
@@ -1323,9 +1323,9 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
           die ins Leere laufen. Ohne Thema bleibt die Frage voll nutzbar. */}
       {lernpfad && (
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 14, color: "var(--text2)" }}>Thema</span>
+          <span style={{ fontSize: 14, color: "var(--text2)" }}>{t("dash.topicLabel")}</span>
           <TopicPicker value={q.topic_id ?? null} onChange={(id) => setQ({ ...q, topic_id: id })} />
-          <span style={{ fontSize: 12, color: "var(--text3)" }}>optional — verbindet die Frage mit Lernpfad-Aufgaben</span>
+          <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("dash.topicHint")}</span>
         </div>
       )}
 

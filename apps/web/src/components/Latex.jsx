@@ -1,5 +1,6 @@
 import { useRef, useEffect } from "react";
 import { COLORS } from "./Icons.jsx";
+import { uebersetze } from "../i18n/index.jsx";
 
 // KaTeX lokal gebundelt statt CDN (DSGVO: keine IP-Uebermittlung an jsdelivr).
 // Lazy geladen: der grosse KaTeX-Chunk kommt nur ueber die Leitung, wenn
@@ -49,7 +50,7 @@ export default function Latex({ children }) {
         } catch {
           ziel.textContent = displayMode ? `$$${quelle}$$` : `$${quelle}$`;
           ziel.style.color = `var(--danger, ${COLORS.danger})`;
-          ziel.title = "Diese Formel kann nicht dargestellt werden";
+          ziel.title = uebersetze("latex.fehler");
         }
       };
 

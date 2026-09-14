@@ -7,6 +7,7 @@
 import { useState, useEffect } from "react";
 import { themenIndex } from "../core/topics.js";
 import { selectStyle } from "./Icons.jsx";
+import { uebersetze } from "../i18n/index.jsx";
 
 export default function TopicPicker({ value, onChange, style }) {
   const [topics, setTopics] = useState([]);
@@ -41,7 +42,7 @@ export default function TopicPicker({ value, onChange, style }) {
       onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
       style={{ ...selectStyle, ...style }}
     >
-      <option value="">Kein Thema</option>
+      <option value="">{uebersetze("topicPicker.none")}</option>
       {ordered.map((t) => (
         <option key={t.id} value={t.id}>{label(t)}</option>
       ))}
