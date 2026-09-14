@@ -9,6 +9,7 @@ import { Icon, ICONS, btnSecondary, btnSmall, iconBtn, chipStyle, cardStyle, COL
 import { useLanguage } from "../i18n/index.jsx";
 import { hochladen } from "../core/upload.js";
 import Fortschrittsbalken from "./Fortschrittsbalken.jsx";
+import AuthImage from "./AuthImage.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { askConfirm } from "../core/dialog.jsx";
 import { hol } from "../core/melden.js";
@@ -69,6 +70,9 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
   const OFFICE = /\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/i;
   const istOffice = (m) => OFFICE.test(m.filename || "") || /officedocument|opendocument|ms-(word|excel|powerpoint)|msword/.test(m.mime || "");
   const ansehbar = (m) => /^application\/pdf$|^image\//.test(m.mime || "") || istOffice(m);
+  // Nur Rasterbilder bekommen einen Daumennagel — SVG bleibt draussen (es kann
+  // Skript tragen), PDF hat keins, das der Browser ohne Weiteres herausgibt.
+  const istBild = (m) => ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(m.mime || "");
 
   const ansehen = async (m) => {
     // Sofort das Fenster mit „lädt …" oeffnen: eine 5-MB-Datei braucht ein paar
@@ -135,6 +139,19 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
         <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("material.empty")}</p>
       ) : items.map((m) => (
         <div key={m.id} style={row}>
+          {/* Daumennagel bei Bildern: „image.jpg" sagt nichts darueber, WAS
+              drauf ist — und das ist beim Material die einzige Frage. Er kommt
+              vom eigenen Vorschau-Weg (256 px), nicht vom Original: ein
+              Handyfoto sind schnell drei Megabyte, und in der Liste stehen
+              mehrere nebeneinander. Ein Klick oeffnet wie der Name die grosse
+              Ansicht. */}
+          {istBild(m) && (
+            <button onClick={() => ansehen(m)} title={t("material.open")} aria-label={t("material.open")}
+              style={{ border: "none", background: "none", padding: 0, cursor: "pointer", flexShrink: 0, lineHeight: 0 }}>
+              <AuthImage src={`${API}/${m.id}/vorschau`} alt="" zoomable={false}
+                style={{ width: 44, height: 44, objectFit: "cover", borderRadius: CONTROL_R, border: "1px solid var(--border2)" }} />
+            </button>
+          )}
           <button onClick={() => (ansehbar(m) ? ansehen(m) : download(m))}
             title={ansehbar(m) ? t("material.open") : t("material.noPreviewOther")}
             aria-label={ansehbar(m) ? t("material.open") : t("material.download")}

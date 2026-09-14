@@ -151,6 +151,41 @@ def _unveraendert(request, etag: str) -> bool:
     return any(teil.strip().lstrip("W/") == etag for teil in roh.split(",") if teil.strip())
 
 
+@router.get("/{material_id}/vorschau")
+async def vorschau_material(material_id: int, request: Request,
+                            user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Kleines Vorschaubild eines BILDES (längste Kante 256 px).
+
+    Eigener Weg statt `download`: das Original ist ein Handyfoto von 2,8 MB,
+    und in der Materialliste stehen mehrere nebeneinander — die Liste zöge
+    sonst zweistellige Megabyte, nur um Daumennägel zu zeigen. Gerechnet wird
+    bei jedem Abruf neu und NICHT gespeichert: anders als beim Schülerfoto
+    (`students.photo_thumb`) gibt es hier keine zweite Spalte, und ein Material
+    wird selten angesehen — der Cache-Kopf erledigt den Rest.
+
+    Nur Rasterbilder. SVG bleibt draußen (es kann Skript tragen), alles andere
+    hat kein Bild, das sich zeigen ließe.
+    """
+    m = await eigenes(db, Material, material_id, user, "Material nicht gefunden")
+    if (m.mime or "") not in {"image/png", "image/jpeg", "image/gif", "image/webp"}:
+        raise HTTPException(404, "Kein Bild")
+    etag = f'"v{m.id}-{m.size}"'
+    if _unveraendert(request, etag):
+        return Response(status_code=304, headers=_cache_kopf(etag))
+    from starlette.concurrency import run_in_threadpool
+
+    from ..uploads import vorschaubild
+    klein = await run_in_threadpool(vorschaubild, m.data)
+    if not klein:
+        # Umwandlung ausgefallen (kaputte Datei, exotisches Format): lieber das
+        # Original ausliefern als gar nichts — ein Daumennagel ist kein Grund
+        # fuer einen Fehler.
+        return Response(content=m.data, media_type=m.mime,
+                        headers={"X-Content-Type-Options": "nosniff", **_cache_kopf(etag)})
+    return Response(content=klein, media_type="image/jpeg",
+                    headers={"X-Content-Type-Options": "nosniff", **_cache_kopf(etag)})
+
+
 @router.get("/{material_id}/download")
 async def download_material(material_id: int, request: Request, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     m = await eigenes(db, Material, material_id, user, "Material nicht gefunden")

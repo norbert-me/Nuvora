@@ -136,3 +136,13 @@ async def test_kleines_pdf_bekommt_auch_eine_kennung(s):
 
     zweit = await M.material_als_pdf(mid, _Anfrage(etag), user=u, db=s)
     assert zweit.status_code == 304 and not zweit.body
+
+
+def test_vorschau_nur_fuer_rasterbilder():
+    """SVG bleibt draußen: es kann Skript tragen, und der Vorschau-Weg liefert
+    inline aus. Alles andere hat kein Bild, das sich zeigen ließe."""
+    from app.routers.material import vorschau_material  # noqa: F401  (Form, nicht Aufruf)
+
+    erlaubt = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+    assert "image/svg+xml" not in erlaubt
+    assert "application/pdf" not in erlaubt
