@@ -144,3 +144,31 @@ async def test_namenlose_zeile_wird_uebersprungen(s):
     await sichere_personen(s, [z], u.id)
     await s.commit()
     assert (await s.execute(sa.select(Person))).scalars().all() == []
+
+
+@pytest.mark.asyncio
+async def test_person_loeschen_nur_ohne_kurse(s):
+    """Zweistufig mit Absicht (entschieden am 14.09.2026): erst aus den Kursen
+    entfernen — dort steht, was dabei verloren geht —, dann die Person."""
+    from fastapi import HTTPException
+
+    from app.routers.personen import delete_person
+
+    u, a, _b = await _welt(s)
+    await uebernahme_personen(s)
+    leute = (await s.execute(__import__("sqlalchemy").select(Person))).scalars().all()
+    anna = [p for p in leute if p.name == "Anna"][0]
+
+    with pytest.raises(HTTPException) as fehler:
+        await delete_person(anna.id, user=u, db=s)
+    assert fehler.value.status_code == 409
+    assert anna.deleted_at is None, "nichts angefasst"
+
+    # Zeilen weg -> jetzt geht es.
+    for z in (await s.execute(__import__("sqlalchemy").select(Student).where(
+            Student.person_id == anna.id))).scalars().all():
+        await s.delete(z)
+    await s.commit()
+    await delete_person(anna.id, user=u, db=s)
+    await s.refresh(anna)
+    assert anna.deleted_at is not None, "weich geloescht, nicht weg"

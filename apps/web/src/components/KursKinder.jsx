@@ -6,7 +6,7 @@ import {
 import Portrait from "./Portrait.jsx";
 import SchuelerAngaben from "./SchuelerAngaben.jsx";
 import BildZuschnitt from "./BildZuschnitt.jsx";
-import { askConfirm, askPrompt } from "../core/dialog.jsx";
+import { askConfirm } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n";
 
 // Die Kinder eines Kurses — dort gepflegt, wo man mit ihnen arbeitet.
@@ -44,19 +44,9 @@ export default function KursKinder({ kursId, t: tProp }) {
     if (r && r.ok) { setNeu(""); laden(); }
   };
 
-  // Name UND Foto gehören der Person — nicht der Zeile, in der sie gerade
-  // steht. Deshalb gehen beide an /api/personen; die Listenzeilen bekommen es
-  // mit, solange sie es noch selbst führen.
-  const umbenennen = async (kind) => {
-    const name = await askPrompt(text("kurse.kindName"), { initial: kind.name });
-    if (!name || !name.trim() || !kind.person_id) return;
-    await fetch(`/api/personen/${kind.person_id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim() }),
-    }).catch(() => {});
-    laden();
-  };
-
+  // Das Foto gehört der Person — nicht der Zeile, in der sie gerade steht;
+  // deshalb geht es an /api/personen. Umbenannt wird hier nicht mehr: der Name
+  // gehört ebenfalls der Person und wird unter „Personen" gepflegt.
   const fotoWaehlen = (kind) => {
     if (!kind.person_id) return;
     dateiWaehlen((datei) => setZuschnitt({ personId: kind.person_id, datei }), "image/*");
@@ -170,10 +160,10 @@ export default function KursKinder({ kursId, t: tProp }) {
             {/* Nur DASS etwas vereinbart ist. Was genau, steht im Dialog des
                 Kindes — eine Kursliste ist kein Ort fuer Art-9-Angaben. */}
             {k.nta && <span style={badge(C.warning)} title={text("kurse.ntaHint")}>{text("kurse.nta")}</span>}
-            <button onClick={() => umbenennen(k)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
-              title={text("kurse.kindName")} aria-label={text("kurse.kindName")}>
-              <Icon d={ICONS.edit} size={15} />
-            </button>
+            {/* Umbenennen stand hier und ist entfernt: der Name gehoert der
+                PERSON und wandert beim Aendern auf alle Kurse mit — im Kurs
+                sah er wie eine Angabe DIESES Kurses aus. Gepflegt wird er
+                unter „Personen" (Weg dorthin im Dialog des Kindes). */}
             <button onClick={() => fotoWaehlen(k)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
               title={text("kurse.kindFoto")} aria-label={text("kurse.kindFoto")}>
               <Icon d={ICONS.camera} size={15} />
@@ -188,7 +178,7 @@ export default function KursKinder({ kursId, t: tProp }) {
                 dem Namen, auf den geklickt wurde. */}
             {offen === k.student_id && (
               <div style={{ margin: "0 0 8px 34px", paddingLeft: 12, borderLeft: "2px solid var(--border2)" }}>
-                <SchuelerAngaben studentId={k.student_id} kursId={kursId} t={text} />
+                <SchuelerAngaben studentId={k.student_id} kursId={kursId} personEbene={false} personId={k.person_id} t={text} />
               </div>
             )}
           </div>

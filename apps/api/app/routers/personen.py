@@ -9,6 +9,7 @@ Regel 3 gilt auch hier: jede Quelle wird einzeln gefragt (`is_active`), ein
 fehlendes Modul laesst seinen Teil weg — es gibt kein 403 und keine leere
 Seite, nur weniger Zeilen.
 """
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -245,6 +246,42 @@ async def update_person(person_id: int, body: PersonPatch,
     await db.commit()
     await db.refresh(p)
     return PersonOut(id=p.id, name=p.name, niveau=p.niveau or "", has_photo=p.has_photo)
+
+
+@router.delete("/{person_id}", status_code=204)
+async def delete_person(person_id: int, user: User = Depends(get_current_user),
+                        db: AsyncSession = Depends(get_db)):
+    """Eine Person loeschen — aber nur, solange nichts mehr an ihr haengt.
+
+    Entschieden am 14.09.2026. Die bequemere Fassung („alles mit, 30 Tage in den
+    Papierkorb") waere ein Knopf, hinter dem Noten, Karten und Anwesenheit aus
+    JEDEM Kurs verschwinden — und zwar leise, denn wer ihn drueckt, sieht die
+    Kurse gerade nicht. Die Loesung ist deshalb zweistufig: erst aus den Kursen
+    entfernen (dort steht, was dabei verloren geht), dann die Person loeschen.
+
+    Weich geloescht wie alles im Haus (`deleted_at`), damit ein Fehlgriff
+    umkehrbar bleibt; das Foto bleibt an der Zeile, bis der Aufraeumjob sie holt.
+    """
+    p = await _eigene(db, person_id, user)
+    zeilen = await _zeilen(db, p)
+    if zeilen:
+        # Die Kurse NENNEN, nicht nur zaehlen: „noch in 2 Kursen" schickt die
+        # Lehrkraft suchen, „noch in WP8 und Mathe 7.5" nicht.
+        klassen = {c.id: c for c in (await db.execute(select(SchoolClass).where(
+            SchoolClass.owner_id == user.id))).scalars().all()}
+        kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
+            Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)))).scalars().all()}
+        je_zeile = await _kurse_je_zeile(db, zeilen, klassen, kurse)
+        namen = []
+        for z in zeilen:
+            for k in je_zeile.get(z.id, []):
+                if k.name not in namen:
+                    namen.append(k.name)
+        wo = ", ".join(namen) if namen else str(len(zeilen))
+        raise HTTPException(409, f"Diese Person ist noch in Kursen: {wo}. "
+                                 "Erst dort entfernen, dann löschen.")
+    p.deleted_at = datetime.now()
+    await db.commit()
 
 
 @router.post("/{person_id}/photo", response_model=PersonOut)

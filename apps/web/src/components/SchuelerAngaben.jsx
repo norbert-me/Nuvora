@@ -17,6 +17,7 @@
 //
 // Gespeichert wird auf Knopfdruck (Speicherleiste), wie überall sonst.
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { FOERDER, MASSNAHMEN } from "../core/foerderung.js";
 import { alsJson, hol, sende } from "../core/melden.js";
 import Speicherleiste, { useEntwurf } from "./Speichern.jsx";
@@ -33,14 +34,31 @@ const titel = { fontSize: 13, fontWeight: 600, color: "var(--text)", margin: "14
  * statt als leere Ueberschrift Platz zu kosten. Gepflegt wird im Kurs und auf
  * der Personenseite.
  */
-export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau = false, nurLesen = false, t }) {
+export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau = false, nurLesen = false,
+                                          // Gehoeren die PERSONEN-Angaben hierher?
+                                          //
+                                          // Foerderschwerpunkte, Klassenleitung und Notiz gelten dem Kind
+                                          // ueberall gleich — im Kurs bearbeitet standen sie an einer Stelle,
+                                          // an der man sie fuer kursbezogen halten musste, und dasselbe Feld
+                                          // lag in jedem Kurs des Kindes noch einmal. Gepflegt werden sie
+                                          // unter „Personen"; im Kurs bleibt, was dem KURS gehoert (E/G und
+                                          // der Nachteilsausgleich) — plus ein Weg dorthin.
+                                          personEbene = true,
+                                          // Nur fuer den Weg zur Personenseite gebraucht; die Kursliste
+                                          // kennt sie ohnehin (`KindOut.person_id`), also wird sie
+                                          // hereingereicht statt die Schueler-Antwort zu erweitern.
+                                          personId = null, t }) {
   const [person, setPerson] = useState(null);
   const [basis, setBasis] = useState(null);
   const entwurfRef = useRef(null);
   const e = useEntwurf(basis || { niveau: "", foerder: [], notizen: "", klassenlehrer: "", massnahmen: [] }, async (w) => {
-    const ok = await sende(`/api/classes/students/${studentId}`, alsJson("PATCH", {
-      niveau: w.niveau, foerder: w.foerder, notizen: w.notizen, klassenlehrer: w.klassenlehrer,
-    }), t("classes.editStudent"));
+    // Nur GESETZTE Felder gehen mit (siehe CLAUDE.md): ohne die Personen-Ebene
+    // darf dieser Dialog die Foerderschwerpunkte nicht mitschreiben — er zeigt
+    // sie ja nicht einmal.
+    const rumpf = personEbene
+      ? { niveau: w.niveau, foerder: w.foerder, notizen: w.notizen, klassenlehrer: w.klassenlehrer }
+      : { niveau: w.niveau };
+    const ok = await sende(`/api/classes/students/${studentId}`, alsJson("PATCH", rumpf), t("classes.editStudent"));
     if (!ok) return false;
     // Maßnahmen gehen an den Kurs — nur wenn es einen gibt und sie sich geändert haben.
     if (kursId && JSON.stringify(w.massnahmen) !== JSON.stringify(basis?.massnahmen || [])) {
@@ -123,6 +141,7 @@ export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau =
         </div>
       )}
 
+      {personEbene && (<>
       <div style={titel}>{t("classes.supportNeeds")}</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {FOERDER.map(([wert, erklaerung]) => {
@@ -139,6 +158,23 @@ export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau =
           );
         })}
       </div>
+      </>)}
+
+      {/* Ohne Personen-Ebene steht hier nur, DASS etwas vorliegt — samt Weg
+          dorthin. Ein Kurs-Dialog ohne jeden Hinweis liesse die Frage offen,
+          wo die Schwerpunkte geblieben sind. */}
+      {!personEbene && (
+        <div style={{ marginTop: 10, fontSize: 13, color: "var(--text2)", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {(w.foerder || []).length > 0 && (
+            <span><span style={{ color: "var(--text3)" }}>{t("classes.supportNeeds")}:</span> {w.foerder.join(", ")}</span>
+          )}
+          {personId && (
+            <Link to={`/personen?person=${personId}`} style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>
+              {t("kurse.zurPerson")} ↗
+            </Link>
+          )}
+        </div>
+      )}
 
       {/* Nachteilsausgleiche wirken fachbezogen — ohne gewählten Kurs gäbe es
           keine Ebene, an die sie gehören. */}
@@ -171,6 +207,7 @@ export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau =
         </div>
       </>) : null}
 
+      {personEbene && (<>
       {/* Die Klassenleitung gehoert zur PERSON, nicht zu einer ihrer Zeilen:
           wer die 7a fuehrt, ist in Mathe dieselbe wie in Deutsch. Gepflegt
           wurde sie bisher nur in der Klassenmaske — und die ist auf dem Weg
@@ -185,6 +222,7 @@ export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau =
       <textarea value={w.notizen || ""} onChange={(ev) => e.setz({ notizen: ev.target.value })}
         rows={2} maxLength={2000} placeholder={t("classes.notesPlaceholder")}
         style={{ ...inputStyle, width: "100%", maxWidth: "100%", fontSize: 13, resize: "vertical", overflowX: "hidden", overflowWrap: "anywhere", whiteSpace: "pre-wrap" }} />
+      </>)}
 
       <Speicherleiste entwurf={e} style={{ marginTop: 8 }} klein />
     </div>

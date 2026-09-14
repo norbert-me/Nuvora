@@ -16,6 +16,12 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Personen lassen sich löschen** — solange sie in keinem Kurs mehr stehen; die
+  Absage nennt die Kurse.
+- **Kurs: Förderschwerpunkte, Klassenleitung und Notiz werden nicht mehr dort
+  bearbeitet.** Sie gehören der Person und stehen unter „Personen"; im Kurs
+  bleiben E/G und der Nachteilsausgleich, dazu ein Weg zur Person.
+- Kurs: Umbenennen an der Kinderliste ist weg — der Name gehört der Person.
 - **Anwesenheit: ein abgelehnter Vorschlag kommt nicht wieder.** Wer „das Kind ist
   in meiner Stunde da" sagt und speichert, bekommt denselben Vorschlag beim
   nächsten Aufschlagen nicht erneut. Gezählt wird er nirgends.

@@ -10,6 +10,7 @@ import BildZuschnitt from "../components/BildZuschnitt.jsx";
 import { oeffentlicheBasis } from "../core/basis.js";
 import { dateiWaehlen, btnSecondary, btnSmall, iconBtn, inputStyle, Modal } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n";
+import { askConfirm, showAlert } from "../core/dialog.jsx";
 
 // Ein Kind, nicht eine Zeile in einer Liste.
 //
@@ -89,6 +90,25 @@ export default function Personen() {
     const d = await fetch(`/api/personen/${id}/auswertung`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     if (d) setStand(d);
     fetch("/api/personen").then((r) => (r.ok ? r.json() : [])).then((d2) => setListe(Array.isArray(d2) ? d2 : []));
+  };
+
+  // Eine Person loeschen — der Server laesst das nur zu, solange sie in keinem
+  // Kurs mehr steht (entschieden am 14.09.2026: der bequeme Knopf haette Noten,
+  // Karten und Anwesenheit aus jedem Kurs mitgenommen, und zwar leise). Seine
+  // Absage nennt die Kurse; sie wird hier wortwoertlich gezeigt, statt sie in
+  // ein allgemeines „ging nicht" zu uebersetzen.
+  const personLoeschen = async (p) => {
+    if (!(await askConfirm(t("personen.loeschenFrage", { name: p.name })))) return;
+    const r = await fetch(`/api/personen/${p.id}`, { method: "DELETE" }).catch(() => null);
+    if (r && r.status === 409) {
+      const d = await r.json().catch(() => null);
+      await showAlert(d?.detail || t("common.error"));
+      return;
+    }
+    if (!r || !r.ok) { await showAlert(t("common.error")); return; }
+    setOffen(null);
+    setStand(null);
+    fetch("/api/personen").then((x) => (x.ok ? x.json() : [])).then((d) => setListe(Array.isArray(d) ? d : []));
   };
 
   const nameSpeichern = async () => {
@@ -189,6 +209,12 @@ export default function Personen() {
                     {p.has_photo && <button onClick={() => fotoZuschneiden(p.id)} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.fotoZuschnitt")}</button>}
                     {p.has_photo && <button onClick={() => fotoWeg(p.id)} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.fotoWeg")}</button>}
                     <button onClick={() => setNameEdit({ id: p.id, wert: p.name })} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.nameAendern")}</button>
+                    {/* Loeschen steht am rechten Rand und traegt die Warnfarbe —
+                        wie ueberall das Gefaehrliche zuletzt. */}
+                    <button onClick={() => personLoeschen(p)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }}
+                      title={t("personen.loeschen")} aria-label={t("personen.loeschen")}>
+                      <Icon d={ICONS.trash} size={16} color={C.danger} />
+                    </button>
                   </div>
                   {nameEdit && nameEdit.id === p.id && (
                     <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
