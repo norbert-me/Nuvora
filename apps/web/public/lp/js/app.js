@@ -414,6 +414,10 @@
                     // gleichzeitiges ensureAufgabenGesynct dieselbe Aufgabe ein
                     // zweites Mal an (Temp-id -> echte id merkt sie selbst).
                     await legeAufgabeAn(a);
+                    // Kleiner Abstand wie in der Testfamilie (scripts/gemeinsam.py):
+                    // der Proxy laesst 30 Anfragen je Sekunde durch, ein Import
+                    // von 600 Aufgaben rennt sonst in die Sperre.
+                    await new Promise(res => setTimeout(res, 40));
                     continue;
                 }
                 const r = await api(`${LP}/exercises/${a.id}`, { method: 'PUT', body: JSON.stringify(await zuKern(a)) });
@@ -424,12 +428,23 @@
             // wurden. Ein partieller/stale Cache (z.B. Cache-First vor dem Load)
             // wuerde sonst alle fehlenden Server-Aufgaben massenhaft loeschen.
             if (aufgabenVomServer) {
-                for (const weg of serverIds) {
-                    // 404 heisst „gibt es dort nicht mehr" — genau das wollten
-                    // wir. Nur echte Fehler sind welche.
-                    const r = await api(`${LP}/exercises/${weg}`, { method: 'DELETE' }).catch(() => null);
-                    if (r && !r.ok && r.status !== 404) console.warn('syncAufgaben: DELETE %s -> %s', weg, r.status);
-                    delete syncSigs[weg];
+                // In EINER Anfrage statt in hundert.
+                //
+                // Beim Aufraeumen einer doppelt importierten Sammlung fallen
+                // schnell mehrere hundert Loeschungen an. Einzeln geschickt
+                // rennen sie in die Bremse des Proxys (30 Anfragen je Sekunde),
+                // und dessen 429 kommt ohne CORS-Kopfzeilen zurueck — der
+                // Browser meldet dann „Fetch API cannot load … due to access
+                // control checks", was wie ein Rechteproblem aussieht und eine
+                // Bremse ist. In Haeppchen, damit auch 3000 Aufgaben passen.
+                const alle = [...serverIds];
+                for (let i = 0; i < alle.length; i += 500) {
+                    const teil = alle.slice(i, i + 500);
+                    const r = await api(`${LP}/exercises/loeschen`, {
+                        method: 'POST', body: JSON.stringify({ ids: teil.map(Number) }),
+                    }).catch(() => null);
+                    if (!r || !r.ok) { console.warn('syncAufgaben: Loeschen fehlgeschlagen (%s)', r ? r.status : 'Netz'); break; }
+                    teil.forEach(weg => { delete syncSigs[weg]; });
                 }
             } else if (serverIds.size) {
                 console.warn('syncAufgaben: Loeschen uebersprungen —', serverIds.size, 'Server-Aufgaben nicht in lokaler Liste, aber Basis noch nicht vom Server geladen (Schutz vor Datenverlust)');
@@ -1718,7 +1733,7 @@
         body.innerHTML = `
             <h3 style="margin:0 0 4px">Doppelte aufräumen</h3>
             <p style="color:var(--text-muted);font-size:13px;margin:0 0 4px">
-                Paar ${dubIndex + 1} von ${gruppen.length}${gruppe.length > 2 ? ` · ${gruppe.length} Zeilen mit dieser Quelle` : ''}
+                ${gruppe.length > 2 ? 'Gruppe' : 'Paar'} ${dubIndex + 1} von ${gruppen.length}${gruppe.length > 2 ? ` · ${gruppe.length} Zeilen mit derselben Quelle` : ''}
             </p>
             ${gruppe.filter(x => (benutzt.get(String(x.id)) || benutzt.get(String(x._id)) || 0) > 0).length > 1
                 ? '<p style="font-size:13px;margin:0 0 8px;background:#fef3c7;color:#92400e;border-radius:6px;padding:6px 8px">'
@@ -1734,6 +1749,10 @@
             </div>
             <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
                 <button class="btn primary" id="dub-vorschlag">Vorschlag übernehmen (${esc(fmtId(weg.code || weg.id))} löschen)</button>
+                ${gruppe.length > 2
+                    ? `<button class="btn" id="dub-gruppe-weg" title="Behält nur ${esc(fmtId(behalten.code || behalten.id))}">`
+                      + `Alle ${gruppe.length - 1} anderen dieser Quelle löschen</button>`
+                    : ''}
                 <button class="btn" id="dub-skip">Beide behalten</button>
                 ${(() => { const n = dubUnbenutztGruppen().reduce((k, g) => k + g.length - 1, 0);
                     return n ? `<button class="btn" id="dub-alle-frei" title="Behalten wird je Paar die vollständigere Fassung">${n} ohne Zuordnung aufräumen</button>` : ''; })()}
@@ -1746,6 +1765,19 @@
             b.addEventListener('click', () => dubLoeschen(b.dataset.dubWeg));
         });
         document.getElementById('dub-vorschlag').addEventListener('click', () => dubLoeschen(weg._id));
+        // Eine Gruppe aus acht Zeilen einzeln durchzuklicken sieht aus, als
+        // passiere nichts: nach jedem Loeschen steht dieselbe Quelle wieder da,
+        // nur mit zwei anderen Zeilen. Also am Stueck.
+        const gruppeWeg = document.getElementById('dub-gruppe-weg');
+        if (gruppeWeg) gruppeWeg.addEventListener('click', async () => {
+            if (!await confirmDlg(`${gruppe.length - 1} Aufgaben löschen und ${fmtId(behalten.code || behalten.id)} behalten?`,
+                { ok: 'Löschen', cancel: 'Abbrechen', danger: true })) return;
+            const weg2 = new Set(gruppe.filter(a => a !== behalten).map(a => a._id));
+            aufgaben = aufgaben.filter(a => !weg2.has(a._id));
+            save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
+            toast(weg2.size + ' Aufgaben gelöscht');
+            dubZeichne();
+        });
         document.getElementById('dub-skip').addEventListener('click', weiter);
         const alleFrei = document.getElementById('dub-alle-frei');
         if (alleFrei) alleFrei.addEventListener('click', async () => {

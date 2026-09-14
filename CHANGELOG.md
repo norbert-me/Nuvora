@@ -16,6 +16,14 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: viele Aufgaben löschen geht jetzt in EINER Anfrage.** Beim
+  Aufräumen einer doppelt importierten Sammlung lief der Browser vorher in die
+  Bremse des Servers — die Löschungen kamen nicht an, und in der Konsole stand
+  „Fetch API cannot load … due to access control checks".
+- **Lernpfad: eine Gruppe gleicher Aufgaben lässt sich am Stück aufräumen** —
+  bei acht Zeilen derselben Quelle sah das Einzelklicken aus, als passiere nichts.
+- Tafel: der Warnton kommt jetzt nach einer halben Sekunde statt nach drei — ein
+  einzelner Knall reicht weiterhin nicht.
 - Selbsttest: hängt Chromiums Offline-Ablage im Profil, wendet der Desktop-Test
   den dokumentierten Handgriff selbst an („Offline-Speicher zurücksetzen") und
   prüft erneut — rot wird es erst, wenn das nichts hilft.

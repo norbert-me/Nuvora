@@ -31,3 +31,28 @@ async def test_teilaufgaben_ueberleben_den_roundtrip(s):
                                           "teile": {"3": "a", "9": "1-3"}}]), user=u, db=s)
     assert geaendert.assignments[0]["teile"] == {"3": "a", "9": "1-3"}
     assert geaendert.assignments[0]["exercise_ids"] == [3, 9], "die Zuweisung bleibt daneben"
+
+
+@pytest.mark.asyncio
+async def test_sammel_loeschen_fasst_nur_eigene_an(s):
+    """Beim Aufräumen fallen hunderte Löschungen an. Einzeln geschickt rennen
+    sie in die Bremse des Proxys (30/s) — deshalb gibt es einen Sammel-Weg.
+    Fremde ids fallen darin STILL heraus: eine geratene Nummer darf weder eine
+    fremde Aufgabe treffen noch die ganze Anfrage kippen."""
+    from app.models import Exercise
+    from app.routers.lernpfad import IdListe, delete_exercises
+
+    ich = User(email="ich2@x.de", password_hash="x", email_verified=True)
+    fremd = User(email="fremd2@x.de", password_hash="x", email_verified=True)
+    s.add_all([ich, fremd])
+    await s.flush()
+    meine = [Exercise(owner_id=ich.id, kategorie="Basis") for _ in range(3)]
+    deine = Exercise(owner_id=fremd.id, kategorie="Basis")
+    s.add_all([*meine, deine])
+    await s.commit()
+
+    aus = await delete_exercises(IdListe(ids=[m.id for m in meine] + [deine.id, 999999]),
+                                 user=ich, db=s)
+    assert aus["geloescht"] == 3, "nur die eigenen, und kein Fehler wegen der fremden"
+    uebrig = (await s.execute(__import__("sqlalchemy").select(Exercise))).scalars().all()
+    assert [x.id for x in uebrig] == [deine.id], "die fremde steht unberuehrt da"

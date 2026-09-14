@@ -387,8 +387,14 @@ function warnton(ctx) {
  * (d) **Der Balken zeigt den geglaetteten Pegel**, nicht den Augenblickswert:
  *     ein zappelnder Balken laesst sich aus der letzten Reihe nicht lesen.
  */
-const LAERM_HALTE_S = 3;    // so lange muss es zu laut sein
-const LAERM_RUHE_S = 20;    // fruehestens wieder warnen
+// Der Ton kommt SOFORT, nicht nach einer Bedenkzeit: wer ihn hoert, soll
+// wissen, WORAUF er sich bezieht — drei Sekunden spaeter ist der Moment vorbei,
+// und die Klasse sucht den Grund. Eine halbe Sekunde bleibt trotzdem stehen:
+// ein einzelner Knall (Buch faellt, Stuhl rueckt) ist keine Lautstaerke.
+const LAERM_HALTE_S = 0.5;
+// Danach eine Ruhezeit, sonst piept es im Dauerlaerm ununterbrochen — und eine
+// Klasse, die dauerpiept, ist lauter als vorher.
+const LAERM_RUHE_S = 20;
 
 function TafelLaerm({ item, onPatch, t }) {
   const [an, setAn] = useState(false);

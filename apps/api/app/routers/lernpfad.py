@@ -139,6 +139,38 @@ async def update_exercise(
     return ex
 
 
+class IdListe(BaseModel):
+    ids: List[int] = []
+
+
+@router.post("/exercises/loeschen")
+async def delete_exercises(body: IdListe, user: User = Depends(require_module),
+                           db: AsyncSession = Depends(get_db)):
+    """Viele Aufgaben auf EINEN Schlag loeschen.
+
+    Warum nicht einfach oft `DELETE /exercises/{id}`: beim Aufraeumen einer
+    doppelt importierten Sammlung sind das schnell mehrere hundert Anfragen in
+    wenigen Sekunden. Der Proxy laesst 30 je Sekunde durch (`limit_req` in
+    nginx.conf) und beantwortet den Rest mit 429 — ohne CORS-Kopfzeilen, und
+    dann meldet der Browser „Fetch API cannot load … due to access control
+    checks". Es sieht aus wie ein Rechteproblem und ist eine Bremse.
+
+    Geloescht wird ausschliesslich, was dem Konto gehoert; fremde und
+    unbekannte ids fallen still heraus (die Antwort sagt, wie viele es
+    wirklich waren). 404 waere hier falsch: beim Aufraeumen ist „gibt es schon
+    nicht mehr" der Normalfall, kein Fehler.
+    """
+    ids = [int(x) for x in (body.ids or [])][:5000]
+    if not ids:
+        return {"geloescht": 0}
+    rows = (await db.execute(select(Exercise).where(
+        Exercise.id.in_(ids), Exercise.owner_id == user.id))).scalars().all()
+    for ex in rows:
+        await db.delete(ex)
+    await db.commit()
+    return {"geloescht": len(rows)}
+
+
 @router.delete("/exercises/{exercise_id}", status_code=204)
 async def delete_exercise(
     exercise_id: int,
