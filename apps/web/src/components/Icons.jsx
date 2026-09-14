@@ -165,8 +165,6 @@ export const ICONS = {
   pause: ["M7.5 4.5v11", "M12.5 4.5v11"],
   volume: ["M4 8v4h3l3.5 3V5L7 8H4z", "M13.5 7.5a3.5 3.5 0 010 5", "M15.8 5.4a6.5 6.5 0 010 9.2"],
   volumeOff: ["M4 8v4h3l3.5 3V5L7 8H4z", "M13.5 8l4 4", "M17.5 8l-4 4"],
-  textSmaller: ["M3 15L7 5l4 10", "M4.3 12h5.4", "M13 10h4"],
-  textLarger: ["M3 15L7 5l4 10", "M4.3 12h5.4", "M13 10h4", "M15 8v4"],
   settings: ["M10 7.6a2.4 2.4 0 100 4.8 2.4 2.4 0 000-4.8z",
     "M10 2v2.2M10 15.8V18M2 10h2.2M15.8 10H18M4.4 4.4l1.6 1.6M14 14l1.6 1.6M15.6 4.4L14 6M6 14l-1.6 1.6"],
 };
@@ -299,21 +297,11 @@ export const linkBtn = {
   padding: "7px 0", margin: "-7px 0",
 };
 
-// Einheitliche Export-/Import-Knoepfe (Icon + Label) — moduluebergreifend
-// dasselbe Aussehen und Verhalten. Nie je Seite nachbauen.
-export function ExportButton({ label, onClick, style, iconOnly, ...props }) {
-  if (iconOnly)
-    return (
-      <button onClick={onClick} className="icon-btn" style={{ ...iconBtn, ...style }} {...props}>
-        <Icon d={ICONS.export} size={18} />
-      </button>
-    );
-  return (
-    <button onClick={onClick} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6, ...style }} {...props}>
-      <Icon d={ICONS.export} size={15} /> {label}
-    </button>
-  );
-}
+// ExportButton/ImportButton standen hier einmal als „nie je Seite nachbauen"-
+// Bausteine. Abgeloest hat sie `dateiWaehlen()` unten: seit Import und Export im
+// „Mehr"-Menue stehen, ist beides ein Menueeintrag, und ein Menueeintrag ist ein
+// Knopf, der kein `<input type=file>` umschliessen kann. Keine einzige Seite hat
+// die zwei Komponenten zuletzt noch benutzt.
 /**
  * Datei-Auswahl per Aufruf statt per `<label>`.
  *
@@ -332,22 +320,6 @@ export function dateiWaehlen(onFile, accept = ".json,application/json") {
   });
   document.body.appendChild(feld);
   feld.click();
-}
-
-export function ImportButton({ label, onFile, accept = ".json,application/json", style, iconOnly, ...props }) {
-  if (iconOnly)
-    return (
-      <label className="icon-btn" style={{ ...iconBtn, cursor: "pointer", ...style }} {...props}>
-        <Icon d={ICONS.import} size={18} />
-        <input type="file" accept={accept} style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) onFile(e.target.files[0]); e.target.value = ""; }} />
-      </label>
-    );
-  return (
-    <label style={{ ...btnSecondary, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, ...style }} {...props}>
-      <Icon d={ICONS.import} size={15} /> {label}
-      <input type="file" accept={accept} style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) onFile(e.target.files[0]); e.target.value = ""; }} />
-    </label>
-  );
 }
 
 // Bewusst NICHT vereinheitlicht, weil kontextgebunden und je Gruppe stimmig:

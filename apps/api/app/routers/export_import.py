@@ -895,14 +895,6 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
 
 # --- Individual student evaluation PDFs ---
 
-def _grade_from_pct(pct, scale=None):
-    s = scale or DEFAULT_SCALE
-    for g in range(1, 6):
-        if pct >= s.get(g, s.get(str(g), 0)):
-            return g
-    return 6
-
-
 def _decimal_grade(pct, scale=None):
     """Prozent -> Dezimalnote. Eine Quelle: die Fassung aus noten.py.
 
