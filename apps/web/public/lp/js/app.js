@@ -1756,7 +1756,15 @@
                 + '<p style="color:var(--text-muted)">Es stehen keine doppelten Aufgaben mehr in der Liste.</p>';
             return;
         }
-        if (dubIndex >= gruppen.length) dubIndex = 0;
+        // Durch ist durch: wer alle Paare uebersprungen hat, landete durch das
+        // stille Zuruecksetzen wieder beim ersten — eine Runde ohne Ende.
+        if (dubIndex >= gruppen.length) {
+            body.innerHTML = '<h3 style="margin:0 0 8px">Durchgesehen</h3>'
+                + `<p style="color:var(--text-muted)">Alle ${gruppen.length} Paare angesehen. `
+                + 'Was offen blieb, steht weiter in der Liste — mit dem Filter „nur doppelte" findest du es wieder.</p>';
+            dubIndex = 0;
+            return;
+        }
         const gruppe = gruppen[dubIndex];
         const benutzt = verwendungen();
         const [behalten, weg, grund] = dubVorschlag(gruppe[0], gruppe[1], benutzt);
@@ -1869,12 +1877,20 @@
         document.getElementById('dub-fertig').addEventListener('click', () => { dubModal.style.display = 'none'; renderAufgaben(); });
     }
 
-    function dubLoeschen(_id) {
+    async function dubLoeschen(_id) {
         // Ohne Rueckfrage: der Dialog IST die Rueckfrage — beide Fassungen
         // stehen nebeneinander, und man hat gerade auf eine davon gezeigt.
         aufgaben = aufgaben.filter(a => a._id !== _id);
-        save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
-        toast('Aufgabe gelöscht');
+        // Erst der Abgleich, dann die Meldung: ungewartet stand „Aufgabe
+        // geloescht" da, waehrend das DELETE noch lief — scheiterte es, war
+        // die Zeile nach dem Neuladen wieder da, und gemeldet war das
+        // Gegenteil.
+        try {
+            await save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
+            toast('Aufgabe gelöscht');
+        } catch (e) {
+            toast('Löschen hat nicht geklappt — bitte neu laden.');
+        }
         dubZeichne();
     }
 
@@ -2012,10 +2028,20 @@
     // Lernleitern steckte. Einmal je Sitzung nachladen und die Liste danach neu
     // zeichnen; laeuft es schief, bleibt es beim Strich statt bei einer Schleife.
     let verwendungGeladen = false;
+    let verwendungLaeuft = false;
     function verwendungenSicherstellen(danach) {
         if (verwendungGeladen || lernpfade.length) { verwendungGeladen = true; return; }
-        verwendungGeladen = true;
-        loadLernpfade().then(() => danach && danach()).catch(() => {});
+        // Die Marke erst setzen, wenn es GEKLAPPT hat: davor genuegte ein
+        // misslungener Abruf, und die Spalte „Verwendet" stand fuer den Rest
+        // der Sitzung auf „–", ohne dass es je einen zweiten Versuch gab.
+        // `verwendungLaeuft` haelt dabei den Deckel drauf: ohne ihn stiesse
+        // jedes Neuzeichnen einen weiteren Abruf an, solange keiner klappt.
+        if (verwendungLaeuft) return;
+        verwendungLaeuft = true;
+        loadLernpfade().then(() => {
+            verwendungGeladen = true;
+            if (danach) danach();
+        }).catch(() => {}).finally(() => { verwendungLaeuft = false; });
     }
 
     /**
@@ -3381,7 +3407,14 @@
                     const section = kat === 'Basis' ? 'Basis' : kat === 'G-Niveau' ? 'G-Niveau' : kat === 'Erklärung' ? 'Erklärung' : 'E-Niveau';
                     // in ganze Gruppe (oder nur diesen Schüler) einfügen
                     groupEntries(entry).forEach(ge => {
-                        if (!ge.tasks.some(t => t._id === a._id)) ge.tasks.push({ ...a, section, selected: true, teil: '' });
+                        if (ge.tasks.some(t => t._id === a._id)) return;
+                        ge.tasks.push({ ...a, section, selected: true, teil: '' });
+                        // Pflicht/Zusatz neu bestimmen: ohne das trug die
+                        // ergaenzte Aufgabe gar kein `zusatz`, und die
+                        // Ueberschrift auf dem Arbeitsblatt stimmte bis zum
+                        // ersten Ziehen nicht.
+                        pflichtZusatzNeu(ge.tasks, (typeof getGenConfig === 'function'
+                            ? getGenConfig().pflicht : Infinity));
                     });
                     modal.style.display = 'none';
                     renderPreview();
@@ -4258,6 +4291,14 @@
     bulkSelectAll.addEventListener('change', () => {
         document.querySelectorAll('.bulk-cb').forEach(cb => { cb.checked = bulkSelectAll.checked; });
         updateBulkBar();
+        // „Alle auswaehlen" meint die GERENDERTEN — die Tabelle zeigt 50 auf
+        // einmal. Bei 600 gefilterten Aufgaben hakt der Kasten also 50 an, und
+        // wer danach loescht, trifft weniger als gedacht. Deshalb sagen, was
+        // gemeint ist.
+        if (bulkSelectAll.checked) {
+            const gesamt = document.querySelectorAll('#btn-more-aufgaben').length;
+            if (gesamt) toast('Nur die angezeigten Aufgaben sind ausgewählt — erst „Mehr laden", dann alle.');
+        }
     });
 
     function getSelectedBulkIds() {
@@ -4293,6 +4334,9 @@
         document.getElementById('bulk-thema').value = '';
         document.getElementById('bulk-unterthema').value = '';
         bulkSelectAll.checked = false;
+        // Ohne das blieb der Balken mit der alten Zahl stehen („12 ausgewählt"),
+        // obwohl nach dem Neuzeichnen nichts mehr angehakt ist.
+        updateBulkBar();
         toast(count + ' Aufgaben aktualisiert');
     });
 
