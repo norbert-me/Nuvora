@@ -38,11 +38,16 @@ const SCHRIFT = new Set([11, 12, 13, 14, 16, 22]);
 //     rund 60 %, und aus drei Metern Entfernung muss es lesbar sein;
 //     Session 28 ist der Sitzungscode am Beamer, Scanner 44 der vierstellige
 //     Code, Mathefussball 32 der Ball im Spielfeld. Kein Fliesstext.
-//   borderRadius (33) — reine Grafik, bei der der Radius die halbe Kante ist
+//   borderRadius (31) — reine Grafik, bei der der Radius die halbe Kante ist
 //     (Balkenkappen, Punkte, Kreise, Dreh-Griffe) sowie zwei bewusste Nullen
-//     (Tabs in einer Segment-Gruppe bringen keine eigenen Ecken mit). Der
-//     dreiunddreissigste ist der Farbpunkt in der Hervorheben-Legende des
-//     Sitzplans — derselbe Punkt wie in der SEGEL-Legende daneben.
+//     (Tabs in einer Segment-Gruppe bringen keine eigenen Ecken mit). Darunter
+//     der Farbpunkt in der Hervorheben-Legende des Sitzplans — derselbe Punkt
+//     wie in der SEGEL-Legende daneben.
+//
+// ACHTUNG, was dieser Test NICHT bewacht: die Leitern fuer **Abstaende** und
+// **Schatten** stehen in Icons.jsx als Regel, nachgezaehlt wird nur Schrift und
+// Radius. Und gezaehlt wird nur in `*.jsx` unter `src/` — ohne Icons.jsx selbst
+// (dort entstehen die Bausteine) und ohne den Code-Detektiv (fremdes Design).
 //
 // Sinken erlaubt, steigen nicht. Wer weiter aufraeumt, traegt die kleinere
 // Zahl hier ein — das ist die halbe Minute, die den Rueckfall verhindert.

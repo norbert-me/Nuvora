@@ -14,7 +14,7 @@ Learners need no devices and no accounts — they only appear as records the tea
 
 Nuvora is the base: account, classes, courses, students and topics live here. Modules are switched on and work on this data — they do not own it.
 
-> **Status: stable, still growing.** The frame stands — sign-in, home page, module management, classes, courses and topics are Nuvora. Fourteen modules sit on the core; none has its own accounts or database. Related tools are bundled under one module with **tabs** (e.g. Auswertung = gradebook + class tests, Notizbrett = notes + to-do, Orga = checklists + attendance + lending + seating plan). The shared **topic taxonomy** connects them: a topic students struggled with in CardVote or Code-Detektiv spawns a Karten practice deck or a Lernpfad revision task at the press of a button, test results become a grade column, and the topic view shows everything attached to a topic across the modules — including stored material.
+> **Status: stable, still growing.** The frame stands — sign-in, home page, module management, classes, courses and topics are Nuvora. Thirteen modules sit on the core; none has its own accounts or database. Related tools are bundled under one module with **tabs** (e.g. Auswertung = gradebook + class tests, Notizbrett = notes + to-do, Orga = checklists + attendance + lending + seating plan). The shared **topic taxonomy** connects them: a topic students struggled with in CardVote or Code-Detektiv spawns a Karten practice deck or a Lernpfad revision task at the press of a button, test results become a grade column, and the topic view shows everything attached to a topic across the modules — including stored material.
 
 ## Core
 
@@ -134,8 +134,7 @@ Nuvora core (apps/api, apps/web)
     ├── Orga               /orga               checklists · attendance · lending · seating plan
     ├── Zufallsschüler     /zufall             draw a random student / groups
     ├── Notizbrett         /notizbrett         notes + to-do
-    ├── Klassenleitung     /klassenleitung     parent contacts
-    ├── Beobachtungen      /notizen            formative notes per student
+    ├── PAP-Editor         /pap                flowcharts (DIN 66001), hand-in via QR
     ├── Tafel              /tafel              projector text fields + timer
     └── Mathespiele        /mathespiele        math games (projector)
 ```
@@ -216,7 +215,7 @@ Then on <http://localhost:8080>:
 | `/cardvote/` | CardVote module                                   |
 | `/lernpfad`  | Lernpfad module                                   |
 | `/auswertung`| Auswertung module (gradebook + class tests)       |
-| others       | `/karten` · `/kalender` · `/unterrichtsplanung` · `/code-detektiv` · `/orga` · `/zufall` · `/notizbrett` · `/klassenleitung` · `/notizen` · `/tafel` · `/mathespiele` |
+| others       | `/karten` · `/kalender` · `/unterrichtsplanung` · `/code-detektiv` · `/orga` · `/zufall` · `/notizbrett` · `/pap` · `/tafel` · `/mathespiele` |
 
 Without `POSTGRES_PASSWORD` and `TOKEN_SECRET` the stack deliberately won't start — default passwords must not accidentally end up in production. Generate a random value with `openssl rand -hex 32`.
 

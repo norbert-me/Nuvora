@@ -28,14 +28,15 @@ Nuvora ist ausdrücklich **nicht**:
   und einer Code-Detektiv-Sitzung beitreten (`/cd/<code>`) —, beide über einen
   geheimen Link, beide ohne Anmeldung.
 - **kein Schulverwaltungsprogramm.** Keine Zeugnisse, keine Stundenpläne für
-  ein Kollegium, keine Elternportale, kein Rollenmodell (Administration ist
-  Konto 1).
+  ein Kollegium, keine Elternportale, kein Rollenmodell im eigentlichen Sinn —
+  es gibt genau zwei Stufen: Lehrkraft und Administration (Konto 1 sowie jedes
+  Konto, das es dazu ernennt).
 - **kein gehosteter Dienst.** Es gibt keine Nuvora-Cloud. Wer es nutzen will,
   betreibt es selbst — und ist damit im Sinne der DSGVO verantwortlich.
 - **kein Produkt mit Support.** Ein-Personen-Projekt ohne Einnahmen, ohne
   Zusage auf Antwortzeit und ohne Zusicherung, dass ein Modul erhalten bleibt.
 
-**Stand:** Version 4.0.4. Der Rahmen steht, 14 Module sitzen darauf, keins hat
+**Stand:** Version 4.3.7. Der Rahmen steht, 13 Module sitzen darauf, keins hat
 eigene Konten oder eine eigene Datenbank. Rund 300 API-Tests und 75
 Frontend-Tests laufen bei jedem Push; nach jedem Deploy benutzt ein Selbsttest
 jedes Modul einmal wirklich. Was das *nicht* heißt: dass jemand außer dem Autor
@@ -196,20 +197,22 @@ es auch:
 ./selftest.sh --schnell          # nur der kurze API-Selbsttest
 ./selftest.sh --ohne-browser     # API + Systemtest, ohne Playwright
 ./selftest.sh --ohne-system      # ohne den Alleinstellungs-Durchgang
-./selftest.sh --nur-system       # ohne Anmeldung, ohne Schreiben
+./selftest.sh --ohne-desktop     # ohne die beiden Desktop-Läufe
 ./selftest.sh --url https://…    # gegen eine andere Instanz
 ./selftest.sh --browser=webkit   # Engine der iPads (auch: chromium|beide)
-./selftest.sh --debug            # jede Anfrage mit Status und Dauer
 ```
 
-Vier Teile:
+Sieben Teile:
 
 | Teil | Datei | Was es tut |
 | ---- | ----- | ---------- |
-| Selbsttest | `scripts/selftest.py` | Erreichbarkeit, Sicherheit, Web-Dateien, Einrichtung (über `GET /api/selftest`), je Modul ein Schreib-Roundtrip auf Kern-Klasse und -Schülern |
+| Einrichtung | `apps/api/app/routers/selftest.py` | Datenbank, Schema gegen die Modelle, Konfiguration, `config/site.json`, E-Mail bis zur Absender-Freigabe — über `GET /api/selftest` (Administration oder `SELFTEST_TOKEN`) |
+| Selbsttest | `scripts/selftest.py` | Erreichbarkeit, Sicherheit, Web-Dateien, je Modul ein Schreib-Roundtrip auf Kern-Klasse und -Schülern, Schüler-Wege ohne Login, Mandantentrennung an der laufenden Installation, Frühwarnung bei Datenschwund |
 | Systemtest | `scripts/systemtest.py` | jedes Modul **einzeln**: nur dieses aktiv, alle fremden Endpunkte müssen genau 403 liefern; dazu nachgerechnete Noten und jede Modul-Brücke zweimal |
 | Rundgang | `scripts/selftest-browser.mjs` | jede Seite im echten Browser — Desktop, Handy (390 px), dunkles Design; echte Handgriffe mit Neuladen als Beweis |
 | Oberflächen | `scripts/systemtest-browser.mjs` | jedes Modul einzeln in der Oberfläche; verbotene Verbindungen bleiben unsichtbar |
+| Desktop | `scripts/desktop-test.mjs` | die Electron-Hülle im echten Fenster: Start, Anmeldung, alle Seiten, Menü, `window.open` bleibt dicht |
+| Desktop offline | `scripts/desktop-offline.mjs` | dieselbe App ohne Netz: Service Worker, Lesen, Deep-Link, echte Inhaltsdaten |
 
 Am Ende steht, welche Teile gelaufen sind und was übersprungen wurde — ein
 grüner Lauf ohne vollen Umfang ist keine Aussage über die Seite. Ausführlich,
@@ -307,10 +310,10 @@ Abhängigkeiten als Anhang.
 
 Das Register steht **im Code** (`apps/api/app/routers/modules.py`): ein Modul
 existiert nur, wenn es Code dazu gibt; die Datenbank merkt sich nur, wer was
-aktiviert hat. Vierzehn Stück, jedes pro Lehrkraft zuschaltbar — und wo ein
+aktiviert hat. Dreizehn Stück, jedes pro Lehrkraft zuschaltbar — und wo ein
 Modul einen Teil mitbringt, den nicht jede Schule braucht, lässt der sich
-einzeln abschalten (auf der Modulseite unter „Teile dieses Moduls"; erster
-Fall: die SEGEL-Stufen im Sitzplan). Eingetragene Daten bleiben dabei erhalten,
+einzeln abschalten (im **Profil** unter „Teile der Module"; erster Fall: die
+SEGEL-Stufen im Sitzplan). Eingetragene Daten bleiben dabei erhalten,
 abgeschaltet ist die Anzeige:
 
 | Modul | Pfad | Wofür |
@@ -327,6 +330,7 @@ abgeschaltet ist die Anzeige:
 | Notizbrett | `/notizbrett` | Notizzettel + To-do-Liste. Datierte Aufgaben erscheinen im Kalender. Nicht an Schüler gebunden |
 | Tafel | `/tafel` | Classroom-Screen für den Beamer: frei platzierbare Textfelder, Timer. Ohne Daten |
 | Mathespiele | `/mathespiele` | Aktuell Mathefußball: Kopfrechen-Duell für zwei Teams am Beamer |
+| PAP-Editor | `/pap` | Programmablaufpläne nach DIN 66001: frei zeichnen (ohne Zuordnung, im Browser gespeichert) oder als Aufgabe stellen — Lernende geben über ihren QR-Zugang ab |
 
 Ein **Reifegrad** steht an jedem Modul (`stable` / `beta`); die Shell zeigt ihn
 als Badge.
@@ -551,21 +555,25 @@ einigen Tagen ohne Besuch auf.
 
 ### Fehler melden
 
-Unten rechts hängt in jeder angemeldeten Ansicht ein Käfer-Knopf. Er schickt
-eine kurze Meldung an die Betreiber-Adresse (`ADMIN_EMAIL`, sonst `SMTP_FROM`)
-und legt auf Wunsch das Protokoll der letzten Minuten bei: Seitenwechsel,
-fehlgeschlagene Aufrufe, Fehlermeldungen. **Keine Namen, keine Noten, keine
-Inhalte** — IDs im Pfad werden ersetzt, Antwortkörper werden nie
-mitgeschrieben, und vor dem Absenden lässt sich alles im Klartext ansehen.
+Unten rechts hängt in jeder angemeldeten Ansicht ein Käfer-Knopf. Er legt die
+Meldung **in die Datenbank** (früher ging sie per Mail hinaus und war weg,
+sobald das Postfach aufgeräumt wurde); die Administration liest, öffnet und
+löscht sie im Profil und kann das Melden im Ganzen abschalten. Auf Wunsch
+gehen das Protokoll der letzten Minuten und die technischen Eckdaten mit:
+Seitenwechsel, fehlgeschlagene Aufrufe, Fehlermeldungen. **Keine Namen, keine
+Noten, keine Inhalte** — IDs im Pfad werden ersetzt, Antwortkörper werden nie
+mitgeschrieben, und der Knopf „Was wird mitgeschickt?" zeigt vor dem Absenden
+den vollständigen Inhalt im Klartext.
 
-Dasselbe Protokoll steht unter `/profile` dauerhaft zum Ansehen, Kopieren und
-Leeren. **Ein Server-Protokoll ist das nicht**: es lebt im Arbeitsspeicher des
+**Ein Server-Protokoll ist das nicht**: es lebt im Arbeitsspeicher des
 Browsers, in dem es entstanden ist. Auch die Administration kann fremde
 Sitzungen nicht einsehen — was ankommt, ist das, was jemand ausdrücklich mit
 einer Meldung schickt.
 
-Gegen Missbrauch braucht die Meldung ein angemeldetes Konto; dazu kommen fünf
-Meldungen je Konto und zehn je IP-Adresse pro Stunde.
+Gegen Missbrauch braucht die Meldung ein angemeldetes Konto. Eine Mengenbremse
+gibt es bewusst nicht mehr: wer drei Dinge hintereinander findet, ist der beste
+Melder, den ein Werkzeug haben kann, und bekam beim vierten Mal eine Absage.
+Was zu viel ist, entscheidet der Betreiber — durch Löschen oder Abschalten.
 
 ## Datenschutz
 
