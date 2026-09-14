@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..besitz import nur_eigenes
 from ..database import get_db
 from ..models import Question, Topic, User
 from ..uploads import bildtyp
@@ -275,11 +276,10 @@ async def delete_question(question_id: int, user: User = Depends(get_current_use
     den Antworten stand. Die Set-Eintraege bleiben absichtlich stehen: so
     steht die Frage nach dem Wiederherstellen wieder in ihrem Quiz.
     """
-    q = await db.get(Question, question_id)
-    if not q:
-        raise HTTPException(404)
-    if q.owner_id and q.owner_id != user.id:
-        raise HTTPException(403, "Kein Zugriff auf diese Frage")
+    # Streng wie ueberall beim Wegnehmen (siehe besitz.nur_eigenes): eine Frage
+    # ohne Besitzer gehoert beim ANSEHEN allen, beim Loeschen niemandem.
+    q = await nur_eigenes(db, Question, question_id, user,
+                          "Frage nicht gefunden", "Kein Zugriff auf diese Frage")
     # Schon im Papierkorb? Dann ist nichts zu tun — und das ist kein Fehler.
     # Loeschen muss wiederholbar sein: ein geloeschtes Quiz legt seine
     # alleinigen Fragen selbst hinein, und wer danach die Frage loescht (die

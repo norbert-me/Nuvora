@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, RootModel, field_validator
 from sqlalchemy import select, or_, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
-from ..besitz import oder_403
+from ..besitz import oder_403, nur_eigenes
 from ..database import get_db
 from ..kursmitglieder import kurs_der_klasse
 from ..importe import geprueft
@@ -375,7 +375,9 @@ async def toggle_archive(session_id: int, user: User = Depends(get_current_user)
 
 @router.delete("/{session_id}", status_code=204)
 async def delete_session(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    s = await oder_403(db, Session, session_id, user)
+    # Streng: eine besitzlose Bestands-Sitzung samt Auswertung und Scans war
+    # fuer jedes Konto loeschbar, und Sitzungsnummern sind fortlaufend.
+    s = await nur_eigenes(db, Session, session_id, user, "Sitzung nicht gefunden", "Keine Berechtigung")
     await db.delete(s)
     await db.commit()
 

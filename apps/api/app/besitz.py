@@ -43,6 +43,29 @@ async def oder_403(db, model, obj_id, user, fehlt=None, verboten=None):
     return obj
 
 
+async def nur_eigenes(db, model, obj_id, user, fehlt=None, verboten=None):
+    """Wie `oder_403` — aber OHNE Nachsicht fuer besitzlose Zeilen.
+
+    `oder_403` laesst eine Zeile ohne `owner_id` durch: Bestand aus der Zeit
+    vor der Mandantentrennung gehoert dort allen. Zum ANSEHEN ist das der
+    bewusste Kompromiss (sonst kaeme die Lehrkraft an ihre eigenen Altdaten
+    nicht mehr heran). Zum LOESCHEN ist es ein Loch: ein Ordner ohne Besitzer
+    liesse sich von jedem angemeldeten Konto samt Unterordnern und Quizzen
+    hart entfernen, und Ordner- wie Sitzungs-IDs sind fortlaufend — man muss
+    sie nicht raten, man zaehlt sie durch.
+
+    Deshalb gilt fuer alles, was WEGNIMMT: kein Besitzer, kein Zugriff. Die
+    Meldung sagt, was zu tun ist — `owner_backfill` in main.py traegt den
+    Besitzer nach, wo er sich herleiten laesst.
+    """
+    obj = await db.get(model, obj_id)
+    if not obj:
+        raise HTTPException(404, fehlt)
+    if obj.owner_id != user.id:
+        raise HTTPException(403, verboten or "Keine Berechtigung")
+    return obj
+
+
 async def klasse_oder_403(db, user, class_id) -> SchoolClass:
     """Klasse holen; fremde Klasse ist 403, unbekannte 404.
 

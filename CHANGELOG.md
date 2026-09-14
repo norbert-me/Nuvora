@@ -16,6 +16,18 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Aufgaben liegen jetzt im Papierkorb.** Gelöschte Lernpfad-Aufgaben sind 30
+  Tage wiederherstellbar, statt sofort weg zu sein — beim Aufräumen doppelter
+  Importe gehen hunderte auf einmal.
+- **Sicherheit: Löschen kennt keine Nachsicht mehr.** Datensätze aus der Zeit vor
+  der Mandantentrennung (ohne Besitzer) galten als „gehören allen" — beim Ansehen
+  bleibt das so, beim Löschen nicht. Der Besitzer wird beim Start nachgetragen, wo
+  er sich herleiten lässt.
+- Sicherheit: das Massenlöschen von Aufgaben hat eine Obergrenze (500 je Anfrage)
+  und eine Bremse; das endgültige Löschen eines Themas fasst nur noch eigene
+  Inhalte an.
+- Lernpfad: das Aufräumen zeigt einen Fortschrittsbalken und meldet erst „fertig",
+  wenn es auch beim Server angekommen ist.
 - **Lernpfad: viele Aufgaben löschen geht jetzt in EINER Anfrage.** Beim
   Aufräumen einer doppelt importierten Sammlung lief der Browser vorher in die
   Bremse des Servers — die Löschungen kamen nicht an, und in der Konsole stand

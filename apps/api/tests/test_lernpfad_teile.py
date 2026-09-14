@@ -54,5 +54,23 @@ async def test_sammel_loeschen_fasst_nur_eigene_an(s):
     aus = await delete_exercises(IdListe(ids=[m.id for m in meine] + [deine.id, 999999]),
                                  user=ich, db=s)
     assert aus["geloescht"] == 3, "nur die eigenen, und kein Fehler wegen der fremden"
-    uebrig = (await s.execute(__import__("sqlalchemy").select(Exercise))).scalars().all()
-    assert [x.id for x in uebrig] == [deine.id], "die fremde steht unberuehrt da"
+    for m in meine:
+        await s.refresh(m)
+        assert m.deleted_at is not None, "weich geloescht — 30 Tage Papierkorb"
+    await s.refresh(deine)
+    assert deine.deleted_at is None, "die fremde steht unberuehrt da"
+
+
+@pytest.mark.asyncio
+async def test_sammel_loeschen_hat_eine_obergrenze(s):
+    """Eine Anfrage raeumt einen Ordner auf, nicht ein Konto."""
+    from fastapi import HTTPException
+
+    from app.routers.lernpfad import MAX_LOESCHEN, IdListe, delete_exercises
+
+    u = User(email="grenze@x.de", password_hash="x", email_verified=True)
+    s.add(u)
+    await s.commit()
+    with pytest.raises(HTTPException) as fehler:
+        await delete_exercises(IdListe(ids=list(range(MAX_LOESCHEN + 1))), user=u, db=s)
+    assert fehler.value.status_code == 400

@@ -10,6 +10,7 @@ der Speicherort:
 Alle Endpunkte pruefen die Modulaktivierung: ein abgeschaltetes Modul
 antwortet nicht, auch wenn jemand die Adresse kennt.
 """
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -99,7 +100,7 @@ async def list_exercises(
     user: User = Depends(require_module),
     db: AsyncSession = Depends(get_db),
 ):
-    q = select(Exercise).where(Exercise.owner_id == user.id)
+    q = select(Exercise).where(Exercise.owner_id == user.id, Exercise.deleted_at.is_(None))
     if topic_id is not None:
         q = q.where(Exercise.topic_id == topic_id)
     result = await db.execute(q.order_by(Exercise.id))
@@ -139,6 +140,11 @@ async def update_exercise(
     return ex
 
 
+# Eine Anfrage raeumt einen Ordner auf, nicht ein Konto. Wer wirklich mehr
+# loeschen will, schickt mehrere — dann greift das Rate-Limit.
+MAX_LOESCHEN = 500
+
+
 class IdListe(BaseModel):
     ids: List[int] = []
 
@@ -146,27 +152,47 @@ class IdListe(BaseModel):
 @router.post("/exercises/loeschen")
 async def delete_exercises(body: IdListe, user: User = Depends(require_module),
                            db: AsyncSession = Depends(get_db)):
-    """Viele Aufgaben auf EINEN Schlag loeschen.
+    """Viele Aufgaben auf EINEN Schlag loeschen — abgeriegelt an vier Stellen.
 
-    Warum nicht einfach oft `DELETE /exercises/{id}`: beim Aufraeumen einer
-    doppelt importierten Sammlung sind das schnell mehrere hundert Anfragen in
-    wenigen Sekunden. Der Proxy laesst 30 je Sekunde durch (`limit_req` in
-    nginx.conf) und beantwortet den Rest mit 429 — ohne CORS-Kopfzeilen, und
-    dann meldet der Browser „Fetch API cannot load … due to access control
-    checks". Es sieht aus wie ein Rechteproblem und ist eine Bremse.
+    **Warum es den Weg gibt.** Beim Aufraeumen einer doppelt importierten
+    Sammlung fallen schnell mehrere hundert Loeschungen an. Einzeln geschickt
+    laufen sie in `limit_req` (30 Anfragen je Sekunde, nginx.conf), und dessen
+    429 kommt ohne CORS-Kopfzeilen zurueck — der Browser meldet dann „Fetch API
+    cannot load … due to access control checks". Es sieht aus wie ein
+    Rechteproblem und ist eine Bremse.
 
-    Geloescht wird ausschliesslich, was dem Konto gehoert; fremde und
-    unbekannte ids fallen still heraus (die Antwort sagt, wie viele es
-    wirklich waren). 404 waere hier falsch: beim Aufraeumen ist „gibt es schon
-    nicht mehr" der Normalfall, kein Fehler.
+    **Warum er trotzdem eng ist.** Ein Endpunkt, der auf einen Aufruf hin
+    beliebig viel loescht, ist der lohnendste Angriffspunkt des Moduls — eine
+    einzige gekaperte Sitzung wuerde sonst den ganzen Aufgabenbestand mitnehmen.
+    Vier Riegel:
+
+    1. **Nur Eigenes.** Gefiltert wird in der ABFRAGE (`owner_id == user.id`),
+       nicht nachtraeglich geprueft: fremde ids koennen gar nicht erst in die
+       Menge geraten. Sie fallen still heraus — beim Aufraeumen ist „gibt es
+       schon nicht mehr" der Normalfall, und ein 404 wuerde nebenbei verraten,
+       welche ids es gibt.
+    2. **Obergrenze je Aufruf** (`MAX_LOESCHEN`): eine Anfrage raeumt einen
+       Ordner auf, nicht ein Konto.
+    3. **Rate-Limit je Konto**: auch wiederholte Aufrufe kommen nicht beliebig
+       schnell durch — die Bremse steht damit im Haus und nicht nur im Proxy.
+    4. **Weich.** Gesetzt wird `deleted_at`; die Aufgabe liegt 30 Tage im
+       Papierkorb und laesst sich zurueckholen. Ein Fehlgriff — eigener wie
+       fremder — ist damit umkehrbar, und genau das ist der Unterschied
+       zwischen einem Missgeschick und einem Schaden.
     """
-    ids = [int(x) for x in (body.ids or [])][:5000]
+    rate_limit("ex_delete", f"u{user.id}", 20, 60,
+               "Zu viele Loeschungen in kurzer Zeit. Bitte kurz warten.")
+    ids = {int(x) for x in (body.ids or [])}
+    if len(ids) > MAX_LOESCHEN:
+        raise HTTPException(400, f"Hoechstens {MAX_LOESCHEN} Aufgaben auf einmal")
     if not ids:
         return {"geloescht": 0}
     rows = (await db.execute(select(Exercise).where(
-        Exercise.id.in_(ids), Exercise.owner_id == user.id))).scalars().all()
+        Exercise.id.in_(ids), Exercise.owner_id == user.id,
+        Exercise.deleted_at.is_(None)))).scalars().all()
+    jetzt = datetime.now()
     for ex in rows:
-        await db.delete(ex)
+        ex.deleted_at = jetzt
     await db.commit()
     return {"geloescht": len(rows)}
 
@@ -178,7 +204,9 @@ async def delete_exercise(
     db: AsyncSession = Depends(get_db),
 ):
     ex = await eigenes(db, Exercise, exercise_id, user, "Aufgabe nicht gefunden")
-    await db.delete(ex)
+    # Weich wie ueberall: eine Aufgabe steckt in Lernleitern und auf
+    # ausgeteilten Blaettern. Endgueltig weg ist sie ueber den Papierkorb.
+    ex.deleted_at = datetime.now()
     await db.commit()
 
 
@@ -358,6 +386,29 @@ async def purge_path(path_id: int, user: User = Depends(require_module), db: Asy
 
 async def _owned_path(db: AsyncSession, user: User, path_id: int) -> LearningPath:
     return await eigenes(db, LearningPath, path_id, user, "Lernpfad nicht gefunden")
+
+
+@router.post("/exercises/{exercise_id}/restore", response_model=ExerciseOut)
+async def restore_exercise(exercise_id: int, user: User = Depends(require_module),
+                           db: AsyncSession = Depends(get_db)):
+    """Aus dem Papierkorb zurueckholen. Die Lernleitern, die sie nennen, haben
+    ihre id nie verloren — die Aufgabe steht danach wieder in ihnen."""
+    ex = await eigenes(db, Exercise, exercise_id, user, "Aufgabe nicht gefunden")
+    ex.deleted_at = None
+    await db.commit()
+    await db.refresh(ex)
+    return ex
+
+
+@router.delete("/exercises/{exercise_id}/purge", status_code=204)
+async def purge_exercise(exercise_id: int, user: User = Depends(require_module),
+                         db: AsyncSession = Depends(get_db)):
+    """Endgueltig loeschen — nur aus dem Papierkorb heraus."""
+    ex = await eigenes(db, Exercise, exercise_id, user, "Aufgabe nicht gefunden")
+    if ex.deleted_at is None:
+        raise HTTPException(400, "Aufgabe ist nicht im Papierkorb")
+    await db.delete(ex)
+    await db.commit()
 
 
 @router.post("/paths/{path_id}/ladders", response_model=LadderOut, status_code=201)

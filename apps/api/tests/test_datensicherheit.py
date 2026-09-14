@@ -211,3 +211,50 @@ async def test_reihenfolge_laesst_fremde_quizze_unberuehrt(s):
     await s.refresh(deins)
     assert meins.position == 2, "das eigene Quiz bekommt seine Position"
     assert deins.position == 0, "das fremde bleibt unberuehrt"
+
+
+# ── 7) Wegnehmen kennt keine Nachsicht ───────────────────────────────────────
+@pytest.mark.asyncio
+async def test_besitzlose_zeile_ist_nicht_loeschbar(s):
+    """`owner_id IS NULL` heißt „Bestand aus der Zeit vor der
+    Mandantentrennung". Beim ANSEHEN gilt das als „gehört allen" — beim
+    LÖSCHEN nicht: ein Ordner ohne Besitzer ließe sich sonst von jedem
+    angemeldeten Konto samt Unterordnern und Quizzen entfernen, und Ordner-IDs
+    sind fortlaufend. Man muss sie nicht raten, man zählt sie durch."""
+    from fastapi import HTTPException
+
+    from app.besitz import nur_eigenes, oder_403
+
+    u = User(email="wer@x.de", password_hash="x", email_verified=True)
+    s.add(u)
+    await s.flush()
+    herrenlos = Folder(name="Altbestand", owner_id=None)
+    s.add(herrenlos)
+    await s.commit()
+
+    # Ansehen: geht weiter (sonst käme niemand mehr an seine Altdaten).
+    assert await oder_403(s, Folder, herrenlos.id, u) is herrenlos
+
+    # Wegnehmen: nicht mehr.
+    with pytest.raises(HTTPException) as fehler:
+        await nur_eigenes(s, Folder, herrenlos.id, u, "nicht gefunden")
+    assert fehler.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_fremde_zeile_bleibt_fremd(s):
+    from fastapi import HTTPException
+
+    from app.besitz import nur_eigenes
+
+    ich = User(email="ich3@x.de", password_hash="x", email_verified=True)
+    fremd = User(email="fremd3@x.de", password_hash="x", email_verified=True)
+    s.add_all([ich, fremd])
+    await s.flush()
+    deiner = Folder(name="Deiner", owner_id=fremd.id)
+    s.add(deiner)
+    await s.commit()
+
+    with pytest.raises(HTTPException) as fehler:
+        await nur_eigenes(s, Folder, deiner.id, ich, "nicht gefunden")
+    assert fehler.value.status_code == 403

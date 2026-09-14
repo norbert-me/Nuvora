@@ -303,6 +303,7 @@ def _ensure_columns(sync_conn):
         ("question_sets", "niveau_aktiv", "BOOLEAN DEFAULT FALSE NOT NULL"),
         ("question_sets", "minuspunkte", "BOOLEAN DEFAULT FALSE NOT NULL"),
         ("question_sets", "position", "INTEGER DEFAULT 0 NOT NULL"),
+        ("exercises", "deleted_at", "TIMESTAMPTZ"),
         ("question_set_items", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("topics", "ziel_g", "TEXT DEFAULT '' NOT NULL"),
         ("topics", "ziel_e", "TEXT DEFAULT '' NOT NULL"),
@@ -892,6 +893,64 @@ async def startup():
         except Exception as e:
             print(f"[STARTUP-WARN] Kurs-Migration übersprungen: {e}", flush=True)
 
+    # Besitzer nachtragen, wo er sich herleiten laesst.
+    #
+    # Zeilen ohne `owner_id` stammen aus der Zeit vor der Mandantentrennung.
+    # Beim Ansehen gelten sie als „gehoert allen" (besitz.oder_403) — beim
+    # LOESCHEN nicht mehr (besitz.nur_eigenes), sonst liesse sich ein fremder
+    # Ordnerbaum samt Quizzen per durchgezaehlter ID entfernen. Damit die
+    # Strenge niemanden von den EIGENEN Altdaten aussperrt, wird der Besitzer
+    # vorher nachgetragen, und zwar nur dort, wo er eindeutig ist:
+    #
+    #   Quiz      -> ueber seinen Ordner
+    #   Sitzung   -> ueber ihre Klasse
+    #   Frage     -> ueber ein Quiz, in dem sie steht (nur wenn ALLE Quizze
+    #                derselben Lehrkraft gehoeren — sonst waere es geraten)
+    #   Ordner    -> ueber den Elternordner
+    #
+    # Mehrdeutiges bleibt liegen: lieber eine Zeile, die niemand loeschen kann,
+    # als eine, die dem Falschen zugeschlagen wird. Idempotent — jeder Lauf
+    # fasst nur noch an, was uebrig ist.
+    async with async_session() as db:
+        for name, sql in (
+            ("Quiz", """
+                UPDATE question_sets qs SET owner_id = f.owner_id
+                FROM folders f
+                WHERE qs.owner_id IS NULL AND qs.folder_id = f.id AND f.owner_id IS NOT NULL
+            """),
+            ("Ordner", """
+                UPDATE folders k SET owner_id = e.owner_id
+                FROM folders e
+                WHERE k.owner_id IS NULL AND k.parent_id = e.id AND e.owner_id IS NOT NULL
+            """),
+            ("Sitzung", """
+                UPDATE sessions s SET owner_id = c.owner_id
+                FROM school_classes c
+                WHERE s.owner_id IS NULL AND s.class_id = c.id AND c.owner_id IS NOT NULL
+            """),
+            ("Frage", """
+                UPDATE questions q SET owner_id = t.owner_id
+                FROM (
+                    SELECT qsi.question_id AS qid,
+                           MIN(qs.owner_id) AS owner_id,
+                           COUNT(DISTINCT qs.owner_id) AS wieviele
+                    FROM question_set_items qsi
+                    JOIN question_sets qs ON qs.id = qsi.question_set_id
+                    WHERE qs.owner_id IS NOT NULL
+                    GROUP BY qsi.question_id
+                ) t
+                WHERE q.owner_id IS NULL AND q.id = t.qid AND t.wieviele = 1
+            """),
+        ):
+            try:
+                res = await db.execute(text(sql))
+                await db.commit()
+                if res.rowcount:
+                    print(f"[STARTUP] Besitzer nachgetragen: {res.rowcount} {name}(e).", flush=True)
+            except Exception as e:
+                await db.rollback()
+                print(f"[STARTUP-WARN] Besitzer-Nachtrag ({name}) uebersprungen: {type(e).__name__}: {e}", flush=True)
+
     # Karteikarten: Bestandsstapel in die neue Kurs-Zuweisung heben (einmalig je
     # Konto, siehe karten.uebernahme_deck_kurse). Ohne das stuenden nach dem
     # Umbau alle Stapel als „keinem Kurs zugewiesen" da und kein Kind bekaeme
@@ -1026,6 +1085,9 @@ async def startup():
 # Test test_papierkorb_job.py.
 PAPIERKORB_TABELLEN = (
     ("cards", "Karte(n)"), ("learning_ladders", "Lernleiter(n)"),
+    # Aufgaben vor Themen (dieselbe Regel wie bei den Fragen: sie zeigen per
+    # topic_id auf ihr Thema).
+    ("exercises", "Aufgabe(n)"),
     ("school_classes", "Klasse(n)"), ("card_decks", "Deck(s)"),
     ("learning_paths", "Lernpfad(e)"), ("kurse", "Kurs(e)"),
     # Fragen vor Themen: eine Frage zeigt per topic_id auf ihr Thema. Andersherum

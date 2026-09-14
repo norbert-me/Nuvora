@@ -332,11 +332,15 @@
         }
     }
 
+    // Gibt das Versprechen des Abgleichs ZURUECK: wer auf „ist es beim Server
+    // angekommen?" warten muss (der Fortschrittsbalken beim Aufraeumen), kann
+    // das dann auch. Alle uebrigen Aufrufer ignorieren es wie bisher.
     function save(key, data, opt) {
         cacheSetzen(key, JSON.stringify(data));
-        if (key === STORAGE_KEYS.aufgaben) syncAufgaben(data, opt);
+        if (key === STORAGE_KEYS.aufgaben) return syncAufgaben(data, opt);
         // schueler/klassen gehoeren dem Kern und werden unter /classes gepflegt —
         // von hier aus wird nichts zurueckgeschrieben.
+        return Promise.resolve();
     }
 
     // Signatur des zuletzt gespiegelten Standes je Aufgabe (id -> String). Nach
@@ -1647,16 +1651,59 @@
         return dubGruppen().filter(g => g.every(a => zahl(a) === 0));
     }
 
-    function dubAutoUnbenutzt() {
+    async function dubAutoUnbenutzt(melde) {
         const weg = new Set();
         dubUnbenutztGruppen().forEach(gruppe => {
             const bleibt = gruppe.slice().sort((a, b) => (dubGehalt(b) - dubGehalt(a)) || (codeNum(a) - codeNum(b)))[0];
             gruppe.forEach(a => { if (a !== bleibt) weg.add(a._id); });
         });
         if (!weg.size) return 0;
+        if (melde) await melde(0);
         aufgaben = aufgaben.filter(a => !weg.has(a._id));
-        save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
+        // Auf den Abgleich WARTEN: der Balken soll erst voll sein, wenn es auch
+        // beim Server angekommen ist — sonst meldet er „fertig", waehrend noch
+        // gesendet wird, und ein Neuladen holt alles zurueck.
+        await save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
+        if (melde) await melde(weg.size);
         return weg.size;
+    }
+
+    /**
+     * Einen laufenden Vorgang im Dialog zeigen — Balken, Zahl, kein Weiterklicken.
+     *
+     * `melde(getan)` schiebt den Balken; die Arbeit selbst macht der Aufrufer.
+     * Der Kasten legt sich UEBER den Dialoginhalt statt ihn zu ersetzen: danach
+     * steht wieder da, was vorher dastand, und man verliert die Stelle nicht.
+     */
+    async function dubFortschritt(gesamt, arbeit) {
+        const body = document.getElementById('dubletten-body');
+        const huelle = document.createElement('div');
+        huelle.style.cssText = 'position:absolute;inset:0;background:var(--surface);display:flex;'
+            + 'flex-direction:column;align-items:center;justify-content:center;gap:12px;border-radius:var(--radius);z-index:2';
+        huelle.innerHTML = `
+            <div style="font-size:15px;font-weight:600">Wird aufgeräumt …</div>
+            <div style="width:min(420px,80%);height:10px;background:var(--bg);border-radius:5px;overflow:hidden">
+                <div id="dub-balken" style="width:0%;height:100%;background:var(--primary);transition:width .15s linear"></div>
+            </div>
+            <div id="dub-balken-text" style="font-size:13px;color:var(--text-muted)">0 von ${gesamt}</div>`;
+        const inhalt = body.parentElement;
+        inhalt.style.position = 'relative';
+        inhalt.appendChild(huelle);
+        const balken = huelle.querySelector('#dub-balken');
+        const text = huelle.querySelector('#dub-balken-text');
+        const melde = (getan) => {
+            const pct = gesamt ? Math.min(100, Math.round((getan / gesamt) * 100)) : 100;
+            balken.style.width = pct + '%';
+            text.textContent = getan + ' von ' + gesamt;
+            // Dem Browser eine Bildschirmrunde geben — ohne sie springt der
+            // Balken erst am Ende von 0 auf 100.
+            return new Promise(res => requestAnimationFrame(() => res()));
+        };
+        try {
+            await arbeit(melde);
+        } finally {
+            huelle.remove();
+        }
     }
 
     let dubIndex = 0;
@@ -1773,8 +1820,12 @@
             if (!await confirmDlg(`${gruppe.length - 1} Aufgaben löschen und ${fmtId(behalten.code || behalten.id)} behalten?`,
                 { ok: 'Löschen', cancel: 'Abbrechen', danger: true })) return;
             const weg2 = new Set(gruppe.filter(a => a !== behalten).map(a => a._id));
-            aufgaben = aufgaben.filter(a => !weg2.has(a._id));
-            save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
+            await dubFortschritt(weg2.size, async (melde) => {
+                await melde(0);
+                aufgaben = aufgaben.filter(a => !weg2.has(a._id));
+                await save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
+                await melde(weg2.size);
+            });
             toast(weg2.size + ' Aufgaben gelöscht');
             dubZeichne();
         });
@@ -1784,10 +1835,15 @@
             const wieviele = dubUnbenutztGruppen().reduce((k, g) => k + g.length - 1, 0);
             if (!await confirmDlg(
                 wieviele + ' Aufgabe' + (wieviele === 1 ? '' : 'n') + ' entfernen? Sie stehen in keiner Lernleiter; '
-                + 'behalten wird je Paar die vollständigere Fassung. Das lässt sich nicht rückgängig machen.',
+                + 'behalten wird je Paar die vollständigere Fassung. Sie liegen danach 30 Tage im Papierkorb.',
                 { ok: 'Entfernen', cancel: 'Abbrechen', danger: true })) return;
-            const n = dubAutoUnbenutzt();
-            if (n) toast(n + ' Aufgabe' + (n === 1 ? '' : 'n') + ' ohne Zuordnung entfernt');
+            // Mit Fortschritt: bei hunderten Aufgaben laeuft das Speichern
+            // sekundenlang, und ein Dialog, der stillsteht, sieht aus wie einer,
+            // der haengt — genau daran ist der erste Anlauf gescheitert.
+            await dubFortschritt(wieviele, async (melde) => {
+                const n = await dubAutoUnbenutzt(melde);
+                if (n) toast(n + ' Aufgabe' + (n === 1 ? '' : 'n') + ' ohne Zuordnung entfernt');
+            });
             dubIndex = 0;
             dubZeichne();
         });

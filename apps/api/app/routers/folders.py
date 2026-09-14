@@ -6,6 +6,7 @@ from sqlalchemy import select, or_, delete as sql_delete, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..besitz import nur_eigenes
 from ..database import get_db
 from ..models import Folder, Question, QuestionSet, QuestionSetItem, Scan, User
 from .auth import get_current_user, rate_limit
@@ -157,11 +158,11 @@ async def list_root_question_sets(user: User = Depends(get_current_user), db: As
 
 @router.put("/folders/{folder_id}", response_model=FolderOut)
 async def update_folder(folder_id: int, body: FolderCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    f = await db.get(Folder, folder_id)
-    if not f:
-        raise HTTPException(404)
-    if f.owner_id and f.owner_id != user.id:
-        raise HTTPException(403, "Keine Berechtigung")
+    # STRENG, nicht nachsichtig: ein Ordner ohne Besitzer (Bestand aus der Zeit
+    # vor der Mandantentrennung) war bisher fuer JEDES angemeldete Konto
+    # loeschbar — samt Unterordnern und allen Quizzen darin, per Kaskade und
+    # ohne Papierkorb. Ordner-IDs sind fortlaufend; man muss sie nicht raten.
+    f = await nur_eigenes(db, Folder, folder_id, user, "Ordner nicht gefunden", "Keine Berechtigung")
     f.name = body.name
     f.parent_id = body.parent_id
     if not f.owner_id:
@@ -247,10 +248,10 @@ async def fragen_anhaengen(set_id: int, body: FragenAnhaengen, user: User = Depe
     Fragen, die schon drin sind, werden still uebergangen — sonst scheitert
     eine Zuweisung von 40 Fragen an der einen, die schon drinsteht.
     """
-    qs = await db.get(QuestionSet, set_id)
-    if not qs:
-        raise HTTPException(404)
-    await ensure_set_access(db, qs, user.id)
+    # Wie beim Ordner: zum Loeschen zaehlt nur der eigene Besitz. `ensure_set_access`
+    # laesst besitzlose Quizze durch — das ist beim Ansehen gewollt und beim
+    # Wegnehmen ein Loch.
+    qs = await nur_eigenes(db, QuestionSet, set_id, user, "Quiz nicht gefunden", "Keine Berechtigung")
     rate_limit("set_anhaengen", f"u{user.id}", 60, 60, "Zu viele Zuweisungen. Bitte kurz warten.")
     await _eigene_fragen(db, user, body.question_ids)
 

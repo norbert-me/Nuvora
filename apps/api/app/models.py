@@ -688,6 +688,10 @@ class Exercise(Versioniert, Base):
     latex: Mapped[str] = mapped_column(Text, default="", server_default="")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Weich geloescht wie alles im Haus: eine Aufgabe steckt in Lernleitern und
+    # auf ausgeteilten Blaettern. Hart geloescht war sie weg — und beim
+    # Aufraeumen doppelter Importe gehen schnell hunderte auf einmal.
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
 
 class LearningPath(Base):

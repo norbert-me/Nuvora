@@ -141,14 +141,22 @@ async def _owned_auch_geloescht(db: AsyncSession, user: User, topic_id: int) -> 
     return topic
 
 
-async def _mit_unterthemen(db: AsyncSession, topic_id: int) -> List[int]:
+async def _mit_unterthemen(db: AsyncSession, topic_id: int, owner_id: Optional[int] = None) -> List[int]:
     """Thema samt aller Nachfahren (ueber parent_id abgestiegen). Stand dreimal
     fast wortgleich da (delete_topic, restore_topic, purge_topic) — loeschen,
     zurueckholen und endgueltig loeschen fassen denselben Teilbaum an, also
     wird er auch nur einmal ermittelt (`ids` bremst kaputte Daten aus)."""
+    # Der Abstieg bleibt im eigenen Konto, wenn der Aufrufer es sagt. Bisher
+    # folgte er `parent_id` blind — dicht war das nur, weil `parent_id` beim
+    # Anlegen und Verschieben besitzgeprueft wird. Eine einzige Lockerung dort
+    # haette daraus einen mandantenuebergreifenden Schaden gemacht; die Grenze
+    # gehoert an die Stelle, die sie braucht.
     ids, rand = {topic_id}, [topic_id]
     while rand:
-        kinder = (await db.execute(select(Topic.id).where(Topic.parent_id.in_(rand)))).scalars().all()
+        q = select(Topic.id).where(Topic.parent_id.in_(rand))
+        if owner_id is not None:
+            q = q.where(Topic.owner_id == owner_id)
+        kinder = (await db.execute(q)).scalars().all()
         rand = [k for k in kinder if k not in ids]
         ids.update(rand)
     return list(ids)
@@ -397,8 +405,9 @@ async def delete_topic(
     from datetime import datetime, timezone
 
     topic = await _owned(db, user, topic_id)
-    # Thema samt aller Nachfahren (das Loeschen kaskadiert ueber parent_id).
-    ids = await _mit_unterthemen(db, topic.id)
+    # Thema samt aller Nachfahren (das Loeschen kaskadiert ueber parent_id) —
+    # im eigenen Konto.
+    ids = await _mit_unterthemen(db, topic.id, user.id)
     # Weich: Thema und Unterthemen wandern in den Papierkorb (30 Tage). Die
     # topic_id der Inhalte bleibt UNANGETASTET — wuerde sie jetzt geloest, kaeme
     # das Thema leer zurueck, und das Zurueckholen waere keins. Geloest wird
@@ -412,7 +421,7 @@ async def delete_topic(
 async def restore_topic(topic_id: int, user: User, db: AsyncSession):
     """Aus dem Papierkorb zurueck — samt Unterthemen (wie beim Loeschen)."""
     topic = await _owned_auch_geloescht(db, user, topic_id)
-    ids = await _mit_unterthemen(db, topic.id)
+    ids = await _mit_unterthemen(db, topic.id, user.id)
     for t in (await db.execute(select(Topic).where(Topic.id.in_(ids)))).scalars().all():
         t.deleted_at = None
     # Das Oberthema muss mit zurueck, sonst haengt das Unterthema im Nichts:
@@ -439,9 +448,15 @@ async def purge_topic(topic_id: int, user: User, db: AsyncSession):
     """
     from sqlalchemy import update
     topic = await _owned_auch_geloescht(db, user, topic_id)
-    ids = await _mit_unterthemen(db, topic.id)
+    ids = await _mit_unterthemen(db, topic.id, user.id)
+    # Und das Aufloesen fasst nur Eigenes an. Ohne diesen Filter lief ein
+    # UPDATE ueber zehn Tabellen ALLER Konten — dicht nur, solange `ids`
+    # garantiert eigene Themen sind. Zwei Riegel sind hier einer zu wenig.
     for modell in (Question, CardDeck, Exercise, CalendarEntry, CodePuzzle,
                    LearningLadder, GradeCategory, Method, TimetableSlot, Material):
-        await db.execute(update(modell).where(modell.topic_id.in_(ids)).values(topic_id=None))
+        stmt = update(modell).where(modell.topic_id.in_(ids))
+        if hasattr(modell, "owner_id"):
+            stmt = stmt.where(modell.owner_id == user.id)
+        await db.execute(stmt.values(topic_id=None))
     await db.delete(topic)
     await db.commit()
