@@ -37,6 +37,24 @@ function open() {
 }
 function tx(mode) { return open().then((db) => db.transaction(STORE, mode).objectStore(STORE)); }
 
+/**
+ * Zu welchem Konto gehoert das, was gerade in die Warteschlange geht?
+ *
+ * Die Warteschlange ueberlebt das Abmelden — sie haelt ungespeicherte Arbeit,
+ * und die wegzuwerfen waere ein stiller Datenverlust. Nachgespielt wurde sie
+ * aber mit dem Token, das beim NACHSPIELEN gerade dasteht: meldet sich am
+ * selben Browser jemand anders an und das Netz kommt zurueck, gingen die
+ * offline getippten Aenderungen des vorigen Kontos unter dem neuen hinaus.
+ * Deshalb traegt jeder Eintrag seinen Urheber, und `flush` laesst fremde
+ * liegen.
+ */
+export function kontoId() {
+  try {
+    const u = JSON.parse(localStorage.getItem("user") || "null");
+    return u && u.id != null ? u.id : null;
+  } catch { return null; }
+}
+
 export function newTmp() {
   return "tmp-" + (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 }
@@ -92,8 +110,14 @@ const SPERRE = [
   [/^\/api\/marketplace\//, "Veroeffentlichung nach aussen"],
   // (b) nicht wiederholbar
   [/\/purge$/, "endgueltiges Loeschen — das faehrt man nicht blind nach"],
+  // Der Papierkorb im Ganzen: „leeren" und das endgueltige Loeschen einer
+  // einzelnen Zeile enden nicht auf `/purge` und waren damit nicht erfasst —
+  // stundenspaeter nachgespielt traefe „leeren" einen inzwischen neu
+  // gefuellten Papierkorb.
+  [/^\/api\/trash/, "Papierkorb: endgueltig, und beim Nachspielen ein anderer Inhalt"],
+  [/\/verwaist$/, "Sammel-Loeschung aller verwaisten Fragen"],
   [/\/tokens\/rotate$/, "macht jeden ausgeteilten Ausdruck tot"],
-  [/\/(copy|remediate|nachholbedarf|draw|probelauf|pruefen|zurueckspielen|resync)$/, "Aktion mit Seiteneffekt, beim Nachspielen liefe sie ein zweites Mal"],
+  [/\/(copy|duplicate|remediate|nachholbedarf|draw|probelauf|pruefen|zurueckspielen|resync)$/, "Aktion mit Seiteneffekt, beim Nachspielen liefe sie ein zweites Mal"],
   [/\/(import|export)/, "Massenvorgang"],
   // (c) kein JSON
   [/\/(photo|upload-image)$/, "Bild"],
@@ -130,6 +154,10 @@ export function classify(method, url, bodyObj, koerperOk = true) {
   // Aufrufe zeigen — die braucht eine Behelfs-ID. POST auf etwas, das schon eine
   // ID IM PFAD hat, ist ein Zustandswechsel an einem bestehenden Ding
   // (archivieren, wiederherstellen, umschalten) und braucht keine.
+  // Ein Umschalter legt nichts an: `…/dividers/toggle` galt wegen der zwei
+  // Segmente hinter der ID als "create" und bekam eine Behelfs-ID, die nie
+  // aufgeloest werden konnte — der abhaengige Eintrag waere verworfen worden.
+  if (m === "POST" && /\/toggle$/.test(p)) return "write";
   if (m === "POST") return /\/\d+(\/[a-z-]+)?$/.test(p) ? "write" : "create";
   return "write";
 }
@@ -148,6 +176,8 @@ export async function enqueue(method, url, bodyObj, opts = {}) {
   const store = await tx("readwrite");
   await new Promise((resolve, reject) => {
     const r = store.add({ method, url, body: bodyObj || null, kind: opts.kind || "write", tmp: opts.tmp || null,
+                          // Wer das getippt hat (siehe kontoId).
+                          konto: opts.konto !== undefined ? opts.konto : kontoId(),
                           // Auf WELCHEN Stand sich diese Aenderung bezieht. Der
                           // Server vergleicht ihn beim Nachspielen; ohne ihn
                           // waere „nachspielen" schlicht ueberschreiben.
@@ -162,6 +192,18 @@ async function all() {
   const store = await tx("readonly");
   return new Promise((resolve) => { const r = store.getAll(); r.onsuccess = () => resolve(r.result || []); r.onerror = () => resolve([]); });
 }
+/**
+ * Die ganze Warteschlange wegwerfen.
+ *
+ * Nur nach einem erfolgreichen Abgleich benutzen: was hier liegt, ist Arbeit,
+ * die der Server noch nicht hat.
+ */
+export async function leeren() {
+  const store = await tx("readwrite");
+  await new Promise((resolve) => { const r = store.clear(); r.onsuccess = resolve; r.onerror = resolve; });
+  notify();
+}
+
 async function remove(id) {
   const store = await tx("readwrite");
   return new Promise((resolve) => { const r = store.delete(id); r.onsuccess = resolve; r.onerror = resolve; });
@@ -255,8 +297,14 @@ export async function flush(rawFetch) {
   const doFetch = rawFetch || window.fetch;
   const map = loadMap();
   try {
+    const ich = kontoId();
     const items = (await all()).sort((a, b) => a.id - b.id);
     for (const it of items) {
+      // Fremder Urheber: liegen lassen, nicht senden und nicht verwerfen. Die
+      // Aenderung gehoert dem anderen Konto — unter diesem Token abgeschickt
+      // waere sie eine Faelschung, weggeworfen ein Datenverlust bei jemandem,
+      // der gerade gar nicht hier ist.
+      if (it.konto != null && ich != null && it.konto !== ich) continue;
       const [url, urlRest] = remapUrl(it.url, map);
       const [body, bodyRest] = remapBody(it.body, map);
       if (urlRest || bodyRest) {

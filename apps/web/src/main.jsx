@@ -7,7 +7,8 @@ import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import "@fontsource/inter/800.css";
 import { LanguageProvider, useLanguage } from "./i18n/index.jsx";
-import { enqueue, classify, newTmp, flush as flushOutbox, setKonfliktFrage } from "./core/outbox.js";
+import { enqueue, classify, newTmp, flush as flushOutbox, setKonfliktFrage, leeren as outboxLeeren, count as outboxCount } from "./core/outbox.js";
+import { raeumeBrowser } from "./core/abmelden.js";
 // Optimistisches Sperren: gelesene Staende merken, beim Schreiben mitschicken
 // (Gegenstueck: app/versionierung.py).
 import { KOPF as VERSION_KOPF, merke as merkeVersion, fuer as versionFuer, vergiss as vergissVersion } from "./core/versionen.js";
@@ -117,9 +118,9 @@ window.fetch = function(input, init) {
         && !url.includes("/api/caldav/") && tokenBeimStart) {
       const tokenJetzt = lies("token") || "";
       if (tokenJetzt === tokenBeimStart) {
-        loesche("token");
-        loesche("user");
-        location.reload();
+        // Abgelaufene Sitzung ist ein Abmelden wie jedes andere — und der
+        // haeufigste. Ohne dieselbe Raeumung bliebe hier alles liegen.
+        raeumeBrowser().finally(() => location.reload());
       }
     }
     return res;
@@ -1329,21 +1330,26 @@ function App() {
     return () => clearTimeout(timer);
   }, [user]);
 
-  const logout = () => {
-    loesche("token");
-    loesche("user");
-    try { localStorage.removeItem("nuvora:vorgeladen"); } catch { /* egal */ }
-    // Zwischengespeicherte Kerndaten des Nutzers loeschen (kein Rest fuer den
-    // naechsten Login am selben Browser).
-    schluessel("nuvora_cache_").forEach(loesche);
-    // Auch die Ansichts-Einstellungen: der naechste Nutzer an diesem Browser
-    // soll nicht die Startseite des vorigen sehen.
+  const logout = async () => {
+    // Erst abgeben, dann raeumen: was offline getippt wurde, liegt in der
+    // Warteschlange und ist noch nirgends gespeichert. Geht es hinaus, ist sie
+    // hinterher leer; geht es nicht, bleibt sie liegen — mit dem Konto daran,
+    // damit die naechste Person sie nicht unter ihrem Namen abschickt
+    // (siehe kontoId in outbox.js).
+    try {
+      if (navigator.onLine && (await outboxCount()) > 0) {
+        await flushOutbox();
+        if ((await outboxCount()) === 0) await outboxLeeren();
+      }
+    } catch { /* kein Netz, kein IndexedDB: dann bleibt sie eben liegen */ }
+    // Der Rest an EINER Stelle (core/abmelden.js): Token, Nutzer, die
+    // Zwischenspeicher, die Tafel, der Code-Detektiv, die Lernpfad-Namen —
+    // und der API-Vorrat des Service-Workers, in dem nach `vorladen()` die
+    // Noten und die Anwesenheit aller Klassen liegen.
+    await raeumeBrowser();
+    // Ansichts-Einstellungen: der naechste Nutzer an diesem Browser soll nicht
+    // die Startseite des vorigen sehen.
     ansichtenVergessen();
-    // Und der Anzeige-Cache der eingebetteten Lernpfad-App: unter `ll_schueler`
-    // liegen SCHUELERNAMEN. Sie ueberlebten das Abmelden — der eigene Knopf im
-    // Lernpfad raeumte sie, der hier oben nicht, und am geteilten Rechner ist
-    // das der Weg, auf dem Namen bei der naechsten Person landen.
-    ["ll_aufgaben", "ll_schueler", "ll_klassen", "ll_id_counter"].forEach(loesche);
     setUser(null);
   };
 

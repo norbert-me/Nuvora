@@ -148,8 +148,16 @@ export default function Legal() {
         <p style={{ marginTop: 8 }}>
           Zusätzlich legt die Anwendung im localStorage einen <strong>lokalen Zwischenspeicher</strong> selten
           wechselnder eigener Daten der Lehrkraft ab (z.&nbsp;B. Klassen, Themen, aktive Module, die Reihenfolge
-          der Startseiten-Kacheln), damit Seiten schneller erscheinen. Diese Daten verbleiben im Browser der
-          Lehrkraft, werden nicht an Dritte übertragen und beim Abmelden wieder entfernt.
+          der Startseiten-Kacheln), damit Seiten schneller erscheinen. Für den Offline-Betrieb legt der
+          Service-Worker zusätzlich die abgerufenen Daten in einem Zwischenspeicher des Browsers ab.
+          Diese Daten verbleiben im Browser der Lehrkraft, werden nicht an Dritte übertragen und
+          <strong>beim Abmelden entfernt</strong> — einschließlich des Offline-Zwischenspeichers.
+        </p>
+        <p style={{ marginTop: 8 }}>
+          Eine Ausnahme davon sind <strong>offline getätigte Änderungen</strong>, die noch nicht zum Server
+          übertragen werden konnten: sie warten in einer Warteschlange im Browser, bis wieder eine Verbindung
+          besteht — sie beim Abmelden zu löschen hieße, unwiederbringlich Arbeit zu verwerfen. Sie tragen das
+          Konto, zu dem sie gehören, und werden nie unter einem anderen übertragen.
         </p>
         <p style={{ marginTop: 8 }}>
           Sämtliche Schriften und Bibliotheken (u.&nbsp;a. KaTeX zur Formeldarstellung) werden

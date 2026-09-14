@@ -6,7 +6,7 @@
 // faellt niemandem auf — bis eine Anmeldung offline "gelingt" oder eine
 // Sitzung ohne Server startet. Deshalb dieser Test.
 import { describe, expect, it } from "vitest";
-import { classify, eigeneIstNeuer, gesperrt } from "./outbox.js";
+import { classify, eigeneIstNeuer, gesperrt, kontoId } from "./outbox.js";
 
 // classify baut Pfade ueber new URL(url, location.origin) — in der
 // Node-Umgebung gibt es kein location.
@@ -98,5 +98,36 @@ describe("Konflikt: fragen oder selbst entscheiden", () => {
     expect(eigeneIstNeuer(jetzt, null)).toBe(false);
     expect(eigeneIstNeuer(jetzt, "Unsinn")).toBe(false);
     expect(eigeneIstNeuer(0, "2026-09-08T11:00:00Z")).toBe(false);
+  });
+});
+
+
+describe("endgueltiges Loeschen wird nicht nachgespielt", () => {
+  it("Papierkorb und Sammel-Loeschungen stehen auf der Sperrliste", () => {
+    // Stunden spaeter nachgespielt traefe „Papierkorb leeren" einen inzwischen
+    // neu gefuellten Papierkorb — und dahinter gibt es keinen Rueckweg.
+    expect(gesperrt("/api/trash")).toBeTruthy();
+    expect(gesperrt("/api/trash/exercise/12")).toBeTruthy();
+    expect(gesperrt("/api/questions/verwaist")).toBeTruthy();
+    expect(gesperrt("/api/question-sets/4/duplicate")).toBeTruthy();
+  });
+
+  it("ein Umschalter legt nichts an", () => {
+    // Zwei Segmente hinter der ID machten daraus ein "create" samt Behelfs-ID,
+    // die nie aufgeloest werden konnte.
+    expect(classify("POST", "/api/noten/classes/7/dividers/toggle", {})).toBe("write");
+  });
+});
+
+describe("die Warteschlange gehoert ihrem Urheber", () => {
+  it("kontoId liest die id aus dem angemeldeten Nutzer", () => {
+    globalThis.localStorage = {
+      getItem: (k) => (k === "user" ? JSON.stringify({ id: 7, email: "a@b.de" }) : null),
+    };
+    expect(kontoId()).toBe(7);
+    globalThis.localStorage = { getItem: () => "kein json" };
+    expect(kontoId()).toBe(null);
+    globalThis.localStorage = undefined;
+    expect(kontoId()).toBe(null);
   });
 });

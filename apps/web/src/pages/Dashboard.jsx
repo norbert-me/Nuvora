@@ -16,6 +16,7 @@ import { themenIndex, useThemen } from "../core/topics.js";
 import { useAktiv } from "../core/modules.js";
 import { useZiehVorschau } from "../core/ziehsortieren.js";
 import { alsJson, hol } from "../core/melden.js";
+import { raeumeBrowser } from "../core/abmelden.js";
 import { formelEinfuegen, LATEX_TASTEN_LANG } from "../core/latextabelle.js";
 
 const API = "/api";
@@ -280,7 +281,9 @@ export default function Dashboard() {
     try {
       const [fr, qr] = await Promise.all([fetch(`${API}/folders`), fetch(`${API}/questions`)]);
       if (fr.status === 401 || qr.status === 401) {
-        localStorage.removeItem("token"); localStorage.removeItem("user"); location.reload(); return;
+        // Dieselbe Raeumung wie beim Abmelden (core/abmelden.js) — sonst bleibt
+        // beim 401 am geteilten Rechner alles liegen.
+        raeumeBrowser().finally(() => location.reload()); return;
       }
       const [f, q] = await Promise.all([fr.json(), qr.json()]);
       setFolders(Array.isArray(f) ? f : []);

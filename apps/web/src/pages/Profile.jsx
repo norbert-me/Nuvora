@@ -8,6 +8,7 @@ import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle
   sectionLabel, Tabs, th as thBasis, td as tdBasis, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson } from "../core/melden.js";
+import { raeumeBrowser } from "../core/abmelden.js";
 import { useModules } from "../core/modules.js";
 import BugAdmin from "../components/BugAdmin.jsx";
 
@@ -702,8 +703,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             body: JSON.stringify({ password: pw }),
           });
           if (res.ok) {
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
+            // Das Konto ist weg — dann darf im Browser erst recht nichts
+            // liegen bleiben.
+            await raeumeBrowser();
             location.reload();
           } else {
             const data = await res.json();

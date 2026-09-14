@@ -25,6 +25,7 @@ import BildZuschnitt from "../components/BildZuschnitt.jsx";
 import { useAktiv } from "../core/modules.js";
 import { peek, put } from "../core/cache.js";
 import { alsJson } from "../core/melden.js";
+import { raeumeBrowser } from "../core/abmelden.js";
 
 const API = "/api";
 
@@ -74,7 +75,7 @@ export default function Classes() {
   // beim Umschalten kurz die falsche Liste.
   const [archiv, setArchiv] = useState(false);
   const load = (imArchiv = archiv) => fetch(`${API}/classes${imArchiv ? "?archiviert=true" : ""}`).then((r) => {
-    if (r.status === 401) { localStorage.removeItem("token"); localStorage.removeItem("user"); location.reload(); return []; }
+    if (r.status === 401) { raeumeBrowser().finally(() => location.reload()); return []; }
     return r.json();
   }).then((d) => { const list = Array.isArray(d) ? d : []; setClasses(list); if (!imArchiv) put("classes", list); setLoadError(false); }).catch(() => setLoadError(true)).finally(() => setLoaded(true));
   useEffect(() => {
