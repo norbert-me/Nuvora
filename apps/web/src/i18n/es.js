@@ -2025,6 +2025,7 @@ export default {
   "melder.mitLog": "Enviar el registro",
   "melder.mitUmgebung": "Enviar datos técnicos",
   "melder.umgebungTitel": "Datos técnicos",
+  "melder.seiteTitel": "Página",
   "melder.protokollTitel": "Registro",
   "melder.logZeigen": "Ver el registro",
   "melder.wasGeht": "¿Qué se envía?",

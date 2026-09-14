@@ -2024,6 +2024,7 @@ export default {
   "melder.mitLog": "Include log",
   "melder.mitUmgebung": "Include technical details",
   "melder.umgebungTitel": "Technical details",
+  "melder.seiteTitel": "Page",
   "melder.protokollTitel": "Log",
   "melder.logZeigen": "View log",
   "melder.wasGeht": "What is sent?",

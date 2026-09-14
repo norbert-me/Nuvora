@@ -34,7 +34,7 @@ from ..pdfdruck import neue_seite
 from .. import rueckmeldung
 from ..database import get_db
 from ..schueler import sortiert
-from ..uploads import bildtyp
+from ..uploads import anhang_kopf, bildtyp
 # Optimistisches Sperren (siehe app/versionierung.py).
 from ..versionierung import VersionOut, pruefe, stand
 from sqlalchemy.orm import selectinload
@@ -1170,7 +1170,7 @@ async def zugaenge_pdf(class_id: int, base: str = "",
     c.save()
     name = f"Zugaenge_{(cls.name or 'Klasse').replace(' ', '_')}.pdf"
     return Response(content=puffer.getvalue(), media_type="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+                    headers={"Content-Disposition": anhang_kopf(name)})
 
 
 # ─── Lehrkraft: Fortschritt ───

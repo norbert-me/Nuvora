@@ -30,10 +30,30 @@ async def test_als_anhang_setzt_kopfzeile_und_spult_zurueck():
     buf.seek(12)   # absichtlich am Ende — der Helfer muss zurueckspulen
     r = als_anhang(buf, "Zeugnis.pdf")
     assert r.media_type == "application/pdf"
-    assert r.headers["content-disposition"] == 'attachment; filename="Zeugnis.pdf"'
+    assert r.headers["content-disposition"] == (
+        'attachment; filename="Zeugnis.pdf"; filename*=UTF-8\'\'Zeugnis.pdf')
     assert buf.tell() == 0
     # Auch rohe Bytes muessen gehen (das Zeugnis liefert welche).
     assert als_anhang(b"%PDF-1.4", "x.pdf").media_type == "application/pdf"
+
+
+@pytest.mark.asyncio
+async def test_ein_name_mit_umlaut_sprengt_die_kopfzeile_nicht():
+    """Eine Kopfzeile traegt nur Latin-1.
+
+    „Ayşe" liess Starlette beim Kodieren werfen — der Ausdruck endete in
+    HTTP 500, und zwar fuer genau dieses Kind. Der ASCII-Ersatz haelt die
+    Kopfzeile gueltig, `filename*` traegt den richtigen Namen.
+    """
+    r = als_anhang(b"%PDF-1.4", "Zeugnis Ayşe.pdf")
+    kopf = r.headers["content-disposition"]
+    kopf.encode("latin-1")            # das war der Absturz
+    assert "filename*=UTF-8''" in kopf
+    assert "Ay%C5%9Fe" in kopf
+
+    # Und eine eingeschleuste Kopfzeile bleibt eine Zeichenkette.
+    boese = als_anhang(b"%PDF-1.4", 'a"\r\nX-Spass: 1.pdf').headers["content-disposition"]
+    assert "\n" not in boese and "\r" not in boese
 
 
 @pytest.mark.asyncio

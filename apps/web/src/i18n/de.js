@@ -2010,6 +2010,7 @@ export default {
   "melder.mitLog": "Protokoll mitschicken",
   "melder.mitUmgebung": "Technische Angaben mitschicken",
   "melder.umgebungTitel": "Technische Angaben",
+  "melder.seiteTitel": "Seite",
   "melder.protokollTitel": "Protokoll",
   "melder.logZeigen": "Protokoll ansehen",
   "melder.wasGeht": "Was wird mitgeschickt?",

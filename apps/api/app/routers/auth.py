@@ -15,7 +15,7 @@ from argon2 import PasswordHasher
 from argon2.low_level import Type as Argon2Type
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..netz import client_ip as _client_ip
@@ -45,6 +45,12 @@ async def _purge_user_content(db: AsyncSession, user_id: int):
             urls.update(v for v in q.choice_images.values() if isinstance(v, str))
     # 2) Marktplatz-Veröffentlichungen der Person löschen (Ratings kaskadieren).
     await db.execute(delete(MarketplaceQuiz).where(MarketplaceQuiz.author_id == user_id))
+    # 2b) Fehlermeldungen bleiben stehen (SET NULL, damit ein Bericht nicht mit
+    #     dem Konto verschwindet) — die E-Mail-Adresse darin nicht. Sie ist die
+    #     einzige Personenangabe im Datensatz und hat nach dem Löschen des
+    #     Kontos keinen Zweck mehr; die Meldung bleibt ohne sie lesbar.
+    from ..models import BugReport as _BugReport
+    await db.execute(sa_update(_BugReport).where(_BugReport.user_id == user_id).values(email=""))
     # 3) Dateien löschen — aber nur, wenn keine fremde Frage sie noch nutzt
     #    (übernommene Kopien referenzieren dieselbe URL, sollen nicht kaputtgehen).
     for url in urls:
@@ -75,8 +81,6 @@ TOKEN_TTL = 86400 * 30  # 30 Tage; per Sliding-Renewal (siehe get_current_user)
                         # laeuft also praktisch nie ab. Nur echtes Nichtstun > 30 Tage
                         # (oder token_version-Wechsel) meldet ab.
 
-# Rate limiting: {ip: [(timestamp, ...)]}
-_login_attempts: dict[str, list[float]] = defaultdict(list)
 MAX_LOGIN_ATTEMPTS = 5
 LOGIN_WINDOW = 60
 
@@ -109,6 +113,12 @@ LOGIN_WINDOW = 60
 # je Anmeldung unter Last nichts bringt, ausser sich selbst im Weg zu stehen.
 # Gemessen: ~14 ms je Pruefung (PBKDF2 mit 600 000 Runden: ~48 ms) — deutlich
 # unter der 100-ms-Grenze, mit Luft fuer eine langsamere Server-CPU.
+# Gegen das Zeit-Orakel bei der Anmeldung: eine unbekannte Adresse sprang
+# frueher am Argon2-Aufruf vorbei und war nach ~0 ms beantwortet, eine bekannte
+# nach ~14 ms. Das ist ein Erkennungskanal ohne jede Grenze — er verraet, WER
+# ein Konto hat, und das Rate-Limit deckt ihn nicht, weil die Antwort in beiden
+# Faellen „falsch" lautet. `_verify_pw` prueft deshalb bei unbekannter Adresse
+# gegen diesen Blindwert.
 PW_ALGO = "pbkdf2_sha256"
 PW_ITERATIONS = 600_000
 PW_ITERATIONS_LEGACY = 100_000
@@ -176,6 +186,10 @@ def _hash_pbkdf2(password: str, iterations: int = PW_ITERATIONS) -> str:
 
 def _hash_pw(password: str) -> str:
     return _hasher.hash(password)
+
+
+# Einmal beim Start gerechnet (~14 ms) — nicht je Anmeldung.
+_DUMMY_PW_HASH = _hasher.hash("nuvora-blindpruefung")
 
 
 def _verify_pw(password: str, stored: str) -> bool:
@@ -255,9 +269,21 @@ def _decode_reset_token(token: str):
         return None
 
 
+# Ein Bestaetigungslink hatte bisher WEDER Frist NOCH Verbrauch: derselbe Link
+# aktivierte das Konto noch Monate spaeter, und ein Adresswechsel hin und
+# zurueck machte alte Links wieder gueltig. Die Frist ist dieselbe, nach der ein
+# unbestaetigtes Konto ohnehin geloescht wird (siehe Mailtext) — laenger kann
+# ein Link nicht sinnvoll gelten. Wer ihn verpasst, fordert unter
+# `/api/auth/resend-verification` einen neuen an; der Weg sagt wie bisher
+# nichts darueber, ob es die Adresse gibt.
+VERIFY_TTL = 86400 * 14
+
+
 def _make_verify_token(user: User) -> str:
-    sig = hmac.new(SECRET.encode(), f"verify:{user.id}:{user.email}".encode(), "sha256").hexdigest()[:32]
-    return base64.urlsafe_b64encode(f"{user.id}:{sig}".encode()).decode().rstrip("=")
+    ts = int(time.time())
+    payload = f"{user.id}:{ts}"
+    sig = hmac.new(SECRET.encode(), f"verify:{payload}:{user.email}".encode(), "sha256").hexdigest()[:32]
+    return base64.urlsafe_b64encode(f"{payload}:{sig}".encode()).decode().rstrip("=")
 
 
 def _decode_id_sig(token: str):
@@ -299,6 +325,28 @@ async def _send_verify_mail(user: User):
     )
 
 
+async def _send_schon_vergeben_mail(user: User):
+    """Antwort auf eine Registrierung mit einer Adresse, die es schon gibt.
+
+    Sie geht an die EIGENTUEMERIN der Adresse, nicht an die anfragende Seite —
+    deshalb verraet sie niemandem etwas, den es nichts angeht, und sagt der
+    richtigen Person genau das, was sie wissen muss.
+    """
+    link = f"{SITE_URL}/forgot-password" if SITE_URL else "/forgot-password"
+    await mailer.send_email(
+        user.email,
+        "Nuvora — Konto besteht bereits",
+        "Hallo,\n\n"
+        "mit dieser Adresse wurde gerade versucht, ein Nuvora-Konto anzulegen — "
+        "es gibt aber schon eines.\n\n"
+        "Warst du das und hast dein Passwort vergessen, setze es hier zurück:\n\n"
+        f"{link}\n\n"
+        "Warst du das nicht, kannst du diese Nachricht ignorieren. "
+        "Es wurde nichts angelegt und nichts geändert.\n\n"
+        "Viele Grüße\nDein Nuvora-Team",
+    )
+
+
 async def get_current_user(request: Request, response: Response, db: AsyncSession = Depends(get_db)) -> User:
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
@@ -324,12 +372,15 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
 
 
 def _check_rate_limit(ip: str):
-    now = time.time()
-    attempts = _login_attempts[ip]
-    _login_attempts[ip] = [t for t in attempts if now - t < LOGIN_WINDOW]
-    if len(_login_attempts[ip]) >= MAX_LOGIN_ATTEMPTS:
-        raise HTTPException(429, "Zu viele Anmeldeversuche. Bitte warte eine Minute.")
-    _login_attempts[ip].append(now)
+    """Anmeldeversuche je Adresse.
+
+    Lief frueher ueber ein eigenes `_login_attempts`, das NIE ausgekehrt wurde:
+    jede neue Adresse legte einen Eintrag an, der fuer immer blieb — Speicher,
+    den man von aussen beliebig aufblasen kann. Jetzt derselbe Eimer wie
+    ueberall sonst, samt Kehrmaschine.
+    """
+    rate_limit("login", ip, MAX_LOGIN_ATTEMPTS, LOGIN_WINDOW,
+               "Zu viele Anmeldeversuche. Bitte warte eine Minute.")
 
 
 # Generischer, wiederverwendbarer Sliding-Window-Limiter (pro IP + Bucket)
@@ -518,9 +569,20 @@ async def me(user: User = Depends(get_current_user)):
 async def login(body: LoginBody, request: Request, db: AsyncSession = Depends(get_db)):
     ip = request.headers.get("X-Real-IP", request.client.host if request.client else "unknown")
     _check_rate_limit(ip)
-    result = await db.execute(select(User).where(User.email == body.email.lower().strip()))
+    email = body.email.lower().strip()
+    # Zweite Bremse, und zwar je KONTO: das Limit je Adresse allein hilft nicht
+    # gegen verteiltes Ausprobieren — wer ueber viele Adressen kommt, hat gegen
+    # ein bekanntes Konto beliebig viele Versuche.
+    rate_limit("login_konto", email, 20, 300,
+               "Zu viele Anmeldeversuche für dieses Konto. Bitte kurz warten.")
+    result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
-    if not user or not _verify_pw(body.password, user.password_hash):
+    if not user:
+        # Blindpruefung, damit eine unbekannte Adresse genauso lange braucht
+        # wie eine bekannte (siehe _DUMMY_PW_HASH).
+        _verify_pw(body.password, _DUMMY_PW_HASH)
+        raise HTTPException(401, "E-Mail oder Passwort falsch")
+    if not _verify_pw(body.password, user.password_hash):
         raise HTTPException(401, "E-Mail oder Passwort falsch")
     if not user.email_verified:
         raise HTTPException(403, "E-Mail noch nicht bestätigt. Bitte prüfe dein Postfach (auch Spam).")
@@ -539,8 +601,21 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
     rate_limit("register", client_ip(request), 10, 600, "Zu viele Registrierungen. Bitte später erneut versuchen.")
     email = body.email.lower().strip()
     result = await db.execute(select(User).where(User.email == email))
-    if result.scalar_one_or_none():
-        raise HTTPException(400, "E-Mail bereits registriert")
+    vorhanden = result.scalar_one_or_none()
+    if vorhanden:
+        # KEINE Auskunft darueber, ob es dieses Konto gibt. Vorher stand hier
+        # „E-Mail bereits registriert" — eine Adresse je Anfrage, und damit ein
+        # sauberer Weg, Konten aufzuzaehlen. „Passwort vergessen" nebenan haelt
+        # sich seit jeher heraus; hier hob es dieselbe Zurueckhaltung wieder auf.
+        #
+        # Wer WIRKLICH dieses Konto besitzt, erfaehrt es trotzdem — per Mail an
+        # die Adresse, die es schon gibt. Ein Konto wird dabei nicht angelegt
+        # und kein Passwort geaendert.
+        if vorhanden.email_verified:
+            await _send_schon_vergeben_mail(vorhanden)
+        else:
+            await _send_verify_mail(vorhanden)
+        return {"ok": True}
     # changelog_seen von Anfang an auf die laufende Fassung: ein neues Konto
     # soll beim ersten Anmelden nicht die Aenderungsliste der letzten zwanzig
     # Fassungen sehen — fuer diese Person ist daran nichts neu.
@@ -654,16 +729,19 @@ async def oeffentliche_adresse():
 @router.post("/verify-email")
 async def verify_email(body: VerifyEmailBody, request: Request, db: AsyncSession = Depends(get_db)):
     rate_limit("verify", client_ip(request), 20, 600)
-    dec = _decode_verify_token(body.token)
+    dec = _decode_reset_token(body.token)   # gleiche Form: id:ts:sig
     if not dec:
         raise HTTPException(400, "Ungültiger Bestätigungslink")
-    user_id, sig = dec
+    user_id, ts, sig = dec
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(400, "Ungültiger Link")
-    expected = hmac.new(SECRET.encode(), f"verify:{user.id}:{user.email}".encode(), "sha256").hexdigest()[:32]
+    expected = hmac.new(SECRET.encode(), f"verify:{user.id}:{ts}:{user.email}".encode(),
+                        "sha256").hexdigest()[:32]
     if not hmac.compare_digest(sig, expected):
         raise HTTPException(400, "Ungültiger Bestätigungslink")
+    if int(time.time()) - ts > VERIFY_TTL:
+        raise HTTPException(400, "Der Bestätigungslink ist abgelaufen. Fordere unter „E-Mail erneut senden\" einen neuen an.")
     if not user.email_verified:
         user.email_verified = True
         await db.commit()

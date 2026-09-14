@@ -16,7 +16,7 @@ import {
   btnPrimary, btnSecondary, cardStyle, COLORS as C, CONTROL_R, dateiWaehlen, DialogKopf, Icon, iconBtn, ICONS,
   inputStyle, Modal, SHADOW,
 } from "./Icons.jsx";
-import { alsText, beobachte, leeren, protokoll, umgebung } from "../core/protokoll.js";
+import { alsText, anonym, beobachte, leeren, protokoll, umgebung } from "../core/protokoll.js";
 import { alsJson } from "../core/melden.js";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -75,7 +75,9 @@ export default function Fehlermelder() {
       message: text.trim(),
       log: mitLog ? alsText() : "",
       umgebung: mitUmg ? umgebung() : "",
-      seite: window.location.pathname + window.location.search,
+      // Maskiert wie im Protokoll: der Pfad sagt WO es klemmte, die IDs darin
+      // gehen niemanden etwas an (der Query-Teil faellt in anonym() ganz weg).
+      seite: anonym(window.location.pathname),
       ...(datei ? { anhang_name: datei.name, anhang_typ: datei.typ, anhang_daten: datei.daten } : {}),
     })).catch(() => null);
     setBusy(false);
@@ -204,7 +206,8 @@ export default function Fehlermelder() {
               {logOffen && (
                 <pre style={{ ...cardStyle, padding: 10, maxHeight: 240, overflow: "auto", fontSize: 11,
                   lineHeight: 1.5, color: "var(--text2)", whiteSpace: "pre-wrap", margin: "0 0 12px" }}>
-                  {[mitUmg ? `--- ${t("melder.umgebungTitel")} ---\n${umgebung()}` : "",
+                  {[`--- ${t("melder.seiteTitel")} ---\n${anonym(window.location.pathname)}`,
+                    mitUmg ? `--- ${t("melder.umgebungTitel")} ---\n${umgebung()}` : "",
                     mitLog ? `--- ${t("melder.protokollTitel")} ---\n${alsText() || t("melder.logLeer")}` : ""]
                     .filter(Boolean).join("\n\n") || t("melder.logLeer")}
                 </pre>

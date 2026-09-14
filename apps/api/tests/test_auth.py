@@ -17,11 +17,11 @@ from app.routers import auth as A
 
 @pytest.fixture(autouse=True)
 def _rate_limit_zuruecksetzen():
-    """Das Anmelde-Limit zählt pro IP und lebt im Modul weiter. Ohne Zurücksetzen
-    reißen sich die Tests gegenseitig in ein 429."""
-    A._login_attempts.clear()
+    """Das Anmelde-Limit zählt pro IP UND pro Konto und lebt im Modul weiter.
+    Ohne Zurücksetzen reißen sich die Tests gegenseitig in ein 429."""
+    A._buckets.clear()
     yield
-    A._login_attempts.clear()
+    A._buckets.clear()
 
 
 class _Anfrage:

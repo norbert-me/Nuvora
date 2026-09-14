@@ -52,7 +52,7 @@ from ..models import (CaldavToken, CalendarEntry, Kurs, SchoolClass,
                       SlotCancellation, TimetableSlot, User)
 from ..oeffentlich import site_url as _site_url
 from ..zeit import tagesbeginn
-from .auth import _hash_pw, _verify_pw, rate_limit
+from .auth import _hash_pw, _verify_pw, client_ip, rate_limit
 from .kalender import (_d_iso, _kurs_label, ext_dateiname, ext_uid,
                        externe_ereignisse, stundenplan_vorkommen,
                        todo_dateiname, todo_termine, todo_uid)
@@ -130,6 +130,27 @@ def _pfad_maske(pfad: str) -> str:
     return "/".join(teile)
 
 
+def _log_kennung(kennung: str) -> str:
+    """Die Kennung fuers SERVERprotokoll: bereinigt und verkuerzt.
+
+    Zwei Gruende. Erstens steht dort die E-Mail der Lehrkraft — alle paar
+    Minuten, jahrelang, im Klartext, lesbar fuer jeden, der an
+    `docker compose logs api` kommt; fuer die Frage „welches Geraet kommt nicht
+    durch?" genuegt der Anfang. Zweitens kommt sie roh aus dem Basic-Kopf: mit
+    einem Zeilenumbruch darin liesse sich eine komplette zusaetzliche Logzeile
+    erfinden (dieselbe Bereinigung wie in `mailer._fuer_log`).
+
+    Der Teilen-Dialog der Lehrkraft zeigt weiterhin ihre eigenen Eintraege — da
+    steht die Kennung nur als Schluessel und wird nirgends ausgegeben.
+    """
+    roh = (kennung or "").replace("\r", " ").replace("\n", " ")
+    roh = "".join(c for c in roh if c.isprintable())[:120]
+    name, _, domain = roh.partition("@")
+    if not domain:
+        return (name[:3] + "…") if len(name) > 3 else name
+    return f"{name[:2]}…@{domain}"
+
+
 def notiere(kennung: str, request: Request, status: int, grund: str) -> None:
     """Einen Zugriff festhalten — und ihn ins Serverprotokoll schreiben.
 
@@ -160,7 +181,7 @@ def notiere(kennung: str, request: Request, status: int, grund: str) -> None:
     }
     eimer.append(eintrag)
     _log.info("caldav %s %s -> %s (%s) fuer %s", eintrag["methode"], eintrag["pfad"],
-              status, grund, schluessel)
+              status, grund, _log_kennung(schluessel))
 
 
 def _kennung_aus(request: Request) -> str:
@@ -212,6 +233,14 @@ async def _anmelden(request: Request, db: AsyncSession) -> User:
     # Bremse gegen Durchprobieren: ein CalDAV-Client meldet sich oft an, aber
     # nicht hundertmal in der Minute mit wechselnden Passwoertern.
     rate_limit("caldav", f"n{kennung.lower()[:80]}", 60, 60, "Zu viele Anmeldungen.")
+    # Und eine zweite je Adresse. Hier haengt Arbeit dran, die ein Angreifer
+    # ohne jede Anmeldung ausloest: je Anfrage werden bis zu 20 Geraete-
+    # Passwoerter mit Argon2id geprueft (19 MiB und ~14 ms das Stueck). Ohne
+    # diese Bremse liesse sich der Server mit den 30 Anfragen je Sekunde, die
+    # der Proxy durchlaesst, ein Vielfaches der Echtzeit rechnen lassen — und
+    # die Bremse je Benutzername greift dabei nicht, weil man den Namen
+    # wechseln kann.
+    rate_limit("caldav_ip", client_ip(request), 120, 60, "Zu viele Anmeldungen.")
 
     u = (await db.execute(select(User).where(User.email == kennung.strip().lower()))).scalar_one_or_none()
     if not u:

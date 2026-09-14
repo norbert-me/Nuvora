@@ -35,8 +35,14 @@ const LANGSAM_MS = 2000;
 const eintraege = [];
 const hoerer = new Set();
 
-/** Zahlen im Pfad ersetzen: /api/classes/12/students/7 -> /api/classes/{id}/students/{id} */
-function anonym(pfad) {
+/** Zahlen im Pfad ersetzen: /api/classes/12/students/7 -> /api/classes/{id}/students/{id}
+ *
+ * Exportiert, weil die Fehlermeldung dieselbe Maske braucht: sie schickte die
+ * AKTUELLE Adresse roh mit (`/classes/12`, `?class=7&work=41`) — auch dann,
+ * wenn beide Haekchen aus waren, und ohne sie in „Was wird mitgeschickt?" zu
+ * zeigen. Genau das, was das Protokoll seit jeher vermeidet.
+ */
+export function anonym(pfad) {
   return String(pfad).split("?")[0].replace(/\/\d+(?=\/|$)/g, "/{id}")
     // Tokens und Codes sind lang und zufällig — auch die haben hier nichts zu suchen.
     .replace(/\/[A-Za-z0-9_-]{16,}(?=\/|$)/g, "/{token}");

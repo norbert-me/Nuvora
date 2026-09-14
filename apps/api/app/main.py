@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .netz import client_ip
+from .uploads import anhang_kopf
 from .kursmitglieder import schuljahr_aus_name
 from .database import engine, async_session
 from .models import AppSetting, Base, Kurs, Session as SessionModel, User
@@ -1748,7 +1749,7 @@ async def bugreport_anhang(report_id: int, user=Depends(_require_admin), db=Depe
     if not r or not r.anhang:
         raise HTTPException(404, "Kein Anhang")
     return _Resp(content=r.anhang, media_type=r.anhang_typ or "application/octet-stream",
-                 headers={"Content-Disposition": f'inline; filename="{r.anhang_name or "anhang"}"'})
+                 headers={"Content-Disposition": anhang_kopf(r.anhang_name or "anhang", "inline")})
 
 
 @app.post("/api/contact")

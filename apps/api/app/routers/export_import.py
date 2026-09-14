@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 # Unterstrich im Namen) und in noten.py ein drittes Mal mit Text-Schluesseln.
 # Es gibt eine: die in scoring.py, wo auch gerechnet wird.
 from ..scoring import DEFAULT_SCALE, bewerte, e_modus_von, gefehlt_von, status_of
+from ..uploads import anhang_kopf
 from ..schueler import sortiert
 from ..pdfdruck import als_anhang, neue_seite
 from ..austauschformat import quiz_inhalt, quiz_schnappschuss
@@ -130,7 +131,7 @@ def _xlsx_response(wb, filename: str) -> StreamingResponse:
     return StreamingResponse(
         buf,
         media_type=XLSX_MEDIA,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": anhang_kopf(filename)},
     )
 
 
@@ -888,7 +889,7 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
     return StreamingResponse(
         buf,
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": anhang_kopf(filename)},
     )
 
 

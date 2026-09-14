@@ -192,14 +192,14 @@ async def download_material(material_id: int, request: Request, user: User = Dep
     etag = f'"d{m.id}-{m.size}"'
     if _unveraendert(request, etag):
         return Response(status_code=304, headers=_cache_kopf(etag))
-    safe = m.filename.replace("\r", " ").replace("\n", " ").replace('"', "'")
+    from ..uploads import anhang_kopf
     # Inline nur fuer sichere, nicht-skriptfaehige Typen (PDF, Rasterbilder).
     # Alles andere — besonders HTML/SVG — als Download, damit hochgeladener Code
     # nicht im eigenen Origin ausgefuehrt wird (SVG kann Skript tragen).
     inline_ok = {"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"}
     disp = "inline" if (m.mime in inline_ok) else "attachment"
     return Response(content=m.data, media_type=m.mime or "application/octet-stream",
-                    headers={"Content-Disposition": f'{disp}; filename="{safe}"',
+                    headers={"Content-Disposition": anhang_kopf(m.filename, disp),
                              "X-Content-Type-Options": "nosniff", **_cache_kopf(etag)})
 
 
@@ -363,9 +363,10 @@ async def material_als_pdf(material_id: int, request: Request, user: User = Depe
     else:
         raise HTTPException(415, "Diese Datei lässt sich nicht als PDF anzeigen.")
 
-    safe = (m.filename or "datei").rsplit(".", 1)[0].replace('"', "'")[:180]
+    from ..uploads import anhang_kopf
+    safe = (m.filename or "datei").rsplit(".", 1)[0]
     return Response(content=pdf, media_type="application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="{safe}.pdf"',
+                    headers={"Content-Disposition": anhang_kopf(f"{safe}.pdf", "inline"),
                              "X-Content-Type-Options": "nosniff",
                              # Dieselbe Kennung wie oben — sonst passt der
                              # zweite Abruf nie auf den ersten.

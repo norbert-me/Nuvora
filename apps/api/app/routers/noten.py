@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..besitz import eigene_klasse, eigenes, kurs_oder_klasse
+from ..uploads import anhang_kopf
 from ..scoring import note_aus_pct
 from ..kursmitglieder import eigener_kurs, member_student_ids, sibling_class_ids, kurs_der_klasse
 from ..felder import ohne_leer, ohne_none
@@ -1545,4 +1546,4 @@ async def export_bundle(class_id: int, term: str = "1", agg: str = "mean", kurs_
         z.writestr(pdf_name, pdf)
     zbuf.seek(0)
     return StreamingResponse(zbuf, media_type="application/zip",
-                             headers={"Content-Disposition": f'attachment; filename="noten-{safe}-hj{term}.zip"'})
+                             headers={"Content-Disposition": anhang_kopf(f"noten-{safe}-hj{term}.zip")})

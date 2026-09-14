@@ -46,7 +46,7 @@ Das WebAssembly aus dem JS herausziehen — die eigentliche Ursache
 Der Build ist `SINGLE_FILE`: das 8-MB-WebAssembly steckt als
 `data:application/octet-stream;base64,…` mitten im Skript, und Emscripten holt
 es beim Start mit `fetch(wasmBinaryFile)`. Ein `fetch` auf eine `data:`-URL
-zählt für die CSP als Verbindung — unser `connect-src 'self' wss: ws:` kennt
+zählt für die CSP als Verbindung — unser `connect-src 'self'` kennt
 kein `data:`, also blockt Chrome ihn ab. Was danach passiert, sieht aus wie ein
 ganz anderer Fehler: `window.cv` entsteht, `cv.calledRun` ist `true`, `cv.Mat`
 ist eine Funktion — aber von den 374 Schlüsseln stammt kein einziger aus der

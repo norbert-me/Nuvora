@@ -39,7 +39,31 @@ def dateiname_sicher(name: str) -> str:
     Zeilenumbruch darin waere eine eingeschleuste Kopfzeile.
     """
     sauber = (name or "").replace("\r", " ").replace("\n", " ").replace('"', "'")
-    return sauber.strip() or "datei"
+    # Auch alle uebrigen Steuerzeichen: eine Kopfzeile endet am ersten davon.
+    sauber = "".join(c for c in sauber if c.isprintable())
+    return sauber.strip()[:120] or "datei"
+
+
+def anhang_kopf(name: str, art: str = "attachment") -> str:
+    """Fertiger `Content-Disposition`-Wert fuer einen Dateinamen aus Nutzerdaten.
+
+    Zwei Dinge, die einzeln gebaut jedes Mal vergessen werden:
+
+    * **Bereinigen.** In diesem Namen steht ein Schueler-, Klassen- oder
+      Quizname. Ein `"` oder ein Zeilenumbruch darin waere eine eingeschleuste
+      Kopfzeile.
+    * **Umlaute und alles ausserhalb von Latin-1.** Eine Kopfzeile traegt nur
+      Latin-1; Starlette wirft beim Kodieren, also endete der Druck fuer ein
+      Kind namens „Ayşe" in HTTP 500 — beim Ausdruck der Klassenliste fuer
+      genau dieses Kind. Deshalb der ASCII-Ersatz als `filename` UND die
+      richtige Fassung als `filename*` (RFC 5987), die jeder heutige Browser
+      bevorzugt.
+    """
+    from urllib.parse import quote
+
+    sauber = dateiname_sicher(name)
+    einfach = sauber.encode("ascii", "replace").decode("ascii")
+    return f"{art}; filename=\"{einfach}\"; filename*=UTF-8''{quote(sauber, safe='')}"
 
 
 def vorschaubild(daten: bytes, kante: int = 256) -> Optional[bytes]:

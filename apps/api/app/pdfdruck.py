@@ -37,5 +37,6 @@ def als_anhang(inhalt, filename: str):
     from fastapi.responses import StreamingResponse
     puffer = io.BytesIO(inhalt) if isinstance(inhalt, (bytes, bytearray)) else inhalt
     puffer.seek(0)
+    from .uploads import anhang_kopf   # lokal: pdfdruck ist ein Blatt ohne Router-Importe
     return StreamingResponse(puffer, media_type="application/pdf",
-                             headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+                             headers={"Content-Disposition": anhang_kopf(filename)})
