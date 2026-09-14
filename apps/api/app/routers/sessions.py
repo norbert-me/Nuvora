@@ -1,5 +1,5 @@
 import io
-from typing import Dict, List, Optional, Union
+from typing import Literal, Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -262,6 +262,10 @@ class EvalConfigIn(BaseModel):
     anwesend: Optional[List[Union[int, str]]] = None
     times: Optional[Dict[str, float]] = None
     total_time: Optional[float] = None
+    # Wie zaehlen Anforderungsfragen fuer ein Kind im G-Kurs? Siehe
+    # app/scoring.e_modus_von — Unbekanntes gilt dort als "bonus", deshalb
+    # genuegt hier die Form.
+    e_modus: Optional[Literal["bonus", "keine", "alle"]] = None
     model_config = {"extra": "allow"}
 
     @field_validator("grade_scale")

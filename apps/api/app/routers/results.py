@@ -15,7 +15,7 @@ from ..kursmitglieder import sibling_class_ids
 from ..schueler import roster_klasse
 from ..models import Scan, Session, SchoolClass, Student, QuestionSet, QuestionSetItem, Question, User, Topic
 from .auth import get_current_user
-from ..scoring import bewerte, gefehlt_von, note_aus_pct, status_of
+from ..scoring import bewerte, e_modus_von, gefehlt_von, note_aus_pct, status_of
 # Punktelogik der Klassenarbeit (Teilaufgaben, Altformat, Abwesende) — die
 # Fruehwarnung rechnet sie NICHT nach, sie ruft sie auf. Kein Importring:
 # klassenarbeit.py holt nur database/models/auth/modules.
@@ -322,7 +322,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
                 "is_correct": is_correct,
             })
         wertung = bewerte(
-            questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv,
+            questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
             minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
             gefehlt_topics=gefehlt_von(student["card_id"], config),
         )
@@ -713,7 +713,7 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
                 student_scores[student["card_id"]] = {"score": None, "total": max_score, "present": False, "status": status}
                 continue
             eigene = {q["id"]: scan_map.get((student["card_id"], q["id"])) for q in questions}
-            wertung = bewerte(questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv,
+            wertung = bewerte(questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
                               minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
                               gefehlt_topics=gefehlt_von(student["card_id"], config))
             student_scores[student["card_id"]] = {
@@ -794,7 +794,7 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
                 if status_of(student.card_id, has_any, config) == "krank":
                     continue   # krank bleibt aus dem Schnitt, eine gewertete 0 nicht
                 eigene = {q["id"]: scan_map.get((student.card_id, q["id"])) for q in questions}
-                w = bewerte(questions, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv,
+                w = bewerte(questions, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
                             minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
                             gefehlt_topics=gefehlt_von(student.card_id, config))
                 all_pcts.append(round(w["pct"]))
@@ -872,7 +872,7 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
                 if status_of(student.card_id, has_any, config) == "krank":
                     continue
                 eigene = {q["id"]: scan_map.get((student.card_id, q["id"])) for q in questions}
-                pct = round(bewerte(questions, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv,
+                pct = round(bewerte(questions, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
                                     minuspunkte=minuspunkte, weights=weights, scale=scale,
                                     gefehlt_topics=gefehlt_von(student.card_id, config))["pct"])
                 for g in range(1, 6):

@@ -312,3 +312,28 @@ describe("Bei dem Thema gefehlt", () => {
     expect(w.bonusPct).toBe(0);
   });
 });
+
+// Wie zählen Anforderungsfragen für ein G-Kind? (eval_config.e_modus)
+// Dieselben Fälle wie in apps/api/tests/test_scoring.py — die Regel steht
+// doppelt und muss zusammen geändert werden.
+describe("e_modus", () => {
+  it("keine: kein Bonus, aber auch keine zusaetzliche Last", () => {
+    const w = bewerte(QUESTIONS, ANTWORTEN, { niveau: "G", niveauAktiv: true, eModus: "keine" });
+    expect(w.bonusPct).toBe(0);
+    expect(w.maxScore).toBe(4);
+    expect(w.basePct).toBe(75);
+  });
+
+  it("alle: die Unterscheidung ist aufgehoben", () => {
+    const w = bewerte(QUESTIONS, ANTWORTEN, { niveau: "G", niveauAktiv: true, eModus: "alle" });
+    const ohne = bewerte(QUESTIONS, ANTWORTEN, { niveau: "G", niveauAktiv: false });
+    expect(w.maxScore).toBe(7);
+    expect(w.pct).toBe(ohne.pct);
+  });
+
+  it("unbekannter Wert verhaelt sich wie bonus", () => {
+    const a = bewerte(QUESTIONS, ANTWORTEN, { niveau: "G", niveauAktiv: true, eModus: "quatsch" });
+    const b = bewerte(QUESTIONS, ANTWORTEN, { niveau: "G", niveauAktiv: true });
+    expect(a.pct).toBe(b.pct);
+  });
+});

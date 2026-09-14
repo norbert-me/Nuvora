@@ -33,7 +33,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import QuestionSet, QuestionSetItem, Scan, Session, Topic
-from .scoring import bewerte, gefehlt_von, note_aus_pct, status_of
+from .scoring import bewerte, e_modus_von, gefehlt_von, note_aus_pct, status_of
 
 # Ab hier gilt ein Thema als gesessen bzw. als offen. Dazwischen steht bewusst
 # nichts: „62 % — weder noch" ist keine Rückmeldung, sondern eine Zahl.
@@ -128,7 +128,7 @@ async def quiz(db: AsyncSession, session: Session, nur_card_id: Optional[int] = 
         hat_etwas = any(v is not None for v in eigene.values())
         if status_of(st.card_id, hat_etwas, config) == "krank":
             continue          # nichts abgegeben: keine Aussage, keine Rückmeldung
-        w = bewerte(questions, eigene, niveau=st.niveau or "", niveau_aktiv=niveau_aktiv,
+        w = bewerte(questions, eigene, niveau=st.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
                     minuspunkte=minuspunkte, weights=config.get("weights"),
                     scale=config.get("grade_scale"),
                     gefehlt_topics=gefehlt_von(st.card_id, config))

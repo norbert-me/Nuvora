@@ -34,14 +34,18 @@ export function statusOf(cardId, hasAnyScan, config) {
 // questions: [{ id, correct_answer, niveau, topic_id }] · answers: { [questionId]: "A" | null }
 // gefehltTopics: Themen, bei denen dieses Kind gefehlt hat — ihre Fragen zaehlen
 // nicht zur Basis, sondern geben Bonus wie E-Fragen (siehe app/scoring.py).
-export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, minuspunkte = false, weights = {}, scale = null, gefehltTopics = null } = {}) {
+export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, eModus = "bonus", minuspunkte = false, weights = {}, scale = null, gefehltTopics = null } = {}) {
   const s = scale || DEFAULT_SCALE;
   const gewicht = (qid) => Number(weights[String(qid)] ?? weights[qid] ?? 1) || 0;
   const gegeben = (q) => answers[q.id] ?? answers[String(q.id)] ?? null;
   const richtig = (q) => { const a = gegeben(q); return !!(a && q.correct_answer && q.correct_answer.includes(a)); };
 
   const zaehlend = questions.filter((q) => q.correct_answer);
-  const differenziert = !!niveauAktiv && niveau !== "E";
+  // Wie zaehlen die Anforderungsfragen fuer ein G-Kind? „bonus" (Vorgabe),
+  // „keine" (sie zaehlen gar nicht) oder „alle" (keine Unterscheidung).
+  // Begruendung und Wortlaut siehe app/scoring.py — die Regel steht doppelt.
+  const modus = ["bonus", "keine", "alle"].includes(eModus) ? eModus : "bonus";
+  const differenziert = !!niveauAktiv && niveau !== "E" && modus !== "alle";
   const fehlt = new Set((gefehltTopics || []).map(Number).filter((x) => Number.isFinite(x)));
   const verpasst = (q) => fehlt.size > 0 && q.topic_id != null && fehlt.has(Number(q.topic_id));
   const istExtra = (q) => verpasst(q) || (differenziert && (q.niveau || "") === "E");
@@ -61,15 +65,17 @@ export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, 
   score = Math.max(0, score);
   const basePct = baseMax > 0 ? (score / baseMax) * 100 : 0;
 
-  const eRichtig = extra.filter(richtig).length;
-  const eFalsch = extra.filter((q) => gegeben(q) && !richtig(q)).length;
+  // Bei „keine" zaehlen nur verpasste Themen zum Bonus (siehe app/scoring.py).
+  const bonusFragen = modus === "keine" ? extra.filter(verpasst) : extra;
+  const eRichtig = bonusFragen.filter(richtig).length;
+  const eFalsch = bonusFragen.filter((q) => gegeben(q) && !richtig(q)).length;
   let bonusPct = 0;
   // Schon EINE richtige Anforderungsfrage zaehlt — anteilig, geteilt durch
   // mindestens zwei. Begruendung siehe app/scoring.py (die Regel steht doppelt
   // und muss zusammen geaendert werden).
   const netto = Math.max(0, eRichtig - eFalsch);
-  if (extra.length && netto >= 1) {
-    bonusPct = (netto / Math.max(extra.length, 2)) * naechsteStufe(basePct, s);
+  if (bonusFragen.length && netto >= 1) {
+    bonusPct = (netto / Math.max(bonusFragen.length, 2)) * naechsteStufe(basePct, s);
   }
 
   return {

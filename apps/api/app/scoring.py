@@ -94,6 +94,18 @@ def status_of(card_id: int, has_any_scan: bool, config: Optional[dict]) -> str:
     return "anwesend" if has_any_scan else "krank"
 
 
+def e_modus_von(config: Optional[dict]) -> str:
+    """Wie zaehlen Anforderungsfragen fuer ein G-Kind? (aus eval_config)
+
+    "bonus" (Vorgabe) | "keine" | "alle" — die Entscheidung gehoert der
+    einzelnen Auswertung, nicht dem Quiz: dasselbe Quiz kann einmal als
+    Lernstand und einmal als Leistung gewertet werden. Unbekanntes und
+    Fehlendes gilt als "bonus", damit Bestandsauswertungen sich nicht aendern.
+    """
+    wert = (config or {}).get("e_modus")
+    return wert if wert in ("bonus", "keine", "alle") else "bonus"
+
+
 def gefehlt_von(card_id, config: Optional[dict]):
     """Themen, bei denen dieses Kind gefehlt hat (aus eval_config).
 
@@ -116,7 +128,7 @@ def gefehlt_von(card_id, config: Optional[dict]):
     return out
 
 
-def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
+def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False, e_modus: str = "bonus",
             minuspunkte: bool = False, weights: Optional[dict] = None,
             scale: Optional[dict] = None, gefehlt_topics=None) -> dict:
     """Punkte und Prozent für ein Kind.
@@ -152,7 +164,21 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
 
     zaehlend = [q for q in questions if q.get("correct_answer")]
     # Ohne E/G-Flag oder für ein Kind im E-Kurs zählt alles regulär.
-    differenziert = bool(niveau_aktiv) and niveau != "E"
+    # Wie zaehlen die Anforderungsfragen fuer ein Kind im G-Kurs?
+    #
+    #   "bonus" (Vorgabe) – sie stehen neben der Wertung und geben Bonus.
+    #   "keine"           – sie stehen daneben, geben aber NICHTS. Fuer eine
+    #                       Arbeit, in der die Anforderung erkennbar Zusatz ist
+    #                       und die Note allein aus der Grundlage kommt.
+    #   "alle"            – keine Unterscheidung: alle rechnen alles, wie ohne
+    #                       den Schalter am Quiz.
+    #
+    # Die Entscheidung gehoert der einzelnen Auswertung (eval_config), nicht dem
+    # Quiz: dasselbe Quiz kann einmal als Lernstand und einmal als Leistung
+    # gewertet werden. Sie gilt nur fuer E/G — ein verpasstes Thema gibt weiter
+    # Bonus, das ist ein anderer Sachverhalt.
+    modus = e_modus if e_modus in ("bonus", "keine", "alle") else "bonus"
+    differenziert = bool(niveau_aktiv) and niveau != "E" and modus != "alle"
     fehlt = {int(x) for x in (gefehlt_topics or []) if str(x).lstrip("-").isdigit()}
 
     def verpasst(q):
@@ -179,8 +205,12 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
     score = max(0.0, score)
     base_pct = (score / base_max * 100) if base_max > 0 else 0.0
 
-    e_richtig = sum(1 for q in extra if richtig(q))
-    e_falsch = sum(1 for q in extra if beantwortet(q) and not richtig(q))
+    # Bei „keine" zaehlen nur die verpassten Themen zum Bonus, nicht die
+    # E-Fragen — sie bleiben trotzdem aus der Basis heraus, denn gemessen wird
+    # ein G-Kind an den G-Fragen.
+    bonus_fragen = [q for q in extra if verpasst(q)] if modus == "keine" else extra
+    e_richtig = sum(1 for q in bonus_fragen if richtig(q))
+    e_falsch = sum(1 for q in bonus_fragen if beantwortet(q) and not richtig(q))
     bonus_pct = 0.0
     # SCHON EINE richtige Anforderungsfrage zaehlt — anteilig.
     #
@@ -197,8 +227,8 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
     # Ratefall), aber sie zaehlt: eine von einer ergibt eine halbe Stufe, eine
     # von fuenf ein Fuenftel. Falsche Antworten zehren den Bonus wie bisher auf.
     netto = max(0, e_richtig - e_falsch)
-    if extra and netto >= 1:
-        anteil = netto / max(len(extra), 2)
+    if bonus_fragen and netto >= 1:
+        anteil = netto / max(len(bonus_fragen), 2)
         bonus_pct = anteil * naechste_stufe(base_pct, scale)
 
     return {

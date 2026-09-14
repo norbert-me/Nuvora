@@ -159,3 +159,46 @@ def test_gefehlt_von_liest_die_konfiguration():
     assert gefehlt_von(8, cfg) == []
     assert gefehlt_von(9, cfg) == []
     assert gefehlt_von(9, None) == []
+
+
+# ── Wie zaehlen Anforderungsfragen fuer ein G-Kind? (eval_config.e_modus) ─────
+# Die Entscheidung gehoert der einzelnen Auswertung: dasselbe Quiz kann einmal
+# als Lernstand und einmal als Leistung gewertet werden.
+
+def test_e_modus_keine_gibt_keinen_bonus_aber_auch_keine_last():
+    w = bewerte(QUESTIONS, ANTWORTEN, niveau="G", niveau_aktiv=True, e_modus="keine")
+    assert w["bonus_pct"] == 0.0
+    assert w["max_score"] == 4       # gemessen wird weiter NUR an den G-Fragen
+    assert w["base_pct"] == 75.0
+
+
+def test_e_modus_alle_hebt_die_unterscheidung_auf():
+    w = bewerte(QUESTIONS, ANTWORTEN, niveau="G", niveau_aktiv=True, e_modus="alle")
+    assert w["max_score"] == 7       # alle Fragen zaehlen, wie ohne den Schalter
+    assert w["bonus_pct"] == 0.0
+    ohne_flag = bewerte(QUESTIONS, ANTWORTEN, niveau="G", niveau_aktiv=False)
+    assert w["pct"] == ohne_flag["pct"]
+
+
+def test_e_modus_keine_laesst_verpasste_themen_unberuehrt():
+    """Der Schalter gilt E/G — „bei dem Thema gefehlt" ist ein anderer
+    Sachverhalt und gibt weiter Bonus."""
+    fragen = ([{"id": i, "correct_answer": "A", "niveau": "", "topic_id": 10} for i in range(1, 4)]
+              + [{"id": i, "correct_answer": "A", "niveau": "", "topic_id": 20} for i in range(4, 7)])
+    antw = {1: "A", 2: "A", 3: "B", 4: "A", 5: "A", 6: "A"}
+    w = bewerte(fragen, antw, niveau="G", niveau_aktiv=True, e_modus="keine", gefehlt_topics=[20])
+    assert w["bonus_pct"] > 0
+
+
+def test_unbekannter_e_modus_verhaelt_sich_wie_bonus():
+    a = bewerte(QUESTIONS, ANTWORTEN, niveau="G", niveau_aktiv=True, e_modus="quatsch")
+    b = bewerte(QUESTIONS, ANTWORTEN, niveau="G", niveau_aktiv=True)
+    assert a["pct"] == b["pct"]
+
+
+def test_e_modus_von_liest_die_konfiguration():
+    from app.scoring import e_modus_von
+    assert e_modus_von({"e_modus": "keine"}) == "keine"
+    assert e_modus_von({"e_modus": "unsinn"}) == "bonus"
+    assert e_modus_von({}) == "bonus"
+    assert e_modus_von(None) == "bonus"

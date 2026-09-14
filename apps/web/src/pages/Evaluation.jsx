@@ -97,7 +97,7 @@ export default function Evaluation() {
   // Vorher lief jede dieser Aenderungen nach 800 ms von selbst zum Server —
   // man sah nur ein kurzes „gespeichert" und hatte nichts in der Hand.
   const [gespeicherteConfig, setGespeicherteConfig] = useState({
-    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [], gefehlt: {},
+    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [], gefehlt: {}, eModus: "bonus",
   });
   // Was sonst noch in der Konfiguration steht (Zeiten aus der Live-Sitzung).
   // Die PUT ersetzt sie als Ganzes — ohne diese Kopie waeren sie nach dem
@@ -108,11 +108,12 @@ export default function Evaluation() {
         ...restConfig.current,
         weights: wert.weights, grade_scale: wert.gradeScale,
         krank: wert.krank, anwesend: wert.anwesend, gefehlt: wert.gefehlt,
+        e_modus: wert.eModus,
       })).catch(() => null);
     if (!r || !r.ok) return false;
     setGespeicherteConfig(wert);
   });
-  const { weights, gradeScale, krank: krankListe, anwesend: anwesendListe, gefehlt: gefehltMap } = eConf.wert;
+  const { weights, gradeScale, krank: krankListe, anwesend: anwesendListe, gefehlt: gefehltMap, eModus } = eConf.wert;
 
   // Nach dem Laden die Arbeitskopie auf den geladenen Stand setzen. `useEntwurf`
   // uebernimmt einen neuen Stand nur, wenn NICHTS offen ist — und beim ersten
@@ -161,6 +162,9 @@ export default function Evaluation() {
         anwesend: (config && Array.isArray(config.anwesend)) ? config.anwesend : [],
         // „bei dem Thema gefehlt": { card_id: [topic_id, ...] }
         gefehlt: (config && config.gefehlt && typeof config.gefehlt === "object") ? config.gefehlt : {},
+        // Fehlt der Schluessel (jede Auswertung vor dieser Fassung), gilt
+        // „bonus" — sonst aenderte sich ueber Nacht jede alte Note.
+        eModus: ["bonus", "keine", "alle"].includes(config && config.e_modus) ? config.e_modus : "bonus",
       });
       setLadeStand((n) => n + 1);
     });
@@ -263,7 +267,7 @@ export default function Evaluation() {
   const werte = (s) => bewerte(
     questions.map((q) => ({ id: q.id, correct_answer: q.correct_answer, niveau: q.niveau || "", topic_id: q.topic_id ?? null })),
     Object.fromEntries(s.answers.map((a) => [a.question_id, a.answer])),
-    { niveau: s.niveau || "", niveauAktiv, minuspunkte, weights, scale: gradeScale,
+    { niveau: s.niveau || "", niveauAktiv, eModus, minuspunkte, weights, scale: gradeScale,
       gefehltTopics: (gefehltMap || {})[String(s.card_id)] || [] },
   );
 
@@ -621,6 +625,28 @@ const gradeDistribution = (() => {
         />
       )}
 
+      {/* Wie zaehlen die Anforderungsfragen? Erklaerung UND Umschalter.
+          Die Rechenregel sieht man dem Bildschirm nicht an (CLAUDE.md laesst
+          genau dafuer Erklaertext zu), und sie ist eine paedagogische
+          Entscheidung, keine Eigenschaft des Quiz: dasselbe Quiz kann einmal
+          als Lernstand und einmal als Leistung gewertet werden. Gespeichert
+          wird an der Auswertung, ueber dieselbe Speicherleiste wie Gewichte
+          und Notenschluessel. */}
+      {niveauAktiv && (
+        <div style={{ ...panelStyle, padding: 16, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+            <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{t("cv.eModusTitle")}</h4>
+            <Tabs value={eModus} onChange={(v) => eConf.setz({ eModus: v })} style={{ marginLeft: "auto" }}
+              options={[["bonus", t("cv.eModusBonus")], ["keine", t("cv.eModusKeine")], ["alle", t("cv.eModusAlle")]]} />
+          </div>
+          <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6 }}>
+            {eModus === "bonus" ? t("cv.eModusBonusText")
+              : eModus === "keine" ? t("cv.eModusKeineText")
+              : t("cv.eModusAlleText")}
+          </p>
+        </div>
+      )}
+
       {/* Statistik-Kacheln */}
       <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <Stat label={t("cv.statPresent")} value={`${presentStudents.length} / ${students.filter(imNiveau).length}`} />
@@ -707,7 +733,15 @@ const gradeDistribution = (() => {
           scores.length >= 3
             // Bei E/G ist die erreichbare Punktzahl je Kind verschieden — dann
             // ist Prozent die einzige gemeinsame Achse.
-            ? (niveauAktiv ? <Boxplot values={pcts} max={100} /> : <Boxplot values={scores} max={maxScore} />)
+            ? (<>
+                {/* Was die Achse zeigt, muss dranstehen: neben einer
+                    Notenverteilung im Reiter daneben liest man die Zahlen
+                    sonst als Noten — und 85 waere dort eine sehr schlechte. */}
+                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}>
+                  {niveauAktiv ? t("cv.boxplotAxisPct") : t("cv.boxplotAxisPts", { max: fmt(maxScore) })}
+                </div>
+                {niveauAktiv ? <Boxplot values={pcts} max={100} /> : <Boxplot values={scores} max={maxScore} />}
+              </>)
             : <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("cv.needThree")}</p>
         )}
       </div>

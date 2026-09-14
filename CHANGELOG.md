@@ -16,6 +16,12 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote-Auswertung: die E/G-Regel steht auf der Seite — und lässt sich
+  umstellen.** Drei Möglichkeiten je Auswertung: E-Aufgaben als Bonus (wie
+  bisher), E-Aufgaben zählen gar nicht, oder alle rechnen alles. Bestehende
+  Auswertungen bleiben beim Bonus.
+- Der Boxplot sagt jetzt, dass seine Achse Prozent (bzw. Punkte) zeigt und keine
+  Noten.
 - **CardVote-Auswertung: E und G werden auf der ganzen Seite getrennt.** Der
   Niveau-Umschalter steht jetzt oben und wirkt auf Kacheln, Notenverteilung,
   Boxplot, Fragen-Statistik, Vorschläge und Themenanalyse — nicht mehr nur auf die
