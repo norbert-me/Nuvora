@@ -27,7 +27,7 @@ from ..besitz import eigenes
 from ..kursmitglieder import class_kurs_ids, eigener_kurs
 from ..database import get_db
 from ..importe import geprueft
-from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, WorkAnalysis, Session as TestSession
+from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, WorkAnalysis
 # Optimistisches Sperren (siehe app/versionierung.py).
 from ..versionierung import VersionOut, pruefe
 from .auth import rate_limit

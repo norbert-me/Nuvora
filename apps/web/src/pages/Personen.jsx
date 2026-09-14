@@ -56,8 +56,11 @@ export default function Personen() {
   // deshalb gehen sie an /api/personen, und der Name wandert von dort auf alle
   // Listenzeilen.
   const [nameEdit, setNameEdit] = useState(null);   // { id, wert }
-  // Zaehler, der die Portraits nach einem Foto-Wechsel neu laden laesst
-  // (der Browser haelt sonst das alte Bild unter derselben Adresse fest).
+  // Zaehler, der die Portraits nach einem Foto-Wechsel neu laden laesst (der
+  // Browser haelt sonst das alte Bild unter derselben Adresse fest). Er wurde
+  // hochgezaehlt, aber nirgends gelesen — das Bild blieb also stehen. Jetzt
+  // haengt er als `key` am Portrait: ein neuer Schluessel heisst neues Element,
+  // und damit wird das Bild neu geholt.
   const [fotoVer, setFotoVer] = useState(0);
   const [qr, setQr] = useState(null);               // { token, name }
   const [kurse, setKurse] = useState([]);
@@ -182,7 +185,7 @@ export default function Personen() {
           <button onClick={() => zeigen(p)}
             style={{ display: "flex", alignItems: "center", gap: 12, width: "100%",
               border: "none", background: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
-            <Portrait student={{ id: p.id, name: p.name, has_photo: p.has_photo }} size={34} form="eckig" quelle="person" />
+            <Portrait key={`${p.id}-${fotoVer}`} student={{ id: p.id, name: p.name, has_photo: p.has_photo }} size={34} form="eckig" quelle="person" />
             <span style={{ fontWeight: 600, flex: 1, color: "var(--text)" }}>{p.name}</span>
             <span style={{ color: "var(--text3)", display: "inline-flex",
               transform: offen === p.id ? "rotate(90deg)" : "none", transition: "transform .15s" }}>

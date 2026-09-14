@@ -1288,6 +1288,16 @@
         aufgabeModal.style.display = 'none';
     }
 
+    // Zwei Aufgaben mit derselben Nummer sind nicht immer ein Doppel: nach einem
+    // Import tragen verschiedene Aufgaben dieselbe. Dann will man nicht rechnen,
+    // welche Nummer noch frei ist — `nextAufgabeId` weiss es (kleinste Luecke).
+    document.getElementById('aufgabe-code-frei')?.addEventListener('click', () => {
+        const feld = document.getElementById('aufgabe-code');
+        feld.value = nextAufgabeId();
+        document.getElementById('aufgabe-code-fehler').style.display = 'none';
+        feld.focus();
+    });
+
     document.getElementById('aufgabe-modal-close').addEventListener('click', () => resetAufgabeForm());
     aufgabeModal.addEventListener('click', (e) => { if (e.target === aufgabeModal) resetAufgabeForm(); });
 
@@ -1317,7 +1327,7 @@
                 }
                 codeNeu = '#' + roh.padStart(6, '0');
                 if (codeNeu !== alt && aufgaben.some(x => x._id !== editId && (x.code || '') === codeNeu)) {
-                    codeFehler.textContent = 'Diese Nummer hat schon eine andere Aufgabe.';
+                    codeFehler.textContent = 'Diese Nummer hat schon eine andere Aufgabe — „Nächste freie" nimmt ' + nextAufgabeId() + '.';
                     codeFehler.style.display = '';
                     return;
                 }
@@ -1562,6 +1572,38 @@
         return weg.size;
     }
 
+    /**
+     * Doppelte, die NIRGENDS verwendet werden, in einem Zug aufraeumen.
+     *
+     * Der Unterschied zu `dubAuto`: dort muessen die Zeilen in allem gleich
+     * sein. Hier duerfen sie sich unterscheiden — behalten wird die
+     * vollstaendigste (bei Gleichstand die aeltere Nummer). Das ist eine
+     * Entscheidung mit Rest-Risiko (eine der Fassungen koennte die spaeter
+     * ueberarbeitete sein), deshalb steht sie als EIGENER Knopf mit Zahl da
+     * und laeuft nicht von selbst: „42 ohne Zuordnung aufraeumen" sagt vorher,
+     * was passiert.
+     *
+     * Nirgends verwendet heisst: in keiner Lernleiter. Damit kann nichts
+     * zerbrechen — es gibt keinen Verweis, der ins Leere zeigen koennte.
+     */
+    function dubUnbenutztGruppen() {
+        const benutzt = verwendungen();
+        const zahl = (x) => benutzt.get(String(x.id)) || benutzt.get(String(x._id)) || 0;
+        return dubGruppen().filter(g => g.every(a => zahl(a) === 0));
+    }
+
+    function dubAutoUnbenutzt() {
+        const weg = new Set();
+        dubUnbenutztGruppen().forEach(gruppe => {
+            const bleibt = gruppe.slice().sort((a, b) => (dubGehalt(b) - dubGehalt(a)) || (codeNum(a) - codeNum(b)))[0];
+            gruppe.forEach(a => { if (a !== bleibt) weg.add(a._id); });
+        });
+        if (!weg.size) return 0;
+        aufgaben = aufgaben.filter(a => !weg.has(a._id));
+        save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
+        return weg.size;
+    }
+
     let dubIndex = 0;
     const dubModal = document.getElementById('dubletten-modal');
 
@@ -1639,6 +1681,8 @@
             <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
                 <button class="btn primary" id="dub-vorschlag">Vorschlag übernehmen (${esc(fmtId(weg.code || weg.id))} löschen)</button>
                 <button class="btn" id="dub-skip">Beide behalten</button>
+                ${(() => { const n = dubUnbenutztGruppen().reduce((k, g) => k + g.length - 1, 0);
+                    return n ? `<button class="btn" id="dub-alle-frei" title="Behalten wird je Paar die vollständigere Fassung">${n} ohne Zuordnung aufräumen</button>` : ''; })()}
                 <span style="flex:1"></span>
                 <button class="btn" id="dub-fertig">Schließen</button>
             </div>`;
@@ -1649,6 +1693,13 @@
         });
         document.getElementById('dub-vorschlag').addEventListener('click', () => dubLoeschen(weg._id));
         document.getElementById('dub-skip').addEventListener('click', weiter);
+        const alleFrei = document.getElementById('dub-alle-frei');
+        if (alleFrei) alleFrei.addEventListener('click', () => {
+            const n = dubAutoUnbenutzt();
+            if (n) toast(n + ' Aufgabe' + (n === 1 ? '' : 'n') + ' ohne Zuordnung entfernt');
+            dubIndex = 0;
+            dubZeichne();
+        });
         document.getElementById('dub-fertig').addEventListener('click', () => { dubModal.style.display = 'none'; renderAufgaben(); });
     }
 

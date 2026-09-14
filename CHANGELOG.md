@@ -14,7 +14,14 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.3.6
+
+- **Lernpfad: Doppelte ohne Zuordnung lassen sich in einem Zug aufräumen** —
+  behalten wird je Paar die vollständigere Fassung; der Knopf sagt vorher, wie
+  viele es sind.
+- **Lernpfad: „Nächste freie" setzt eine freie Nummer ein**, wenn zwei Aufgaben
+  dieselbe tragen.
+- Abhängigkeiten aktualisiert: React 19.3, Vite 8.3, numpy 2.5.3.
 
 - **Lernpfad: Teilaufgaben je Kind.** An jeder Stufe steht ein Feld — „nur a, b"
   —, und genau das steht dann auf dem Blatt und im Lösungsblatt. Leer heißt wie
