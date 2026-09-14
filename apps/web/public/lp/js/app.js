@@ -1711,6 +1711,11 @@
 
     async function dubStart() {
         if (!dubGruppen().length) { toast('Keine doppelten Aufgaben gefunden'); return; }
+        // Erst wissen, was verwendet wird — sonst zaehlt alles als unbenutzt.
+        if (!await verwendungBekannt()) {
+            toast('Lernpfade nicht erreichbar — ohne sie lässt sich nicht sagen, welche Aufgabe gebraucht wird');
+            return;
+        }
         // Erst das Eindeutige weg — aber NICHT still.
         //
         // „Automatisch" hiess einmal: der Knopf raeumt los, und wie viel, sieht
@@ -1832,6 +1837,13 @@
         document.getElementById('dub-skip').addEventListener('click', weiter);
         const alleFrei = document.getElementById('dub-alle-frei');
         if (alleFrei) alleFrei.addEventListener('click', async () => {
+            // Zweiter Riegel unmittelbar vor der Tat: zwischen dem Oeffnen des
+            // Dialogs und diesem Klick kann viel liegen (Neuladen, Abmelden,
+            // Netzabbruch). Was hier faellt, faellt endgueltig.
+            if (!await verwendungBekannt()) {
+                toast('Lernpfade nicht erreichbar — es wird nichts gelöscht');
+                return;
+            }
             const wieviele = dubUnbenutztGruppen().reduce((k, g) => k + g.length - 1, 0);
             if (!await confirmDlg(
                 wieviele + ' Aufgabe' + (wieviele === 1 ? '' : 'n') + ' entfernen? Sie stehen in keiner Lernleiter; '
@@ -1997,6 +2009,36 @@
         if (verwendungGeladen || lernpfade.length) { verwendungGeladen = true; return; }
         verwendungGeladen = true;
         loadLernpfade().then(() => danach && danach()).catch(() => {});
+    }
+
+    /**
+     * WISSEN wir, wo die Aufgaben verwendet werden?
+     *
+     * `verwendungen()` zaehlt ueber `lernpfade`. Sind die noch nicht geladen —
+     * und sie werden erst beim Oeffnen ihres Reiters geholt —, ist die Liste
+     * leer, und dann sieht JEDE Aufgabe aus wie eine, die in keiner Lernleiter
+     * steht. Genau daran haengt das Aufraeumen „ohne Zuordnung": es haette
+     * kommentarlos auch alles Verwendete mitgenommen.
+     *
+     * „Unbekannt" ist nicht „unbenutzt". Wer das verwechselt, loescht das
+     * Falsche und merkt es erst, wenn eine Lernleiter leer ist. Deshalb fragt
+     * jeder Weg, der auf dieser Zahl LOESCHT, vorher hier nach — und wartet
+     * notfalls, bis die Pfade da sind.
+     */
+    async function verwendungBekannt() {
+        if (lernpfade.length) return true;
+        // NICHT ueber loadLernpfade pruefen: das schluckt jeden Fehler und
+        // setzt die Liste auf leer (`catch(e) { lernpfade = []; }`). Genau
+        // dieses „leer" ist hier die gefaehrliche Antwort — es sieht aus wie
+        // „es gibt keine Lernpfade" und heisst „wir konnten nicht nachsehen".
+        // Also selbst fragen und nur eine ECHTE Antwort gelten lassen.
+        const r = await api(`${LP}/paths`).catch(() => null);
+        if (!r || !r.ok) return false;
+        await loadLernpfade();
+        verwendungGeladen = true;
+        // Jetzt darf die Liste leer sein: dann gibt es wirklich keine
+        // Lernpfade, und „in keiner Lernleiter" stimmt fuer alle.
+        return true;
     }
 
     function verwendungen() {

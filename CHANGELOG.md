@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: „ohne Zuordnung aufräumen" löschte auch verwendete Aufgaben.**
+  Waren die Lernpfade noch nicht geladen, galt jede Aufgabe als unbenutzt. Jetzt
+  wird vorher nachgesehen — und ohne Antwort wird nichts gelöscht.
 - **Sicherheit: ein fremdes Konto zu löschen verlangt jetzt das eigene Passwort**
   — und geht nicht mehr im Sekundentakt. Bisher reichte ein Klick; die
   Selbstlöschung daneben verlangte seit jeher eins.
