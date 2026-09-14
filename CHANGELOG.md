@@ -16,6 +16,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote-Auswertung: E und G werden auf der ganzen Seite getrennt.** Der
+  Niveau-Umschalter steht jetzt oben und wirkt auf Kacheln, Notenverteilung,
+  Boxplot, Fragen-Statistik, Vorschläge und Themenanalyse — nicht mehr nur auf die
+  Namenstabelle. Stehen beide zusammen, sagt ein Hinweis, dass Streuung und
+  Verteilung zwei Maßstäbe mischen.
 - **CardVote: die Live-Session weiß, wer heute fehlt.** Abwesende zählen nicht
   mehr zu „x / y erfasst" und stehen durchgestrichen am Ende der Namensliste —
   ohne Modul Orga ändert sich nichts.

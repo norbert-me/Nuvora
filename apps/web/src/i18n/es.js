@@ -2369,6 +2369,7 @@ export default {
   "cv.tipHighSpreadLow": "Dispersión alta (σ={{sd}} %) con media baja: las tareas son probablemente demasiado difíciles. Baja la dificultad o repite el tema.",
   "cv.tipHighSpreadHigh": "Dispersión alta (σ={{sd}} %) con media alta: algunos alumnos tienen lagunas claras mientras la mayoría domina la materia. Considera apoyo específico.",
   "cv.tipHighSpread": "Dispersión alta (σ={{sd}} %): grandes diferencias de rendimiento. Considera diferenciación o tareas escalonadas.",
+  "cv.tipMixedNiveau": "Los niveles E y G aparecen juntos — la dispersión y la distribución mezclan dos escalas. Cambia por nivel arriba.",
   "cv.tipCeiling": "Efecto techo: {{n}} de {{total}} alumnos ({{pct}} %) alcanzan el 95 % o más. El test fue demasiado fácil: no permite diferenciar por arriba. Añade tareas más difíciles.",
   "cv.tipFloor": "Efecto suelo: {{n}} de {{total}} alumnos ({{pct}} %) alcanzan el 10 % o menos. El test fue demasiado difícil: no permite diferenciar por abajo. Baja la dificultad o repite el tema.",
   "cv.tipAbsent": "{{pct}} % de ausencias ({{n}}/{{total}}): tasa alta, planifica una fecha de recuperación.",

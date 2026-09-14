@@ -2368,6 +2368,7 @@ export default {
   "cv.tipHighSpreadLow": "High spread (σ={{sd}}%) with a low average — the tasks are probably too hard. Lower the difficulty or revisit the topic.",
   "cv.tipHighSpreadHigh": "High spread (σ={{sd}}%) with a high average — a few learners have clear gaps while most master the material. Consider targeted support.",
   "cv.tipHighSpread": "High spread (σ={{sd}}%) — large performance differences. Consider differentiation or tiered tasks.",
+  "cv.tipMixedNiveau": "Higher and standard level are shown together — spread and grade distribution mix two scales. Switch by level above.",
   "cv.tipCeiling": "Ceiling effect: {{n}} of {{total}} learners ({{pct}}%) reach 95% or more. The test was too easy — no differentiation at the top. Add harder tasks.",
   "cv.tipFloor": "Floor effect: {{n}} of {{total}} learners ({{pct}}%) reach 10% or less. The test was too hard — no differentiation at the bottom. Lower the difficulty or revisit the topic.",
   "cv.tipAbsent": "{{pct}}% absent ({{n}}/{{total}}) — high absence rate, plan a make-up date.",

@@ -2354,6 +2354,7 @@ export default {
   "cv.tipHighSpreadLow": "Hohe Streuung (σ={{sd}}%) bei niedrigem Durchschnitt — die Aufgaben sind vermutlich zu schwer. Schwierigkeitsgrad senken oder Thema erneut behandeln.",
   "cv.tipHighSpreadHigh": "Hohe Streuung (σ={{sd}}%) bei hohem Durchschnitt — einzelne Lernende haben deutliche Lücken, während die Mehrheit den Stoff beherrscht. Gezielte Förderung erwägen.",
   "cv.tipHighSpread": "Hohe Streuung (σ={{sd}}%) — große Leistungsunterschiede. Binnendifferenzierung oder gestufte Aufgaben erwägen.",
+  "cv.tipMixedNiveau": "E- und G-Kurs stehen hier zusammen — Streuung und Notenverteilung mischen zwei Maßstäbe. Oben je Niveau umschalten.",
   "cv.tipCeiling": "Deckeneffekt: {{n}} von {{total}} Lernenden ({{pct}}%) erreichen ≥95%. Der Test war zu leicht — Differenzierung nach oben nicht möglich. Schwierigere Aufgaben einbauen.",
   "cv.tipFloor": "Bodeneffekt: {{n}} von {{total}} Lernenden ({{pct}}%) erreichen ≤10%. Der Test war zu schwer — Differenzierung nach unten nicht möglich. Schwierigkeitsgrad senken oder Thema wiederholen.",
   "cv.tipAbsent": "{{pct}}% abwesend ({{n}}/{{total}}) — hohe Fehlquote, Nachholtermin einplanen.",

@@ -270,10 +270,28 @@ export default function Evaluation() {
   // „krank" bleibt aus jeder Wertung. Wer anwesend war und nichts abgegeben
   // hat, zählt mit 0 mit — umschaltbar je Kind (setStatus).
   const status = (s) => statusOf(s.card_id, s.present, { krank: krankListe, anwesend: anwesendListe });
-  const presentStudents = students.filter((s) => status(s) === "anwesend").map((s) => {
+  const alleAnwesend = students.filter((s) => status(s) === "anwesend").map((s) => {
     const w = werte(s);
     return { ...s, weightedScore: w.score, ownMax: w.maxScore, pct: w.pct, basePct: w.basePct, bonusPct: w.bonusPct, eCorrect: w.eCorrect, eTotal: w.eTotal };
   });
+
+  // E und G in EINER Statistik sind zwei Maßstäbe in einer Zahl.
+  //
+  // Für ein Kind im G-Kurs zählen nur die G-Fragen als 100 %, für ein Kind im
+  // E-Kurs alle. Vier G-Kinder mit allen G-Aufgaben richtig stehen deshalb zu
+  // Recht bei einer 1 — in einem gemeinsamen Diagramm sieht das aus wie eine
+  // zerrissene Klasse, und die Streuung daneben („σ=31,2 %, erwägen Sie
+  // Binnendifferenzierung") empfiehlt genau das, was schon läuft. Der Filter
+  // galt bisher nur für die Namenstabelle ganz unten; jetzt gilt er für die
+  // ganze Seite: Kacheln, Notenverteilung, Boxplot, Item-Statistik, Vorschläge
+  // und Themenanalyse. „Alle" bleibt die Vorgabe — wer nicht differenziert,
+  // merkt nichts davon.
+  //
+  // Ohne hinterlegtes Niveau zählt ein Kind als G (dieselbe Regel wie in der
+  // Wertung selbst). Was NICHT gefiltert wird: die Notenübernahme und die
+  // Rückmeldebogen — die gelten dem einzelnen Kind, nicht der Auswertung.
+  const imNiveau = (s) => !niveauFilter || (s.niveau || "G") === niveauFilter;
+  const presentStudents = alleAnwesend.filter(imNiveau);
 
   const absentStudents = students.filter((s) => status(s) === "krank");
 
@@ -385,6 +403,14 @@ const gradeDistribution = (() => {
 
     if (avgPct > 85) tips.push(t("cv.tipEasyOverall"));
     if (avgPct < 40) tips.push(t("cv.tipHardOverall"));
+
+    // Bei ungefiltertem E/G steht die Streuung fuer ZWEI Massstaebe. Ohne
+    // diesen Hinweis las man „hohe Streuung, Binnendifferenzierung erwaegen" —
+    // ein Rat, der genau das empfiehlt, was gerade laeuft.
+    if (niveauAktiv && !niveauFilter
+        && presentStudents.some((st) => (st.niveau || "G") === "E")
+        && presentStudents.some((st) => (st.niveau || "G") !== "E"))
+      tips.push(t("cv.tipMixedNiveau"));
 
     if (sdPct < 10 && presentStudents.length >= 2)
       tips.push(t("cv.tipLowSpread", { sd: sdPct.toFixed(1) }));
@@ -535,7 +561,7 @@ const gradeDistribution = (() => {
       {notenDialog && (
         <NotenImport
           sessionId={Number(id)} classId={data.class_id} kursId={data.kurs_id ?? null} sessionName={data.session_name}
-          grades={presentStudents.map((st) => ({
+          grades={alleAnwesend.map((st) => ({
             card_id: st.card_id, name: st.name,
             value: gradeMode === "tendency"
               ? tendencyGrade(st.pct, gradeScale)
@@ -580,9 +606,24 @@ const gradeDistribution = (() => {
           kartenAktiv={kartenAktiv} lernpfadAktiv={lernpfadAktiv} />
       )}
 
+      {/* Filter nach Kursniveau — GANZ OBEN, weil er die ganze Seite umstellt.
+          Er stand bis heute erst über der Namenstabelle und wirkte nur auf
+          diese; Kacheln, Diagramm und Vorschläge darüber mischten weiter beide
+          Maßstäbe. Bewusst kein gemeinsames Ranking über beide Niveaus: für ein
+          G-Kind sind die G-Fragen die 100 %, für ein E-Kind alle. */}
+      {niveauAktiv && (
+        <Werkzeugleiste style={{ marginBottom: 12 }}
+          links={<>
+            <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("eval.niveauFilter")}</span>
+            <Tabs value={niveauFilter} onChange={setNiveauFilter}
+              options={[["", t("eval.niveauAll")], ["E", "E"], ["G", "G"]]} />
+          </>}
+        />
+      )}
+
       {/* Statistik-Kacheln */}
       <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-        <Stat label={t("cv.statPresent")} value={`${presentStudents.length} / ${students.length}`} />
+        <Stat label={t("cv.statPresent")} value={`${presentStudents.length} / ${students.filter(imNiveau).length}`} />
         <Stat
           label={avgMode === "pts" ? t("cv.statAvgPoints") : t("cv.statAvgPct")}
           value={avgMode === "pts" ? fmt(avgScore) : `${avgPct}%`}
@@ -788,18 +829,6 @@ const gradeDistribution = (() => {
 
       <TopicAnalysis questions={questions} presentStudents={presentStudents} />
 
-      {/* Filter nach Kursniveau. Bewusst kein gemeinsames Ranking über beide
-          Niveaus — die Maßstäbe sind verschieden. */}
-      {niveauAktiv && (
-        <Werkzeugleiste style={{ marginBottom: 12 }}
-          links={<>
-            <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("eval.niveauFilter")}</span>
-            <Tabs value={niveauFilter} onChange={setNiveauFilter}
-              options={[["", t("eval.niveauAll")], ["E", "E"], ["G", "G"]]} />
-          </>}
-        />
-      )}
-
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", fontSize: 14, whiteSpace: "nowrap" }}>
           <thead>
@@ -831,7 +860,6 @@ const gradeDistribution = (() => {
           </thead>
           <tbody>
             {presentStudents
-              .filter((s) => !niveauFilter || (s.niveau || "G") === niveauFilter)
               .map((student) => {
               const pct = Math.round(student.pct);
               const grade = gradeFromPct(pct, gradeScale);
