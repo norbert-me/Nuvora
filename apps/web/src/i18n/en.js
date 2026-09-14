@@ -512,6 +512,7 @@ export default {
   "profile.noAccounts": "No other accounts.",
   "profile.deleteUser": "Delete account",
   "profile.deleteUserConfirm": "Really delete {{email}}?",
+  "profile.deleteUserPassword": "Enter your own password to confirm:",
   "profile.deleted": "{{email}} deleted",
   "profile.logout": "Sign out",
   "profile.deletePwPrompt": "Enter your password to delete:",

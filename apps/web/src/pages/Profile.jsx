@@ -650,10 +650,19 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                               aria-label={t("profile.deleteUser")}
                               onClick={async () => {
                                 if (!await askConfirm(t("profile.deleteUserConfirm", { email: u.email }))) return;
-                                const res = await fetch(`${API}/auth/admin/users/${u.id}`, { method: "DELETE" });
+                                // Das EIGENE Passwort — nicht das des Kontos: die
+                                // Administration bestaetigt sich, nicht das Opfer.
+                                // Eine uebernommene Sitzung (offener Rechner im
+                                // Lehrerzimmer) reicht damit nicht mehr aus.
+                                const pw = await askPrompt(t("profile.deleteUserPassword"), { typ: "password" });
+                                if (!pw) return;
+                                const res = await fetch(`${API}/auth/admin/users/${u.id}/delete`, alsJson("POST", { password: pw }));
                                 if (res.ok) {
                                   setAdminUsers(adminUsers.filter(x => x.id !== u.id));
                                   setAdminMsg(t("profile.deleted", { email: u.email }));
+                                } else {
+                                  const d = await res.json().catch(() => null);
+                                  setAdminMsg(d?.detail || t("common.error"));
                                 }
                               }}
                               style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R }}
@@ -684,7 +693,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         }} style={btnSecondary}>{t("profile.exportData")}</button>
         <button onClick={onLogout} style={{ ...btnPrimary, background: C.danger }}>{t("profile.logout")}</button>
         <button onClick={async () => {
-          const pw = await askPrompt(t("profile.deletePwPrompt"));
+          const pw = await askPrompt(t("profile.deletePwPrompt"), { typ: "password" });
           if (!pw) return;
           if (!await askConfirm(t("profile.deleteConfirm"))) return;
           const res = await fetch(`${API}/auth/delete-account`, {

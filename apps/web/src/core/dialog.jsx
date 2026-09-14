@@ -24,8 +24,12 @@ export function askConfirm(message, opts = {}) {
 export function showAlert(message, opts = {}) {
   return request({ kind: "alert", message, ok: opts.ok });
 }
+// `typ: "password"` blendet die Eingabe aus. Ein Passwort, das man abtippt,
+// waehrend der Beamer laeuft, steht sonst in Schriftgroesse 16 an der Wand —
+// und genau dort wird es abgefragt (Konto loeschen, fremdes Konto tilgen).
 export function askPrompt(message, opts = {}) {
-  return request({ kind: "prompt", message, placeholder: opts.placeholder || "", initial: opts.initial || "", ok: opts.ok, cancel: opts.cancel });
+  return request({ kind: "prompt", message, placeholder: opts.placeholder || "", initial: opts.initial || "",
+                   typ: opts.typ || "text", ok: opts.ok, cancel: opts.cancel });
 }
 
 // Mehr als ja/nein: eine Frage mit mehreren Antworten ("nur dieser Termin" /
@@ -85,6 +89,8 @@ export function DialogHost() {
       </div>
       {cur.kind === "prompt" && (
         <input autoFocus value={val} onChange={(e) => setVal(e.target.value)} placeholder={cur.placeholder}
+          type={cur.typ === "password" ? "password" : "text"}
+          autoComplete={cur.typ === "password" ? "current-password" : undefined}
           onKeyDown={(e) => { if (e.key === "Enter") bestaetigen(); }}
           style={{ ...inputStyle, width: "100%", marginBottom: 16 }} />
       )}

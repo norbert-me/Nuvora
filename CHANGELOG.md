@@ -16,6 +16,14 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Sicherheit: ein fremdes Konto zu löschen verlangt jetzt das eigene Passwort**
+  — und geht nicht mehr im Sekundentakt. Bisher reichte ein Klick; die
+  Selbstlöschung daneben verlangte seit jeher eins.
+- **Sicherheit: die Klassenmaske leert keine Klasse mehr aus Versehen.** Kinder
+  fallen dort durch Abwesenheit im gesendeten Stand — ein halb geladener Stand
+  hätte die halbe Klasse samt Noten mitgenommen. Ab der Hälfte wird abgelehnt.
+- Passwortabfragen im Dialog zeigen das Passwort nicht mehr im Klartext.
+- Sicherheit: „Papierkorb leeren" hat eine Bremse.
 - **Aufgaben liegen jetzt im Papierkorb.** Gelöschte Lernpfad-Aufgaben sind 30
   Tage wiederherstellbar, statt sofort weg zu sein — beim Aufräumen doppelter
   Importe gehen hunderte auf einmal.

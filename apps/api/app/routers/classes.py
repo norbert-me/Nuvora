@@ -332,6 +332,13 @@ async def get_class(class_id: int, user: User = Depends(get_current_user), db: A
     return sc
 
 
+# Wie viele Kinder darf ein einzelnes Speichern der Klassenmaske entfernen?
+# Der Deckel greift erst, wenn es ausserdem mehr als die Haelfte der Klasse ist
+# — eine Klasse aufzuloesen bleibt moeglich, nur nicht aus Versehen in einem
+# einzigen Rumpf.
+MAX_ENTFERNT = 5
+
+
 @router.put("/{class_id}", response_model=ClassOut)
 async def update_class(class_id: int, body: ClassCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     sc = await db.get(SchoolClass, class_id)
@@ -371,9 +378,21 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
                            position=pos, niveau=s.niveau, foerder=s.foerder, massnahmen=_massnahmen(s),
                            notizen=s.notizen, klassenlehrer=s.klassenlehrer))
     # Nur wirklich entfernte Karten loeschen (deren Daten sollen dann auch weg).
-    for card_id, s in by_card.items():
-        if card_id not in seen:
-            await db.delete(s)
+    #
+    # ABER: mit Deckel. Was hier faellt, faellt hart und mit Kaskade — Noten,
+    # Karten-Fortschritt, Scans. Und es faellt durch ABWESENHEIT: ein Kind ist
+    # geloescht, wenn es im Rumpf FEHLT. Damit reicht ein abgeschnittener oder
+    # veralteter Rumpf (halb geladene Maske, alter Browser-Tab, unterbrochene
+    # Antwort), um eine ganze Klasse zu leeren, ohne dass jemand „loeschen"
+    # gesagt haette. Eine Klasse verliert an einem Tag ein, zwei Kinder —
+    # nicht die Haelfte; wer wirklich raeumt, macht es in zwei Schritten.
+    weg = [s for card_id, s in by_card.items() if card_id not in seen]
+    if weg and len(weg) > MAX_ENTFERNT and len(weg) > len(existing) / 2:
+        raise HTTPException(409,
+            f"{len(weg)} von {len(existing)} Kindern würden dabei gelöscht — samt Noten und Karten. "
+            "Bitte in kleineren Schritten entfernen.")
+    for s in weg:
+        await db.delete(s)
 
     await db.flush()
     if body.renumber:

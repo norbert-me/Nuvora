@@ -26,7 +26,7 @@ from ..database import get_db
 from ..models import (Card, CardDeck, Exercise, Kurs, LearningLadder, LearningPath, Question,
                       QuestionSet, QuestionSetItem, PapAufgabe, SchoolClass, Student, Topic,
                       User)
-from .auth import get_current_user
+from .auth import get_current_user, rate_limit
 from . import classes as classes_router
 from . import karten as karten_router
 from . import kurse as kurse_router
@@ -235,7 +235,16 @@ LEER_REIHENFOLGE = _LEER_ZUERST + [k for k in _AKTIONEN if k not in _LEER_ZUERST
 
 @router.delete("", status_code=204)
 async def empty_trash(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Papierkorb leeren — alles endgültig löschen (siehe LEER_REIHENFOLGE)."""
+    """Papierkorb leeren — alles endgültig löschen (siehe LEER_REIHENFOLGE).
+
+    Der einzige „alles auf einen Schlag"-Knopf einer Lehrkraft, und hinter ihm
+    gibt es keinen Rückweg mehr: was hier fällt, war die letzte Kopie. Die
+    Bremse steht deshalb im Haus und nicht nur im Proxy — eine übernommene
+    Sitzung soll den Papierkorb nicht im Sekundentakt leeren können, und wer
+    versehentlich doppelt klickt, tut es auch nicht zweimal.
+    """
+    rate_limit("trash_leeren", f"u{user.id}", 3, 300,
+               "Der Papierkorb wurde gerade geleert. Bitte kurz warten.")
     reihenfolge = LEER_REIHENFOLGE
     items = await list_trash(user, db)
     nach_art = {k: [i.id for i in items if i.kind == k] for k in reihenfolge}

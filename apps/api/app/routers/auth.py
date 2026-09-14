@@ -907,12 +907,46 @@ async def admin_set_role(user_id: int, body: AdminRolleIn, user: User = Depends(
     return {"ok": True, "admin": ziel.is_admin}
 
 
-@router.delete("/admin/users/{user_id}")
-async def admin_delete_user(user_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+class AdminDeleteUserBody(BaseModel):
+    """Das EIGENE Passwort der Administration — nicht das des Kontos."""
+    password: str = ""
+
+
+@router.post("/admin/users/{user_id}/delete")
+async def admin_delete_user(user_id: int, body: AdminDeleteUserBody,
+                            user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Ein fremdes Konto tilgen — mit denselben Riegeln wie die Selbstloeschung.
+
+    Das ist der Loeschweg mit dem groessten Wirkradius, den eine angemeldete
+    Person hat: Konto, alle Klassen, Noten, Karten, Sitzungen und die Dateien
+    auf der Platte, unwiederbringlich und ohne Papierkorb. Trotzdem stand er
+    lange als blosses `DELETE` ohne Passwort und ohne Bremse da, waehrend die
+    SELBSTloeschung daneben das Passwort verlangt — die schwaechere Huerde lag
+    also auf der schwereren Tat.
+
+    Drei Riegel, alle drei aus dem Haus:
+
+    * **Das eigene Passwort.** Eine uebernommene Sitzung (gestohlener Token,
+      offener Rechner im Lehrerzimmer) reicht damit nicht mehr aus. Geprueft
+      wird das der ADMINISTRATION, nicht das des Ziels — sie bestaetigt sich,
+      nicht das Opfer.
+    * **Eine Bremse** (3 in 10 Minuten): wer eine Installation leerraeumen
+      will, kommt nicht in einem Rutsch durch, und im Protokoll steht es.
+    * **POST statt DELETE**, weil ein Rumpf dazugehoert — und nebenbei faellt
+      damit jeder alte Client auf 405 statt still weiterzuloeschen.
+    """
     if not ist_admin(user):
         raise HTTPException(403, "Nur Admin")
+    rate_limit("admin_del_user", f"u{user.id}", 3, 600,
+               "Zu viele Kontoloeschungen in kurzer Zeit. Bitte kurz warten.")
     if user_id == 1:
         raise HTTPException(400, "Admin-Konto kann nicht gelöscht werden")
+    if user_id == user.id:
+        # „Konto loeschen" im eigenen Profil ist der richtige Weg dafuer —
+        # dort steht auch, was dabei verloren geht.
+        raise HTTPException(400, "Das eigene Konto wird im Profil gelöscht")
+    if not _verify_pw(body.password, user.password_hash):
+        raise HTTPException(400, "Passwort falsch")
     target = await db.get(User, user_id)
     if not target:
         raise HTTPException(404)

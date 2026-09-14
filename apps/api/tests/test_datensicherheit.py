@@ -258,3 +258,60 @@ async def test_fremde_zeile_bleibt_fremd(s):
     with pytest.raises(HTTPException) as fehler:
         await nur_eigenes(s, Folder, deiner.id, ich, "nicht gefunden")
     assert fehler.value.status_code == 403
+
+
+# ── 8) Der Loeschweg mit dem groessten Wirkradius braucht das Passwort ────────
+@pytest.mark.asyncio
+async def test_fremdes_konto_nur_mit_eigenem_passwort(s):
+    """`DELETE /admin/users/{id}` tilgt Konto, Klassen, Noten, Karten und die
+    Dateien auf der Platte — unwiederbringlich. Er stand lange ohne Passwort da,
+    während die SELBSTlöschung daneben eins verlangt: die schwächere Hürde lag
+    auf der schwereren Tat. Eine übernommene Sitzung reicht jetzt nicht mehr."""
+    from fastapi import HTTPException
+
+    from app.routers.auth import AdminDeleteUserBody, _hash_pw, admin_delete_user
+
+    chef = User(email="chef@x.de", password_hash=_hash_pw("richtig"), email_verified=True, is_admin=True)
+    andere = User(email="wer2@x.de", password_hash="x", email_verified=True)
+    s.add_all([chef, andere])
+    await s.commit()
+
+    with pytest.raises(HTTPException) as fehler:
+        await admin_delete_user(andere.id, AdminDeleteUserBody(password="falsch"), user=chef, db=s)
+    assert fehler.value.status_code == 400
+    assert await s.get(User, andere.id) is not None, "nichts angefasst"
+
+
+@pytest.mark.asyncio
+async def test_klassenmaske_leert_die_klasse_nicht_aus_versehen(s):
+    """Kinder werden durch ABWESENHEIT im Rumpf gelöscht — hart, mit Kaskade auf
+    Noten und Karten. Ein abgeschnittener Rumpf (halb geladene Maske, alter Tab)
+    darf damit nicht die halbe Klasse mitnehmen."""
+    from fastapi import HTTPException
+
+    from app.models import SchoolClass, Student
+    from app.routers.classes import ClassCreate, update_class
+
+    u = User(email="lehrkraft@x.de", password_hash="x", email_verified=True)
+    s.add(u)
+    await s.flush()
+    c = SchoolClass(name="7a", owner_id=u.id)
+    s.add(c)
+    await s.flush()
+    for i in range(1, 21):
+        s.add(Student(card_id=i, name=f"Kind {i}", class_id=c.id, position=i))
+    await s.commit()
+
+    # Ein Rumpf mit nur zwei Kindern würde 18 von 20 löschen.
+    with pytest.raises(HTTPException) as fehler:
+        await update_class(c.id, ClassCreate(name="7a", students=[
+            {"card_id": 1, "name": "Kind 1"}, {"card_id": 2, "name": "Kind 2"},
+        ]), user=u, db=s)
+    assert fehler.value.status_code == 409
+
+    # Zwei entfernen geht weiterhin — das ist der Alltag.
+    await update_class(c.id, ClassCreate(name="7a", students=[
+        {"card_id": i, "name": f"Kind {i}"} for i in range(1, 19)
+    ]), user=u, db=s)
+    rest = (await s.execute(__import__("sqlalchemy").select(Student).where(Student.class_id == c.id))).scalars().all()
+    assert len(rest) == 18

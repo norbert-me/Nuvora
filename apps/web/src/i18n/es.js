@@ -513,6 +513,7 @@ export default {
   "profile.noAccounts": "No hay más cuentas.",
   "profile.deleteUser": "Eliminar cuenta",
   "profile.deleteUserConfirm": "¿Eliminar {{email}}?",
+  "profile.deleteUserPassword": "Introduce tu propia contraseña para confirmar:",
   "profile.deleted": "{{email}} eliminada",
   "profile.logout": "Cerrar sesión",
   "profile.deletePwPrompt": "Introduce tu contraseña para eliminar:",

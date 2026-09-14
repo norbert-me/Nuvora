@@ -514,6 +514,7 @@ export default {
   "profile.noAccounts": "Keine weiteren Konten vorhanden.",
   "profile.deleteUser": "Konto löschen",
   "profile.deleteUserConfirm": "{{email}} wirklich löschen?",
+  "profile.deleteUserPassword": "Zur Bestätigung dein eigenes Passwort eingeben:",
   "profile.deleted": "{{email}} gelöscht",
   "profile.logout": "Abmelden",
   "profile.deletePwPrompt": "Zum Löschen bitte Passwort eingeben:",
