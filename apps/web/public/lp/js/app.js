@@ -993,8 +993,15 @@
     // checkAuth lief nie. Folge: die App zeigte nur den localStorage-Cache,
     // holte nie Aufgaben, Klassen und Kurse vom Server. In einem frischen
     // Browser blieb der Lernpfad damit leer.
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', checkAuth);
-    else checkAuth();
+    // …aber NICHT hier, sondern ganz am Ende des Moduls (siehe „Init").
+    //
+    // Hier gerufen lief `checkAuth` mitten in der Auswertung dieser Datei:
+    // `loadUserData` zeichnet sofort die Aufgabenliste, und die liest
+    // `verwendungGeladen` und `ICON` — beide sind weiter unten deklariert und
+    // in diesem Augenblick noch in ihrer temporalen Todeszone. Der Zugriff
+    // warf, der Wurf verschwand im `catch`, und der ganze Cache-First-Start war
+    // seit dem Umbau auf in-page wirkungslos: die Liste blieb leer, bis der
+    // Server antwortete.
 
     // Migrate old multi-category data to single kategorie
     aufgaben.forEach(a => {
@@ -2104,8 +2111,11 @@
     function sucheFelder(a) {
         const code = fmtId(a.code || a.id);
         return {
+            // `aufgabentext` und `latex` gehoeren dazu: das ist der Text, den
+            // die Detailansicht zeigt — wer danach sucht, sucht danach.
             text: [a.quelle, a.operator, getKategorie(a), a.thema, a.unterthema,
-                   a.kompetenz, a.methode, a.loesung, code].filter(Boolean).join(' ').toLowerCase(),
+                   a.kompetenz, a.methode, a.loesung, a.aufgabentext, a.latex, code]
+                .filter(Boolean).join(' ').toLowerCase(),
             zahlen: [codeNum(a), Number(a.id)].filter(n => Number.isFinite(n)),
         };
     }
@@ -2268,6 +2278,51 @@
     });
     document.getElementById('aufgaben-suche').addEventListener('input', renderAufgabenReset);
 
+    /**
+     * Aufgaben aus einer Datei UEBERNEHMEN — anhaengen, nie ersetzen.
+     *
+     * Der Unterschied ist kein Geschmack: `aufgaben = data.aufgaben` hiess,
+     * dass `syncAufgaben` alles loescht, was nicht in der Datei steht. Ein
+     * halbes Jahr alter Export nahm damit jede seitdem angelegte Aufgabe mit,
+     * serverseitig, ohne Rueckfrage. Angehaengt wird mit frischer Behelfs-ID:
+     * die DB-id vergibt der Server.
+     */
+    function aufgabenUebernehmen(items) {
+        let imported = 0;
+        items.forEach(item => {
+            const kat = item.kategorie || (item.kategorien && item.kategorien[0]) || '';
+            const obj = {
+                _id: uid(),
+                // Server vergibt die DB-id; Anzeige-Code lueckenfuellend.
+                code: item.code || nextAufgabeId(),
+                thema: item.thema || '',
+                unterthema: item.unterthema || '',
+                kategorie: kat,
+                quelle: item.quelle || '',
+                quelleTyp: item.quelleTyp || 'schulbuch',
+                quelleDetail: item.quelleDetail || '',
+                operator: item.operator || '',
+                unteraufgaben: parseInt(item.unteraufgaben) || 1,
+                kompetenz: item.kompetenz || '',
+                methode: item.methode || '',
+                sozialform: item.sozialform || '',
+                lrs: !!item.lrs,
+                lrsText: item.lrsText || '',
+                foerderschwerpunkte: Array.isArray(item.foerderschwerpunkte) ? item.foerderschwerpunkte : [],
+                loesung: item.loesung || '',
+                aufgabentext: item.aufgabentext || '',
+                bild: item.bild || undefined,
+                loesungBild: item.loesungBild || undefined,
+                latex: item.latex || ''
+            };
+            if (obj.thema && obj.kategorie) {
+                aufgaben.push(obj);
+                imported++;
+            }
+        });
+        return imported;
+    }
+
     // ─── JSON Import ───
     document.getElementById('btn-json-import').addEventListener('click', () => {
         document.getElementById('json-file-input').click();
@@ -2284,38 +2339,7 @@
                 const items = Array.isArray(data) ? data : (data.aufgaben || []);
                 if (!items.length) { toast('Keine Aufgaben in JSON gefunden'); return; }
 
-                let imported = 0;
-                items.forEach(item => {
-                    const kat = item.kategorie || (item.kategorien && item.kategorien[0]) || '';
-                    const obj = {
-                        _id: uid(),
-                        // Server vergibt die DB-id; Anzeige-Code lueckenfuellend.
-                        code: item.code || nextAufgabeId(),
-                        thema: item.thema || '',
-                        unterthema: item.unterthema || '',
-                        kategorie: kat,
-                        quelle: item.quelle || '',
-                        quelleTyp: item.quelleTyp || 'schulbuch',
-                        quelleDetail: item.quelleDetail || '',
-                        operator: item.operator || '',
-                        unteraufgaben: parseInt(item.unteraufgaben) || 1,
-                        kompetenz: item.kompetenz || '',
-                        methode: item.methode || '',
-                        sozialform: item.sozialform || '',
-                        lrs: !!item.lrs,
-                        lrsText: item.lrsText || '',
-                        foerderschwerpunkte: Array.isArray(item.foerderschwerpunkte) ? item.foerderschwerpunkte : [],
-                        loesung: item.loesung || '',
-                        aufgabentext: item.aufgabentext || '',
-                        bild: item.bild || undefined,
-                        loesungBild: item.loesungBild || undefined,
-                        latex: item.latex || ''
-                    };
-                    if (obj.thema && obj.kategorie) {
-                        aufgaben.push(obj);
-                        imported++;
-                    }
-                });
+                const imported = aufgabenUebernehmen(items);
 
                 save(STORAGE_KEYS.aufgaben, aufgaben);
                 renderAufgaben();
@@ -2357,15 +2381,17 @@
         reader.onload = ev => {
             try {
                 const data = JSON.parse(ev.target.result);
-                if (data.aufgaben) { aufgaben = data.aufgaben; save(STORAGE_KEYS.aufgaben, aufgaben); }
-                if (data.schueler) { schueler = data.schueler; save(STORAGE_KEYS.schueler, schueler); }
-                if (data.klassen) { klassen = data.klassen; save(STORAGE_KEYS.klassen, klassen); }
-                if (data.idCounter) { cacheSetzen(STORAGE_KEYS.idCounter, String(data.idCounter)); }
+                // NUR die Aufgaben, und ANGEHAENGT (siehe aufgabenUebernehmen).
+                // Klassen und Schueler kamen hier frueher scheinbar mit: sie
+                // landeten im Anzeige-Cache, gingen nie zum Server und waren
+                // nach dem Neuladen wieder weg — gemeldet wurde trotzdem
+                // „Alle Daten importiert". Gepflegt werden sie unter /classes.
+                const n = data.aufgaben ? aufgabenUebernehmen(data.aufgaben) : 0;
+                save(STORAGE_KEYS.aufgaben, aufgaben);
                 renderAufgaben();
-                renderKlassen();
-                renderSchueler();
                 setNextId();
-                toast('Alle Daten importiert');
+                toast(n + ' Aufgaben übernommen' + ((data.schueler || data.klassen)
+                    ? ' — Klassen und Schüler bitte unter „Klassen" pflegen' : ''));
             } catch (err) {
                 toast('Fehler: ' + err.message);
             }
@@ -4275,10 +4301,16 @@
         if (!ids.length) return;
         if (!await confirmDlg(ids.length + ' ausgewählte Aufgabe(n) wirklich löschen?', { ok: 'Löschen' })) return;
         const idSet = new Set(ids);
-        // Backend + lokal löschen
-        ids.forEach(id => api(`${LP}/exercises/` + id, { method: 'DELETE' }).catch(() => {}));
+        // Nur lokal streichen — der Abgleich raeumt den Server in EINER Anfrage
+        // nach (syncAufgaben, `exercises/loeschen`). Vorher standen hier N
+        // einzelne DELETEs ohne `await` und mit verschlucktem Fehler: bei mehr
+        // als dreissig Aufgaben rannten sie in die Bremse des Proxys, und
+        // was scheiterte, merkte niemand.
         aufgaben = aufgaben.filter(a => !idSet.has(a._id));
-        save(STORAGE_KEYS.aufgaben, aufgaben);
+        // `geloescht`: sonst haelt die Sicherung eine leer geraeumte Liste fuer
+        // einen Ladefehler und meldet „Abgleich ausgesetzt … bitte neu laden",
+        // obwohl genau das gewollt war.
+        save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
         bulkSelectAll.checked = false;
         renderAufgaben();
         updateFilters();
@@ -5079,6 +5111,12 @@
                 e.stopPropagation();
                 const llId = e.currentTarget.dataset.llId;
                 const action = e.currentTarget.dataset.action;
+                // Die Zeile SELBST traegt `data-ll-id` und faengt den Klick
+                // deshalb mit. Ohne Aktion fiel er bis ans Ende durch und
+                // loeste dort ein `savePfad` aus: ein Griff auf den Ziehgriff
+                // oder den Leerraum schrieb, ohne dass jemand etwas geaendert
+                // haette.
+                if (!action) return;
                 const idx = currentPfad.lernleitern.findIndex(ll => ll._id === llId);
                 if (action === 'open') {
                     openLernleiter(currentPfad, currentPfad.lernleitern[idx]);
@@ -5116,25 +5154,17 @@
                     else { const b = r ? await r.json().catch(() => ({})) : {}; toast(typeof b.detail === 'string' ? b.detail : 'Hat nicht geklappt.'); }
                     return;
                 }
-                if (action === 'rename') {
-                    const ll = currentPfad.lernleitern[idx];
-                    const neuThema = prompt('Thema der Lernleiter:', ll.thema || '');
-                    if (neuThema === null) return;  // abgebrochen
-                    const neuUnter = prompt('Unterthema (leer lassen für keins):', ll.unterthema || '');
-                    if (neuUnter === null) return;
-                    ll.thema = neuThema.trim();
-                    ll.unterthema = neuUnter.trim();
-                } else if (action === 'up' && idx > 0) {
-                    [currentPfad.lernleitern[idx - 1], currentPfad.lernleitern[idx]] = [currentPfad.lernleitern[idx], currentPfad.lernleitern[idx - 1]];
-                } else if (action === 'down' && idx < currentPfad.lernleitern.length - 1) {
-                    [currentPfad.lernleitern[idx + 1], currentPfad.lernleitern[idx]] = [currentPfad.lernleitern[idx], currentPfad.lernleitern[idx + 1]];
-                } else if (action === 'delete') {
+                // `rename`, `up` und `down` standen hier noch als Zweige — die
+                // Knoepfe dazu gibt es im Markup nicht mehr (geordnet wird
+                // gezogen, benannt wird am Pfad). Weg damit: toter Code an
+                // einer Stelle, an der jeder Klick ohne Aktion landet.
+                if (action === 'delete') {
                     if (!await confirmDlg('Lernleiter aus Pfad entfernen?', { ok: 'Entfernen' })) return;
                     currentPfad.lernleitern.splice(idx, 1);
                 }
                 // Ordnung geaendert? Dann die (evtl. neue) erste Lernleiter von
                 // ihren Wiederholungs-Aufgaben befreien — davor gibt es kein Thema.
-                if (action === 'up' || action === 'down' || action === 'delete') {
+                if (action === 'delete') {
                     if (bereinigeErsteWiederholung(currentPfad)) toast('Wiederholungs-Aufgaben der ersten Lernleiter entfernt (kein Thema davor).');
                 }
                 await savePfad(currentPfad);
@@ -5188,16 +5218,23 @@
         const proGruppe = new Map();
         const proNiveau = new Map();
         const zaehler = new Map();
+        // Die Teilaufgaben gehoeren zur Zuweisung („Nr. 4" heisst fuer dieses
+        // Kind „Nr. 4 a, b") und wurden beim Uebertragen stillschweigend
+        // weggeworfen — im neuen Kurs stand wieder die ganze Aufgabe.
+        const teileProGruppe = new Map();
+        const teileProNiveau = new Map();
+        let teileNotnagel = {};
         (ll.schueler || []).forEach(sch => {
             const ids = sch.aufgabenIds || [];
             if (!ids.length) return;
             const st = schueler.find(x => String(x.id) === String(sch.id) || String(x._id) === String(sch._id))
                 || (sch.name && schueler.find(x => x.name === sch.name));
             const k = st ? groupKey(st) : ('?' + sch._id);
-            if (!proGruppe.has(k)) proGruppe.set(k, ids);
+            if (!proGruppe.has(k)) { proGruppe.set(k, ids); teileProGruppe.set(k, sch.teile || {}); }
             const niv = st ? (st.niveau || '') : '';
-            if (!proNiveau.has(niv)) proNiveau.set(niv, ids);
+            if (!proNiveau.has(niv)) { proNiveau.set(niv, ids); teileProNiveau.set(niv, sch.teile || {}); }
             const sig = ids.join(',');
+            if (!zaehler.has(sig)) teileNotnagel = sch.teile || {};
             zaehler.set(sig, (zaehler.get(sig) || 0) + 1);
         });
         const haeufigste = [...zaehler.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -5209,9 +5246,11 @@
         let exakt = 0, ueberNiveau = 0, notfalls = 0;
         const neuePreview = zielKinder.map(st => {
             let ids = proGruppe.get(groupKey(st));
+            let teile = teileProGruppe.get(groupKey(st)) || {};
             if (ids) exakt++;
-            else if ((ids = proNiveau.get(st.niveau || ''))) ueberNiveau++;
-            else { ids = notnagel; notfalls++; }
+            else if ((ids = proNiveau.get(st.niveau || ''))) {
+                ueberNiveau++; teile = teileProNiveau.get(st.niveau || '') || {};
+            } else { ids = notnagel; teile = teileNotnagel; notfalls++; }
             const tasks = ids.map(id => aufgaben.find(a => String(a.id) === String(id) || String(a._id) === String(id)))
                 .filter(Boolean)
                 .map(a => {
@@ -5222,7 +5261,9 @@
                     const wdh = k !== 'Erklärung' && ll.thema && a.thema && a.thema !== ll.thema;
                     const section = k === 'Erklärung' ? 'Erklärung' : wdh ? 'Wiederholung'
                         : k === 'Basis' ? 'Basis' : k === 'E-Niveau' ? 'E-Niveau' : 'G-Niveau';
-                    return { ...a, section, selected: true, teil: '' };
+                    // Die Teilaufgabe haengt an der SERVER-id der Aufgabe —
+                    // dieselbe Aufgabe, anderer Kurs, also bleibt sie gueltig.
+                    return { ...a, section, selected: true, teil: teile[String(a.id)] || '' };
                 });
             pflichtZusatzNeu(tasks, (ll.config && ll.config.pflicht != null) ? ll.config.pflicht : Infinity);
             return { student: st, tasks, thema: ll.thema, unterthema: ll.unterthema || '' };
@@ -5450,4 +5491,9 @@
     renderAufgaben();
     renderSchueler();
     loadLernpfade();
+
+    // Anmeldung und Server-Daten ZULETZT: erst jetzt sind alle Deklarationen
+    // dieser Datei ausgewertet (siehe der Hinweis oben bei `checkAuth`).
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', checkAuth);
+    else checkAuth();
 })();
