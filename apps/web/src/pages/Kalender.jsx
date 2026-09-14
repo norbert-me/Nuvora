@@ -893,7 +893,7 @@ export default function Kalender() {
           onClose={() => setHiddenOffen(false)} t={t} />
       )}
 
-      {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?todo=${td.id}` : "/notizbrett")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
+      {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
         <div style={{ ...cardStyle, marginBottom: 12, padding: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("kalender.wdhTitle")}</div>
@@ -909,8 +909,8 @@ export default function Kalender() {
           </div>
         </div>
       )}
-      {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?todo=${td.id}` : "/notizbrett")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
-      {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?todo=${td.id}` : "/notizbrett")} slotsFor={slotsFor} onCancelSlot={cancelSlot} frei={frei} className={className} slotName={slotName} eintragName={eintragName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
+      {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} onCancelSlot={cancelSlot} frei={frei} className={className} slotName={slotName} eintragName={eintragName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {untisOffen && (
         <UntisImport onClose={() => setUntisOffen(false)} kurse={kurse} klassen={classes} periods={tt.periods}
           onFertig={() => { loadTt(); loadBreaks(); loadCancels(); }} />
@@ -2226,14 +2226,6 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onRau
 }
 
 function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, topicName = () => "", kursName = () => "", onSave, onDelete, onClose, t }) {
-  const navigate = useNavigate();
-  // "Ergebnis als Note": die gelaufene Session zum verknüpften Quiz suchen und
-  // deren Auswertung mit direkt geöffnetem Noten-Import ansteuern.
-  const alsNote = async () => {
-    const r = await fetch(`${API}/quiz-session?set_id=${entry.cardvote_set_id}&class_id=${entry.class_id}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-    if (r && r.session_id) { onClose(); navigate(`/cardvote/evaluation/${r.session_id}?import=1`); }
-    else showAlert(t("kalender.noSession"));
-  };
   const [title, setTitle] = useState(entry.title || "");
   const [notes, setNotes] = useState(entry.notes || "");
   const [verlauf, setVerlauf] = useState(Array.isArray(entry.verlaufsplan) ? entry.verlaufsplan : []);
@@ -2449,6 +2441,11 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
     // „Teile der Module" abgeschaltet hat, findet ihn in der Navigation nicht
     // mehr — dann darf ihn der Kalender auch nicht anbieten. `useZielFilter`
     // beantwortet beides auf einmal, wie in KursLinks.
+    // Ins Notenbuch: „hat heute mitgearbeitet" faellt in der Stunde an, und
+    // offen ist dabei der Termin, nicht die Notentabelle. Derselbe Weg wie in
+    // KursLinks (?tab=noten mit Klasse UND Kurs — ohne den Kurs raet die
+    // Zielseite den ersten zur Klasse).
+    aktiv.auswertung && classId && { to: `/auswertung?tab=noten&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`, label: t("kursLinks.noten"), kind: t("kursLinks.noten") },
     orgaTeil("anwesenheit") && classId && { to: `/orga?tab=anwesenheit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}&date=${ymd(new Date(entry.date))}`, label: t("kalender.zurAnwesenheit"), kind: t("kalender.zurAnwesenheit") },
     orgaTeil("checklisten") && classId && { to: `/orga?tab=checklisten&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`, label: t("kalender.zurCheckliste"), kind: t("kalender.zurCheckliste") },
     // Der Sitzplan gehoert in dieselbe Reihe: er ist die Ansicht, die waehrend
@@ -2490,9 +2487,12 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
         <div style={{ padding: "6px 24px 22px" }}>
         {!edit && (
           <div>
-            {(clsName || topName || ort || entry.rrule) && (
+            {((clsName && title) || topName || ort || entry.rrule) && (
               <div style={{ marginTop: 4 }}>
-                {clsName && (
+                {/* Traegt der Eintrag keinen eigenen Titel, IST der Kursname die
+                    Ueberschrift (siehe Kopf) — dann steht er hier ein zweites
+                    Mal, zwei Zeilen darunter. */}
+                {clsName && title && (
                   <div style={{ display: "flex", gap: 8, fontSize: 14, padding: "3px 0" }}>
                     {/* Steht dort ein Kurs (Fach), heißt die Zeile auch so — und
                         der Link führt in den Kurs, nicht in die Klasse. */}
@@ -2522,13 +2522,12 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
             {/* Was für einzelne Kinder in Arbeiten abweicht (Zeitzuschlag,
                 abweichende Lernziele …) — beim Aufschlagen des Termins sichtbar. */}
             {entry.exam_id && classId && <ExamMassnahmen classId={Number(classId)} kursId={kursId ?? null} t={t} />}
-            {aktiv.cardvote && aktiv.auswertung && entry.cardvote_set_id && classId && (
-              <button onClick={alsNote}
-                style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", cursor: "pointer", color: "var(--accent)", fontSize: 14, fontWeight: 600, width: "100%" }}>
-                <Icon d={ICONS.chart} size={15} color="var(--accent)" />
-                {t("kalender.resultAsGrade")}
-              </button>
-            )}
+            {/* „Ergebnis als Note uebernehmen" stand hier und ist entfernt:
+                am Termin steht die PLANUNG („in dieser Stunde laeuft dieses
+                Quiz"), nicht das Ergebnis. Der Knopf riet sich ausserdem die
+                gelaufene Sitzung aus Quiz + Klasse zusammen — bei zwei Laeufen
+                desselben Quiz die falsche. Uebernommen wird dort, wo das
+                Ergebnis steht: in der Auswertung. */}
             {linkList.length > 0 && (
               <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={lbl}>{t("kalender.openLinked")}</div>
@@ -2586,6 +2585,11 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
                 Eintrag. Beim blossen Aufschlagen der Stunde stand sonst ein
                 Datei-Knopf zwischen den Angaben. */}
             {entry.id && <div style={{ marginTop: 16 }}><MaterialPanel entryId={entry.id} nurLesen /></div>}
+            {/* Und das Material des THEMAS. Es haengt am Thema, weil es fuer
+                jede Stunde dazu gilt — am Termin sucht man es trotzdem: dort
+                steht, was heute dran ist. Nur lesend, gepflegt wird es unter
+                „Themen"; ohne Dateien erscheint der Kasten gar nicht. */}
+            {topicId && <div style={{ marginTop: 16 }}><MaterialPanel topicId={Number(topicId)} nurLesen titel={t("kalender.topicMaterial")} /></div>}
             <div style={{ display: "flex", gap: 8, marginTop: 24, alignItems: "center" }}>
               <button onClick={() => setEdit(true)} style={btnPrimary}>{t("common.edit")}</button>
               <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>

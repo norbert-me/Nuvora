@@ -16,6 +16,14 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Kalender: die Stunde führt jetzt auch ins Notenbuch** — neben Anwesenheit,
+  Checkliste und Sitzplan.
+- **Kalender: das Material des Themas steht an der Stunde** (nur zum Nachschlagen;
+  gepflegt wird es unter „Themen").
+- Kalender: „Ergebnis als Note übernehmen" ist am Termin weg — dort steht die
+  Planung, übernommen wird in der Auswertung.
+- Kalender: der Kursname steht nicht mehr doppelt im Eintrag.
+- **Kalender: der Klick auf eine Aufgabe öffnet die Aufgaben, nicht die Notizen.**
 - **CardVote: die Auswertung hat eine SuS-Ansicht** — Namen, Punkte und Noten je
   Kind aus, der Rest bleibt. Zum Besprechen vor der Klasse, wie in der
   Klassenarbeit.

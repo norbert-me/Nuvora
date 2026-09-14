@@ -14,7 +14,10 @@ export default function Notizbrett() {
   // Dieselbe Regel wie in der Auswertung: ist der voreingestellte Teil im
   // Modul-Zahnrad abgeschaltet, zeigt der Aufruf ohne ?tab den anderen.
   const notizenAn = useModulOption("notizbrett", "notizen");
-  const gewaehlt = params.get("tab") === "aufgaben" ? "aufgaben" : "notizen";
+  // `?todo=<id>` nennt eine AUFGABE — dann ist der Reiter entschieden, auch
+  // ohne `?tab`. Der Klick auf eine Aufgabe im Kalender landete sonst bei den
+  // Notizzetteln, und die gesuchte Aufgabe war nirgends zu sehen.
+  const gewaehlt = (params.get("tab") === "aufgaben" || params.get("todo")) ? "aufgaben" : "notizen";
   const tab = gewaehlt === "notizen" && !notizenAn ? "aufgaben" : gewaehlt;
   return (
     <div style={{ ...pageApp }}>

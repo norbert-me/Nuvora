@@ -177,7 +177,6 @@ def endpunkte(u):
             ("GET", "/api/kalender/subscribe"),
             ("GET", "/api/kalender/external"),
             ("GET", "/api/kalender/external-hidden"),
-            ("GET", f"/api/kalender/quiz-session?set_id=0&class_id={c}"),
         ],
         "orga": [
             ("GET", f"/api/orga/{c}"),

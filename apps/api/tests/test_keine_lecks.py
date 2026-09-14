@@ -507,7 +507,6 @@ def _routen():
 QUERY = {
     "/api/kalender/entries": "von=2020-01-01&bis=2030-01-01",
     "/api/kalender/external-events": "von=2020-01-01&bis=2030-01-01",
-    "/api/kalender/quiz-session": "set_id={set_id}&class_id={class_id}",
     "/api/anwesenheit/{class_id}": "date=2026-01-15",
     "/api/notizen": "student_id={student_id}",
     "/api/notizen/counts": "class_id={class_id}",
