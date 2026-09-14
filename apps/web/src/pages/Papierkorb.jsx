@@ -11,8 +11,13 @@ import { sende } from "../core/melden.js";
 
 const API = "/api";
 
-// Anzeige-Reihenfolge der Arten (Kern zuerst, dann die Module).
-const ARTEN = ["kurs", "class", "topic", "deck", "card", "path", "ladder", "question"];
+// Anzeige-REIHENFOLGE der Arten (Kern zuerst, dann die Module) — keine Auswahl.
+// Als Auswahl war sie eine Falle: der Server lieferte laengst Aufgaben,
+// PAP-Aufgaben und Personen, und die Seite liess sie stillschweigend weg. Wer
+// hundert Aufgaben geloescht hatte, fand einen leeren Papierkorb und hielt sie
+// fuer endgueltig weg. Alles, was nicht hier steht, haengt sich jetzt hinten an.
+const ARTEN = ["kurs", "class", "topic", "person", "deck", "card", "path", "ladder",
+               "exercise", "question", "pap"];
 
 export default function Papierkorb() {
   const { t } = useLanguage();
@@ -55,7 +60,7 @@ export default function Papierkorb() {
   // Verbleibende Tage bis zum endgültigen Löschen (Server: 30 Tage).
   const restTage = (it) => Math.max(0, Math.ceil((new Date(it.purge_at) - new Date()) / 86400000));
 
-  const gruppen = ARTEN
+  const gruppen = [...new Set([...ARTEN, ...items.map((i) => i.kind)])]
     .map((kind) => ({ kind, list: items.filter((i) => i.kind === kind) }))
     .filter((g) => g.list.length);
 

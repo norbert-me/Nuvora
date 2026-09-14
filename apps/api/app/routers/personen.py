@@ -284,6 +284,29 @@ async def delete_person(person_id: int, user: User = Depends(get_current_user),
     await db.commit()
 
 
+# ── Papierkorb ──
+#
+# Weich geloescht war sie seit jeher — sichtbar war sie nirgends: `persons`
+# stand im Aufraeumjob (`PAPIERKORB_TABELLEN`), aber in keiner Liste des
+# Papierkorbs. Eine geloeschte Person verschwand also spurlos und wurde nach
+# 30 Tagen endgueltig entfernt, ohne dass sie je jemand haette zurueckholen
+# koennen. Die beiden Funktionen holt `trash.py` sich hier ab, damit die
+# Semantik nur einmal existiert.
+
+async def restore_person(person_id: int, user: User, db: AsyncSession) -> None:
+    p = await db.get(Person, person_id)
+    if p and p.owner_id == user.id:
+        p.deleted_at = None
+        await db.commit()
+
+
+async def purge_person(person_id: int, user: User, db: AsyncSession) -> None:
+    p = await db.get(Person, person_id)
+    if p and p.owner_id == user.id:
+        await db.delete(p)
+        await db.commit()
+
+
 @router.post("/{person_id}/photo", response_model=PersonOut)
 async def upload_photo(person_id: int, file: UploadFile = File(...),
                        user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):

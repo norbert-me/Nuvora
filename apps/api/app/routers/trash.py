@@ -23,15 +23,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import (Card, CardDeck, Exercise, Kurs, LearningLadder, LearningPath, Question,
-                      QuestionSet, QuestionSetItem, PapAufgabe, SchoolClass, Student, Topic,
-                      User)
+from ..models import (Card, CardDeck, Exercise, Kurs, LearningLadder, LearningPath, Person,
+                      Question, QuestionSet, QuestionSetItem, PapAufgabe, SchoolClass, Student,
+                      Topic, User)
 from .auth import get_current_user, rate_limit
 from . import classes as classes_router
 from . import karten as karten_router
 from . import kurse as kurse_router
 from . import lernpfad as lernpfad_router
 from . import pap as pap_router
+from . import personen as personen_router
 from . import questions as questions_router
 from . import topics as topics_router
 
@@ -170,6 +171,16 @@ async def list_trash(user: User = Depends(get_current_user), db: AsyncSession = 
         add("topic", t.id, t.name, "Thema", "kern", t.deleted_at,
             namen.get(t.parent_id, "") if t.parent_id else "")
 
+    # ── Personen (Kern) ──
+    #
+    # Sie waren weich geloescht und trotzdem nirgends zu sehen: `persons` stand
+    # im Aufraeumjob, aber in keiner Liste hier. Eine geloeschte Person war
+    # damit spurlos weg und nach 30 Tagen endgueltig.
+    personen = (await db.execute(select(Person).where(
+        Person.owner_id == user.id, Person.deleted_at.is_not(None)))).scalars().all()
+    for pers in personen:
+        add("person", pers.id, pers.name, "Person", "kern", pers.deleted_at)
+
     items.sort(key=lambda i: i.deleted_at, reverse=True)
     return items
 
@@ -187,6 +198,7 @@ _AKTIONEN = {
     "question": (questions_router.restore_question, questions_router.purge_question),
     "topic": (topics_router.restore_topic, topics_router.purge_topic),
     "pap": (pap_router.restore_aufgabe, pap_router.purge_aufgabe),
+    "person": (personen_router.restore_person, personen_router.purge_person),
 }
 
 
