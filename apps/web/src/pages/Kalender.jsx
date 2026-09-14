@@ -2383,18 +2383,21 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topicId, decks, ladders, methods, aktiv.karten, aktiv.lernpfad, aktiv.unterrichtsplanung]);
-  // Dauer des verknüpften Einstiegs einmalig in den Verlaufsplan übernehmen.
-  // Nur, wenn noch keine Einstieg-Phase existiert (überschreibt nichts Eigenes).
+  // Ist ein Einstieg hinterlegt, gehört er als erste Phase in den Verlaufsplan
+  // der Stunde — einmalig, und nur wenn dort noch keine Einstieg-Phase steht
+  // (überschreibt nichts Eigenes). Die Dauer wird mitgenommen, WENN der
+  // Einstieg eine trägt — ohne eine (viele Einstiege sind zeitlos notiert)
+  // steht die Phase trotzdem da, nur ohne Minutenangabe.
   const autoEinstieg = useRef(null);
   useEffect(() => {
     if (!methodId) return;
     const m = methods.find((x) => x.id === Number(methodId));
-    if (!m || !m.dauer) return;
+    if (!m) return;
     if (autoEinstieg.current === m.id) return;
     autoEinstieg.current = m.id;
     setVerlauf((v) => (v.some((p) => (p.phase || "").trim().toLowerCase() === "einstieg")
       ? v
-      : [{ phase: "Einstieg", dauer: String(m.dauer), text: m.title || "" }, ...v]));
+      : [{ phase: "Einstieg", dauer: m.dauer ? String(m.dauer) : "", text: m.title || "" }, ...v]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [methodId, methods]);
   const fld = { ...inputStyle, width: "100%" };
