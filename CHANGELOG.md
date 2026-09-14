@@ -16,6 +16,12 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote: die Live-Session weiß, wer heute fehlt.** Abwesende zählen nicht
+  mehr zu „x / y erfasst" und stehen durchgestrichen am Ende der Namensliste —
+  ohne Modul Orga ändert sich nichts.
+- **CardVote-Auswertung: ein Reiter „Fragen" zeigt den Test zum Nachlesen** —
+  Wortlaut, richtige Antwort und wie viele sie hatten. Vorher kam man an eine
+  Frage nur über die senkrechten Spaltenköpfe der Tabelle.
 - **CardVote: schon EINE richtige Anforderungsfrage bringt Bonus** — anteilig
   statt erst ab zwei. Bei nur einer E-Frage im Quiz hebt sie höchstens um eine
   halbe Notenstufe (ein Zufallstreffer soll keine volle Stufe wert sein).

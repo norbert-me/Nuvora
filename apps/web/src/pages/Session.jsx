@@ -71,6 +71,9 @@ export default function Session() {
   const wsRef = useRef(null);
 
   const [activeSessions, setActiveSessions] = useState([]);
+  // Wer heute fehlt, braucht nicht gescannt zu werden (Namen, nicht ids —
+  // siehe unten). Regel 3: ohne Modul Orga bleibt die Menge leer.
+  const [abwesend, setAbwesend] = useState(() => new Set());
 
   useEffect(() => {
     fetch(`${API}/classes`).then((r) => r.ok ? r.json() : []).then((d) => setClasses(Array.isArray(d) ? d : []));
@@ -78,6 +81,39 @@ export default function Session() {
     fetch(`${API}/folders`).then((r) => r.ok ? r.json() : []).then((d) => setFolders(Array.isArray(d) ? d : []));
     fetch(`${API}/sessions/active`).then((r) => r.ok ? r.json() : []).then((d) => setActiveSessions(Array.isArray(d) ? d : []));
   }, []);
+
+  // Die Anwesenheit von heute holen: wer fehlt, zaehlt nicht zu den Karten, auf
+  // die man wartet — „18 / 27 erfasst" mit neun kranken Kindern liest sich wie
+  // ein Scanfehler, und man sucht Karten, die gar nicht im Raum sind.
+  //
+  // Zugeordnet wird ueber den NAMEN, nicht ueber die student_id: die
+  // Anwesenheit antwortet mit der Zeile der angefragten Klasse, die Session
+  // fuehrt ihre Liste dagegen kursweit (je Name eine Zeile, moeglicherweise aus
+  // einer Geschwisterklasse). Ueber die id passte dann kein Schluessel — genau
+  // der Fehler, der das Notenbuch einmal ohne Rot dastehen liess.
+  //
+  // „Verspaetet" zaehlt NICHT als abwesend: das Kind ist da, seine Karte auch.
+  useEffect(() => {
+    if (!selectedClass) { setAbwesend(new Set()); return; }
+    let gilt = true;
+    const heute = new Date(); heute.setHours(12, 0, 0, 0);   // Tagesmitte: die Zeitzone soll den Tag nicht kippen
+    fetch(`${API}/anwesenheit/${selectedClass.id}?date=${encodeURIComponent(heute.toISOString())}`)
+      .then((r) => (r.ok ? r.json() : {}))
+      .catch(() => ({}))
+      .then((d) => {
+        if (!gilt) return;
+        const namen = new Map();
+        classes.forEach((c) => (c.students || []).forEach((st) => namen.set(String(st.id), (st.name || "").trim())));
+        const weg = new Set();
+        Object.entries(d || {}).forEach(([sid, eintrag]) => {
+          if (!eintrag || !["fehlt", "entsch"].includes(eintrag.status)) return;
+          const name = namen.get(String(sid));
+          if (name) weg.add(name);
+        });
+        setAbwesend(weg);
+      });
+    return () => { gilt = false; };
+  }, [selectedClass, classes]);
 
   const shuffleArray = (arr) => {
     const a = [...arr];
@@ -363,6 +399,9 @@ export default function Session() {
     return Object.values(canon).sort((a, b) => (a.position || 0) - (b.position || 0) || a.card_id - b.card_id || a.id - b.id);
   };
   const studentList = kursRoster(selectedClass);
+  // Auf wie viele Karten wartet man wirklich? Die Abwesenden zaehlen nicht mit.
+  const fehltHeute = (st) => abwesend.has((st.name || "").trim());
+  const erwartet = studentList.filter((st) => !fehltHeute(st));
   const studentMap = Object.fromEntries(studentList.map((s) => [s.card_id, s.name]));
 
   const niveauMap = Object.fromEntries(studentList.map((s) => [s.card_id, s.niveau || ""]));
@@ -849,24 +888,39 @@ export default function Session() {
             {/* Student list */}
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: "clamp(12px, 1.6vh, 15px)", color: "var(--text3)", fontWeight: 600, marginBottom: 6 }}>
-                {t("cv.scanned", { n: scannedStudents.length, total: studentList.length })}
+                {t("cv.scanned", { n: scannedStudents.length, total: erwartet.length })}
+                {abwesend.size > 0 && (
+                  <span style={{ marginLeft: 8, fontWeight: 500 }}>
+                    {t("session.absentNote", { n: studentList.length - erwartet.length })}
+                  </span>
+                )}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                 {[...studentList].sort((a, b) => {
+                  // Wer fehlt, steht ganz hinten: die Liste beantwortet „auf
+                  // wen warte ich noch?", und dort gehoert niemand hin, der
+                  // gar nicht im Raum ist.
+                  const aWeg = fehltHeute(a), bWeg = fehltHeute(b);
+                  if (aWeg !== bWeg) return aWeg ? 1 : -1;
                   const aScanned = scannedIds.has(a.card_id);
                   const bScanned = scannedIds.has(b.card_id);
                   if (aScanned !== bScanned) return aScanned ? 1 : -1;
                   return 0;
                 }).map((student) => {
                   const scanned = scannedIds.has(student.card_id);
+                  const weg = fehltHeute(student) && !scanned;
                   const answer = scanMap[student.card_id];
                   const showColor = revealed && scanned && showAnswers;
                   return (
-                    <div key={student.card_id} style={{
+                    <div key={student.card_id} title={weg ? t("session.absent") : undefined} style={{
                       ...chipStyle, padding: "5px 12px", fontSize: 13,
                       fontWeight: scanned ? 600 : 400,
                       background: showColor ? ANTWORT_COLORS[answer] : scanned ? "var(--text)" : "var(--bg2)",
                       color: scanned ? "var(--bg)" : "var(--text3)",
+                      // Abwesend: blass und durchgestrichen — dieselbe Anzeige
+                      // wie am Sitzplatz, kein eigenes Vokabular.
+                      opacity: weg ? 0.45 : 1,
+                      textDecoration: weg ? "line-through" : "none",
                       transition: "all 0.3s",
                     }}>
                       {student.name}

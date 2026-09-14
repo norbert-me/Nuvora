@@ -58,6 +58,7 @@ export default function Evaluation() {
   const [selectedQ, setSelectedQ] = useState(null);
   const [showWeights, setShowWeights] = useState(false);
   const [showScale, setShowScale] = useState(false);
+  const [showFragen, setShowFragen] = useState(false);
   const [showDiscInfo, setShowDiscInfo] = useState(false);
   const [showSdInfo, setShowSdInfo] = useState(false);
   const [showRateInfo, setShowRateInfo] = useState(false);
@@ -677,9 +678,13 @@ const gradeDistribution = (() => {
       <Werkzeugleiste style={{ marginBottom: 12 }}
         links={
           <Tabs
-            value={showScale ? "scale" : showWeights ? "weights" : ""}
-            onChange={(v) => { setShowScale(v === "scale" && !showScale); setShowWeights(v === "weights" && !showWeights); }}
-            options={[["scale", t("cv.gradeScale")], ["weights", t("cv.weights")]]}
+            value={showScale ? "scale" : showWeights ? "weights" : showFragen ? "fragen" : ""}
+            onChange={(v) => {
+              setShowScale(v === "scale" && !showScale);
+              setShowWeights(v === "weights" && !showWeights);
+              setShowFragen(v === "fragen" && !showFragen);
+            }}
+            options={[["scale", t("cv.gradeScale")], ["weights", t("cv.weights")], ["fragen", t("cv.allQuestions")]]}
           />
         }
       />
@@ -721,6 +726,48 @@ const gradeDistribution = (() => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Alle Fragen des Tests zum Nachlesen.
+          Bisher kam man an eine Frage nur ueber die senkrecht gestellten
+          Spaltenkoepfe der Tabelle („F3") — das findet niemand, der nicht
+          weiss, dass sie anklickbar sind, und beim Besprechen im Unterricht
+          ist „was stand in Frage 3?" die haeufigste Frage. Hier steht der
+          Wortlaut, die richtige Antwort und wie viele sie hatten; ein Klick
+          fuehrt in die bestehende Einzelansicht. */}
+      {showFragen && (
+        <div style={{ ...cardStyle, marginBottom: 12, display: "grid", gap: 8 }}>
+          {questions.map((q, i) => {
+            const stat = questionStats[i];
+            const loesung = (q.correct_answer || "").split("").filter(Boolean);
+            return (
+              <button key={q.id} onClick={() => setSelectedQ(i)}
+                style={{
+                  display: "flex", alignItems: "flex-start", gap: 12, textAlign: "left", width: "100%",
+                  padding: "10px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border3)",
+                  background: "var(--bg3)", cursor: "pointer", color: "var(--text)",
+                }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", flexShrink: 0, paddingTop: 2 }}>
+                  F{i + 1}{niveauAktiv && (q.niveau || "") === "E" ? " · E" : ""}
+                </span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5 }}>
+                  <Latex>{q.text}</Latex>
+                  <span style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                    {loesung.map((k) => (
+                      <span key={k} style={{ ...chipStyle, fontSize: 12, fontWeight: 700, padding: "2px 8px", background: ANTWORT_COLORS[k], color: C.aufAkzent }}>
+                        {k} <Latex>{q.choices?.[k] || ""}</Latex>
+                      </span>
+                    ))}
+                    {!loesung.length && <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("cv.noSolution")}</span>}
+                  </span>
+                </span>
+                <span style={{ fontSize: 12, color: "var(--text3)", flexShrink: 0, paddingTop: 2 }}>
+                  {stat ? `${stat.correct}/${stat.answered}` : ""}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 
