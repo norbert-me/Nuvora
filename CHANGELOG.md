@@ -16,6 +16,12 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote: die Auswertung hat eine SuS-Ansicht** — Namen, Punkte und Noten je
+  Kind aus, der Rest bleibt. Zum Besprechen vor der Klasse, wie in der
+  Klassenarbeit.
+- **CardVote: Quizze lassen sich im Ordner per Ziehen sortieren.**
+- Frage bearbeiten: Speichern und Abbrechen kleben unten am Dialog, statt aus dem
+  Bild zu scrollen.
 - **CardVote-Auswertung: die E/G-Regel steht auf der Seite — und lässt sich
   umstellen.** Drei Möglichkeiten je Auswertung: E-Aufgaben als Bonus (wie
   bisher), E-Aufgaben zählen gar nicht, oder alle rechnen alles. Bestehende

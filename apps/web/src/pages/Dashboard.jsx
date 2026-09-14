@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
-import { AddButton, badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_R, dateiWaehlen, DialogKopf, Icon, iconBtn, ICONS, inputStyle as inputBasis, menuRow, Modal, NiveauToggle, pageApp, pageTitle, panelStyle, Popover, quoteFarbe, sectionLabel, selectStyle, SHADOW, StatCard, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarInput } from "../components/Icons.jsx";
+import { AddButton, badge, btnPrimary, DialogFuss, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_R, dateiWaehlen, DialogKopf, Icon, iconBtn, ICONS, inputStyle as inputBasis, menuRow, Modal, NiveauToggle, pageApp, pageTitle, panelStyle, Popover, quoteFarbe, sectionLabel, selectStyle, SHADOW, StatCard, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarInput } from "../components/Icons.jsx";
 import { dublettenZahlen, findeDubletten, istInSammlung } from "../core/dubletten.js";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
@@ -368,6 +368,31 @@ export default function Dashboard() {
   const currentChildren = currentFolder ? (findNode(folders, currentFolder)?.children || []) : folders;
   const currentSets = currentFolder ? (findNode(folders, currentFolder)?.question_sets || []) : rootSets;
 
+  // Quizze im Ordner von Hand ordnen — dieselbe Mechanik wie bei den Fragen
+  // darunter (core/ziehsortieren.js): die Liste ordnet sich beim Ziehen schon
+  // um, und genau das wird abgelegt. Auf dem Handy (grober Zeiger) nicht: dort
+  // faengt das Ziehen den Bildlauf ab, und ein Ordner voller Quizze liesse sich
+  // nicht mehr scrollen.
+  const setzeSetReihenfolge = async (neu) => {
+    // Sofort zeigen, dann sichern — sonst springt die Liste nach dem Ablegen
+    // einmal in die alte Reihenfolge zurueck, bis der Server geantwortet hat.
+    if (currentFolder) {
+      setFolders((alt) => {
+        const kopie = JSON.parse(JSON.stringify(alt));
+        const knoten = findNode(kopie, currentFolder);
+        if (knoten) knoten.question_sets = neu;
+        return kopie;
+      });
+    } else {
+      setRootSets(neu);
+    }
+    await fetch(`${API}/question-sets/reihenfolge`, alsJson("PUT", { ids: neu.map((x) => x.id) })).catch(() => null);
+  };
+
+  // Grober Zeiger (Handy/Tablet): kein Ziehen — dort faengt es den Bildlauf ab.
+  const isTouch = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+  const setZieh = useZiehVorschau(currentSets, setzeSetReihenfolge, !isTouch);
+
   const openFolder = (folder) => {
     setPath([...path, { id: folder.id, name: folder.name }]);
     setCurrentFolder(folder.id);
@@ -721,10 +746,10 @@ export default function Dashboard() {
                   : <span style={{ color: "var(--text3)" }}>{t("cv.dup.inNoSet")}</span>}
               </div>
               <QuestionForm q={vEdit} setQ={setVEdit} onUpload={bildHochladen} choiceKeys={["A", "B", "C", "D"]} />
-              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <DialogFuss>
                 <button onClick={vSpeichern} disabled={!vEdit.text?.trim()} style={btnPrimary}>{t("common.save")}</button>
                 <button onClick={() => setVEdit(null)} style={btnSecondary}>{t("common.cancel")}</button>
-              </div>
+              </DialogFuss>
             </Modal>
           )}
         </div>
@@ -800,9 +825,15 @@ export default function Dashboard() {
         <div style={{ marginBottom: 20 }}>
           <h3 style={{ marginBottom: 8, fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("dash.setsHeading")}</h3>
           {currentFolder && currentSets.length === 0 && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("dash.emptySets")}</p>}
-          {currentSets.map((qs) => (
-            <div key={qs.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...cardStyle, marginBottom: 8, cursor: "pointer" }}>
+          {setZieh.sichtbar.map((qs, idx) => (
+            <div key={qs.id} {...setZieh.props(idx)}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...cardStyle, marginBottom: 8, cursor: "pointer",
+                opacity: setZieh.vorschau ? 0.92 : 1, transition: "opacity 0.15s" }}>
               <span onClick={() => setEditingSet(qs)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                {!isTouch && (
+                  <span className="drag-handle" style={{ color: "var(--text3)", display: "inline-flex", cursor: "grab", flexShrink: 0 }}
+                    title={t("dash.dragSets")} aria-hidden="true"><Icon d={ICONS.grip} size={15} /></span>
+                )}
                 <strong style={{ color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{qs.name}</strong>
               </span>
               <div style={{ display: "flex", gap: 4 }}>
@@ -1184,11 +1215,13 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         <Modal onClose={() => setEditingQ(null)} width={620} label={t("dash.editQ")}>
             <DialogKopf titel={t("dash.editQ")} onClose={() => setEditingQ(null)} schliessenLabel={t("common.close")} />
             <QuestionForm q={editingQ} setQ={setEditingQ} onUpload={bildHochladen} choiceKeys={CHOICE_KEYS} />
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <QuestionStats questionId={editingQ.id} />
+            {/* Speichern klebt unten am Dialog: der Bogen ist laenger als das
+                Fenster, und mitten im Inhalt scrollte der Knopf aus dem Bild. */}
+            <DialogFuss>
               <button onClick={updateExistingQuestion} disabled={!editingQ.text.trim()} style={btnPrimary}>{t("common.save")}</button>
               <button onClick={() => setEditingQ(null)} style={btnSecondary}>{t("common.cancel")}</button>
-            </div>
-            <QuestionStats questionId={editingQ.id} />
+            </DialogFuss>
         </Modal>
       )}
 
@@ -1197,10 +1230,10 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         <Modal onClose={() => setShowAdd(false)} width={620} label={t("dash.newQ")}>
             <DialogKopf titel={t("dash.newQ")} onClose={() => setShowAdd(false)} schliessenLabel={t("common.close")} />
             <QuestionForm q={newQ} setQ={setNewQ} onUpload={bildHochladen} choiceKeys={CHOICE_KEYS} />
-            <div style={{ display: "flex", gap: 8 }}>
+            <DialogFuss>
               <button onClick={async () => { await addNewQuestion(); setShowAdd(false); }} disabled={!newQ.text.trim()} style={btnPrimary}>{t("dash.add")}</button>
               <button onClick={() => setShowAdd(false)} style={btnSecondary}>{t("common.cancel")}</button>
-            </div>
+            </DialogFuss>
         </Modal>
       )}
     </div>

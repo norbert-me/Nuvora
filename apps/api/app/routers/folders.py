@@ -60,6 +60,8 @@ class QuestionSetOut(BaseModel):
     # Niveau je Frage IN DIESEM Quiz: {"<question_id>": "E"}. Fehlt ein Eintrag,
     # gilt G — das ist die Anforderung, die alle erfuellen sollen.
     niveaus: dict = {}
+    # Reihenfolge im Ordner (gezogen). 0 = nie angefasst.
+    position: int = 0
     questions: List[QuestionInSet] = []
     model_config = {"from_attributes": True}
 
@@ -148,6 +150,7 @@ async def list_root_question_sets(user: User = Depends(get_current_user), db: As
         select(QuestionSet)
         .options(selectinload(QuestionSet.items).selectinload(QuestionSetItem.question))
         .where(QuestionSet.folder_id.is_(None), QuestionSet.owner_id == user.id)
+        .order_by(QuestionSet.position, QuestionSet.id)
     )).scalars().all()
     return [_set_to_dict(qs) for qs in rows]
 
@@ -280,6 +283,43 @@ async def get_question_set(set_id: int, user: User = Depends(get_current_user), 
     return await _load_set(db, set_id)
 
 
+class ReihenfolgeIn(BaseModel):
+    """Die Quiz-ids in der Reihenfolge, in der sie stehen sollen."""
+    ids: List[int] = []
+
+
+@router.put("/question-sets/reihenfolge")
+async def set_reihenfolge(body: ReihenfolgeIn, user: User = Depends(get_current_user),
+                          db: AsyncSession = Depends(get_db)):
+    """Quizze eines Ordners umsortieren.
+
+    Geschickt wird die ganze sichtbare Liste, nicht „verschiebe X vor Y": die
+    Oberflaeche zeigt beim Ziehen schon die fertige Reihenfolge (Live-Vorschau),
+    und genau die soll ankommen. Fremde ids fallen **still** heraus statt die
+    Anfrage abzulehnen — sonst kippt ein einziger Rest aus einem alten
+    Browser-Tab die ganze Sortierung.
+
+    Die Position zaehlt ab 1: 0 bleibt „nie angefasst" und damit die Marke des
+    Bestands.
+    """
+    if not body.ids:
+        return {"ok": True, "n": 0}
+    rows = (await db.execute(select(QuestionSet).where(QuestionSet.id.in_(body.ids)))).scalars().all()
+    erlaubt = {}
+    for qs in rows:
+        try:
+            await ensure_set_access(db, qs, user.id)
+        except HTTPException:
+            continue
+        erlaubt[qs.id] = qs
+    for i, qid in enumerate(body.ids, start=1):
+        qs = erlaubt.get(qid)
+        if qs is not None:
+            qs.position = i
+    await db.commit()
+    return {"ok": True, "n": len(erlaubt)}
+
+
 @router.put("/question-sets/{set_id}", response_model=QuestionSetOut)
 async def update_question_set(set_id: int, body: QuestionSetCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     qs = await db.get(QuestionSet, set_id)
@@ -408,6 +448,7 @@ def _set_to_dict(qs: QuestionSet) -> dict:
         "shuffle_answers": qs.shuffle_answers,
         "niveau_aktiv": bool(qs.niveau_aktiv),
         "minuspunkte": bool(qs.minuspunkte),
+        "position": qs.position or 0,
         "niveaus": {str(item.question_id): (item.niveau or "G") for item in qs.items
                     if item.question and item.question.deleted_at is None},
         "questions": [

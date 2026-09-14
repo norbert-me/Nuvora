@@ -302,6 +302,7 @@ def _ensure_columns(sync_conn):
         ("students", "massnahmen", "JSON"),
         ("question_sets", "niveau_aktiv", "BOOLEAN DEFAULT FALSE NOT NULL"),
         ("question_sets", "minuspunkte", "BOOLEAN DEFAULT FALSE NOT NULL"),
+        ("question_sets", "position", "INTEGER DEFAULT 0 NOT NULL"),
         ("question_set_items", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("topics", "ziel_g", "TEXT DEFAULT '' NOT NULL"),
         ("topics", "ziel_e", "TEXT DEFAULT '' NOT NULL"),

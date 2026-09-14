@@ -172,7 +172,10 @@ class Folder(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     children: Mapped[list["Folder"]] = relationship(back_populates="parent", cascade="all, delete-orphan")
     parent: Mapped[Optional["Folder"]] = relationship(back_populates="children", remote_side="Folder.id")
-    question_sets: Mapped[list["QuestionSet"]] = relationship(back_populates="folder", order_by="QuestionSet.name")
+    # Nach der gezogenen Reihenfolge, bei Gleichstand nach id: der Bestand
+    # steht auf 0 und behaelt damit seine bisherige Folge.
+    question_sets: Mapped[list["QuestionSet"]] = relationship(
+        back_populates="folder", order_by="QuestionSet.position, QuestionSet.id")
     owner: Mapped[Optional["User"]] = relationship(back_populates="folders")
 
 
@@ -218,6 +221,12 @@ class QuestionSet(Base):
     # Minuspunkte: falsche Antwort = -1 (Gesamtpunktzahl nie unter 0). Wer die
     # Karte unten laesst, antwortet nicht: 0 Punkte, kein Abzug.
     minuspunkte: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Reihenfolge innerhalb des Ordners — von Hand gezogen. Vorher kamen die
+    # Quizze in der Reihenfolge, in der die Datenbank sie gerade herausgab, und
+    # das ist keine: wer zwanzig Quizze in einem Ordner hat, sucht das von
+    # heute. Gleiche Position wird nach id aufgeloest (Bestand = alles 0, also
+    # die alte Reihenfolge).
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     folder: Mapped[Optional[Folder]] = relationship(back_populates="question_sets")
     items: Mapped[list["QuestionSetItem"]] = relationship(back_populates="question_set", order_by="QuestionSetItem.position", cascade="all, delete-orphan")

@@ -186,3 +186,28 @@ def test_ics_escape_entschaerft_auch_den_wagenruecklauf():
         # Beide Fassungen muessen dasselbe liefern, sonst laufen sie wieder
         # auseinander.
         assert caldav_escape(roh) == feed_escape(roh), roh
+
+
+# ── 6) Umsortieren fasst nur die eigenen Quizze an ────────────────────────────
+@pytest.mark.asyncio
+async def test_reihenfolge_laesst_fremde_quizze_unberuehrt(s):
+    """Die Oberflaeche schickt die ganze sichtbare Liste. Eine fremde id darin
+    (alter Tab, geratene Nummer) darf weder die Anfrage kippen noch das fremde
+    Quiz anfassen — sie faellt still heraus."""
+    from app.routers.folders import ReihenfolgeIn, set_reihenfolge
+
+    ich = User(email="ich@x.de", password_hash="x", email_verified=True)
+    fremd = User(email="fremd@x.de", password_hash="x", email_verified=True)
+    s.add_all([ich, fremd])
+    await s.commit()
+
+    meins = QuestionSet(name="meins", owner_id=ich.id)
+    deins = QuestionSet(name="deins", owner_id=fremd.id)
+    s.add_all([meins, deins])
+    await s.commit()
+
+    await set_reihenfolge(ReihenfolgeIn(ids=[deins.id, meins.id]), user=ich, db=s)
+    await s.refresh(meins)
+    await s.refresh(deins)
+    assert meins.position == 2, "das eigene Quiz bekommt seine Position"
+    assert deins.position == 0, "das fremde bleibt unberuehrt"

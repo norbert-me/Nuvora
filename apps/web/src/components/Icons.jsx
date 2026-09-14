@@ -988,6 +988,30 @@ export function DialogKopf({ titel, onClose, schliessenLabel = "Schließen", chi
   );
 }
 
+/**
+ * Handgriff-Zeile am Fuß eines Dialogs — und sie bleibt sichtbar.
+ *
+ * Das Panel selbst ist der Scroll-Bereich (`modalPanel`: maxHeight 88vh,
+ * overflow auto). Eine Knopfzeile mitten im Inhalt scrollt mit aus dem Bild,
+ * und dann sucht man Speichern in einem Dialog — derselbe Fehler wie eine
+ * Speicherleiste, die aus dem Bild läuft (siehe `Speichern.jsx`). Deshalb
+ * klebt sie unten am Panel: `sticky` mit negativem Versatz, der das Polster
+ * des Panels ausgleicht, und ein eigener Grund, damit der Inhalt nicht
+ * durchscheint.
+ */
+export function DialogFuss({ children, style }) {
+  return (
+    <div style={{
+      position: "sticky", bottom: -22, marginTop: 16, marginBottom: -22,
+      padding: "12px 0", background: "var(--card)", borderTop: "1px solid var(--border3)",
+      display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", zIndex: 1,
+      ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
 // Pillen-Umschalter (Tabs/Ansichten). options: [[value, label], …].
 export function Tabs({ value, onChange, options, style }) {
   return (

@@ -59,6 +59,10 @@ export default function Evaluation() {
   const [showWeights, setShowWeights] = useState(false);
   const [showScale, setShowScale] = useState(false);
   const [showFragen, setShowFragen] = useState(false);
+  // SuS-Ansicht: alles Persönliche aus (Namen, Punkte, Noten je Kind). Dieselbe
+  // Bauform wie in der Klassenarbeit — die Auswertung wird im Unterricht
+  // besprochen, und dabei gehört die Leistung eines Kindes nicht an die Wand.
+  const [susAnsicht, setSusAnsicht] = useState(false);
   const [showDiscInfo, setShowDiscInfo] = useState(false);
   const [showSdInfo, setShowSdInfo] = useState(false);
   const [showRateInfo, setShowRateInfo] = useState(false);
@@ -594,6 +598,10 @@ const gradeDistribution = (() => {
             {t("notenimp.button")}
           </button>
         )}
+        <button onClick={() => setSusAnsicht((v) => !v)} title={t("klassenarbeit.presentHint")}
+          style={{ ...toolbarBtn, background: susAnsicht ? "var(--accent)" : "transparent", color: susAnsicht ? C.aufAkzent : "var(--text2)" }}>
+          <Icon d={ICONS.eye} size={15} color={susAnsicht ? C.aufAkzent : "var(--text2)"} /> {t("klassenarbeit.presentMode")}
+        </button>
         {bogen.length > 0 && (
           <button onClick={() => window.print()} style={toolbarBtn} title={t("bogen.printHint")}>
             <Icon d={ICONS.print} size={15} /> {t("bogen.print")}
@@ -863,6 +871,10 @@ const gradeDistribution = (() => {
 
       <TopicAnalysis questions={questions} presentStudents={presentStudents} />
 
+      {/* Die Namenstabelle ist der persoenliche Teil — in der SuS-Ansicht bleibt
+          sie weg. Was stehenbleibt, ist die Klasse als Ganzes: welche Frage
+          saß, welches Thema wackelt, wie die Noten verteilt sind. */}
+      {!susAnsicht && (
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", fontSize: 14, whiteSpace: "nowrap" }}>
           <thead>
@@ -1074,6 +1086,7 @@ const gradeDistribution = (() => {
           </tfoot>
         </table>
       </div>
+      )}
 
       {showCiInfo && <CiInfoBox onClose={() => setShowCiInfo(false)} />}
 
