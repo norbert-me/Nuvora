@@ -60,7 +60,18 @@ def _items(roh) -> list:
                 sauber[zahl] = float(it.get(zahl) or 0)
             except (TypeError, ValueError):
                 sauber[zahl] = 0
-        for text in ("text", "color", "bold", "align", "bis", "titel", "kurs_id", "_ref"):
+        # Zahlen, die nur MANCHE Elemente haben — nur uebernehmen, wenn sie
+        # dastehen: ein „minutes: 0" an jedem Textfeld waere eine Angabe, die
+        # niemand gemacht hat. `minutes` (Timer) und `schwelle`
+        # (Lautstaerke-Anzeige) fielen vorher stillschweigend heraus, und die
+        # Einstellung war nach dem Speichern weg.
+        for zahl in ("minutes", "schwelle"):
+            if zahl in it:
+                try:
+                    sauber[zahl] = float(it[zahl])
+                except (TypeError, ValueError):
+                    pass
+        for text in ("text", "color", "bold", "align", "bis", "titel", "kurs_id", "muted", "_ref"):
             if text in it:
                 wert = it[text]
                 sauber[text] = wert[:MAX_TEXT] if isinstance(wert, str) else wert

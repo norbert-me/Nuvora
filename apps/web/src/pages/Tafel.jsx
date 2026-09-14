@@ -103,6 +103,13 @@ export default function Tafel() {
     const it = { id: uid(), type: "verlauf", x: (REF_W - w) / 2, y: 120, w, h, _ref: true };
     setItems((p) => [...p, it]); setSel(it.id);
   };
+  // Lautstaerke-Anzeige. Sie misst NUR — nichts wird aufgenommen und nichts
+  // verlaesst den Browser (siehe TafelLaerm).
+  const addLaerm = () => {
+    const w = 520, h = 300;
+    const it = { id: uid(), type: "laerm", x: (REF_W - w) / 2, y: 140, w, h, schwelle: 55, _ref: true };
+    setItems((p) => [...p, it]); setSel(it.id);
+  };
   const patch = (id, o) => setItems((p) => p.map((i) => (i.id === id ? { ...i, ...o } : i)));
   const del = (id) => { setItems((p) => p.filter((i) => i.id !== id)); if (sel === id) setSel(null); };
 
@@ -210,6 +217,7 @@ export default function Tafel() {
         <span style={{ flex: 1 }} />
         <button onClick={add} style={toolbarBtnPrimary}><Icon d={ICONS.plus} size={15} color="var(--bg)" /> {t("tafel.add")}</button>
         <button onClick={addTimer} style={toolbarBtn}><Icon d={ICONS.plus} size={15} /> {t("tafel.addTimer")}</button>
+        <button onClick={addLaerm} style={toolbarBtn}><Icon d={ICONS.plus} size={15} /> {t("tafel.addLaerm")}</button>
         {kalenderAktiv && <button onClick={addVerlauf} style={toolbarBtn}><Icon d={ICONS.plus} size={15} /> {t("tafel.addVerlauf")}</button>}
         <button onClick={() => setFs((v) => !v)} style={toolbarBtn} title={t("tafel.fullscreen")}><Icon d={fs ? ICONS.close : ICONS.fit} size={16} /> {fs ? t("common.close") : t("tafel.fullscreen")}</button>
       </Werkzeugleiste>
@@ -253,6 +261,8 @@ export default function Tafel() {
                 borderRadius: CONTROL_R, boxSizing: "border-box", background: sel === it.id ? "rgba(10,132,255,0.04)" : "transparent" }}>
               {it.type === "timer" ? (
                 <TafelTimer item={it} onPatch={(o) => patch(it.id, o)} t={t} />
+              ) : it.type === "laerm" ? (
+                <TafelLaerm item={it} onPatch={(o) => patch(it.id, o)} t={t} />
               ) : it.type === "verlauf" ? (
                 <TafelVerlauf t={t} />
               ) : (
@@ -280,7 +290,7 @@ export default function Tafel() {
               <button onPointerDown={(e) => onDown(e, selItem.id, "move")} className="icon-btn" style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", cursor: "grab", touchAction: "none" }} title={t("tafel.move") || ""} aria-label={t("tafel.move") || ""}>
                 <Icon d={ICONS.moveAll} size={18} color="var(--text2)" />
               </button>
-              {selItem.type !== "timer" && selItem.type !== "verlauf" && (<>
+              {selItem.type !== "timer" && selItem.type !== "verlauf" && selItem.type !== "laerm" && (<>
                 <button onClick={() => setFontPop((v) => !v)} className="icon-btn" style={{ ...toolbarIconBtn, border: fontPop ? "1px solid var(--accent)" : "1px solid var(--border2)" }} title={t("tafel.textSize")} aria-label={t("tafel.textSize")}>
                   <Icon d={ICONS.edit} size={16} color={fontPop ? "var(--accent)" : "var(--text2)"} />
                 </button>
@@ -294,7 +304,14 @@ export default function Tafel() {
                   <button onClick={() => bumpFont(2)} style={leistenBtn} title={t("tafel.textLarger")} aria-label={t("tafel.textLarger")}>A<Icon d={ICONS.plus} size={13} color="var(--text2)" /></button>
                 </>)}
               </>)}
-              {selItem.type === "timer" && (
+              {selItem.type === "laerm" && (<>
+                <button onClick={() => patch(selItem.id, { schwelle: Math.max(10, (selItem.schwelle ?? 55) - 5) })} style={leistenBtn}
+                  title={t("tafel.laermStrenger")} aria-label={t("tafel.laermStrenger")}><Icon d={ICONS.minus} size={13} color="var(--text2)" /></button>
+                <span style={{ fontSize: 13, minWidth: 74, textAlign: "center", fontWeight: 600 }}>{t("tafel.laermSchwelle", { n: selItem.schwelle ?? 55 })}</span>
+                <button onClick={() => patch(selItem.id, { schwelle: Math.min(95, (selItem.schwelle ?? 55) + 5) })} style={leistenBtn}
+                  title={t("tafel.laermLockerer")} aria-label={t("tafel.laermLockerer")}><Icon d={ICONS.plus} size={13} color="var(--text2)" /></button>
+              </>)}
+              {(selItem.type === "timer" || selItem.type === "laerm") && (
                 <button onClick={() => patch(selItem.id, { muted: !selItem.muted })} style={{ ...leistenBtn, gap: 4, fontWeight: 500 }}>
                   <Icon d={selItem.muted ? ICONS.volumeOff : ICONS.volume} size={15} color="var(--text2)" />
                   {selItem.muted ? t("tafel.soundOff") : t("tafel.soundOn")}
@@ -320,6 +337,151 @@ function beep() {
     for (let i = 0; i < 3; i++) { g.gain.setValueAtTime(0.3, ti); g.gain.setValueAtTime(0.0001, ti + 0.15); ti += 0.3; }
     o.stop(ti + 0.05);
   } catch { /* Ton optional */ }
+}
+
+// Warnton bei zu viel Laerm — bewusst ANDERS als der Timer-Ton: tiefer und
+// zweimal kurz. Beide auf derselben Tafel muessen sich unterscheiden lassen,
+// ohne hinzusehen („ist die Zeit um oder sind wir zu laut?").
+function warnton() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination); o.type = "triangle"; o.frequency.value = 330;
+    let ti = ctx.currentTime; o.start();
+    for (let i = 0; i < 2; i++) { g.gain.setValueAtTime(0.25, ti); g.gain.setValueAtTime(0.0001, ti + 0.22); ti += 0.34; }
+    o.stop(ti + 0.05);
+  } catch { /* Ton optional */ }
+}
+
+/**
+ * Lautstaerke-Anzeige mit Warnton.
+ *
+ * Vier Entscheidungen:
+ *
+ * (a) **Das Mikrofon laeuft erst auf Knopfdruck.** Ein Werkzeug, das sich beim
+ *     Oeffnen einer Seite selbst einschaltet, hoert im Klassenraum mit, ohne
+ *     dass jemand zugestimmt hat. Der Knopf ist die Zustimmung, und der
+ *     Browser fragt zusaetzlich.
+ * (b) **Es wird NICHTS aufgenommen und nichts verschickt.** Gemessen wird der
+ *     Pegel im Browser (AnalyserNode), der Ton selbst wird nirgends
+ *     gespeichert. Das steht auch im Feld — eine Datenschutz-Angabe gehoert zu
+ *     den Texten, die bleiben duerfen.
+ * (c) **Der Warnton kommt erst nach ein paar Sekunden ueber der Schwelle**
+ *     (HALTE_S) und danach fruehestens alle RUHE_S wieder. Ein Ton bei jedem
+ *     Huster waere nach zwei Minuten abgeschaltet — und eine Klasse, die
+ *     dauerpiept, ist lauter als vorher.
+ * (d) **Der Balken zeigt den geglaetteten Pegel**, nicht den Augenblickswert:
+ *     ein zappelnder Balken laesst sich aus der letzten Reihe nicht lesen.
+ */
+const LAERM_HALTE_S = 3;    // so lange muss es zu laut sein
+const LAERM_RUHE_S = 20;    // fruehestens wieder warnen
+
+function TafelLaerm({ item, onPatch, t }) {
+  const [an, setAn] = useState(false);
+  const [pegel, setPegel] = useState(0);      // 0..100, geglaettet
+  const [fehler, setFehler] = useState("");
+  const [warnt, setWarnt] = useState(false);
+  const technik = useRef(null);               // { stream, ctx, raf }
+  const ueber = useRef(0);                    // seit wann ueber der Schwelle (ms)
+  const letzteWarnung = useRef(0);
+  const schwelle = item.schwelle ?? 55;
+  const stumm = !!item.muted;
+  // Die Schwelle steckt in einem Ref: die Messschleife laeuft ausserhalb von
+  // React und saehe sonst den Wert von ihrem Start.
+  const schwelleRef = useRef(schwelle); schwelleRef.current = schwelle;
+  const stummRef = useRef(stumm); stummRef.current = stumm;
+
+  const stopp = () => {
+    const tk = technik.current;
+    if (!tk) return;
+    cancelAnimationFrame(tk.raf);
+    tk.stream.getTracks().forEach((sp) => sp.stop());
+    tk.ctx.close().catch(() => {});
+    technik.current = null;
+    setAn(false); setPegel(0); setWarnt(false); ueber.current = 0;
+  };
+  // Das Mikrofon muss auch dann aus, wenn das Feld geloescht oder die Seite
+  // verlassen wird — sonst leuchtet die Aufnahme-Anzeige des Browsers weiter.
+  useEffect(() => () => stopp(), []);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  const start = async () => {
+    setFehler("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        // Keine Aufbereitung: die Automatiken regeln genau das weg, was hier
+        // gemessen werden soll.
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      });
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const quelle = ctx.createMediaStreamSource(stream);
+      const analyse = ctx.createAnalyser();
+      analyse.fftSize = 1024;
+      quelle.connect(analyse);
+      const puffer = new Float32Array(analyse.fftSize);
+      let geglaettet = 0, vorher = performance.now();
+      const schleife = () => {
+        analyse.getFloatTimeDomainData(puffer);
+        let summe = 0;
+        for (let i = 0; i < puffer.length; i++) summe += puffer[i] * puffer[i];
+        const rms = Math.sqrt(summe / puffer.length);
+        // dBFS auf 0..100: -60 dB (sehr leise) bis -10 dB (sehr laut).
+        const db = 20 * Math.log10(Math.max(rms, 1e-7));
+        const roh = Math.max(0, Math.min(100, ((db + 60) / 50) * 100));
+        geglaettet = geglaettet * 0.85 + roh * 0.15;
+        const wert = Math.round(geglaettet);
+        setPegel(wert);
+
+        const jetzt = performance.now();
+        const delta = jetzt - vorher; vorher = jetzt;
+        if (wert >= schwelleRef.current) {
+          ueber.current += delta;
+          if (ueber.current >= LAERM_HALTE_S * 1000 && jetzt - letzteWarnung.current >= LAERM_RUHE_S * 1000) {
+            letzteWarnung.current = jetzt;
+            ueber.current = 0;
+            setWarnt(true);
+            setTimeout(() => setWarnt(false), 4000);
+            if (!stummRef.current) warnton();
+          }
+        } else {
+          ueber.current = 0;
+        }
+        technik.current.raf = requestAnimationFrame(schleife);
+      };
+      technik.current = { stream, ctx, raf: 0 };
+      setAn(true);
+      technik.current.raf = requestAnimationFrame(schleife);
+    } catch {
+      // Abgelehnt, kein Mikrofon, oder unsicherer Kontext (http): alle drei
+      // enden hier, und alle drei helfen mit demselben Satz.
+      setFehler(t("tafel.laermKeinMikro"));
+    }
+  };
+
+  const farbe = pegel >= schwelle ? C.danger : pegel >= schwelle * 0.75 ? C.warning : C.success;
+  const bh = item.h || 300;
+  return (
+    <div className={warnt ? "tafel-flash" : ""}
+      style={{ width: "100%", height: "100%", boxSizing: "border-box", borderRadius: CONTROL_R,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "20px 18px" }}>
+      {/* Der Balken ist die Anzeige — die Zahl daneben ist fuer die Lehrkraft,
+          die Klasse liest die Farbe. */}
+      <div style={{ position: "relative", width: "100%", height: Math.max(40, bh * 0.28), background: "var(--bg2)", borderRadius: CONTROL_R, overflow: "hidden" }}>
+        <div style={{ width: `${pegel}%`, height: "100%", background: farbe, transition: "width .12s linear, background .2s" }} />
+        {/* Die Schwelle als Strich: man sieht, wie weit es noch hin ist. */}
+        <div style={{ position: "absolute", left: `${schwelle}%`, top: 0, bottom: 0, width: 4, background: "var(--text)", opacity: 0.55 }} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", justifyContent: "center" }}>
+        {!an
+          ? <button onClick={start} style={miniBtn}>{t("tafel.laermStart")}</button>
+          : <button onClick={stopp} style={miniBtn}>{t("tafel.laermStop")}</button>}
+        {an && <span style={{ fontSize: 34, fontWeight: 800, color: farbe, fontVariantNumeric: "tabular-nums", minWidth: 90, textAlign: "center" }}>{pegel}</span>}
+      </div>
+      {fehler && <div style={{ fontSize: 24, color: C.danger, textAlign: "center" }}>{fehler}</div>}
+      {/* Datenschutz-Angabe: sie sagt etwas, das man dem Bildschirm nicht
+          ansieht, und bleibt deshalb stehen. */}
+      <div style={{ fontSize: 22, color: "var(--text3)", textAlign: "center", lineHeight: 1.3 }}>{t("tafel.laermHinweis")}</div>
+    </div>
+  );
 }
 
 // Countdown-Widget auf der Tafel. Zeit skaliert mit der Feldhöhe; die eingestellte

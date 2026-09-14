@@ -14,6 +14,15 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- **Tafel: eine Lautstärke-Anzeige mit Warnton.** Balken mit Schwelle, Warnton
+  erst nach ein paar Sekunden über der Grenze und danach frühestens alle 20
+  Sekunden wieder. Das Mikrofon läuft erst auf Knopfdruck; aufgenommen und
+  gesendet wird nichts.
+- Tafel: die Einstellungen der Felder (Timer-Minuten, Lautstärke-Schwelle)
+  überleben jetzt das Speichern.
+
 ## 4.3.6
 
 - **Lernpfad: Doppelte ohne Zuordnung lassen sich in einem Zug aufräumen** —
