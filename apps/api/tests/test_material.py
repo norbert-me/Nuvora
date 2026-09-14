@@ -20,8 +20,13 @@ class _Anfrage:
         self.headers = {"if-none-match": etag} if etag else {}
 
 
-def _upload(name, content):
-    return UploadFile(filename=name, file=io.BytesIO(content))
+def _upload(name, content, mime=None):
+    from starlette.datastructures import Headers
+    if mime is None:
+        mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                "pdf": "application/pdf"}.get(name.rsplit(".", 1)[-1].lower(), "application/octet-stream")
+    return UploadFile(filename=name, file=io.BytesIO(content),
+                      headers=Headers({"content-type": mime}))
 
 
 async def _setup(s):
@@ -204,3 +209,54 @@ async def test_loeschen_der_quelle_befoerdert_einen_verweis(s):
     for mid in (b.id, c.id):
         resp = await M.download_material(mid, _Anfrage(), user=u, db=s)
         assert resp.body == bild
+
+
+@pytest.mark.asyncio
+async def test_grosses_foto_wird_verlustarm_verkleinert(s):
+    """Ein gering komprimiertes JPEG wird beim Upload kleiner gespeichert, ohne
+    die Aufloesung anzutasten; die Bytes stimmen mit dem gespeicherten sha256."""
+    from io import BytesIO
+    from PIL import Image
+    import hashlib
+    from sqlalchemy import select
+    from app.models import Material
+
+    u, tp = await _setup(s)
+    # Ein „Foto" mit Struktur (nicht komprimierbares Rauschen wuerde nicht
+    # schrumpfen) bei absichtlich hoher Ausgangsqualitaet.
+    import random; random.seed(1)
+    bild = Image.new("RGB", (1200, 900))
+    px = bild.load()
+    for y in range(900):
+        for x in range(0, 1200, 3):
+            v = (x + y) % 256
+            for dx in range(3):
+                if x + dx < 1200:
+                    px[x + dx, y] = (v, (v * 2) % 256, (v * 3) % 256)
+    roh = BytesIO(); bild.save(roh, format="JPEG", quality=100); roh = roh.getvalue()
+
+    out = await M.upload_material(file=_upload("foto.jpg", roh), topic_id=tp.id, entry_id=None,
+                                  method_id=None, work_id=None, rolle="", user=u, db=s)
+    assert out.size < len(roh), "verkleinert gespeichert"
+    r = (await s.execute(select(Material.data, Material.sha256).where(Material.id == out.id))).first()
+    assert hashlib.sha256(r[0]).hexdigest() == r[1], "Hash trifft die gespeicherte Form"
+    # Aufloesung unangetastet.
+    with Image.open(BytesIO(r[0])) as gespeichert:
+        assert gespeichert.size == (1200, 900)
+
+
+@pytest.mark.asyncio
+async def test_png_bleibt_unangetastet(s):
+    """PNG (Transparenz) wird nicht zu JPEG umkodiert."""
+    from io import BytesIO
+    from PIL import Image
+    from sqlalchemy import select
+    from app.models import Material
+
+    u, tp = await _setup(s)
+    bild = Image.new("RGBA", (50, 50), (255, 0, 0, 128))
+    roh = BytesIO(); bild.save(roh, format="PNG"); roh = roh.getvalue()
+    out = await M.upload_material(file=_upload("t.png", roh), topic_id=tp.id, entry_id=None,
+                                  method_id=None, work_id=None, rolle="", user=u, db=s)
+    r = (await s.execute(select(Material.mime, Material.data).where(Material.id == out.id))).first()
+    assert r[0] == "image/png" and r[1] == roh
