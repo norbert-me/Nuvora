@@ -1256,12 +1256,69 @@
         return document.getElementById('aufgabe-kategorie').value;
     }
 
+    // Bearbeiten laeuft im Popup — wie jede andere Maske in Nuvora.
+    //
+    // Das Formular wird dafuer VERSCHOBEN, nicht nachgebaut: an ihm haengen
+    // Felder, Bildvorschau, LaTeX-Vorschau und das Absenden. Eine zweite
+    // Fassung im Dialog waere nach dem ersten Umbau eine andere Maske. Beim
+    // Schliessen geht es an seinen Platz zurueck, damit „Neue Aufgabe" weiter
+    // dort steht, wo es immer stand.
+    const aufgabeModal = document.getElementById('aufgabe-modal');
+    const aufgabeSlot = document.getElementById('aufgabe-modal-slot');
+    let formHeimat = null;   // { eltern, davor } — wohin das Formular zurueckgehoert
+
+    function aufgabeModalAuf() {
+        const panel = aufgabeForm.closest('.panel') || aufgabeForm;
+        if (!formHeimat) formHeimat = { eltern: panel.parentNode, davor: panel.nextSibling };
+        aufgabeSlot.appendChild(panel);
+        aufgabeModal.style.display = '';
+        // Das Formular ist im Tab womoeglich zugeklappt — im Dialog waere es
+        // dann ein leerer Kasten.
+        if (window.setAufgabeFormOpen) window.setAufgabeFormOpen(true);
+    }
+
+    function aufgabeModalZu() {
+        if (!formHeimat) { aufgabeModal.style.display = 'none'; return; }
+        const panel = aufgabeForm.closest('.panel') || aufgabeForm;
+        formHeimat.eltern.insertBefore(panel, formHeimat.davor);
+        aufgabeModal.style.display = 'none';
+    }
+
+    document.getElementById('aufgabe-modal-close').addEventListener('click', () => resetAufgabeForm());
+    aufgabeModal.addEventListener('click', (e) => { if (e.target === aufgabeModal) resetAufgabeForm(); });
+
     aufgabeForm.addEventListener('submit', e => {
         e.preventDefault();
         const editId = document.getElementById('aufgabe-edit-id').value;
         const kategorie = getSelectedKategorie();
 
         if (!kategorie) { toast('Kategorie wählen'); return; }
+
+        // Die Nummer darf geaendert werden — geprueft wird hier, nicht erst
+        // beim Server: sie steht auf ausgeteilten Blaettern und in Lernleitern,
+        // und zwei Aufgaben mit derselben Nummer waeren genau die Verwechslung,
+        // die die Nummer verhindern soll. Leer heisst „lassen wie sie war".
+        const codeFeld = document.getElementById('aufgabe-code');
+        const codeFehler = document.getElementById('aufgabe-code-fehler');
+        let codeNeu = '';
+        if (editId && codeFeld) {
+            const roh = (codeFeld.value || '').trim().replace(/^#/, '');
+            const alt = aufgaben.find(x => x._id === editId)?.code || '';
+            codeFehler.style.display = 'none';
+            if (roh) {
+                if (!/^\d{1,6}$/.test(roh)) {
+                    codeFehler.textContent = 'Nur Ziffern, höchstens sechs.';
+                    codeFehler.style.display = '';
+                    return;
+                }
+                codeNeu = '#' + roh.padStart(6, '0');
+                if (codeNeu !== alt && aufgaben.some(x => x._id !== editId && (x.code || '') === codeNeu)) {
+                    codeFehler.textContent = 'Diese Nummer hat schon eine andere Aufgabe.';
+                    codeFehler.style.display = '';
+                    return;
+                }
+            }
+        }
 
         const quelleTyp = document.getElementById('aufgabe-quelle-typ').value;
         const quelleDetail = document.getElementById('aufgabe-quelle-detail').value.trim();
@@ -1280,7 +1337,7 @@
             // Neu: keine id (der Server vergibt die DB-id beim Sync); der
             // Anzeige-Code wird lueckenfuellend ab 1 gesetzt.
             id: editId ? document.getElementById('aufgabe-id').value.trim() : undefined,
-            code: editId ? (aufgaben.find(x => x._id === editId)?.code || '') : nextAufgabeId(),
+            code: editId ? (codeNeu || aufgaben.find(x => x._id === editId)?.code || '') : nextAufgabeId(),
             thema: document.getElementById('aufgabe-thema').value.trim(),
             unterthema: document.getElementById('aufgabe-unterthema').value.trim(),
             kategorie,
@@ -1335,8 +1392,10 @@
         document.getElementById('aufgabe-unteraufgaben').value = '1';
         document.getElementById('aufgabe-latex').value = '';
         document.getElementById('aufgabe-latex-preview').innerHTML = '';
+        document.getElementById('aufgabe-code-fehler').style.display = 'none';
         updateFormVisibility();
         setNextId();
+        aufgabeModalZu();
         if (window.setAufgabeFormOpen) window.setAufgabeFormOpen(false);
     }
 
@@ -1376,13 +1435,13 @@
             loesungBildPreview.innerHTML = '';
         }
         document.getElementById('edit-id-display').style.display = '';
-        document.getElementById('edit-id-label').textContent = fmtId(a.code || a.id);
+        document.getElementById('aufgabe-code').value = fmtId(a.code || a.id);
+        document.getElementById('aufgabe-code-fehler').style.display = 'none';
         document.getElementById('aufgaben-form-title-text').textContent = 'Aufgabe bearbeiten';
         document.getElementById('aufgabe-cancel-btn').style.display = '';
         document.getElementById('aufgabe-submit-btn').textContent = 'Änderung speichern';
-        if (window.setAufgabeFormOpen) window.setAufgabeFormOpen(true);
         updateFormVisibility();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        aufgabeModalAuf();
     }
 
     async function deleteAufgabe(_id) {
@@ -1393,6 +1452,209 @@
         save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
         renderAufgaben();
         toast('Aufgabe gelöscht');
+    }
+
+    // ─── Doppelte aufraeumen: einer nach dem anderen ─────────────────────────
+    //
+    // Der Filter „Nur moegliche Doppelte" zeigt sie, aber bei vierzig Paaren
+    // ist Zeile-fuer-Zeile-Vergleichen im Raster Handarbeit: man sucht die
+    // zwei zusammengehoerigen, liest beide, entscheidet, loescht, sucht die
+    // naechsten. Hier kommt jedes Paar EINZELN, nebeneinander, mit einem
+    // Vorschlag und hervorgehobenen Unterschieden.
+    //
+    // Der Vorschlag ist genau das: ein Vorschlag. Geloescht wird auf Klick, und
+    // was die Lehrkraft ueberspringt, bleibt stehen.
+
+    /** Die Felder, die beim Vergleich zaehlen — in der Reihenfolge der Anzeige. */
+    const DUB_FELDER = [
+        ['Nummer', a => fmtId(a.code || a.id)],
+        ['Thema', a => a.thema || ''],
+        ['Unterthema', a => a.unterthema || ''],
+        ['Kategorie', a => getKategorie(a)],
+        ['Quelle', a => a.quelle || ''],
+        ['Operator', a => a.operator || ''],
+        ['Kompetenz', a => a.kompetenz || ''],
+        ['Methode', a => a.methode || ''],
+        ['Sozialform', a => a.sozialform || ''],
+        ['Aufgabentext', a => a.aufgabentext || ''],
+        ['Lösung', a => a.loesung || ''],
+        ['LaTeX', a => a.latex || ''],
+        ['LRS-Text', a => a.lrsText || ''],
+        ['Förderschwerpunkte', a => (a.foerderschwerpunkte || []).join(', ')],
+    ];
+
+    /** Wie viel steht an dieser Aufgabe? Mehr Inhalt = eher behalten. */
+    function dubGehalt(a) {
+        return DUB_FELDER.reduce((n, [, lies]) => n + (String(lies(a) || '').trim() ? 1 : 0), 0)
+            + (a.bild ? 2 : 0) + (a.loesungBild ? 2 : 0);
+    }
+
+    /**
+     * Welche der beiden behalten? Drei Gruende, in dieser Reihenfolge:
+     *   1. VERWENDUNG — was in Lernleitern steckt, darf nicht weg. Das ist kein
+     *      Geschmack, das waeren kaputte Leitern.
+     *   2. INHALT — die vollstaendigere Zeile (Loesung, Text, Bild).
+     *   3. NUMMER — die kleinere: sie ist die aeltere und steht womoeglich auf
+     *      schon ausgeteilten Blaettern.
+     */
+    function dubVorschlag(a, b, benutzt) {
+        const zahl = (x) => benutzt.get(String(x.id)) || benutzt.get(String(x._id)) || 0;
+        if (zahl(a) !== zahl(b)) return zahl(a) > zahl(b) ? [a, b, 'verwendet'] : [b, a, 'verwendet'];
+        const ga = dubGehalt(a), gb = dubGehalt(b);
+        if (ga !== gb) return ga > gb ? [a, b, 'inhalt'] : [b, a, 'inhalt'];
+        return codeNum(a) <= codeNum(b) ? [a, b, 'nummer'] : [b, a, 'nummer'];
+    }
+
+    /** Alle Paare (je Schluessel die Aufgaben, aufsteigend nach Nummer). */
+    function dubGruppen() {
+        const nach = new Map();
+        aufgaben.forEach(a => {
+            const k = dublettenSchluessel(a);
+            if (!k) return;
+            if (!nach.has(k)) nach.set(k, []);
+            nach.get(k).push(a);
+        });
+        return [...nach.values()].filter(g => g.length > 1)
+            .map(g => g.slice().sort((x, y) => codeNum(x) - codeNum(y)));
+    }
+
+    /** Sind zwei Zeilen in ALLEM gleich, was wir vergleichen — Nummer inklusive? */
+    function dubIdentisch(gruppe) {
+        const wie = (a) => DUB_FELDER.map(([, lies]) => String(lies(a) || '').trim()).join('|')
+            + '|' + (a.bild || '') + '|' + (a.loesungBild || '');
+        const erste = wie(gruppe[0]);
+        return gruppe.every(a => wie(a) === erste);
+    }
+
+    /**
+     * Was sich ohne Rueckfrage entscheiden laesst, wird ohne Rueckfrage
+     * entschieden.
+     *
+     * Zwei Faelle, und beide verlieren nichts:
+     *   - Die Zeilen sind in ALLEM gleich (Texte, Loesung, Bilder, sogar die
+     *     Nummer) und keine steckt in einer Lernleiter: dann ist die zweite
+     *     eine Kopie ohne eigene Geschichte. Es bleibt eine.
+     *   - Sie sind gleich und GENAU EINE steckt in Lernleitern: dann muss genau
+     *     diese bleiben, die anderen sind Karteileichen.
+     *
+     * Alles andere kommt vor Augen: verschiedene Inhalte koennten eine
+     * ueberarbeitete Fassung sein, und mehrere verwendete Zeilen wegzuraeumen
+     * hiesse, fremde Lernleitern umzuhaengen — das ist kein Aufraeumen mehr.
+     */
+    function dubAuto() {
+        const benutzt = verwendungen();
+        const zahl = (x) => benutzt.get(String(x.id)) || benutzt.get(String(x._id)) || 0;
+        const weg = new Set();
+        dubGruppen().forEach(gruppe => {
+            if (!dubIdentisch(gruppe)) return;
+            const verwendet = gruppe.filter(a => zahl(a) > 0);
+            if (verwendet.length > 1) return;                  // mehrere im Einsatz: zeigen
+            const bleibt = verwendet[0] || gruppe[0];          // sonst die aelteste Nummer
+            gruppe.forEach(a => { if (a !== bleibt) weg.add(a._id); });
+        });
+        if (!weg.size) return 0;
+        aufgaben = aufgaben.filter(a => !weg.has(a._id));
+        save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
+        return weg.size;
+    }
+
+    let dubIndex = 0;
+    const dubModal = document.getElementById('dubletten-modal');
+
+    function dubStart() {
+        if (!dubGruppen().length) { toast('Keine doppelten Aufgaben gefunden'); return; }
+        // Erst das Eindeutige weg - was danach noch dasteht, braucht wirklich
+        // eine Entscheidung.
+        const auto = dubAuto();
+        if (auto) toast(auto + ' eindeutige Kopie' + (auto === 1 ? '' : 'n') + ' automatisch entfernt');
+        renderAufgaben();
+        if (!dubGruppen().length) { toast('Fertig - es bleiben keine doppelten Aufgaben'); return; }
+        dubIndex = 0;
+        dubModal.style.display = '';
+        dubZeichne();
+    }
+
+    function dubZeichne() {
+        const body = document.getElementById('dubletten-body');
+        const gruppen = dubGruppen();
+        if (!gruppen.length) {
+            body.innerHTML = '<h3 style="margin:0 0 8px">Fertig</h3>'
+                + '<p style="color:var(--text-muted)">Es stehen keine doppelten Aufgaben mehr in der Liste.</p>';
+            return;
+        }
+        if (dubIndex >= gruppen.length) dubIndex = 0;
+        const gruppe = gruppen[dubIndex];
+        const benutzt = verwendungen();
+        const [behalten, weg, grund] = dubVorschlag(gruppe[0], gruppe[1], benutzt);
+        const grundText = {
+            verwendet: 'steht in mehr Lernleitern',
+            inhalt: 'ist vollständiger (Text, Lösung, Bild)',
+            nummer: 'hat die kleinere Nummer — sie ist die ältere',
+        }[grund];
+
+        const spalte = (a, istVorschlag) => {
+            const zahl = benutzt.get(String(a.id)) || benutzt.get(String(a._id)) || 0;
+            const zeilen = DUB_FELDER.map(([name, lies]) => {
+                const wert = String(lies(a) || '').trim();
+                const anderer = String(lies(a === behalten ? weg : behalten) || '').trim();
+                const abweichung = wert !== anderer;
+                if (!wert && !anderer) return '';
+                return `<div style="padding:4px 0;border-top:1px solid var(--border)">
+                    <div style="font-size:11px;color:var(--text-muted)">${esc(name)}</div>
+                    <div style="font-size:13px;${abweichung ? 'background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 4px' : ''}">${esc(wert) || '<span style="color:var(--text-muted)">—</span>'}</div>
+                </div>`;
+            }).join('');
+            return `<div style="flex:1;min-width:0;border:2px solid ${istVorschlag ? '#16a34a' : 'var(--border)'};border-radius:10px;padding:10px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+                    <strong style="font-family:ui-monospace,monospace">${esc(fmtId(a.code || a.id))}</strong>
+                    ${istVorschlag ? '<span style="font-size:11px;font-weight:700;color:#16a34a">BEHALTEN</span>' : ''}
+                    <span style="font-size:11px;color:var(--text-muted)">${zahl ? zahl + '× in Lernleitern' : 'in keiner Lernleiter'}</span>
+                </div>
+                ${zeilen}
+                <button class="btn small danger" data-dub-weg="${escAttr(a._id)}" style="margin-top:10px;width:100%">Diese löschen</button>
+            </div>`;
+        };
+
+        body.innerHTML = `
+            <h3 style="margin:0 0 4px">Doppelte aufräumen</h3>
+            <p style="color:var(--text-muted);font-size:13px;margin:0 0 4px">
+                Paar ${dubIndex + 1} von ${gruppen.length}${gruppe.length > 2 ? ` · ${gruppe.length} Zeilen mit dieser Quelle` : ''}
+            </p>
+            ${gruppe.filter(x => (benutzt.get(String(x.id)) || benutzt.get(String(x._id)) || 0) > 0).length > 1
+                ? '<p style="font-size:13px;margin:0 0 8px;background:#fef3c7;color:#92400e;border-radius:6px;padding:6px 8px">'
+                  + 'Beide stehen in Lernleitern. Wer hier loescht, nimmt sie dort mit heraus.</p>'
+                : ''}
+            <p style="font-size:13px;margin:0 0 12px">
+                Vorschlag: <strong>${esc(fmtId(behalten.code || behalten.id))}</strong> behalten — ${esc(grundText)}.
+                Unterschiede sind <span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 4px">markiert</span>.
+            </p>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
+                ${spalte(behalten, true)}
+                ${spalte(weg, false)}
+            </div>
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+                <button class="btn primary" id="dub-vorschlag">Vorschlag übernehmen (${esc(fmtId(weg.code || weg.id))} löschen)</button>
+                <button class="btn" id="dub-skip">Beide behalten</button>
+                <span style="flex:1"></span>
+                <button class="btn" id="dub-fertig">Schließen</button>
+            </div>`;
+
+        const weiter = () => { dubIndex++; dubZeichne(); };
+        body.querySelectorAll('[data-dub-weg]').forEach(b => {
+            b.addEventListener('click', () => dubLoeschen(b.dataset.dubWeg));
+        });
+        document.getElementById('dub-vorschlag').addEventListener('click', () => dubLoeschen(weg._id));
+        document.getElementById('dub-skip').addEventListener('click', weiter);
+        document.getElementById('dub-fertig').addEventListener('click', () => { dubModal.style.display = 'none'; renderAufgaben(); });
+    }
+
+    function dubLoeschen(_id) {
+        // Ohne Rueckfrage: der Dialog IST die Rueckfrage — beide Fassungen
+        // stehen nebeneinander, und man hat gerade auf eine davon gezeigt.
+        aufgaben = aufgaben.filter(a => a._id !== _id);
+        save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
+        toast('Aufgabe gelöscht');
+        dubZeichne();
     }
 
     function getKategorie(a) {
@@ -1489,10 +1751,24 @@
     function applySort(arr) {
         if (!sortState.table || !sortState.column) return arr;
         const col = sortState.column;
+        // Was die Spalte ZEIGT, wird sortiert — nicht, was zufaellig im Feld
+        // steht: die Nummer numerisch (sonst steht #000100 vor #000020), die
+        // Quelle nach Seite und Aufgabennummer (`quelleKey` — „S.9 Nr.2" gehoert
+        // vor „S.10 Nr.1", alphabetisch waere es umgekehrt), die Kategorie in
+        // der Reihenfolge der Lernleiter statt alphabetisch.
+        const benutzt = col === 'verwendet' ? verwendungen() : null;
+        const zahl = (a) => benutzt.get(String(a.id)) || benutzt.get(String(a._id)) || 0;
         const sorted = arr.slice().sort((a, b) => {
             let cmp;
             if (col === 'id') {
-                cmp = codeNum(a) - codeNum(b);   // nach angezeigter Nummer, NUMERISCH
+                cmp = codeNum(a) - codeNum(b);
+            } else if (col === 'kat') {
+                cmp = (katOrder[getKategorie(a)] ?? 4) - (katOrder[getKategorie(b)] ?? 4);
+            } else if (col === 'quelle') {
+                const [pa, na, ta] = quelleKey(a.quelle), [pb, nb, tb] = quelleKey(b.quelle);
+                cmp = (pa - pb) || (na - nb) || ta.localeCompare(tb);
+            } else if (col === 'verwendet') {
+                cmp = zahl(a) - zahl(b);
             } else {
                 const av = a[col], bv = b[col];
                 cmp = (av > bv) ? 1 : (av < bv) ? -1 : 0;
@@ -1533,14 +1809,29 @@
     }
 
     /**
-     * Zwei Aufgaben sind vermutlich dieselbe, wenn Thema, Kategorie, Quelle und
-     * Operator uebereinstimmen — der Code zaehlt bewusst NICHT mit: ein Doppel
-     * kann auch zwei verschiedene Nummern tragen. Es bleibt ein VERDACHT, keine
-     * automatische Loeschung: was wirklich weg darf, entscheidet die Lehrkraft.
+     * Woran erkennt man dieselbe Aufgabe zweimal?
+     *
+     * An der QUELLE. „Schulbuch [S.16 Nr.4 links]" bezeichnet genau eine
+     * Aufgabe im Buch — steht sie zweimal in der Liste, ist sie zweimal
+     * angelegt worden, egal ob die beiden Zeilen dasselbe Thema tragen oder
+     * denselben Operator. Die erste Fassung verglich all das mit und fand
+     * deshalb kaum etwas: nach einem Import hing die eine Kopie unter einem
+     * anderen Unterthema als die andere.
+     *
+     * Aufgaben OHNE Quelle (selbst getippt, LaTeX) haben diesen Anker nicht —
+     * dort zaehlt der Text. Und wer gar nichts davon hat, ist nie ein Doppel:
+     * eine leere Zeile neben einer leeren Zeile sagt nichts.
+     *
+     * Der Code zaehlt bewusst NICHT mit: ein Doppel traegt zwei Nummern (genau
+     * das sieht man in der Liste). Es bleibt ein VERDACHT, keine automatische
+     * Loeschung — was weg darf, entscheidet die Lehrkraft, und die Spalte
+     * „Verwendet" sagt, welche der beiden Zeilen gebraucht wird.
      */
     function dublettenSchluessel(a) {
-        return [a.thema, a.unterthema, getKategorie(a), a.quelle, a.operator,
-                (a.aufgabentext || '').trim(), (a.latex || '').trim()].join('|').toLowerCase();
+        const quelle = (a.quelle || '').trim().toLowerCase();
+        if (quelle) return 'q|' + quelle;
+        const text = ((a.aufgabentext || '') + ' ' + (a.latex || '')).trim().toLowerCase();
+        return text ? 't|' + text : '';
     }
 
     /**
@@ -1610,12 +1901,12 @@
 
         if (document.getElementById('filter-doppelte')?.checked) {
             const zahl = new Map();
-            aufgaben.forEach(a => { const k = dublettenSchluessel(a); zahl.set(k, (zahl.get(k) || 0) + 1); });
-            filtered = filtered.filter(a => zahl.get(dublettenSchluessel(a)) > 1);
+            aufgaben.forEach(a => { const k = dublettenSchluessel(a); if (k) zahl.set(k, (zahl.get(k) || 0) + 1); });
+            filtered = filtered.filter(a => { const k = dublettenSchluessel(a); return k && zahl.get(k) > 1; });
         }
 
         filtered = sortByKatThenQuelle(filtered);
-        if (sortState.table === 'aufgaben-tabelle' && sortState.column && sortState.column !== 'kat') {
+        if (sortState.table === 'aufgaben-tabelle' && sortState.column) {
             filtered = applySort(filtered);
         }
 
@@ -1720,6 +2011,11 @@
     document.getElementById('filter-unterthema').addEventListener('change', renderAufgabenReset);
     document.getElementById('filter-kategorie').addEventListener('change', renderAufgabenReset);
     document.getElementById('filter-doppelte')?.addEventListener('change', renderAufgabenReset);
+    document.getElementById('btn-dubletten')?.addEventListener('click', dubStart);
+    document.getElementById('dubletten-close')?.addEventListener('click', () => {
+        document.getElementById('dubletten-modal').style.display = 'none';
+        renderAufgaben();
+    });
     document.getElementById('aufgaben-suche').addEventListener('input', renderAufgabenReset);
 
     // ─── JSON Import ───

@@ -47,8 +47,15 @@
             <form id="aufgabe-form">
                 <input type="hidden" id="aufgabe-edit-id">
                 <input type="hidden" id="aufgabe-id">
+                <!-- Die Nummer steht auf Arbeitsblaettern und in Lernleitern;
+                     wer seine Aufgaben durchnummeriert, muss sie auch aendern
+                     koennen. Geprueft wird beim Speichern: sechs Ziffern, und
+                     keine zweite Aufgabe darf sie schon tragen. -->
                 <div id="edit-id-display" style="display:none;margin-bottom:0.5rem">
-                    <span style="font-size:0.8rem;color:var(--text-muted)">ID:</span> <strong id="edit-id-label"></strong>
+                    <label for="aufgabe-code" style="font-size:0.8rem;color:var(--text-muted)">ID</label>
+                    <input type="text" id="aufgabe-code" class="code-input" inputmode="numeric"
+                           maxlength="7" style="width:7.5em;font-weight:700">
+                    <span id="aufgabe-code-fehler" style="font-size:0.8rem;color:#dc2626;display:none"></span>
                 </div>
 
                 <!-- Schritt 1: Was wird geübt -->
@@ -275,6 +282,7 @@
                     <input type="checkbox" id="filter-doppelte">
                     Nur mögliche Doppelte
                 </label>
+                <button type="button" class="btn small" id="btn-dubletten" title="Doppelte Aufgaben nacheinander durchgehen und aufräumen">Doppelte aufräumen</button>
                 <button type="button" class="btn small" id="btn-export-aufgaben-tab" title="Alle Aufgaben als Vorlage exportieren (ohne Schülerdaten)">Vorlage exportieren</button>
             </div>
             <div id="bulk-bar" class="bulk-bar" style="display:none">
@@ -295,12 +303,12 @@
                             <th style="width:30px"><input type="checkbox" id="bulk-select-all"></th>
                             <th data-sort="id">ID</th>
                             <th data-sort="thema">Thema</th>
-                            <th>Kategorie</th>
-                            <th>Quelle</th>
+                            <th data-sort="kat">Kategorie</th>
+                            <th data-sort="quelle">Quelle</th>
                             <th>Tags</th>
                             <th>LRS</th>
                             <th>Lösung</th>
-                            <th title="In wie vielen Lernleitern die Aufgabe steht">Verwendet</th>
+                            <th data-sort="verwendet" title="In wie vielen Lernleitern die Aufgabe steht">Verwendet</th>
                             <th>Aktionen</th>
                         </tr>
                     </thead>
@@ -528,6 +536,25 @@
         </div>
     </section>
 
+    <!-- Huelle fuers Bearbeiten: das Formular oben wird beim Oeffnen HIERHER
+         verschoben und danach zurueck. Verschieben statt nachbauen — alle
+         Verdrahtungen (Felder, Vorschau, Absenden) haengen am Original, eine
+         Kopie waere ein zweites Formular, das nach dem ersten Umbau anders
+         aussieht. -->
+    <div id="dubletten-modal" class="modal-overlay" style="display:none">
+        <div class="modal-content">
+            <button class="modal-close" id="dubletten-close" title="Schließen">&times;</button>
+            <div id="dubletten-body"></div>
+        </div>
+    </div>
+
+    <div id="aufgabe-modal" class="modal-overlay" style="display:none">
+        <div class="modal-content" id="aufgabe-modal-inhalt">
+            <button class="modal-close" id="aufgabe-modal-close" title="Schließen">&times;</button>
+            <div id="aufgabe-modal-slot"></div>
+        </div>
+    </div>
+
     <div id="task-detail-modal" class="modal-overlay" style="display:none">
         <div class="modal-content">
             <button class="modal-close" id="modal-close-btn">&times;</button>
@@ -539,6 +566,6 @@
          Impressum & Datenschutz und Kontakt bereits zeigt. -->
 
     <script src="js/jspdf.umd.min.js"></script>
-    <script src="js/app.js?v=32"></script>
+    <script src="js/app.js?v=33"></script>
 </body>
 </html>

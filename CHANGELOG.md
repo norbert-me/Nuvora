@@ -16,6 +16,16 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Lernpfad: „Doppelte aufräumen" geht sie mit dir durch.** Eindeutige Kopien
+  (in allem gleich, keine oder genau eine in Lernleitern) verschwinden von selbst;
+  der Rest kommt paarweise nebeneinander, mit Vorschlag und markierten
+  Unterschieden.
+- Lernpfad: Doppelte werden an der Quelle erkannt (nicht mehr an Thema, Kategorie
+  und Operator zusammen) — nach einem Import fand der alte Vergleich kaum etwas.
+- **Lernpfad: die Aufgabenliste sortiert nach Klick auf den Spaltenkopf** — auch
+  nach Kategorie, Quelle (Seite/Nummer) und „Verwendet".
+- **Lernpfad: eine Aufgabe wird im Popup bearbeitet, und ihre Nummer lässt sich
+  ändern.**
 - **Personen und Kurs: der Speichern-Knopf steht am unteren Bildschirmrand**,
   sobald etwas offen ist — die Maske klappt in einer langen Namensliste auf, und
   der Knopf lag sonst irgendwo dazwischen.
