@@ -1,4 +1,4 @@
-"""Fuenf Loecher aus dem Sicherheitsdurchgang — je eins, das wieder zufallen soll.
+"""Loecher aus den Sicherheitsdurchgaengen — je eins, das wieder zufallen soll.
 
 Kein Sammelbecken fuer „Sicherheit allgemein": jeder Test haelt genau eine
 Entscheidung fest, die schon einmal falsch war, und sagt im Namen, welche.
@@ -315,3 +315,67 @@ async def test_klassenmaske_leert_die_klasse_nicht_aus_versehen(s):
     ]), user=u, db=s)
     rest = (await s.execute(__import__("sqlalchemy").select(Student).where(Student.class_id == c.id))).scalars().all()
     assert len(rest) == 18
+
+
+# ── 11) Ein Quiz laesst sich nicht aus FREMDEN Fragen bauen ──────────────────
+@pytest.mark.asyncio
+async def test_quiz_aendern_nimmt_keine_fremden_fragen(s):
+    """Die Pruefung stand beim Anlegen und beim Anhaengen — beim Aendern fehlte sie.
+
+    `PUT /api/question-sets/{id}` schreibt die Fragenliste neu und gibt das Quiz
+    danach zurueck: mit fremder Fragen-ID kam deren Text samt richtiger Antwort
+    heraus. Fragen-IDs sind fortlaufend.
+    """
+    from fastapi import HTTPException
+
+    from app.models import Question
+    from app.routers.folders import QuestionSetCreate, create_question_set, update_question_set
+
+    a, b, _fremd = await _zwei_konten(s)
+    eigen = Folder(name="As Ablage", owner_id=a.id)
+    s.add(eigen)
+    fremde_frage = Question(text="Wie lautet die Loesung?", owner_id=b.id,
+                            choices=["1", "2"], correct_answer="A")
+    s.add(fremde_frage)
+    await s.commit()
+
+    qs = await create_question_set(
+        QuestionSetCreate(name="Probe", folder_id=eigen.id, question_ids=[]), a, s)
+    set_id = qs["id"] if isinstance(qs, dict) else qs.id
+
+    with pytest.raises(HTTPException) as e:
+        await update_question_set(
+            set_id,
+            QuestionSetCreate(name="Probe", folder_id=eigen.id, question_ids=[fremde_frage.id]),
+            a, s)
+    assert e.value.status_code == 404
+
+
+# ── 12) Ein Ordner haengt nicht unter einem fremden ──────────────────────────
+@pytest.mark.asyncio
+async def test_ordner_haengt_nicht_unter_fremden_ordner(s):
+    """Der Elternordner ist hier eine ZUGRIFFSGRENZE, keine Anzeige-Eigenschaft.
+
+    `ensure_set_access` entscheidet ueber den Besitzer des Ordners: wer seinen
+    Ordner unter einen fremden haengt, schiebt die Quizze darin in das andere
+    Konto und sperrt sich selbst aus. Beim Anlegen UND beim Verschieben.
+    """
+    from fastapi import HTTPException
+
+    from app.routers.folders import FolderCreate, create_folder, update_folder
+
+    a, b, fremd = await _zwei_konten(s)
+
+    with pytest.raises(HTTPException) as e:
+        await create_folder(FolderCreate(name="Meins", parent_id=fremd.id), a, s)
+    assert e.value.status_code == 404
+
+    eigen = await create_folder(FolderCreate(name="Meins"), a, s)
+    with pytest.raises(HTTPException) as e2:
+        await update_folder(eigen.id, FolderCreate(name="Meins", parent_id=fremd.id), a, s)
+    assert e2.value.status_code == 404
+
+    # Und nicht in sich selbst — sonst haengt ein Teilbaum im Nichts.
+    with pytest.raises(HTTPException) as e3:
+        await update_folder(eigen.id, FolderCreate(name="Meins", parent_id=eigen.id), a, s)
+    assert e3.value.status_code == 400

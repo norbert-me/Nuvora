@@ -402,6 +402,8 @@ async def list_collection_folders(user: User = Depends(require_module), db: Asyn
 @router.post("/card-folders", response_model=CardFolderOut, status_code=201)
 async def create_collection_folder(body: CardFolderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Ordner in der Sammlung anlegen — ohne Klasse."""
+    if body.parent_id is not None:
+        await _owned_card_folder(db, user, body.parent_id)
     f = CardFolder(owner_id=user.id, class_id=None, kurs_id=None, name=body.name.strip(), parent_id=body.parent_id)
     db.add(f)
     await db.commit()
@@ -419,6 +421,8 @@ async def list_card_folders(class_id: int, kurs_id: Optional[int] = None, user: 
 @router.post("/classes/{class_id}/card-folders", response_model=CardFolderOut, status_code=201)
 async def create_card_folder(class_id: int, body: CardFolderIn, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
+    if body.parent_id is not None:
+        await _owned_card_folder(db, user, body.parent_id)
     f = CardFolder(owner_id=user.id, class_id=class_id, kurs_id=kurs_id, name=body.name.strip(), parent_id=body.parent_id)
     db.add(f)
     await db.commit()
@@ -429,6 +433,10 @@ async def create_card_folder(class_id: int, body: CardFolderIn, kurs_id: Optiona
 @router.put("/card-folders/{folder_id}", response_model=CardFolderOut)
 async def update_card_folder(folder_id: int, body: CardFolderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     f = await _owned_card_folder(db, user, folder_id)
+    if body.parent_id is not None:
+        await _owned_card_folder(db, user, body.parent_id)
+    if body.parent_id == folder_id:
+        raise HTTPException(400, "Ein Ordner kann nicht in sich selbst liegen")
     f.name = body.name.strip()
     f.parent_id = body.parent_id
     await db.commit()

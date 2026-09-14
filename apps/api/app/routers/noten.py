@@ -266,9 +266,14 @@ class DividerIn(BaseModel):
 
 
 @router.post("/classes/{class_id}/dividers/toggle")
-async def toggle_divider(class_id: int, body: DividerIn, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def toggle_divider(class_id: int, body: DividerIn, term: str = "1", kurs_id: Optional[int] = None,
+                         user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Strich nach einer Spalte an/aus. Gibt die neue Liste zurueck."""
     await _owned_class(db, user, class_id)
+    # Die Spalte ist eine fremde ID wie jede andere; und `kurs_id` war hier
+    # ueberhaupt nicht definiert — das ANLEGEN eines Teilers endete in einem
+    # NameError, also HTTP 500. Jetzt kommt er wie ueberall sonst als Parameter.
+    await _owned_category(db, user, body.after_category_id)
     existing = (await db.execute(select(QuartalDivider).where(
         QuartalDivider.class_id == class_id, QuartalDivider.owner_id == user.id,
         QuartalDivider.term == term, QuartalDivider.after_category_id == body.after_category_id,
@@ -613,7 +618,12 @@ async def set_comment(body: KommentarIn, user: User = Depends(require_module), d
     Kommentar hat, verschwindet ganz.
     """
     rate_limit("noten_entry", f"u{user.id}", 600, 60, "Zu viele Einträge in kurzer Zeit. Bitte kurz warten.")
-    await _owned_category(db, user, body.category_id)
+    spalte = await _owned_category(db, user, body.category_id)
+    # Wie `create_entry`: die Zeile muss zur Klasse der Spalte gehoeren. Ohne
+    # die Pruefung liess sich ein Kommentar auf eine FREMDE student_id schreiben.
+    abschnitt = await _owned_section(db, user, spalte.section_id)
+    if not await _student_in_kurs(db, abschnitt.class_id, body.student_id, abschnitt.kurs_id):
+        raise HTTPException(404, "Schüler nicht in dieser Klasse")
     text_ = (body.text or "").strip()[:2000]
     vorhanden = (await db.execute(select(GradeEntry).where(
         GradeEntry.category_id == body.category_id,

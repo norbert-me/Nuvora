@@ -386,10 +386,16 @@ async def delete_session(session_id: int, user: User = Depends(get_current_user)
 async def get_session_qr(session_id: int, request: Request, db: AsyncSession = Depends(get_db)):
     # Ohne Besitzpruefung, und das ist die benannte Ausnahme in
     # `tests/test_modul_schranke.py`: das QR-Bild ist der Weg IN die Sitzung
-    # und wird gezeigt, bevor jemand angemeldet ist. Es gibt nur ein Bild her,
-    # keine Inhalte.
+    # und wird gezeigt, bevor jemand angemeldet ist (ein `<img>` traegt keinen
+    # Token). Es gibt nur ein Bild her, keine Inhalte.
     s = await db.get(Session, session_id)
     if not s:
+        raise HTTPException(404)
+    # Wie jeder ausgeteilte Weg: er verstummt mit dem Modul. Sitzungsnummern
+    # sind fortlaufend — ohne das bestaetigte ein Bild die Existenz einer
+    # fremden Sitzung und trug ihren Code nach draussen.
+    from .modules import is_active   # lokal, wie oben
+    if s.owner_id and not await is_active(db, s.owner_id, "cardvote"):
         raise HTTPException(404)
     import qrcode
     forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")

@@ -100,6 +100,11 @@ class FolderTree(BaseModel):
 @router.post("/folders", response_model=FolderOut, status_code=201)
 async def create_folder(body: FolderCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("folder_create", f"u{user.id}", 60, 60, "Zu viele Ordner in kurzer Zeit. Bitte kurz warten.")
+    # Der Elternordner ist eine fremde ID wie jede andere — und hier sogar eine
+    # ZUGRIFFSGRENZE: `ensure_set_access` entscheidet ueber den Besitzer des
+    # Ordners. Wer seinen Ordner unter einen fremden haengt, schiebt die Quizze
+    # darin in das andere Konto und sperrt sich selbst aus.
+    await eigener_ordner(db, user.id, body.parent_id)
     f = Folder(name=body.name, parent_id=body.parent_id, owner_id=user.id)
     db.add(f)
     await db.commit()
@@ -163,6 +168,10 @@ async def update_folder(folder_id: int, body: FolderCreate, user: User = Depends
     # loeschbar — samt Unterordnern und allen Quizzen darin, per Kaskade und
     # ohne Papierkorb. Ordner-IDs sind fortlaufend; man muss sie nicht raten.
     f = await nur_eigenes(db, Folder, folder_id, user, "Ordner nicht gefunden", "Keine Berechtigung")
+    # Verschieben ist derselbe Fall wie Anlegen (siehe `eigener_ordner`).
+    await eigener_ordner(db, user.id, body.parent_id)
+    if body.parent_id == folder_id:
+        raise HTTPException(400, "Ein Ordner kann nicht in sich selbst liegen")
     f.name = body.name
     f.parent_id = body.parent_id
     if not f.owner_id:
@@ -328,6 +337,11 @@ async def update_question_set(set_id: int, body: QuestionSetCreate, user: User =
         raise HTTPException(404)
     await ensure_set_access(db, qs, user.id)
     await eigener_ordner(db, user.id, body.folder_id)
+    # Dieselbe Pruefung wie beim Anlegen und beim Anhaengen: ohne sie liess sich
+    # ein eigenes Quiz aus FREMDEN Fragen zusammenstellen, und die Antwort
+    # dieses Endpunkts (`_load_set`) gab danach deren Text samt richtiger
+    # Loesung heraus. Fragen-IDs sind fortlaufend.
+    await _eigene_fragen(db, user, body.question_ids)
     qs.name = body.name
     qs.folder_id = body.folder_id
     qs.shuffle_questions = body.shuffle_questions

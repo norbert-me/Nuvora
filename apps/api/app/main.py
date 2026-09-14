@@ -1195,7 +1195,12 @@ async def _ws_is_session_owner(token: str, session_id: int) -> bool:
         s = await db.get(SessionModel, session_id)
         if not s:
             return False
-        return (not s.owner_id) or s.owner_id == user_id
+        # STRENG, anders als `oder_403`: eine Sitzung ohne Besitzer (Bestand aus
+        # der Zeit vor der Mandantentrennung) liess hier JEDES angemeldete Konto
+        # live mithoeren, welche Karte gerade welche Antwort abgibt — und
+        # Steuerbefehle senden. Sitzungsnummern sind fortlaufend. Den Besitzer
+        # traegt der Start nach, wo er eindeutig ist (Sitzung -> Klasse).
+        return s.owner_id == user_id
 
 
 @app.websocket("/ws/session/{session_id}")
