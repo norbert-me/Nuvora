@@ -1339,10 +1339,11 @@ function FreiMarker({ label, t }) {
   );
 }
 
-// Die aktuelle Uhrzeit in Minuten seit Mitternacht, abgerundet auf die
-// Viertelstunde — der Takt der Jetzt-Linie in der Tagesansicht.
-export function viertelstunde(d) {
-  return Math.floor((d.getHours() * 60 + d.getMinutes()) / 15) * 15;
+// Die aktuelle Uhrzeit in Minuten seit Mitternacht, abgerundet auf 5 Minuten —
+// der Takt der Jetzt-Linie in der Tagesansicht. Fein genug, dass die Markierung
+// sichtbar wandert, grob genug, dass sie nicht bei jeder Minute neu zeichnet.
+export function fuenfMin(d) {
+  return Math.floor((d.getHours() * 60 + d.getMinutes()) / 5) * 5;
 }
 
 function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDay, todoByDay, onTodo, slotsFor, onCancelSlot, frei, className, slotName, eintragName = () => "", slotColor, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
@@ -1472,9 +1473,9 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   // trotzdem jede Minute — sonst haengt die Linie nach dem Aufwachen des
   // Rechners bis zu einer Viertelstunde hinterher; gesetzt wird der Zustand
   // nur, wenn sich die Viertelstunde wirklich geaendert hat.
-  const [jetztMin, setJetztMin] = useState(() => viertelstunde(new Date()));
+  const [jetztMin, setJetztMin] = useState(() => fuenfMin(new Date()));
   useEffect(() => {
-    const tick = () => setJetztMin((alt) => { const neu = viertelstunde(new Date()); return neu === alt ? alt : neu; });
+    const tick = () => setJetztMin((alt) => { const neu = fuenfMin(new Date()); return neu === alt ? alt : neu; });
     tick();
     const id = setInterval(tick, 60 * 1000);
     return () => clearInterval(id);
