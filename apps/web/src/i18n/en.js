@@ -2800,6 +2800,8 @@ export default {
   "offline.weg": "No connection — retrying…",
   "konflikt.frage": "This data has changed elsewhere in the meantime (another device or a second window). Which version counts?",
   "konflikt.meine": "Keep my change",
+  "konflikt.spalteMeine": "Your change",
+  "konflikt.spalteServer": "Server version",
   "konflikt.server": "Keep the other version",
   "konflikt.offline": "An offline change meets a newer version{{wann}}. Which one counts?",
   "konflikt.offlineWann": " (changed on {{zeit}})",

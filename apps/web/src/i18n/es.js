@@ -2800,6 +2800,8 @@ export default {
   "offline.weg": "Sin conexión: reintentando…",
   "konflikt.frage": "Estos datos han cambiado mientras tanto en otro sitio (otro dispositivo o una segunda ventana). ¿Cuál vale?",
   "konflikt.meine": "Conservar mi cambio",
+  "konflikt.spalteMeine": "Tu cambio",
+  "konflikt.spalteServer": "Versión del servidor",
   "konflikt.server": "Conservar la otra versión",
   "konflikt.offline": "Un cambio hecho sin conexión se encuentra con una versión más reciente{{wann}}. ¿Cuál vale?",
   "konflikt.offlineWann": " (modificado el {{zeit}})",

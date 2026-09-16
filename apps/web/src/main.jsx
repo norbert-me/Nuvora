@@ -169,14 +169,59 @@ window.fetch = function(input, init) {
 // Ein 409 klaeren: den Serverstand lesen, fragen, und bei „meine Fassung"
 // denselben Aufruf mit `*` wiederholen. Sagt die Lehrkraft „Serverstand
 // behalten", bekommt die Seite die 409 zurueck und laedt neu — sonst stuende
+// Feld-fuer-Feld-Vergleich fuer den Konfliktdialog: „deine Aenderung" gegen den
+// „Serverstand". Gezeigt werden die Felder, die die eigene Aenderung anfasst
+// (Schluessel im gesendeten Rumpf) und die sich vom Server unterscheiden —
+// alles andere waere Rauschen. Bytes/technische Felder liefert der Server gar
+// nicht erst mit (siehe versionierung._serverwerte).
+function _konfliktWert(v) {
+  if (v == null || v === "") return "—";
+  if (typeof v === "boolean") return v ? "ja" : "nein";
+  if (Array.isArray(v) || typeof v === "object") { try { return JSON.stringify(v); } catch { return String(v); } }
+  return String(v);
+}
+function KonfliktVergleich({ lokal, server }) {
+  const felder = Object.keys(lokal || {}).filter((k) => {
+    if (["id", "version"].includes(k)) return false;
+    if (!server || !(k in server)) return true;
+    return _konfliktWert(lokal[k]) !== _konfliktWert(server[k]);
+  });
+  const z = { padding: "4px 8px", verticalAlign: "top", fontSize: 13, borderTop: "1px solid var(--border)", wordBreak: "break-word" };
+  return (
+    <div>
+      <div style={{ fontSize: 16, marginBottom: 10 }}>{uebersetze("konflikt.frage")}</div>
+      {felder.length > 0 && (
+        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <thead><tr>
+            <th style={{ ...z, borderTop: "none", textAlign: "left", width: "30%", color: "var(--text3)", fontWeight: 600 }}></th>
+            <th style={{ ...z, borderTop: "none", textAlign: "left", color: "var(--accent)", fontWeight: 700 }}>{uebersetze("konflikt.spalteMeine")}</th>
+            <th style={{ ...z, borderTop: "none", textAlign: "left", color: "var(--text2)", fontWeight: 700 }}>{uebersetze("konflikt.spalteServer")}</th>
+          </tr></thead>
+          <tbody>
+            {felder.map((k) => (
+              <tr key={k}>
+                <td style={{ ...z, color: "var(--text3)" }}>{k}</td>
+                <td style={z}>{_konfliktWert(lokal[k])}</td>
+                <td style={{ ...z, color: "var(--text2)" }}>{server ? _konfliktWert(server[k]) : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 // die verworfene Eingabe weiter auf dem Bildschirm.
 async function konfliktKlaeren(res, input, init, url) {
   let stand = {};
   try { const d = await res.clone().json(); stand = (d && d.detail) || d || {}; } catch { /* dann eben ohne Details */ }
   if (stand.fehler !== "konflikt") return res;
   const { askChoice } = await import("./core/dialog.jsx");
+  let lokal = {};
+  try { lokal = init && typeof init.body === "string" ? JSON.parse(init.body) : (init && init.body) || {}; } catch { /* egal */ }
   const wahl = await askChoice(
-    uebersetze("konflikt.frage"),
+    <KonfliktVergleich lokal={lokal} server={stand.daten} />,
     [{ key: "meine", label: uebersetze("konflikt.meine") },
      { key: "server", label: uebersetze("konflikt.server") }],
   );
@@ -193,9 +238,8 @@ async function konfliktKlaeren(res, input, init, url) {
 // wirklich NEUER ist als die eigene Offline-Aenderung (siehe outbox.js).
 setKonfliktFrage(async (eintrag, stand) => {
   const { askChoice } = await import("./core/dialog.jsx");
-  const zeit = stand.geaendert_at ? new Date(stand.geaendert_at).toLocaleString() : "";
   const wahl = await askChoice(
-    uebersetze("konflikt.offline", { wann: zeit ? uebersetze("konflikt.offlineWann", { zeit }) : "" }),
+    <KonfliktVergleich lokal={eintrag && eintrag.body} server={stand.daten} />,
     [{ key: "server", label: uebersetze("konflikt.neuer") },
      { key: "meine", label: uebersetze("konflikt.meine"), danger: true }],
   );

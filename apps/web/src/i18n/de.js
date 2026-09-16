@@ -2797,6 +2797,8 @@ export default {
   "offline.weg": "Keine Verbindung — Neuversuch läuft…",
   "konflikt.frage": "Diese Daten wurden inzwischen an anderer Stelle geändert (anderes Gerät oder zweites Fenster). Was gilt?",
   "konflikt.meine": "Meine Änderung übernehmen",
+  "konflikt.spalteMeine": "Deine Änderung",
+  "konflikt.spalteServer": "Serverstand",
   "konflikt.server": "Anderen Stand behalten",
   "konflikt.offline": "Eine Änderung aus dem Offline-Betrieb trifft auf einen neueren Stand{{wann}}. Was gilt?",
   "konflikt.offlineWann": " (geändert am {{zeit}})",

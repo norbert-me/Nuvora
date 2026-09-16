@@ -54,11 +54,33 @@ class Versioniert:
     )
 
 
+def _serverwerte(obj) -> dict:
+    """Die skalaren Feldwerte der Zeile — damit der Client bei einem Konflikt
+    „deine Aenderung vs Serverstand" FELD FUER FELD zeigen kann.
+
+    Nur einfache Spalten (Text, Zahl, Bool, Datum, JSON); Bytes und die internen
+    Zaehler bleiben draussen. Es sind die eigenen Daten des Kontos — der Client,
+    der den Konflikt ausloest, darf sie sehen.
+    """
+    from datetime import datetime as _dt
+    raus = {}
+    for spalte in obj.__table__.columns:
+        name = spalte.key
+        if name in ("version", "geaendert_at", "owner_id", "data", "pdf_data", "photo", "photo_thumb"):
+            continue
+        wert = getattr(obj, name, None)
+        if isinstance(wert, (bytes, bytearray, memoryview)):
+            continue
+        raus[name] = wert.isoformat() if isinstance(wert, _dt) else wert
+    return raus
+
+
 def stand(obj) -> dict:
     """Was ein Client braucht, um einen Konflikt selbst zu entscheiden."""
     ga = getattr(obj, "geaendert_at", None)
     return {"version": getattr(obj, "version", None) or 1,
-            "geaendert_at": ga.isoformat() if ga else None}
+            "geaendert_at": ga.isoformat() if ga else None,
+            "daten": _serverwerte(obj)}
 
 
 def basis(request: Optional[Request]) -> Optional[str]:
