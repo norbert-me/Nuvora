@@ -14,7 +14,72 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.4.0 — 16.09.2026
+
+- **Sicherheit: kein Quiz aus fremden Fragen mehr.** Beim Ändern eines Quiz
+  wurden fremde Fragen-IDs ungeprüft übernommen — und die Antwort gab deren Text
+  samt Lösung heraus. Dieselbe Prüfung gilt jetzt auch für Ordner unter fremden
+  Ordnern, Notenkommentare und den Live-Ton einer Abstimmung.
+- **Datenschutz: das Abmelden räumt den Browser wirklich leer.** Liegen blieben
+  bisher der Offline-Vorrat (Noten, Anwesenheit, Klassenlisten **aller** Klassen),
+  die Tafel, die Code-Detektiv-Runde und die Fehlerliste. Am geteilten Rechner
+  war das der Weg zur nächsten Person. Offline getippte, noch nicht gesendete
+  Änderungen bleiben — sie tragen jetzt ihr Konto und gehen nie unter einem
+  anderen hinaus.
+- **Sicherheit: die Anmeldung verrät nicht mehr, welche Adressen ein Konto
+  haben** — weder über die Registrierung noch über die Antwortzeit. Dazu eine
+  zweite Bremse je Konto gegen verteiltes Ausprobieren.
+- **Bestätigungslinks laufen nach 14 Tagen ab.** Bisher galten sie ewig.
+- Sicherheit: Schüler-Token und Kalender-Abo-Adressen stehen in keinem
+  Zugriffsprotokoll mehr; der Kalender-Zugang von Geräten ist zusätzlich je
+  Adresse gebremst.
+- **Der Papierkorb zeigt wieder alles.** Gelöschte Aufgaben, PAP-Aufgaben und
+  Personen waren zwar gelöscht, aber nirgends zu sehen — Personen verschwanden
+  nach 30 Tagen endgültig, ohne dass jemand sie hätte zurückholen können.
+- **Lernpfad: „Alle Daten importieren" löschte.** Ein älterer Export nahm jede
+  seitdem angelegte Aufgabe mit. Jetzt wird angehängt, nie ersetzt.
+- **Lernpfad: die Liste war beim Öffnen leer, bis der Server antwortete** — der
+  Sofortstart aus dem Zwischenspeicher war seit dem Umbau wirkungslos.
+- Lernpfad: die Suche findet endlich den Aufgabentext; „Alle auswählen" sagt,
+  dass es die angezeigten meint; das Aufräumen doppelter Aufgaben läuft nicht
+  mehr im Kreis und meldet „gelöscht" erst, wenn es beim Server angekommen ist;
+  Teilaufgaben gehen beim Übertragen auf einen anderen Kurs nicht mehr verloren.
+- **Material: dieselbe Datei liegt nur noch einmal auf dem Server.** Wird ein
+  Foto ein zweites Mal hochgeladen, verweist der neue Eintrag auf das vorhandene
+  — und kostet keinen Speicherplatz.
+- **Material: Fotos werden beim Hochladen verkleinert** (JPEG, hohe Qualität;
+  Foto-PNGs werden zu JPEG). Die Auflösung bleibt, die Ortsangaben aus der
+  Kamera fallen weg.
+- **Einstiege: Dateien hochladen geht nur noch im Bearbeiten-Dialog** — beim
+  Ansehen stehen sie eingebunden da.
+- **Karteikarten: G-Karten gehen jetzt auch an E-Schüler.** E ist die höhere
+  Stufe und darf den Grundstoff mitüben; ein G-Kind bekommt weiterhin nie eine
+  E-Karte.
+- **Anwesenheit: die Vorauswahl lässt sich im Profil wählen** — anwesend oder
+  abwesend. Wer mit „abwesend" beginnt, hakt die Anwesenden ab; der Übertrag aus
+  der Vorstunde entfällt dann.
+- **Kalender: ein Klick auf eine noch nicht geplante Stunde zeigt die Übersicht**
+  statt sofort das Erstellen-Formular — angelegt wird erst beim Speichern.
+- Kalender: ein hinterlegter Einstieg steht immer als erste Phase im
+  Verlaufsplan; „Erweitert" startet eingeklappt; Cmd-/Strg-Klick auf eine
+  Verlinkung öffnet einen neuen Tab und lässt den Dialog offen; die Jetzt-Linie
+  nennt die genaue Uhrzeit, wandert in 5-Minuten-Schritten und verdeckt die
+  Stundenzahl nicht mehr.
+- **Noten: die Tabelle lässt sich mit den Pfeiltasten begehen** (hoch/runter
+  zwischen Kindern, seitwärts zwischen Spalten).
+- Noten: das Datum einer Spalte lässt sich per × wieder leeren; die
+  Spaltenstatistik zeigt die schlechteste Note nicht mehr doppelt zum Graphen.
+- **Konflikte zeigen beide Fassungen.** Trifft eine Offline-Änderung auf einen
+  neueren Stand, stehen „deine Änderung" und „Serverstand" Feld für Feld
+  nebeneinander — dann wird entschieden.
+- Sitzplan: der Punkt für SEGEL/Anwesenheit liegt nicht mehr hinter dem
+  Dreh-Griff.
+- Code-Detektiv: der MakeCode-Import (.hex) funktioniert wieder — er scheiterte
+  in der ausgelieferten Fassung lautlos.
+- Alle Meldungen, die jeder zu sehen bekommt (Update-Hinweis, Offline-Balken,
+  Fehlerseiten, Konfliktfragen), sind jetzt übersetzt.
+- Sicherung: die Datei wird sortiert geschrieben — sonst konnte das
+  Zurückspielen an einer Verschachtelung scheitern.
 
 - **Material: Bilder zeigen einen Daumennagel.** „image.jpg" sagt nichts darüber,
   was drauf ist — und das ist beim Material die einzige Frage.
