@@ -259,4 +259,8 @@ async def test_png_bleibt_unangetastet(s):
     out = await M.upload_material(file=_upload("t.png", roh), topic_id=tp.id, entry_id=None,
                                   method_id=None, work_id=None, rolle="", user=u, db=s)
     r = (await s.execute(select(Material.mime, Material.data).where(Material.id == out.id))).first()
-    assert r[0] == "image/png" and r[1] == roh
+    # Bleibt PNG (nicht zu JPEG umkodiert) und behaelt die Transparenz —
+    # verlustfrei optimiert dürfen sich die Bytes aber aendern.
+    assert r[0] == "image/png"
+    with Image.open(BytesIO(r[1])) as g:
+        assert g.mode in ("RGBA", "LA", "PA") or (g.mode == "P" and "transparency" in g.info)

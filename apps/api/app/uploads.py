@@ -66,33 +66,35 @@ def anhang_kopf(name: str, art: str = "attachment") -> str:
     return f"{art}; filename=\"{einfach}\"; filename*=UTF-8''{quote(sauber, safe='')}"
 
 
-def bild_sparsam(daten: bytes, mime: str) -> tuple[bytes, str]:
-    """Ein Rasterbild verlustarm verkleinern — behaelt aber nur, was WIRKLICH
-    kleiner wird und die Aufloesung NICHT antastet.
+def bild_sparsam(daten: bytes, mime: str, name: str = "") -> tuple[bytes, str, str]:
+    """Ein Rasterbild so klein wie sinnvoll machen — mit merklicher, aber kaum
+    sichtbarer Qualitaetsstufe (JPEG q80).
 
-    Warum ueberhaupt: Handyfotos kommen mit 3–8 MB und voller EXIF-Spur ins
-    Konto; neu kodiert bei hoher Qualitaet bleiben oft 40–70 % uebrig, ohne dass
-    man den Unterschied sieht. JPEG q90 ist nahezu verlustfrei (deutlich unter
-    den zugestandenen 10 %), `optimize` und `progressive` holen den Rest ohne
-    weiteren Verlust. Die Metadaten (EXIF: Ort, Geraet, Zeit) fallen dabei weg —
-    das ist Datenschutz, kein Nebeneffekt.
+    Warum q80 und nicht „nahezu verlustfrei": Handyfotos kommen selbst schon in
+    hoher JPEG-Qualitaet, ein Neukodieren bei q90 bringt fast nichts. q80 ist
+    die Stufe, bei der die Datei deutlich schrumpft (oft auf ein Drittel), ohne
+    dass man den Unterschied im Unterrichtsmaterial sieht — klar innerhalb der
+    zugestandenen paar Prozent. `optimize`/`progressive` holen den Rest ohne
+    weiteren Verlust, EXIF (Ort, Geraet, Zeit) faellt weg (Datenschutz gratis).
 
-    Drei Grenzen, damit nichts schlechter wird als vorher:
-    * **Nur JPEG.** PNG/WebP/GIF bleiben unangetastet — ein PNG nach JPEG
-      verloere die Transparenz, ein GIF die Animation, und verlustfrei neu zu
-      packen bringt bei ihnen kaum etwas.
-    * **Nur behalten, wenn kleiner.** Ein bereits sparsam kodiertes Foto wird
-      sonst durch das Neukodieren groesser statt kleiner.
-    * **Aufloesung bleibt.** Kein Herunterskalieren — die Detailansicht soll das
-      volle Bild zeigen; verkleinert wird die Datei, nicht das Bild.
+    Was passiert:
+    * **JPEG** wird bei q80 neu kodiert.
+    * **PNG ohne echte Transparenz** (Screenshots, als PNG gespeicherte Fotos)
+      wird zu JPEG q80 — das ist der groesste Hebel, ein Foto-PNG ist ein
+      Vielfaches so gross wie dasselbe als JPEG. Bei ECHTER Transparenz bleibt
+      es PNG (nur `optimize`, verlustfrei), sonst wuerde der durchsichtige Teil
+      schwarz.
+    * **GIF** (Animation) und **WebP** bleiben unangetastet.
+    * **Aufloesung bleibt** — verkleinert wird die Datei, nicht das Bild.
 
-    Deterministisch: dieselbe Eingabe ergibt dieselben Bytes, damit die
-    Inhalts-Deduplizierung (sha256) beim zweiten Upload greift. Faellt etwas
-    aus, kommt das Original unveraendert zurueck — ein Upload darf daran nicht
-    scheitern.
+    Nur behalten, was wirklich kleiner wird; deterministisch (fuer die
+    Inhalts-Deduplizierung); bei jedem Fehler kommt das Original zurueck.
+    Rueckgabe: (bytes, mime, dateiname) — der Name kann sich aendern, wenn ein
+    PNG zu JPEG wird (.png -> .jpg).
     """
-    if mime not in ("image/jpeg", "image/jpg"):
-        return daten, mime
+    QUAL = 80
+    if mime not in ("image/jpeg", "image/jpg", "image/png"):
+        return daten, mime, name
     try:
         from io import BytesIO
 
@@ -100,16 +102,30 @@ def bild_sparsam(daten: bytes, mime: str) -> tuple[bytes, str]:
 
         with Image.open(BytesIO(daten)) as bild:
             bild = ImageOps.exif_transpose(bild)
+            # Echte Transparenz? Dann PNG lassen (nur verlustfrei optimieren).
+            hat_alpha = bild.mode in ("RGBA", "LA", "PA") or (
+                bild.mode == "P" and "transparency" in bild.info)
+            if mime == "image/png" and hat_alpha:
+                puffer = BytesIO()
+                bild.save(puffer, format="PNG", optimize=True)
+                neu = puffer.getvalue()
+                if neu and len(neu) < len(daten):
+                    return neu, mime, name
+                return daten, mime, name
+            # Sonst: als JPEG neu kodieren (PNG ohne Alpha wird JPEG).
             if bild.mode not in ("RGB", "L"):
                 bild = bild.convert("RGB")
             puffer = BytesIO()
-            bild.save(puffer, format="JPEG", quality=90, optimize=True, progressive=True)
+            bild.save(puffer, format="JPEG", quality=QUAL, optimize=True, progressive=True)
         neu = puffer.getvalue()
         if neu and len(neu) < len(daten):
-            return neu, "image/jpeg"
+            neuer_name = name
+            if mime == "image/png" and name.lower().endswith(".png"):
+                neuer_name = name[:-4] + ".jpg"
+            return neu, "image/jpeg", neuer_name
     except Exception:
         pass
-    return daten, mime
+    return daten, mime, name
 
 
 def vorschaubild(daten: bytes, kante: int = 256) -> Optional[bytes]:

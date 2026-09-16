@@ -116,11 +116,14 @@ async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] 
     if len(data) > MAX_BYTES:
         raise HTTPException(413, "Datei zu groß (max. 15 MB)")
     mime = (file.content_type or "")[:120]
-    # Fotos verlustarm verkleinern, BEVOR gehasht wird: die Inhaltsadresse muss
+    name = (file.filename or "datei")[:255]
+    # Fotos verkleinern (JPEG q80), BEVOR gehasht wird: die Inhaltsadresse muss
     # die GESPEICHERTE Form treffen, sonst dedupliziert der zweite Upload nicht.
+    # Ein PNG ohne Transparenz wird dabei zu JPEG — dann aendert sich der Name
+    # (.png -> .jpg).
     from starlette.concurrency import run_in_threadpool
     from ..uploads import bild_sparsam
-    data, mime = await run_in_threadpool(bild_sparsam, data, mime)
+    data, mime, name = await run_in_threadpool(bild_sparsam, data, mime, name)
     import hashlib
     pruef = hashlib.sha256(data).hexdigest()
     # Liegt genau dieser Inhalt schon einmal in diesem Konto? Dann NICHT die
@@ -141,7 +144,7 @@ async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] 
             raise HTTPException(413, "Speicher voll (max. 200 MB je Konto). Bitte alte Dateien löschen.")
     m = Material(owner_id=user.id, topic_id=topic_id, entry_id=entry_id, method_id=method_id,
                  work_id=work_id, rolle=rolle if rolle in ROLLEN else "",
-                 filename=(file.filename or "datei")[:255], mime=mime,
+                 filename=name, mime=mime,
                  size=len(data), sha256=pruef, quelle_id=quelle,
                  data=None if quelle is not None else data)
     db.add(m)
