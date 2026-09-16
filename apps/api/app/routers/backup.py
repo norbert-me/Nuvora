@@ -308,7 +308,15 @@ async def _datenbank_schreiben(zf: zipfile.ZipFile, conn) -> tuple[dict, dict]:
     zaehler = _Zaehler(roh)
     for tabelle in Base.metadata.sorted_tables:
         n = 0
-        stmt = select(tabelle)
+        # NACH PRIMAERSCHLUESSEL sortiert, und das ist kein Schoenheitsfehler:
+        # mehrere Tabellen zeigen auf SICH SELBST (`folders.parent_id`,
+        # `topics.parent_id`, `materials.quelle_id`). Beim Zurueckspielen prueft
+        # Postgres den Fremdschluessel Zeile fuer Zeile — steht das Kind vor
+        # seinem Elternteil, bricht der ganze Lauf mit einem IntegrityError ab.
+        # Ohne ORDER BY ist die Reihenfolge die des Heaps, also nach Updates und
+        # VACUUM beliebig. Aufsteigende id heisst: das Elternteil war zuerst da
+        # und steht zuerst in der Datei.
+        stmt = select(tabelle).order_by(*tabelle.primary_key.columns)
         try:
             ergebnis = await conn.stream(stmt)
             async for row in ergebnis:

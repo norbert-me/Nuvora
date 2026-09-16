@@ -422,8 +422,13 @@ async def delete_material(material_id: int, user: User = Depends(get_current_use
     # auf sie. Der Fremdschluessel-SET-NULL ist nur der Rueckfall, falls dieser
     # Weg je umgangen wird.
     if m.quelle_id is None:
+        # Nach id sortiert, und der Erbe ist die KLEINSTE: danach zeigt jeder
+        # verbliebene Zeiger auf eine kleinere id als seine eigene. Das haelt die
+        # Sicherung heil — sie spielt Zeile fuer Zeile in id-Reihenfolge zurueck,
+        # und ein Zeiger vor seiner Quelle waere ein Fremdschluesselfehler.
         abhaengig = (await db.execute(select(Material).options(undefer(Material.pdf_data))
-                                      .where(Material.quelle_id == m.id))).scalars().all()
+                                      .where(Material.quelle_id == m.id)
+                                      .order_by(Material.id))).scalars().all()
         if abhaengig:
             # `m` mit seinen Bytes laden (pdf_data ist deferred).
             quelle = (await db.execute(select(Material).options(undefer(Material.pdf_data))

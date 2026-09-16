@@ -679,16 +679,18 @@ def inhalt_karten(api, u, spuren):
         raise AssertionError("E-Karte steht in der Detailsicht des G-Kindes")
     e_fortschritt = _finde(api.call("GET", f"/api/karten/classes/{u.class_id}/progress", erwartet=(200,)),
                            student_id=u.students[0])
-    if (e_fortschritt or {}).get("total") != 1:
-        raise AssertionError(f"Fortschritt des E-Kindes zaehlt {e_fortschritt} statt 1 Karte")
-    # Gegenprobe zum Schalter: ausgeschaltet zaehlt das Karten-Niveau nicht
-    # mehr, das E-Kind bekommt auch die G-Karte. Ohne diese Richtung koennte der
-    # Filter einfach immer greifen und niemandem fiele es auf.
+    if (e_fortschritt or {}).get("total") != 3:
+        raise AssertionError(f"Fortschritt des E-Kindes zaehlt {e_fortschritt} statt 3 Karten")
+    # Gegenprobe zum Schalter — mit dem G-KIND, denn nur dort sagt sie noch
+    # etwas: das E-Kind bekommt ohnehin alles (E sieht auch G). Ausgeschaltet
+    # zaehlt das Karten-Niveau nicht mehr, dann sieht auch das G-Kind die
+    # E-Karte. Ohne diese Richtung koennte der Filter einfach immer greifen und
+    # niemandem fiele es auf.
     api.call("PUT", f"/api/karten/decks/{stapel['id']}",
              {"name": f"{PRAEFIX} Stapel", "topic_id": u.topic_id, "niveau_aktiv": False}, erwartet=(200,))
-    ohne_schalter = anonym.call("GET", f"/api/karten/lernen/{token}?all=true", erwartet=(200,))
+    ohne_schalter = anonym.call("GET", f"/api/karten/lernen/{token_g}?all=true", erwartet=(200,))
     if ohne_schalter.get("total") != 3:
-        raise AssertionError(f"ohne Niveau-Schalter zaehlt das E-Kind {ohne_schalter.get('total')} Karten statt 3")
+        raise AssertionError(f"ohne Niveau-Schalter zaehlt das G-Kind {ohne_schalter.get('total')} Karten statt 3")
     api.call("PUT", f"/api/karten/decks/{stapel['id']}",
              {"name": f"{PRAEFIX} Stapel", "topic_id": u.topic_id, "niveau_aktiv": True}, erwartet=(200,))
 
