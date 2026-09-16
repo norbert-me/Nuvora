@@ -596,7 +596,11 @@ export default function Kalender() {
       // Raumtausch die Ausnahme — und die laesst sich am Eintrag ueberschreiben.
       const kid = s.kurs_id ?? (classes.find((c) => c.id === s.class_id) || {}).kurs_id ?? null;
       const raum = (kurse.find((k) => k.id === kid) || {}).raum || "";
-      setEditing({ date: startOfDay(day), period: s.period, title: s.title || "", class_id: s.class_id || null, kurs_id: s.kurs_id ?? null, topic_id: s.topic_id || null, location: raum });
+      // `_ansicht`: der Klick auf eine noch nicht geplante Stunde oeffnet die
+      // Uebersicht (mit Verlinkungen und „Bearbeiten"), NICHT sofort das
+      // Erstellen-Formular. Angelegt wird erst, wenn die Lehrkraft in der
+      // Uebersicht auf Bearbeiten geht und speichert.
+      setEditing({ date: startOfDay(day), period: s.period, title: s.title || "", class_id: s.class_id || null, kurs_id: s.kurs_id ?? null, topic_id: s.topic_id || null, location: raum, _ansicht: true });
     }
   };
 
@@ -2412,7 +2416,9 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
   const zielDa = useZielFilter();
   const orgaTeil = (option) => zielDa({ modul: "orga", option });
   // Bestehender Eintrag oeffnet zuerst als Ansicht; neuer direkt im Bearbeiten.
-  const [edit, setEdit] = useState(!entry.id);
+  // Neuer, leerer Eintrag oeffnet direkt im Bearbeiten; ein bestehender ODER
+  // eine noch nicht geplante Stunde (`_ansicht`, aus fromSlot) zuerst als Ansicht.
+  const [edit, setEdit] = useState(!entry.id && !entry._ansicht);
   // „Erweitert" startet offen, wenn dort schon etwas steht — sonst waere ein
   // gepflegter Eintrag beim naechsten Oeffnen zur Haelfte unsichtbar.
   const [erweitert, setErweitert] = useState(!!(entry.location || entry.rrule || entry.topic_id
