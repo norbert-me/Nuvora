@@ -1024,6 +1024,13 @@ function Zelle({ onSave, onCancel, onTab, onEnter, onPfeil, initial = "" }) {
             e.preventDefault(); weiter.current = true; onPfeil(feld.value, e.key === "ArrowLeft");
           }
         }
+        // Hoch/runter: dieselbe Spalte, voriges/naechstes Kind. Ein einzeiliges
+        // Zahlenfeld kennt keine senkrechte Cursor-Bewegung, das Abfangen ist
+        // also gefahrlos — zusammen mit ←/→ ist die ganze Tabelle mit den
+        // Pfeiltasten begehbar.
+        if ((e.key === "ArrowDown" || e.key === "ArrowUp") && onEnter) {
+          e.preventDefault(); weiter.current = true; onEnter(e.target.value, e.key === "ArrowUp");
+        }
       }}
       placeholder="2,3"
       style={{ width: "100%", minHeight: 32, border: "2px solid var(--accent)", borderRadius: CONTROL_R, background: "var(--input-bg, var(--bg))", color: "var(--text)", textAlign: "center", fontSize: 14, padding: 0, boxSizing: "border-box" }} />
