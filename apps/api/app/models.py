@@ -50,6 +50,11 @@ class User(Base):
     # Noten mit Tendenz (2+/2-) statt ganzer Note (2). Default an — Module (Klassen-
     # arbeit, CardVote) übernehmen das als Voreinstellung.
     grade_tendency: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # Vorauswahl in der Anwesenheit: "da" (anwesend) oder "fehlt" (abwesend).
+    # Wer mit "abwesend" beginnt, hakt die Anwesenden ab — dann ist auch der
+    # Uebertrag aus der Vorstunde sinnlos und wird uebergangen (siehe
+    # anwesenheit.get_day / Anwesenheit.jsx).
+    anwesenheit_default: Mapped[str] = mapped_column(String(10), default="da", server_default="da")
     token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     pending_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

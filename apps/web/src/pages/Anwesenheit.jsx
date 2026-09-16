@@ -27,6 +27,13 @@ const NAME_MIN = 120;
 
 export default function Anwesenheit() {
   const { t } = useLanguage();
+  // Vorauswahl aus dem Profil: "da" (anwesend) oder "fehlt" (abwesend).
+  // Wer mit „abwesend" beginnt, hakt die Anwesenden ab; der Server uebergeht
+  // dann auch den Uebertrag aus der Vorstunde (anwesenheit.get_day).
+  const vorauswahl = (() => {
+    try { const u = JSON.parse(localStorage.getItem("user")); return u && u.anwesenheit_default === "fehlt" ? "fehlt" : "da"; }
+    catch { return "da"; }
+  })();
   const aktiv = useAktiv();
   const kalenderAktiv = aktiv("kalender");
   const [params] = useSearchParams();
@@ -169,18 +176,16 @@ export default function Anwesenheit() {
   // hat (genau das tat der Server bis 10.09.2026 selbst).
   const basis = useMemo(() => {
     const o = {};
-    // Default „verspaetet" (V) auf Wunsch der Lehrkraft: wer keinen echten
-    // Eintrag hat, steht zuerst auf V — abgehakt wird, wer anwesend/fehlt ist.
-    students.forEach((s) => { const e = tag[String(s.id)]; o[String(s.id)] = e && !e.vorschlag ? e.status : "spaet"; });
+    students.forEach((s) => { const e = tag[String(s.id)]; o[String(s.id)] = e && !e.vorschlag ? e.status : vorauswahl; });
     return o;
-  }, [students, tag]);
+  }, [students, tag, vorauswahl]);
   // Die Vorschläge — vorbelegt als offene Änderung, damit die Speicherleiste
   // „nicht gespeichert" zeigt, bis die Lehrkraft sie bestätigt.
   const vorschlaege = useMemo(() => {
     const o = {};
-    students.forEach((s) => { const e = tag[String(s.id)]; if (e?.vorschlag && e.status !== "da") o[String(s.id)] = e.status; });
+    students.forEach((s) => { const e = tag[String(s.id)]; if (e?.vorschlag && e.status !== vorauswahl) o[String(s.id)] = e.status; });
     return o;
-  }, [students, tag]);
+  }, [students, tag, vorauswahl]);
   // Wen hat die Lehrkraft in DIESER Runde selbst angefasst? Nur diese Kinder
   // sind vor frischen Serverdaten geschuetzt (siehe unten).
   const angefasst = useRef(new Set());
@@ -228,7 +233,7 @@ export default function Anwesenheit() {
     fn();
   };
 
-  const statusOf = (sid) => eTag.wert[String(sid)] || tag[String(sid)]?.status || "spaet";
+  const statusOf = (sid) => eTag.wert[String(sid)] || tag[String(sid)]?.status || vorauswahl;
   // Steht hier noch der Vorschlag des Servers? Dann sagt die Zeile das — sonst
   // sähe ein „F" aus wie ein Eintrag, den jemand gemacht hat.
   const vorschlagVon = (sid) => {

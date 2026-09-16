@@ -253,6 +253,7 @@ def _ensure_columns(sync_conn):
         ("users", "feed_external", "BOOLEAN DEFAULT false NOT NULL"),
         ("users", "marketplace_name", "VARCHAR(100) DEFAULT '' NOT NULL"),
         ("users", "grade_tendency", "BOOLEAN DEFAULT true NOT NULL"),
+        ("users", "anwesenheit_default", "VARCHAR(10) DEFAULT 'da' NOT NULL"),
         ("users", "email_verified", "BOOLEAN DEFAULT false NOT NULL"),
         ("users", "pending_email", "VARCHAR(255)"),
         ("questions", "owner_id", "INTEGER"),

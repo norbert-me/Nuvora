@@ -225,6 +225,12 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
 
     exact = {person(r.student_id): r for r in sicht if r.period == period}
     aus = {str(back(sid)): out(r) for sid, r in exact.items()}
+    # Wer mit „abwesend" beginnt, hakt die ANWESENDEN ab — dann waere ein
+    # Uebertrag aus der Vorstunde sinnlos: er schluege genau das vor, was ohnehin
+    # schon dasteht, und die Speicherleiste stuende grundlos auf „nicht
+    # gespeichert". Also gar nicht erst vorschlagen (Profil-Einstellung).
+    if (getattr(user, "anwesenheit_default", "da") or "da") == "fehlt":
+        return aus
     for sid in {person(r.student_id) for r in rows} - set(exact):
         vorher = [r for r in rows if person(r.student_id) == sid and r.period is not None and r.period < period]
         if not vorher:

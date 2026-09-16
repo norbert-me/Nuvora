@@ -122,13 +122,17 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   const [profilBasis, setProfilBasis] = useState({
     gradeScale: user.grade_scale || DEFAULT_SCALE,
     gradeTendency: user.grade_tendency !== false,   // Voreinstellung: mit Tendenz (2+)
+    // Vorauswahl in der Anwesenheit: "da" (anwesend) oder "fehlt" (abwesend).
+    // Wer mit „abwesend" beginnt, hakt die Anwesenden ab — dann uebergeht der
+    // Server auch den Uebertrag aus der Vorstunde.
+    anwDefault: user.anwesenheit_default === "fehlt" ? "fehlt" : "da",
     // Schuljahr. Am Konto und nicht an der Klasse: es ist fuer alle Klassen
     // dieser Lehrkraft dasselbe — je Klasse waere es dieselbe Angabe
     // fuenfzehnmal, und beim ersten Abweichen wuesste niemand, welche stimmt.
     hj1: user.hj1_start || "", hj2: user.hj2_start || "", ende: user.jahr_ende || "",
   });
   const profil = useEntwurf(profilBasis, (w) => saveProfile(w));
-  const { gradeScale, gradeTendency } = profil.wert;
+  const { gradeScale, gradeTendency, anwDefault } = profil.wert;
   // Der Name, unter dem Beiträge im Marktplatz stehen. Er hängt an keinem
   // zweiten Wert und wirkt sofort — deshalb steht er bei den Umschaltern und
   // nicht im Entwurf; geschrieben wird beim Verlassen des Feldes und mit Enter.
@@ -224,6 +228,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ name, salutation, grade_scale: w.gradeScale, grade_tendency: w.gradeTendency,
+                             anwesenheit_default: w.anwDefault,
                              hj1_start: w.hj1 || "", hj2_start: w.hj2 || "", jahr_ende: w.ende || "" }),
     });
     if (res.ok) {
@@ -384,6 +389,11 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         <Zeile label={t("profile.gradeTendency")} hint={t("profile.gradeTendencyHint")}>
           <Tabs value={gradeTendency ? "an" : "aus"} onChange={(v) => profil.setz({ gradeTendency: v === "an" })}
             options={[["an", t("profile.gradeTendencyOn")], ["aus", t("profile.gradeTendencyOff")]]} />
+        </Zeile>
+
+        <Zeile label={t("profile.anwDefault")} hint={t("profile.anwDefaultHint")}>
+          <Tabs value={anwDefault} onChange={(v) => profil.setz({ anwDefault: v })}
+            options={[["da", t("profile.anwDefaultDa")], ["fehlt", t("profile.anwDefaultFehlt")]]} />
         </Zeile>
 
         {profileMsg && <div style={{ fontSize: 13, color: profileMsg === t("profile.saved") ? C.success : C.danger, marginTop: 12 }}>{profileMsg}</div>}

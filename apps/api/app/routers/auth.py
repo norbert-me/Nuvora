@@ -513,6 +513,8 @@ class UpdateProfileBody(BaseModel):
     salutation: str
     grade_scale: Optional[dict] = None
     grade_tendency: Optional[bool] = None
+    # "da" (anwesend) oder "fehlt" (abwesend) — alles andere wird ignoriert.
+    anwesenheit_default: Optional[str] = None
     marketplace_name: Optional[str] = None
     # Schuljahr: Beginn der Halbjahre und Jahresende, als "JJJJ-MM-TT" oder ""
     # zum Loeschen. Am Konto, weil das Schuljahr fuer alle Klassen dieser
@@ -544,6 +546,8 @@ def _user_dict(user):
         # oder ernannt (app/rollen.py).
         "is_admin": ist_admin(user),
         "display_name": display or user.email, "grade_scale": user.grade_scale, "grade_tendency": user.grade_tendency,
+        # Vorauswahl in der Anwesenheit ("da" | "fehlt") — siehe models.User.
+        "anwesenheit_default": getattr(user, "anwesenheit_default", "da") or "da",
         # Gesehene Touren: am Konto, damit sie nicht auf jedem Geraet neu laufen.
         "tours_done": list(getattr(user, "tours_done", None) or []),
         # Ansichts-Einstellungen (Startseite, Kalender) — siehe models.User.
@@ -898,6 +902,8 @@ async def update_profile(body: UpdateProfileBody, user: User = Depends(get_curre
         user.grade_scale = body.grade_scale
     if body.grade_tendency is not None:
         user.grade_tendency = bool(body.grade_tendency)
+    if body.anwesenheit_default in ("da", "fehlt"):
+        user.anwesenheit_default = body.anwesenheit_default
     if body.marketplace_name is not None:
         user.marketplace_name = body.marketplace_name.strip()[:100]
     # Datumsfelder: leerer Text loescht. Unlesbares wird ignoriert statt mit
