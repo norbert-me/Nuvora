@@ -1556,10 +1556,12 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
             <div key={h} style={{ position: "absolute", top: yOf(h * 60), left: 46, right: 0, borderTop: h === 0 || h === 24 ? "none" : "1px solid var(--border)" }}>
               {/* Die Stundenzahl weicht der Jetzt-Beschriftung: liegen beide
                   uebereinander, lugte die graue unter der roten hervor
-                  („15:00" doppelt, halb abgeschnitten). 13 px ist die Hoehe
-                  einer Beschriftungszeile — naeher heisst ueberlappt. Die Zeit
-                  geht dabei nicht verloren, die rote nennt sie ohnehin. */}
-              {h < 24 && !(istHeute && Math.abs(yOf(jetztMin) - yOf(h * 60)) < 13)
+                  („15:00" doppelt, halb abgeschnitten).
+                  Verglichen werden die KAESTEN, nicht die Linien: die rote
+                  Beschriftung sitzt 8 px ueber ihrer Linie, die graue 1 px —
+                  ein Vergleich der blossen Linienabstaende geht um diese
+                  7 px daneben und liess sie bei 15:22 weiter ueberlappen. */}
+              {h < 24 && !(istHeute && Math.abs((yOf(jetztMin) - 8) - (yOf(h * 60) - 1)) < 13)
                 && <span style={{ position: "absolute", top: -1, left: -44, fontSize: 11, color: "var(--text3)" }}>{String(h).padStart(2, "0")}:00</span>}
             </div>
           ))}

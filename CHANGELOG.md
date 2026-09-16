@@ -14,6 +14,12 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- Kalender: die Stundenzahl wird jetzt wirklich ausgeblendet, wenn die
+  Jetzt-Beschriftung darüberliegt — verglichen wurden die Linien statt der
+  Beschriftungen, und die sitzen unterschiedlich hoch.
+
 ## 4.4.0 — 16.09.2026
 
 - **Sicherheit: kein Quiz aus fremden Fragen mehr.** Beim Ändern eines Quiz
