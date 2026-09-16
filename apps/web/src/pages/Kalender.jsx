@@ -1474,10 +1474,17 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   // Rechners bis zu einer Viertelstunde hinterher; gesetzt wird der Zustand
   // nur, wenn sich die Viertelstunde wirklich geaendert hat.
   const [jetztMin, setJetztMin] = useState(() => fuenfMin(new Date()));
+  // Getrennt: die MARKIERUNG rastet auf 5 Minuten (sie soll ruhig stehen), die
+  // beschriftete UHRZEIT zeigt die exakte Minute.
+  const [jetztExakt, setJetztExakt] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
   useEffect(() => {
-    const tick = () => setJetztMin((alt) => { const neu = fuenfMin(new Date()); return neu === alt ? alt : neu; });
+    const tick = () => {
+      const d = new Date();
+      setJetztMin((alt) => { const neu = fuenfMin(d); return neu === alt ? alt : neu; });
+      setJetztExakt(d.getHours() * 60 + d.getMinutes());
+    };
     tick();
-    const id = setInterval(tick, 60 * 1000);
+    const id = setInterval(tick, 30 * 1000);
     return () => clearInterval(id);
   }, []);
   const istHeute = ymd(day) === ymd(new Date());
@@ -1556,7 +1563,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
             <div aria-hidden style={{ position: "absolute", top: yOf(jetztMin), left: 46, right: 0, height: 0,
               borderTop: `2px solid ${C.danger}`, pointerEvents: "none", zIndex: 1 }}>
               <span style={{ position: "absolute", top: -8, left: -44, fontSize: 11, fontWeight: 700, color: C.danger, background: "var(--card)" }}>
-                {`${String(Math.floor(jetztMin / 60)).padStart(2, "0")}:${String(jetztMin % 60).padStart(2, "0")}`}
+                {`${String(Math.floor(jetztExakt / 60)).padStart(2, "0")}:${String(jetztExakt % 60).padStart(2, "0")}`}
               </span>
             </div>
           )}
