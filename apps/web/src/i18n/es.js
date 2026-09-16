@@ -2222,6 +2222,7 @@ export default {
   "noten.verlaufZuWenig": "Para ver una evolución hacen falta al menos dos notas.",
   "noten.colDefault": "Columna {{n}}",
   "noten.colDate": "Fecha de la evaluación",
+  "noten.colDateClear": "Quitar fecha",
   "kurse.editYear": "Curso escolar y año anterior",
   "kurse.noPrevious": "sin año anterior",
   "kurse.previousYear": "Año anterior",

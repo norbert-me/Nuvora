@@ -2207,6 +2207,7 @@ export default {
   "noten.verlaufZuWenig": "Für einen Verlauf braucht es mindestens zwei Noten.",
   "noten.colDefault": "Spalte {{n}}",
   "noten.colDate": "Datum der Leistung",
+  "noten.colDateClear": "Datum entfernen",
   "kurse.editYear": "Schuljahr und Vorjahr",
   "kurse.noPrevious": "kein Vorjahr",
   "kurse.previousYear": "Vorjahr",

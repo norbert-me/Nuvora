@@ -2221,6 +2221,7 @@ export default {
   "noten.verlaufZuWenig": "A trend needs at least two grades.",
   "noten.colDefault": "Column {{n}}",
   "noten.colDate": "Date of the assessment",
+  "noten.colDateClear": "Clear date",
   "kurse.editYear": "School year and previous year",
   "kurse.noPrevious": "no previous year",
   "kurse.previousYear": "Previous year",

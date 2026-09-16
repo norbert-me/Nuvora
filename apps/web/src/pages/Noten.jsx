@@ -1290,7 +1290,14 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
         </div>
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>{t("noten.colDate")}</div>
-          <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={{ ...toolbarInput, width: "100%" }} />
+          {/* Ein natives <input type=date> laesst sich nur umstaendlich wieder
+              leeren (der eingebaute Loesch-Knopf ist winzig und fehlt auf dem
+              Handy ganz). Deshalb ein sichtbares × daneben — nur, wenn ein
+              Datum steht. */}
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={{ ...toolbarInput, flex: 1, minWidth: 0 }} />
+            {datum && <button type="button" onClick={() => setDatum("")} className="icon-btn" style={{ ...iconBtn, padding: 6, flexShrink: 0 }} title={t("noten.colDateClear")} aria-label={t("noten.colDateClear")}><Icon d={ICONS.close} size={18} /></button>}
+          </div>
         </div>
         {topics.length > 0 && (
           <div style={{ marginBottom: 12 }}>
@@ -1371,6 +1378,7 @@ function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "", initialDat
         style={{ ...toolbarInput, flex: 1, minWidth: 120 }} />
       <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} title={t("noten.colDate")} aria-label={t("noten.colDate")}
         style={toolbarInput} />
+      {datum && <button type="button" onClick={() => setDatum("")} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("noten.colDateClear")} aria-label={t("noten.colDateClear")}><Icon d={ICONS.close} size={18} /></button>}
       <button onClick={nimm} style={toolbarBtnPrimary}>OK</button>
       <button onClick={onCancel} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.abort")} aria-label={t("common.abort")}><Icon d={ICONS.close} size={20} /></button>
     </div>
