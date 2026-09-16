@@ -947,8 +947,11 @@ export default function Sitzplan() {
                     {/* Die Knoepfe sitzen NEBEN dem Bild in einer Reihe, nicht
                         mehr an den Ecken: mit einem randlosen Bild lagen sie
                         halb ausserhalb des Platzes. */}
+                    {/* Rechts Platz fuer den Dreh-Griff (oben rechts, 18 px):
+                        ohne ihn lag der SEGEL-/Anwesenheits-Punkt darunter und
+                        war halb verdeckt. */}
                     <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "flex-end",
-                      gap: 3, padding: "3px 4px" }}>
+                      gap: 3, padding: "3px 24px 3px 4px" }}>
                       {!seat.empty && segelTeil && segelOn && (() => {
                         const st = SEGEL.find((x) => x.key === segel[String(seat.sid)]);
                         return (
