@@ -2419,11 +2419,11 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
   // Neuer, leerer Eintrag oeffnet direkt im Bearbeiten; ein bestehender ODER
   // eine noch nicht geplante Stunde (`_ansicht`, aus fromSlot) zuerst als Ansicht.
   const [edit, setEdit] = useState(!entry.id && !entry._ansicht);
-  // „Erweitert" startet offen, wenn dort schon etwas steht — sonst waere ein
-  // gepflegter Eintrag beim naechsten Oeffnen zur Haelfte unsichtbar.
-  const [erweitert, setErweitert] = useState(!!(entry.location || entry.rrule || entry.topic_id
-    || entry.method_id || entry.cardvote_set_id || entry.karten_deck_id || entry.lernpfad_ladder_id
-    || entry.codedetektiv_puzzle || (entry.verlaufsplan || []).length));
+  // „Erweitert" startet IMMER eingeklappt (auf Wunsch): die fuenf Grundfelder
+  // reichen fuer den Normalfall; wer Ort, Wiederholung, Thema, Einstieg,
+  // Modul-Planung oder Verlaufsplan braucht, klappt auf. Gepflegte Werte gehen
+  // nicht verloren — sie stehen beim Aufklappen da.
+  const [erweitert, setErweitert] = useState(false);
   // Nach dem Speichern (Parent setzt _justSaved) in die Ansicht wechseln, statt zu
   // schließen — so sieht man den gespeicherten Eintrag sofort.
   useEffect(() => { if (entry._justSaved) setEdit(false); }, [entry._justSaved]);
