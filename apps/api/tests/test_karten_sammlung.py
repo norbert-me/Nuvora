@@ -254,10 +254,11 @@ async def test_ausgeschaltete_differenzierung_zeigt_allen_alles(s):
     assert [c["card_id"] for c in (await K.student_session("tok-1", db=s))["cards"]] == [g.id]
     assert (await K.progress(cls.id, kurs_id=k.id, user=u, db=s))[0].total == 1
 
-    # Eingeschaltet greift die Regel — dieselbe Karte, dasselbe Kind.
+    # Eingeschaltet greift die Regel — aber E ist die hoehere Stufe und bekommt
+    # die G-Karte MIT (Regel geaendert 16.09.2026): sie bleibt sichtbar.
     await K.update_deck(deck.id, K.DeckIn(name=deck.name, niveau_aktiv=True), user=u, db=s)
-    assert (await K.student_session("tok-1", db=s))["cards"] == []
-    assert (await K.progress(cls.id, kurs_id=k.id, user=u, db=s))[0].total == 0
+    assert [c["card_id"] for c in (await K.student_session("tok-1", db=s))["cards"]] == [g.id]
+    assert (await K.progress(cls.id, kurs_id=k.id, user=u, db=s))[0].total == 1
 
 
 @pytest.mark.asyncio
@@ -279,11 +280,11 @@ async def test_bestandskarten_bleiben_neutral(s):
     await K.update_card(alt.id, K.CardIn(front="alt2", back="alt", niveau=""), user=u, db=s)
     assert (await s.get(Card, alt.id)).niveau == ""
 
-    # Die neu angelegte G-Karte bekommt das E-Kind dagegen NICHT zu sehen —
-    # das ist die gewollte Folge der Vorgabe, keine Panne.
+    # Die neu angelegte Karte ist G — und das E-Kind bekommt G-Karten mit
+    # (Regel geaendert 16.09.2026): es sieht jetzt beide.
     g = await K.add_card(deck.id, K.CardIn(front="neu", back="neu"), user=u, db=s)
     assert g.niveau == "G"
-    assert [c["card_id"] for c in (await K.student_session("tok-1", db=s))["cards"]] == [alt.id]
+    assert sorted(c["card_id"] for c in (await K.student_session("tok-1", db=s))["cards"]) == sorted([alt.id, g.id])
 
 
 # ─── Die Stunde weist zu (statt der Hand) ───

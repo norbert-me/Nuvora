@@ -611,14 +611,14 @@ def inhalt_karten(api, u, spuren):
 
     api.call("POST", f"/api/karten/decks/{stapel['id']}/release", {"now": True}, erwartet=(200,))
     sitzung = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
-    # Das E-Kind bekommt GENAU die E-Karte. Dass es die beiden G-Karten NICHT
-    # sieht, ist die Zusicherung, kein Nebeneffekt: die angabelose Karte ist
-    # oben serverseitig zu "G" geworden und damit fuer ein E-Kind unsichtbar.
-    if sitzung.get("total") != 1 or len(sitzung.get("cards") or []) != 1:
-        raise AssertionError(f"E-Kind sieht {sitzung.get('total')} Karten statt 1")
-    vorderseiten = {c["front"] for c in sitzung["cards"]}
-    if vorderseiten != {"5*6"}:
+    # Das E-Kind sieht seine E-Karte UND die beiden G-Karten: E ist die hoehere
+    # Stufe und bekommt den Grundstoff mit (Regel geaendert 16.09.2026). Die
+    # angabelose Karte ist oben serverseitig zu "G" geworden.
+    vorderseiten = {c["front"] for c in sitzung.get("cards") or []}
+    if vorderseiten != {"5*6", "3+4", "G-Karte"}:
         raise AssertionError(f"falsche Karten ans E-Kind ausgeliefert: {vorderseiten}")
+    if sitzung.get("total") != 3:
+        raise AssertionError(f"E-Kind sieht {sitzung.get('total')} Karten statt 3")
 
     # Gegenprobe: dasselbe Deck, ein G-Kind — es MUSS genau die beiden G-Karten
     # bekommen und die E-Karte nicht. Ohne diese Richtung wuerde ein Filter, der
@@ -739,7 +739,7 @@ def inhalt_karten(api, u, spuren):
     zuweisung = _probe_karten_kurse(api, u)
 
     return (f"{zuweisung}; Stapel freigegeben, Karte ohne Angabe kommt als G an, E-Kind sieht "
-            "genau die E-Karte, G-Kind genau die beiden G-Karten, "
+            "E- und G-Karten, G-Kind genau die beiden G-Karten, "
             "ohne Anmeldung gelernt, Fortschritt 0 -> 1 von 2 "
             f"(Detailsicht bestaetigt reps=1), falsche Karte in {frist:.0f} Minuten "
             "wieder faellig, falscher Token abgewiesen; Niveau-Schalter aus = alle "

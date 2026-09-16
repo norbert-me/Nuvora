@@ -235,10 +235,11 @@ async def _student_deck_where(db, st):
 
 
 def _niveau_where(st):
-    """Niveau-Stapel automatisch verteilen: E-Schueler sehen E- und neutrale
-    Stapel, G-Schueler G- und neutrale, ohne Niveau nur neutrale."""
+    """Niveau-Stapel automatisch verteilen. E ist die hoehere Stufe und bekommt
+    die G-Stapel MIT (ein E-Kind darf den Grundstoff ueben); ein G-Kind sieht
+    nur G und neutrale, ohne Niveau nur neutrale."""
     if st.niveau == "E":
-        return CardDeck.niveau.in_(["", "E"])
+        return CardDeck.niveau.in_(["", "E", "G"])
     if st.niveau == "G":
         return CardDeck.niveau.in_(["", "G"])
     return CardDeck.niveau == ""
@@ -265,7 +266,9 @@ def _sichtbar(schueler_niveau: str, *niveaus: str) -> bool:
     in der Lehrkraft-Uebersicht gebraucht, wo eine einzige Abfrage fuer die
     ganze Klasse laeuft und je Kind gefiltert werden muss.
     """
-    erlaubt = {"", schueler_niveau} if schueler_niveau in ("E", "G") else {""}
+    # E sieht zusaetzlich G (die hoehere Stufe bekommt den Grundstoff mit),
+    # G nur G, ohne Niveau nur neutrale.
+    erlaubt = {"E": {"", "E", "G"}, "G": {"", "G"}}.get(schueler_niveau, {""})
     return all((n or "") in erlaubt for n in niveaus)
 
 
@@ -276,13 +279,12 @@ def _karten_niveau_where(st, deck_ids_aktiv=None):
     Stapel mit ein paar E-Karten die andere. Wer nur das Stapel-Niveau haette,
     muesste jeden gemischten Satz doppelt pflegen.
 
-    Die Regel ist dieselbe wie oben und dieselbe wie bei CardVote: neutrale
-    Karten sehen alle, Niveau-Karten nur das eigene Niveau. Ein Kind ohne
-    hinterlegtes Niveau bekommt die neutralen — nie stillschweigend die eines
-    fremden Niveaus.
+    Neutrale Karten sehen alle. E ist die hoehere Stufe und bekommt die
+    G-Karten MIT (Grundstoff darf man ueben); ein G-Kind sieht nur G, ein Kind
+    ohne hinterlegtes Niveau nur die neutralen — nie stillschweigend E.
     """
     if st.niveau == "E":
-        regel = Card.niveau.in_(["", "E"])
+        regel = Card.niveau.in_(["", "E", "G"])   # E bekommt G-Karten mit
     elif st.niveau == "G":
         regel = Card.niveau.in_(["", "G"])
     else:
