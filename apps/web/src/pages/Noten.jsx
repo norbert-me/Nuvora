@@ -580,7 +580,8 @@ export default function Noten() {
             {!st ? <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("noten.colNoGrades")}</p> : (
               <div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
-                  {[[t("noten.colAvg"), de1(st.avg)], [t("noten.colMedian"), de1(st.median)], [t("noten.colBest"), de1(st.min)], [t("noten.colWorst"), de1(st.max)]].map(([lbl, val], i) => (
+                  {/* „Schlechteste" (colWorst) entfernt — steht am Graph ohnehin. */}
+                  {[[t("noten.colAvg"), de1(st.avg)], [t("noten.colMedian"), de1(st.median)], [t("noten.colBest"), de1(st.min)]].map(([lbl, val], i) => (
                     <div key={i} style={{ padding: "10px 12px", borderRadius: CONTROL_R, background: "var(--bg2)" }}>
                       <div style={{ fontSize: 12, color: "var(--text3)" }}>{lbl}</div>
                       {val !== "" && <div style={{ fontSize: 22, fontWeight: 800 }}>{val}</div>}
