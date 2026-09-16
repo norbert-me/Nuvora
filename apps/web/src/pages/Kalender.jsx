@@ -2424,6 +2424,11 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
   // Modul-Planung oder Verlaufsplan braucht, klappt auf. Gepflegte Werte gehen
   // nicht verloren — sie stehen beim Aufklappen da.
   const [erweitert, setErweitert] = useState(false);
+  // Cmd/Ctrl/Shift- oder Mittelklick auf eine Verlinkung: der Browser oeffnet
+  // sie in einem neuen Tab — dann darf der Dialog NICHT schliessen (sonst ist
+  // der Eintrag weg, den man nebenher ansehen wollte). Nur der einfache Klick
+  // navigiert im selben Tab und schliesst.
+  const linkKlick = (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return; onClose(); };
   // Nach dem Speichern (Parent setzt _justSaved) in die Ansicht wechseln, statt zu
   // schließen — so sieht man den gespeicherten Eintrag sofort.
   useEffect(() => { if (entry._justSaved) setEdit(false); }, [entry._justSaved]);
@@ -2506,7 +2511,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
                     {/* Steht dort ein Kurs (Fach), heißt die Zeile auch so — und
                         der Link führt in den Kurs, nicht in die Klasse. */}
                     <span style={{ color: "var(--text3)", minWidth: 90 }}>{kursId ? t("kurse.one") : t("nav.classes")}</span>
-                    <Link to={kursId ? "/kurse" : `/classes?open=${classId}`} onClick={onClose}
+                    <Link to={kursId ? "/kurse" : `/classes?open=${classId}`} onClick={linkKlick}
                       style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{clsName} ↗</Link>
                   </div>
                 )}
@@ -2522,7 +2527,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
             {/* Klassenarbeitstermin: die Auswertung dazu ist ein Klick entfernt
                 (nur bei aktivem Modul — Regel 3). */}
             {aktiv.auswertung && entry.work_id && classId && (
-              <Link to={`/auswertung?tab=klassenarbeit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}&work=${entry.work_id}`} onClick={onClose}
+              <Link to={`/auswertung?tab=klassenarbeit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}&work=${entry.work_id}`} onClick={linkKlick}
                 style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 14, fontWeight: 600 }}>
                 <Icon d={ICONS.chart} size={15} color="var(--accent)" />
                 {t("kalender.openExamWork")}
@@ -2541,7 +2546,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
               <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={lbl}>{t("kalender.openLinked")}</div>
                 {linkList.map((lk) => (
-                  <Link key={lk.to} to={lk.to} onClick={onClose}
+                  <Link key={lk.to} to={lk.to} onClick={linkKlick}
                     style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 14 }}>
                     <Icon d={ICONS.open} size={15} color="var(--accent)" />
                     <span style={{ fontWeight: 600, fontSize: lk.hideName ? 13.5 : 11.5, color: lk.hideName ? "var(--accent)" : "var(--text3)" }}>{lk.kind}</span>
@@ -2757,7 +2762,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
             <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={lbl}>{t("kalender.openLinked")}</div>
               {links.map((lk) => (
-                <Link key={lk.to} to={lk.to} onClick={onClose}
+                <Link key={lk.to} to={lk.to} onClick={linkKlick}
                   style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 14 }}>
                   <Icon d={ICONS.open} size={15} color="var(--accent)" />
                   <span style={{ color: "var(--text3)", fontSize: 12 }}>{lk.icon}</span>
