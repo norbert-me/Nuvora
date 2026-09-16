@@ -1554,7 +1554,13 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
           }}>
           {Array.from({ length: 25 }, (_, h) => (
             <div key={h} style={{ position: "absolute", top: yOf(h * 60), left: 46, right: 0, borderTop: h === 0 || h === 24 ? "none" : "1px solid var(--border)" }}>
-              {h < 24 && <span style={{ position: "absolute", top: -1, left: -44, fontSize: 11, color: "var(--text3)" }}>{String(h).padStart(2, "0")}:00</span>}
+              {/* Die Stundenzahl weicht der Jetzt-Beschriftung: liegen beide
+                  uebereinander, lugte die graue unter der roten hervor
+                  („15:00" doppelt, halb abgeschnitten). 13 px ist die Hoehe
+                  einer Beschriftungszeile — naeher heisst ueberlappt. Die Zeit
+                  geht dabei nicht verloren, die rote nennt sie ohnehin. */}
+              {h < 24 && !(istHeute && Math.abs(yOf(jetztMin) - yOf(h * 60)) < 13)
+                && <span style={{ position: "absolute", top: -1, left: -44, fontSize: 11, color: "var(--text3)" }}>{String(h).padStart(2, "0")}:00</span>}
             </div>
           ))}
           {/* Die Jetzt-Linie liegt UEBER dem Raster und unter den Kaesten:
