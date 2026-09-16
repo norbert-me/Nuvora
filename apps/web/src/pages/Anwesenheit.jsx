@@ -169,7 +169,9 @@ export default function Anwesenheit() {
   // hat (genau das tat der Server bis 10.09.2026 selbst).
   const basis = useMemo(() => {
     const o = {};
-    students.forEach((s) => { const e = tag[String(s.id)]; o[String(s.id)] = e && !e.vorschlag ? e.status : "da"; });
+    // Default „verspaetet" (V) auf Wunsch der Lehrkraft: wer keinen echten
+    // Eintrag hat, steht zuerst auf V — abgehakt wird, wer anwesend/fehlt ist.
+    students.forEach((s) => { const e = tag[String(s.id)]; o[String(s.id)] = e && !e.vorschlag ? e.status : "spaet"; });
     return o;
   }, [students, tag]);
   // Die Vorschläge — vorbelegt als offene Änderung, damit die Speicherleiste
@@ -226,7 +228,7 @@ export default function Anwesenheit() {
     fn();
   };
 
-  const statusOf = (sid) => eTag.wert[String(sid)] || tag[String(sid)]?.status || "da";
+  const statusOf = (sid) => eTag.wert[String(sid)] || tag[String(sid)]?.status || "spaet";
   // Steht hier noch der Vorschlag des Servers? Dann sagt die Zeile das — sonst
   // sähe ein „F" aus wie ein Eintrag, den jemand gemacht hat.
   const vorschlagVon = (sid) => {
