@@ -1582,6 +1582,8 @@ export default {
   "klassenarbeit.none": "— keine Arbeit —",
   "klassenarbeit.new": "Neue Arbeit",
   "klassenarbeit.newName": "Klassenarbeit",
+  "klassenarbeit.lernstandHint": "Was diese Arbeit zeigt, ist ein Tag. Ob ein Thema dauerhaft wackelt, steht im Lernstand des Kindes.",
+  "klassenarbeit.lernstandLink": "Zum Lernstand der Klasse",
   "klassenarbeit.newNameLabel": "Name",
   "klassenarbeit.newArt": "Art",
   "klassenarbeit.newArtEine": "Eine Arbeit",

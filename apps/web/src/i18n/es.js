@@ -1604,6 +1604,8 @@ export default {
   "klassenarbeit.none": "— sin examen —",
   "klassenarbeit.new": "Nuevo examen",
   "klassenarbeit.newName": "Examen",
+  "klassenarbeit.lernstandHint": "Este examen muestra un día. Si un tema sigue flojeando se ve en el estado de aprendizaje del alumno.",
+  "klassenarbeit.lernstandLink": "Al estado de aprendizaje de la clase",
   "klassenarbeit.newNameLabel": "Nombre",
   "klassenarbeit.newArt": "Tipo",
   "klassenarbeit.newArtEine": "Un examen",

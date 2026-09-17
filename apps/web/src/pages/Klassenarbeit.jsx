@@ -3,14 +3,13 @@
 // Daraus LIVE je SuS ein Fehlerprofil nach Thema, eine Note (Punkte/Max → Skala)
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Boxplot, COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, selectStyle, td as tdBase, th as thBase, toolbarBtn, toolbarIconBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
-import Themenstand from "../components/Themenstand.jsx";
 import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -108,6 +107,7 @@ export default function Klassenarbeit() {
   const kartenAktiv = aktiv("karten");
   const lernpfadAktiv = aktiv("lernpfad");
   const notenAktiv = aktiv("auswertung");
+  const cardvoteAktiv = aktiv("cardvote");
   const [notenModal, setNotenModal] = useState(false);
   const [scale, setScale] = useState(DEFAULT_SCALE);
   useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ } }, []);
@@ -1113,10 +1113,21 @@ export default function Klassenarbeit() {
       {neuOffen && <NeueArbeitModal t={t} onClose={() => setNeuOffen(false)} onAnlegen={anlegen}
         vorschlag={t("klassenarbeit.newName")} />}
       {hasRoster && works.length === 0 && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={() => setNeuOffen(true)} />}
-      {/* Themenstand: die Arbeit sagt „diese Klassenarbeit", der Themenstand
-          „dieses Unterthema ueber die Zeit". Rechnet ueber alle Arbeiten und
-          Quizze der Klasse — deshalb hier unter der Einzelauswertung. */}
-      {hasRoster && !hideIndividual && classId && <Themenstand classId={classId} />}
+      {/* Der Themenstand stand hier einmal als ganzes Panel (mit eigener
+          SuS-Auswahl) — die falsche Stelle: eine Klassenarbeit zeigt EINEN Tag,
+          „wackelt das Thema dauerhaft?" gehoert zum Kind. Geblieben ist der
+          Hinweis; mit CardVote fuehrt er auch hin (Regel 3: ohne das Modul gibt
+          es die Seite nicht, dann bleibt der Satz stehen). */}
+      {hasRoster && !hideIndividual && classId && (
+        <div style={{ ...cardStyle, marginTop: 16, padding: "10px 14px", fontSize: 13, color: "var(--text2)" }}>
+          {t("klassenarbeit.lernstandHint")}{" "}
+          {cardvoteAktiv && (
+            <Link to={`/cardvote/class-evaluation/${classId}`} style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>
+              {t("klassenarbeit.lernstandLink")} ↗
+            </Link>
+          )}
+        </div>
+      )}
 
       {/* Am Bildschirm unsichtbar, auf dem Papier das Einzige. Die Komponente
           haengt sich per Portal an den <body> — der Rahmen hier gaebe ihr sonst

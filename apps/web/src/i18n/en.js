@@ -1603,6 +1603,8 @@ export default {
   "klassenarbeit.none": "— no test —",
   "klassenarbeit.new": "New test",
   "klassenarbeit.newName": "Class test",
+  "klassenarbeit.lernstandHint": "This test shows one day. Whether a topic keeps wobbling is in the child's learning status.",
+  "klassenarbeit.lernstandLink": "To the class learning status",
   "klassenarbeit.newNameLabel": "Name",
   "klassenarbeit.newArt": "Kind",
   "klassenarbeit.newArtEine": "One test",
