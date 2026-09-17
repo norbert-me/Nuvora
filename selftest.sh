@@ -132,6 +132,47 @@ if [ -z "$SELFTEST_EMAIL" ] || [ -z "$SELFTEST_PASSWORD" ]; then
   echo ""
 fi
 
+# ─── Immer nur EIN Lauf ───
+# Alle Laeufe benutzen dasselbe Testkonto und schalten dessen Module um; zwei
+# gleichzeitig sehen sich gegenseitig beim Umschalten und Aufraeumen zu — dann
+# heisst es „Klasse nicht gefunden" und „ModuleGate wirft zurueck", und es
+# sieht aus wie ein kaputter Deploy. Die Sperre ist ein Ordner (mkdir ist
+# atomar) mit der PID darin; gehoert sie einem Prozess, den es nicht mehr gibt
+# (Absturz, kill -9), wird sie uebernommen.
+SPERRE="$DIR/.selftest.lock"
+if ! mkdir "$SPERRE" 2>/dev/null; then
+  ALT_PID="$(cat "$SPERRE/pid" 2>/dev/null || true)"
+  if [ -n "$ALT_PID" ] && kill -0 "$ALT_PID" 2>/dev/null; then
+    echo "✗ Es laeuft schon ein Testlauf (PID $ALT_PID)."
+    echo "  Zwei Laeufe auf demselben Testkonto stoeren sich gegenseitig."
+    echo "  Warten, bis er fertig ist — oder ihn beenden: kill -INT $ALT_PID"
+    exit 1
+  fi
+  echo "Hinweis: verwaiste Sperre eines abgebrochenen Laufs (PID ${ALT_PID:-?}) uebernommen."
+  rm -rf "$SPERRE"
+  mkdir "$SPERRE" || { echo "✗ Sperre $SPERRE laesst sich nicht anlegen."; exit 1; }
+fi
+echo "$$" > "$SPERRE/pid"
+trap 'rm -rf "$SPERRE"' EXIT
+trap 'exit 130' INT TERM
+
+# ─── Vorher aufraeumen ───
+# Ein abgebrochener Lauf hinterlaesst Testdaten und ein Konto mit
+# abgeschalteten Modulen; der naechste Lauf hielt genau das fuer den
+# Ausgangszustand und stellte es am Ende brav wieder her. Deshalb vor JEDEM
+# Lauf: Reste mit Testpraefix weg, alle Module an (das Testkonto soll alles
+# pruefen koennen). Geloescht wird nur, was ein Testpraefix traegt.
+if [ -n "$SELFTEST_EMAIL" ] && [ -n "$SELFTEST_PASSWORD" ]; then
+  echo "→ Testkonto vorbereiten (Reste weg, alle Module an)..."
+  if python3 "$DIR/scripts/aufraeumen.py" --url "$URL" --loeschen --module-an > "$SPERRE/aufraeumen.log" 2>&1; then
+    grep -E "Geloescht|Testreste|Gesetzt" "$SPERRE/aufraeumen.log" | sed 's/^/  /'
+  else
+    echo "  ⚠ Vorbereitung fehlgeschlagen — der Lauf geht trotzdem los:"
+    tail -5 "$SPERRE/aufraeumen.log" | sed 's/^/    /'
+  fi
+  echo ""
+fi
+
 STATUS=0
 # Was lief, was nicht — wird am Ende aufgezaehlt. Ein uebersprungener Teil ist
 # kein Schweigen wert: sonst liest sich "gruen" wie "alles geprueft".

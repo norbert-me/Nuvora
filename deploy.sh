@@ -149,6 +149,18 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# ─── Laeuft gerade ein Testlauf? ───
+# Dann NICHT ausliefern: der Neustart der Container kaeme mitten in dessen
+# Pruefungen, und ein zweiter Selbsttest am Ende wuerde auf demselben Konto mit
+# ihm kollidieren. Die Sperre setzt selftest.sh.
+if [ -f "$DIR/.selftest.lock/pid" ]; then
+  _TEST_PID="$(cat "$DIR/.selftest.lock/pid" 2>/dev/null || true)"
+  if [ -n "$_TEST_PID" ] && kill -0 "$_TEST_PID" 2>/dev/null; then
+    echo "✗ Es laeuft gerade ein Testlauf (PID $_TEST_PID) — erst abwarten oder beenden: kill -INT $_TEST_PID"
+    exit 1
+  fi
+fi
+
 if [ -n "$CLI_PORT" ]; then
   case "$CLI_PORT" in
     ''|*[!0-9]*) echo "Fehler: --port '$CLI_PORT' ist keine Zahl."; exit 1 ;;
@@ -266,6 +278,7 @@ rsync -rlz -c --inplace --delete \
   --exclude='.env.bak-*' \
   --exclude='.env-eingerichtet' \
   --exclude='.deploy.env' \
+  --exclude='.selftest.lock/' \
   --exclude='node_modules/' \
   --exclude='venv/' \
   --exclude='.venv/' \
