@@ -16,6 +16,35 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+## 4.4.3 — 17.09.2026
+
+- **Klassenarbeit mit E und G ist eine Arbeit:** in der Auswahl steht sie
+  einmal, der Umschalter E | G wechselt das Blatt (oder legt das fehlende an).
+- **Vergangene Termine abonnierter Kalender bleiben mindestens 5 Jahre.**
+  Im Dialog „Abonnieren" steht, was archiviert ist, und lässt sich löschen.
+- **Tutorial und geführte Touren für alle Module**, die Hilfe kennt den
+  PAP-Editor. Das Tutorial zeigt nur eingeschaltete Module.
+- **Datenschutzerklärung überarbeitet:** Protokolle, Sicherungen,
+  Fehlermeldungen (Löschung nach 180 Tagen) und Übermittlungen an
+  WebUntis und Kalenderdienste sind beschrieben.
+- **Passwort nötig** für Sicherungen und das Ernennen zur Administration.
+- Nach einem Passwortwechsel müssen Kalender-Geräte neu eingerichtet werden;
+  eine Anmeldung gilt höchstens 90 Tage.
+- Sicherheit: Live-Abstimmung nicht mehr blockierbar, Konto-Sperre nur nach
+  eigenen Fehlversuchen, Formeln in Exporten entschärft, fremde Bild- und
+  Server-Adressen abgewiesen, weitere Wege zu fremden Daten geschlossen.
+- Datenschutz: Förderangaben und Notizen liegen nicht mehr im
+  Browser-Speicher des Lernpfads.
+- Kalender: Stundenplan-Stunden stehen in Woche und Monat nach Uhrzeit;
+  Pausen-Stunde und 0. Stunde richtig beschriftet.
+- Oberfläche: größere Knöpfe, Suchfelder für Themen und Kurse, Notenbuch
+  und Personen mit gemeinsamer Werkzeugleiste, Tafel mit Symbolen,
+  Speichern-Knopf für Marktplatz-Name und Modulteile im Profil.
+- Hilfe und Texte an die heutige Oberfläche angepasst; die
+  Klassenarbeit-Tour startet wieder.
+- Selbsttest: eigenes Wegwerf-Konto je Lauf, danach gelöscht; zwei
+  Läufe können nicht mehr gleichzeitig starten.
+
 ## 4.4.2 — 17.09.2026
 
 - **Stundenplan im Bearbeiten-Modus.** Der Stift schaltet Uhrzeiten,
@@ -23,9 +52,6 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - **Kurse auch in der Pause.** Im Bearbeiten-Modus hat jede Pausenzeile ein
   Plus; die Stunde erscheint mit der Pausenzeit in Kalender, Anwesenheit und
   auf dem Handy.
-- **Klassenarbeit mit E und G ist eine Arbeit:** in der Auswahl steht sie
-  einmal, der Umschalter E | G wechselt das Blatt (oder legt das fehlende an).
-- Kalender: offene Stundenplan-Stunden stehen in Woche und Monat nach Uhrzeit.
 - **Korrektur-To-do nennt den Kurs** („Mathe · 7.5: 2. KA korrigieren") und
   verlinkt Termin und Auswertung.
 - Klassenarbeiten: Speichern/Abbrechen als Symbole, Löschen nur im
@@ -36,23 +62,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   fremden Daten geschlossen (Beobachtungen, Schülernamen, Kartenstapel);
   eine fremde Registrierung kann kein Konto mehr übernehmen; eine ungültige
   Stundennummer legt den Server nicht mehr lahm.
-- Datenschutz: Schülerzugänge stehen nicht mehr im Protokoll, die
-  Datenauskunft enthält die Abo-Adresse nicht mehr, Förderangaben und
-  Notizen liegen nicht mehr im Browser-Speicher des Lernpfads.
-- **Datenschutzerklärung überarbeitet:** Protokolle, Sicherungen,
-  Fehlermeldungen (Löschung nach 180 Tagen) und Übermittlungen an
-  WebUntis und Kalenderdienste sind jetzt beschrieben.
-- **Passwort nötig** für Sicherungen und das Ernennen zur Administration.
-- Nach einem Passwortwechsel müssen Kalender-Geräte neu eingerichtet werden;
-  eine Anmeldung gilt höchstens 90 Tage.
-- Weitere Sicherheitskorrekturen: Live-Abstimmung nicht mehr blockierbar,
-  Konto-Sperre nur nach eigenen Fehlversuchen, Formeln in Exporten
-  entschärft, fremde Bildadressen und Server-Adressen abgewiesen.
-- Oberfläche: größere Knöpfe, Suchfelder für Themen und Kurse, Notenbuch
-  und Personen mit gemeinsamer Werkzeugleiste, Tafel mit Symbolen,
-  Speichern-Knopf für Marktplatz-Name und Modulteile im Profil.
-- Hilfe, Touren und Tutorials an die heutige Oberfläche angepasst; die
-  Klassenarbeit-Tour startet wieder.
+- Datenschutz: Schülerzugänge stehen nicht mehr im Referer des
+  Protokolls, die Datenauskunft enthält die Abo-Adresse nicht mehr.
 
 ## 4.4.1 — 17.09.2026
 
