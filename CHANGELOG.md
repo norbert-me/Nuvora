@@ -23,6 +23,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - **Kurse auch in der Pause.** Im Bearbeiten-Modus hat jede Pausenzeile ein
   Plus; die Stunde erscheint mit der Pausenzeit in Kalender, Anwesenheit und
   auf dem Handy.
+- **Klassenarbeit mit E und G ist eine Arbeit:** in der Auswahl steht sie
+  einmal, der Umschalter E | G wechselt das Blatt (oder legt das fehlende an).
+- Kalender: offene Stundenplan-Stunden stehen in Woche und Monat nach Uhrzeit.
 - **Korrektur-To-do nennt den Kurs** („Mathe · 7.5: 2. KA korrigieren") und
   verlinkt Termin und Auswertung.
 - Klassenarbeiten: Speichern/Abbrechen als Symbole, Löschen nur im

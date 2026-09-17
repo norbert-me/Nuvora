@@ -4,7 +4,7 @@
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, selectStyle, td as tdBase, th as thBase, toolbarBtn, toolbarIconBtn } from "../components/Icons.jsx";
+import { ANTWORT_COLORS, Boxplot, Segment, segmentBtn, COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, selectStyle, td as tdBase, th as thBase, toolbarBtn, toolbarIconBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
@@ -201,7 +201,8 @@ export default function Klassenarbeit() {
     const r = await fetch(`${API}/works/${next.id}`, alsJson("PUT", { name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [], fehler: next.fehler || {} })).catch(() => null);
     if (!r || !r.ok) { showAlert(t("common.notWork")); return false; }
     setSavedWork(next);
-    setWorks((ws) => ws.map((x) => (x.id === next.id ? { ...x, name: next.name } : x)));
+    // Der Name gilt beiden Blaettern (der Server zieht das andere mit).
+    setWorks((ws) => ws.map((x) => (x.id === next.id || (next.partner_id && x.id === next.partner_id) ? { ...x, name: next.name } : x)));
     return true;
   });
   useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
@@ -235,9 +236,9 @@ export default function Klassenarbeit() {
   // Datum mitgeben: der Server markiert daraus die Kinder, die heute fehlen,
   // gleich als abwesend (nur mit Modul Orga). Vergisst man das von Hand,
   // rutschen Nullen in die Wertung.
-  const legeAn = async (name, niveau) => {
+  const legeAn = async (name, niveau, partnerId = null) => {
     const res = await fetch(`${API}/works`, alsJson("POST", {
-      class_id: classId, kurs_id: kursId, niveau,
+      class_id: classId, kurs_id: kursId, niveau, partner_id: partnerId,
       name: (name || t("klassenarbeit.newName")).trim() || t("klassenarbeit.newName"),
       datum: new Date().toISOString(),
     })).catch(() => null);
@@ -251,9 +252,11 @@ export default function Klassenarbeit() {
       // ZWEI Blaetter, zwei Arbeiten: E und G schreiben verschiedene Aufgaben
       // und verschiedene Punkte. Nacheinander, damit die Reihenfolge in der
       // Liste steht (E oben) und ein Fehlschlag nicht die Haelfte verschluckt.
+      // Das E-Blatt verbindet sich mit dem G-Blatt (partner_id): in der
+      // Auswahl steht die Arbeit einmal, umgeschaltet wird mit E | G.
       const g = await legeAn(name, "G");
-      const e = await legeAn(name, "E");
-      const neu = [e, g].filter(Boolean);
+      const e = g ? await legeAn(name, "E", g.id) : null;
+      const neu = [e, g && e ? { ...g, partner_id: e.id } : g].filter(Boolean);
       if (!neu.length) return;
       setWorks((p) => [...neu, ...p]);
       setNeuOffen(false);
@@ -281,10 +284,43 @@ export default function Klassenarbeit() {
     return true;
   };
 
+  // E|G: das andere Blatt derselben Arbeit (falls es in dieser Liste steht).
+  const partnerVon = (w) => (w && w.partner_id ? works.find((x) => x.id === w.partner_id) || null : null);
+  const partner = partnerVon(work);
+  // Zuletzt gewaehltes Blatt — beim Wechsel der Arbeit bleibt man bei E oder G.
+  const [blatt, setBlatt] = useState("E");
+  // In der Auswahl steht ein Paar EINMAL: das G-Blatt faellt heraus, wenn sein
+  // E-Blatt daneben steht.
+  const auswahl = works.filter((w) => !(w.niveau === "G" && partnerVon(w)));
+  const auswahlLabel = (w) => (partnerVon(w) ? `${w.name} (E/G)` : w.niveau ? `${w.name} (${w.niveau})` : w.name);
+  const auswahlWert = work && work.niveau === "G" && partner ? partner.id : work?.id;
+  const waehleAusListe = (w) => {
+    const p = partnerVon(w);
+    const ziel = p && p.niveau === blatt ? p : w;
+    wechseln(() => zeigeArbeit(ziel));
+  };
+  // Umschalten auf das andere Blatt — fehlt es, wird es angelegt (gleicher
+  // Name, gleicher Kurs; der Server verbindet beide).
+  const blattWechseln = async (niveau) => {
+    if (!work || !work.niveau || niveau === work.niveau) return;
+    setBlatt(niveau);
+    if (partner) { wechseln(() => zeigeArbeit(partner)); return; }
+    if (entwurf.geaendert && !(await entwurf.speichern())) return;
+    const neu = await legeAn(work.name, niveau, work.id);
+    if (!neu) return;
+    setWorks((ws) => [...ws.map((x) => (x.id === work.id ? { ...x, partner_id: neu.id } : x)), neu]);
+    zeigeArbeit(neu);
+  };
+
   const loeschen = async () => {
-    if (!work || !(await askConfirm(t("klassenarbeit.delConfirm", { name: work.name })))) return;
-    await fetch(`${API}/works/${work.id}`, { method: "DELETE" }).catch(() => {});
-    setWorks((p) => p.filter((x) => x.id !== work.id)); zeigeArbeit(null);
+    if (!work) return;
+    // Ein Paar geht zusammen: ein einzelnes Blatt ohne sein Gegenstueck ist
+    // nicht mehr die Arbeit, die man in der Auswahl gesehen hat.
+    const frage = partner ? t("klassenarbeit.delPairConfirm", { name: work.name }) : t("klassenarbeit.delConfirm", { name: work.name });
+    if (!(await askConfirm(frage, { danger: true, ok: t("common.delete") }))) return;
+    const ids = [work.id, ...(partner ? [partner.id] : [])];
+    for (const id of ids) await fetch(`${API}/works/${id}`, { method: "DELETE" }).catch(() => {});
+    setWorks((p) => p.filter((x) => !ids.includes(x.id))); zeigeArbeit(null);
   };
 
   // Ein „Teil" (Teilaufgabe a/b/c…) ist die kleinste Wertungseinheit. Hat eine
@@ -612,11 +648,27 @@ export default function Klassenarbeit() {
            ins Mehr-Menue, wo Gefaehrliches selbst nach unten sortiert. */
         <Werkzeugleiste style={{ marginBottom: 16 }}
           links={(
-            <SuchSelect value={work?.id ? String(work.id) : ""} style={{ minWidth: 0, maxWidth: 320 }}
-              onChange={(v) => { const w = works.find((x) => String(x.id) === v) || null; wechseln(() => zeigeArbeit(w)); }}
-              optionen={works.map((w) => ({ wert: String(w.id), label: w.niveau ? `${w.name} (${w.niveau})` : w.name }))} />
+            <SuchSelect value={auswahlWert ? String(auswahlWert) : ""} style={{ minWidth: 0, maxWidth: 320 }}
+              onChange={(v) => { const w = works.find((x) => String(x.id) === v) || null; if (w) waehleAusListe(w); else wechseln(() => zeigeArbeit(null)); }}
+              optionen={auswahl.map((w) => ({ wert: String(w.id), label: auswahlLabel(w) }))} />
           )}
           mehr={work ? [{ key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true, onClick: loeschen }] : []}>
+          {/* E | G: zwei Blaetter einer Arbeit. Fehlt eins, legt der Knopf es an. */}
+          {work && work.niveau && (
+            <Segment>
+              {["E", "G"].map((n) => {
+                const aktiv = work.niveau === n;
+                const fehlt = !aktiv && !partner;
+                return (
+                  <button key={n} onClick={() => blattWechseln(n)} aria-pressed={aktiv}
+                    title={fehlt ? t("klassenarbeit.blattAnlegen", { n }) : t("klassenarbeit.blatt", { n })}
+                    style={{ ...segmentBtn, fontWeight: aktiv ? 700 : 500, color: aktiv ? "var(--accent)" : "var(--text2)", ...(fehlt ? { fontStyle: "italic", opacity: 0.7 } : {}) }}>
+                    {fehlt ? `+ ${n}` : n}
+                  </button>
+                );
+              })}
+            </Segment>
+          )}
           <button data-tour="ka-new" onClick={() => setNeuOffen(true)} style={toolbarBtn}>{t("klassenarbeit.new")}</button>
           {/* Parallelklassen schreiben dieselbe Arbeit — sie zweimal einzutippen
               ist dieselbe Arbeit zweimal. */}

@@ -9,7 +9,7 @@ passiert dort nichts.
 """
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,6 +71,8 @@ class WorkIn(BaseModel):
     name: str = ""
     # "" (alle), "E" oder "G" — siehe WorkAnalysis.niveau.
     niveau: str = ""
+    # Das andere Blatt (E zu G oder umgekehrt) — beide werden verbunden.
+    partner_id: Optional[int] = None
     # Tag der Arbeit — nur, um die Abwesenden vorzubelegen (Bruecke zu Orga).
     datum: Optional[str] = None
 
@@ -96,6 +98,7 @@ class WorkOut(BaseModel):
     absent: list = []
     fehler: dict = {}
     niveau: str = ""
+    partner_id: Optional[int] = None
     model_config = {"from_attributes": True}
 
 
@@ -129,7 +132,7 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
 async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     rows = (await db.execute(select(WorkAnalysis).where(*_keyw(user, class_id, kurs_id)).order_by(WorkAnalysis.created_at.desc()))).scalars().all()
-    return [WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, niveau=w.niveau or "") for w in rows]
+    return [WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, niveau=w.niveau or "") for w in rows]
 
 
 @router.post("/works", response_model=WorkOut, status_code=201)
@@ -149,10 +152,24 @@ async def create_work(body: WorkIn, user: User = Depends(require_module), db: As
     # Es bleibt ein Vorschlag: die Markierung laesst sich je Kind umschalten.
     w.absent = await _abwesende_am_tag(db, user, body.class_id, body.datum) or None
 
+    partner = None
+    if body.partner_id is not None:
+        # Das zweite Blatt: nur zu einer eigenen Arbeit mit dem ANDEREN Niveau,
+        # die noch kein Gegenstueck hat. Name und Kurs kommen von dort.
+        partner = await _owned_work(db, user, body.partner_id)
+        if (partner.partner_id is not None or partner.niveau not in ("E", "G")
+                or w.niveau not in ("E", "G") or w.niveau == partner.niveau):
+            raise HTTPException(400, "Zu dieser Arbeit passt kein weiteres Blatt")
+        w.name, w.class_id, w.kurs_id = partner.name, partner.class_id, partner.kurs_id
+
     db.add(w)
+    await db.flush()
+    if partner is not None:
+        w.partner_id = partner.id
+        partner.partner_id = w.id
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id,
+    return WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id,
                    name=w.name, tasks=[], results={}, absent=w.absent or [], niveau=w.niveau or "")
 
 
@@ -235,7 +252,7 @@ async def copy_work(work_id: int, body: WorkCopyIn, user: User = Depends(require
 
     await db.commit()
     await db.refresh(ziel)
-    return WorkOut(id=ziel.id, source_id=ziel.source_id, class_id=ziel.class_id, kurs_id=ziel.kurs_id, name=ziel.name,
+    return WorkOut(id=ziel.id, partner_id=None, source_id=ziel.source_id, class_id=ziel.class_id, kurs_id=ziel.kurs_id, name=ziel.name,
                    tasks=ziel.tasks or [], results={}, scale=ziel.scale, absent=[], fehler={},
                    niveau=ziel.niveau or "")
 
@@ -245,6 +262,12 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
     w = await _owned_work(db, user, work_id)
     if body.name is not None:
         w.name = body.name.strip()[:200]
+        # Der Name gehoert der ARBEIT, nicht dem Blatt: beide Blaetter heissen
+        # gleich, sonst stuende die Arbeit in der Auswahl zweimal.
+        if w.partner_id:
+            partner = await db.get(WorkAnalysis, w.partner_id)
+            if partner is not None and partner.owner_id == user.id:
+                partner.name = w.name
     if body.tasks is not None:
         # Themenbindung nur aufs eigene Thema; fremdes/unbekanntes → None.
         own = {t for (t,) in (await db.execute(select(Topic.id).where(Topic.owner_id == user.id))).all()}
@@ -338,7 +361,7 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
         w.absent = list({str(x)[:40] for x in body.absent[:400]}) or None
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, niveau=w.niveau or "")
+    return WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, niveau=w.niveau or "")
 
 
 @router.delete("/works/{work_id}", status_code=204)

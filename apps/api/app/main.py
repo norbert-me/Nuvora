@@ -367,6 +367,7 @@ def _ensure_columns(sync_conn):
         ("materials", "sha256", "VARCHAR(64) DEFAULT '' NOT NULL"),
         ("materials", "quelle_id", "INTEGER"),
         ("work_analyses", "source_id", "INTEGER"),
+        ("work_analyses", "partner_id", "INTEGER REFERENCES work_analyses(id) ON DELETE SET NULL"),
         ("school_classes", "archived_at", "TIMESTAMPTZ"),
         ("students", "position", "INTEGER DEFAULT 0 NOT NULL"),
         ("kurse", "archived_at", "TIMESTAMPTZ"),
@@ -897,6 +898,37 @@ async def startup():
             await db.commit()
         except Exception as e:
             print(f"[STARTUP-WARN] Kurs-Migration übersprungen: {e}", flush=True)
+
+    # E- und G-Blatt derselben Arbeit verbinden (partner_id). Bestand aus der
+    # Zeit, als „E und G" zwei lose Arbeiten anlegte: gleicher Name, gleiche
+    # Klasse und gleicher Kurs, eine E und eine G. Nur EINDEUTIGE Paare — gibt
+    # es zwei gleichnamige E-Arbeiten, bleibt alles lose (geraten waere falsch).
+    # Idempotent: verbundene Blaetter fallen heraus.
+    async with async_session() as db:
+        try:
+            from sqlalchemy import text
+            await db.execute(text("""
+                WITH k AS (
+                    SELECT owner_id, class_id, COALESCE(kurs_id, 0) AS kurs, name,
+                           MIN(id) FILTER (WHERE niveau = 'E') AS e_id,
+                           MIN(id) FILTER (WHERE niveau = 'G') AS g_id,
+                           COUNT(*) FILTER (WHERE niveau = 'E') AS e_n,
+                           COUNT(*) FILTER (WHERE niveau = 'G') AS g_n
+                    FROM work_analyses
+                    WHERE partner_id IS NULL AND niveau IN ('E', 'G')
+                    GROUP BY owner_id, class_id, COALESCE(kurs_id, 0), name
+                ), paare AS (
+                    SELECT e_id, g_id FROM k WHERE e_n = 1 AND g_n = 1
+                )
+                UPDATE work_analyses w
+                SET partner_id = CASE WHEN w.id = p.e_id THEN p.g_id ELSE p.e_id END
+                FROM paare p
+                WHERE w.id IN (p.e_id, p.g_id) AND w.partner_id IS NULL
+            """))
+            await db.commit()
+        except Exception as e:
+            await db.rollback()
+            print(f"[STARTUP-WARN] E/G-Blaetter nicht verbunden: {e}", flush=True)
 
     # Besitzer nachtragen, wo er sich herleiten laesst.
     #

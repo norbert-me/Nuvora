@@ -1482,6 +1482,11 @@ class WorkAnalysis(Base):
     # Vergleich ueber Klassen haengt daran. SET NULL: wird das Original
     # geloescht, bleiben die Kopien vollstaendig bestehen.
     source_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Das andere Blatt derselben Arbeit: eine E-Arbeit zeigt auf ihre G-Arbeit
+    # und umgekehrt. Zwei Blaetter (eigene Aufgaben, eigene Punkte, je nur die
+    # Kinder ihres Niveaus), aber EINE Arbeit in der Auswahl — umgeschaltet
+    # wird mit E | G. SET NULL: loescht jemand nur ein Blatt, bleibt das andere.
+    partner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_analyses.id", ondelete="SET NULL"), nullable=True)
     tasks: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     results: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     # Fehlerart je Wertungseinheit und Kind: {"<student_id>": {"t2": "ansatz"}}.
