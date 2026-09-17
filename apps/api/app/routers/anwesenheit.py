@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +16,7 @@ from ..kursmitglieder import eigener_kurs, kurs_der_klasse, member_student_ids, 
 from ..schueler import in_klasse, kanonisch, sortiert
 from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
+from ..caldav import stunde_gueltig, stunden_rang
 from ..models import Attendance, CalendarBreak, Student, TimetableSlot, User
 from ..zeit import SCHUL_TZ, schul_datum
 from .auth import rate_limit
@@ -159,7 +160,7 @@ async def _hat_frueheren_vorschlag(db, canon_id, lo, hi, period) -> bool:
     rows = (await db.execute(select(Attendance).where(
         Attendance.student_id == canon_id, Attendance.date >= lo, Attendance.date <= hi,
     ))).scalars().all()
-    frueher = [r for r in rows if r.status != "da" and (r.period is None or r.period < period)]
+    frueher = [r for r in rows if r.status != "da" and (r.period is None or stunden_rang(r.period) < stunden_rang(period))]
     return bool(frueher)
 
 
@@ -232,7 +233,7 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
     if (getattr(user, "anwesenheit_default", "da") or "da") == "fehlt":
         return aus
     for sid in {person(r.student_id) for r in rows} - set(exact):
-        vorher = [r for r in rows if person(r.student_id) == sid and r.period is not None and r.period < period]
+        vorher = [r for r in rows if person(r.student_id) == sid and r.period is not None and stunden_rang(r.period) < stunden_rang(period)]
         if not vorher:
             # Keine fruehere STUNDE — dann zaehlt der Eintrag des ganzen TAGES
             # (period = NULL). Ohne ihn bliebe eine Verspaetung, die ohne
@@ -242,7 +243,7 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
             continue
         # Der staerkste, bei Gleichstand der spaeteste: wer in der ersten Stunde
         # fehlte und in der zweiten nur zu spaet kam, hat immer noch gefehlt.
-        quelle = max(vorher, key=lambda r: (_RANK.get(r.status, 0), r.period or 0))
+        quelle = max(vorher, key=lambda r: (_RANK.get(r.status, 0), stunden_rang(r.period or 0)))
         if quelle.status == "da":
             continue
         aus[str(back(sid))] = {"status": quelle.status, "note": quelle.note, "period": period,
@@ -388,6 +389,13 @@ class MarkIn(BaseModel):
     # „Anwesenheit ist immer pro Kurs" eine Absicht ohne Schluessel. Fehlt er,
     # bleibt es beim alten Weg (`kurs_der_klasse`, mehrdeutig = None).
     kurs_id: Optional[int] = None
+
+    @field_validator("period")
+    @classmethod
+    def _stunde(cls, v):
+        if v is not None and not stunde_gueltig(v):
+            raise ValueError("Ungueltige Stunde")
+        return v
 
 
 @router.put("/{class_id}")

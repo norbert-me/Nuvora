@@ -425,8 +425,22 @@ async def test_stunde_in_der_pause(s):
     u = User(email="pause@b.de", password_hash="x", name="L"); s.add(u); await s.commit()
     out = await KAL.upsert_slot(KAL.SlotIn(weekday=1, period=PAUSE_BASIS + 1, title="AG"), user=u, db=s)
     assert out.period == PAUSE_BASIS + 1
-    with pytest.raises(HTTPException):
-        await KAL.upsert_slot(KAL.SlotIn(weekday=1, period=50, title="x"), user=u, db=s)
+    with pytest.raises(Exception):
+        KAL.SlotIn(weekday=1, period=50, title="x")
+
+
+def test_stundenzeit_bleibt_billig_bei_riesigen_nummern():
+    """Eine beliebige Nummer darf nichts kosten: die Pause rechnete sich frueher
+    rekursiv, und period=5000 legte die API minutenlang lahm."""
+    import time
+    from app.caldav import stunde_gueltig, stundenzeit
+    t0 = time.perf_counter()
+    for p in (5000, 10**9, 199, -3):
+        stundenzeit([{"start": "08:00", "end": "08:45"}], None, p)
+    assert time.perf_counter() - t0 < 0.1
+    assert not stunde_gueltig(5000) and not stunde_gueltig(17) and stunde_gueltig(116)
+    with pytest.raises(Exception):
+        KAL.ExamIn(date="2026-09-01T08:00:00", period=5000)
 
 
 @pytest.mark.asyncio

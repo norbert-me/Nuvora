@@ -264,10 +264,20 @@ def _ics_zeit(wert):
 # eine zweite Angabe kennen muss. Die Zeit ist die der Pause selbst: vom Ende
 # der n. bis zum Anfang der naechsten Stunde.
 PAUSE_BASIS = 100
+MAX_STUNDE = 16
 
 
 def ist_pause(period) -> bool:
     return isinstance(period, int) and period >= PAUSE_BASIS
+
+
+def stunde_gueltig(period) -> bool:
+    """Eine Stunde im Raster (0..16) oder in der Pause danach.
+
+    Die Grenze ist keine Formsache: jede Nummer landet in `stundenzeit`, und
+    eine beliebig grosse Zahl darf dort nichts kosten koennen."""
+    return isinstance(period, int) and (0 <= period <= MAX_STUNDE
+                                        or PAUSE_BASIS <= period <= PAUSE_BASIS + MAX_STUNDE)
 
 
 def stunden_rang(period) -> float:
@@ -289,8 +299,20 @@ def stundenzeit(times, zero, period):
     benutzen — als Kopie liefe die dritte nach der ersten Aenderung anders.
     """
     if ist_pause(period):
+        # Nicht rekursiv: die Pause kennt nur ihre beiden Nachbarstunden. Eine
+        # Pause „nach einer Pause" gibt es nicht — frueher rief sich die
+        # Funktion dafuer zweimal selbst auf, und eine Nummer wie 5000 legte
+        # die API minutenlang lahm.
         n = period - PAUSE_BASIS
-        return stundenzeit(times, zero, n)[1], stundenzeit(times, zero, n + 1)[0]
+        if n >= PAUSE_BASIS:
+            return "", ""
+        return _stunde_roh(times, zero, n)[1], _stunde_roh(times, zero, n + 1)[0]
+    return _stunde_roh(times, zero, period)
+
+
+def _stunde_roh(times, zero, period):
+    if not isinstance(period, int) or period < 0:
+        return "", ""
     z = zero if period == 0 else (
         times[period - 1] if isinstance(times, list) and 0 < period <= len(times) else None)
     if not isinstance(z, dict):

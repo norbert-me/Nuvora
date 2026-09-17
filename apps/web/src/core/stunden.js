@@ -20,7 +20,9 @@ export const stundeLabel = (p, t) => (istPause(p)
 export function stundenZeit(times, zero, p) {
   if (istPause(p)) {
     // Stunde in der Pause: vom Ende der n. bis zum Anfang der naechsten.
+    // Nicht tiefer als eine Ebene: eine „Pause nach einer Pause" gibt es nicht.
     const n = p - PAUSE_BASIS;
+    if (n >= PAUSE_BASIS) return null;
     const a = stundenZeit(times, zero, n), b = stundenZeit(times, zero, n + 1);
     return a || b ? { start: (a && a.end) || "", end: (b && b.start) || "" } : null;
   }

@@ -18,7 +18,7 @@ from ..zeit import tagesbeginn
 # RRULE ist ICS-Grammatik; die Uebersetzung liegt in app/caldav.py (ohne
 # FastAPI, ohne Datenbank, testbar ohne Server). Eine zweite Fassung hier waere
 # die, in der eine Pruefung fehlt.
-from ..caldav import PAUSE_BASIS, rrule_pruefen, stunden_rang, stundenzeit
+from ..caldav import rrule_pruefen, stunde_gueltig, stunden_rang, stundenzeit
 from ..oeffentlich import basis as oeffentliche_basis
 from ..felder import ohne_leer, ohne_none
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
@@ -86,6 +86,15 @@ def serien_tage(e, von: date, bis: date) -> list:
         return [tag] if von <= tag <= bis else []
     return _expand_rrule(tag, e.rrule, set(e.exdate or []), von, bis)
 
+
+
+def _stunde_ok(v):
+    """Pydantic-Pruefung fuer jede Stundennummer, die hereinkommt (None = keine)."""
+    if v is None:
+        return v
+    if not stunde_gueltig(v):
+        raise ValueError("Ungueltige Stunde")
+    return v
 
 class PhaseItem(BaseModel):
     phase: str = ""
@@ -411,6 +420,8 @@ async def _check_verknuepfungen(db: AsyncSession, user: User, body) -> None:
 
 @router.post("/entries", response_model=EntryOut, status_code=201)
 async def create_entry(body: EntryIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    if body.period is not None and not stunde_gueltig(body.period):
+        raise HTTPException(422, "Ungueltige Stunde")
     rate_limit("kalender_entry", f"u{user.id}", 300, 60, "Zu viele Eintraege. Bitte kurz warten.")
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
@@ -426,6 +437,8 @@ async def create_entry(body: EntryIn, user: User = Depends(require_module), db: 
 
 @router.put("/entries/{entry_id}", response_model=EntryOut)
 async def update_entry(entry_id: int, body: EntryIn, request: Request = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    if body.period is not None and not stunde_gueltig(body.period):
+        raise HTTPException(422, "Ungueltige Stunde")
     e = await eigenes(db, CalendarEntry, entry_id, user, "Eintrag nicht gefunden")
     pruefe(request, e)
     await _check_class(db, user, body.class_id)
@@ -582,8 +595,8 @@ class ImportSlot(BaseModel):
     @field_validator("period")
     @classmethod
     def period_ok(cls, v: int) -> int:
-        if v < 1:
-            raise ValueError("Stunde muss mindestens 1 sein")
+        if v < 1 or not stunde_gueltig(v):
+            raise ValueError("Ungueltige Stunde")
         return v
 
 
@@ -617,6 +630,7 @@ class ImportBreak(BaseModel):
 class ImportKalEntry(BaseModel):
     date: Optional[datetime] = None
     period: Optional[int] = None
+    _stunde = field_validator("period")(_stunde_ok)
     title: str = ""
     notes: str = ""
     class_: Optional[str] = Field(default=None, alias="class")
@@ -794,6 +808,7 @@ class ExamIn(BaseModel):
     class_id: Optional[int] = None
     kurs_id: Optional[int] = None
     period: Optional[int] = None   # an eine Stunde binden; None = ganztägig
+    _stunde = field_validator("period")(_stunde_ok)
     # Freie Notiz zum Termin. Der Titel ist die Bezeichnung der Arbeit und
     # bleibt kurz; alles Weitere ("Zweitkorrektur bis Freitag") hatte bisher
     # keinen Ort und landete im Titel.
@@ -811,6 +826,8 @@ class ExamIn(BaseModel):
 
 
 class ExamOut(ExamIn):
+    # Gelesen wird, was gespeichert ist — die Eingangspruefung gilt hier nicht.
+    _stunde = field_validator("period")(lambda v: v)
     id: int
     work_id: Optional[int] = None   # verknüpfte Auswertung im Modul „Klassenarbeit"
     model_config = {"from_attributes": True}
@@ -1408,7 +1425,7 @@ async def zeitleiste(kurs_id: int, term: str = "", user: User = Depends(require_
                            "titel": lab, "sub": ""})
 
     # Nach Tag, dann nach Stunde: an einem Tag steht die 1. Stunde ueber der 5.
-    punkte.sort(key=lambda p: (p["date"], p.get("period") if p.get("period") is not None else 99))
+    punkte.sort(key=lambda p: (p["date"], stunden_rang(p["period"]) if p.get("period") is not None else 999))
     return {"kurs": {"id": k.id, "name": k.name, "fach": k.fach or ""},
             "von": start.isoformat(), "bis": ende.isoformat(),
             # Ohne gepflegtes Schuljahr gibt es keine Halbjahre, aus denen die
@@ -1424,6 +1441,7 @@ async def zeitleiste(kurs_id: int, term: str = "", user: User = Depends(require_
 class SlotIn(BaseModel):
     weekday: int
     period: int
+    _stunde = field_validator("period")(_stunde_ok)
     class_id: Optional[int] = None
     kurs_id: Optional[int] = None   # gewaehlter Kurs (Fach) — Anzeige daraus
     title: str = ""
@@ -1463,6 +1481,8 @@ def _stundenplan_fenster(user: User, term: str):
 
 
 class SlotOut(SlotIn):
+    # Gelesen wird, was gespeichert ist — die Eingangspruefung gilt hier nicht.
+    _stunde = field_validator("period")(lambda v: v)
     id: int
     valid_from: Optional[date] = None  # None = seit jeher gültig
     valid_to: Optional[date] = None    # None = noch aktiv; sonst letzter gültiger Tag
@@ -1508,6 +1528,7 @@ async def get_timetable(user: User = Depends(require_module), db: AsyncSession =
 class SlotCancelIn(BaseModel):
     date: datetime
     period: int
+    _stunde = field_validator("period")(_stunde_ok)
 
 
 @router.get("/slot-cancellations")
@@ -1559,7 +1580,7 @@ async def set_periods(body: PeriodsIn, user: User = Depends(require_module), db:
 async def upsert_slot(body: SlotIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Setzt die Stunde an (weekday, period) — legt an oder aktualisiert."""
     # Eine Stunde im Raster (0..16) oder in der Pause danach (PAUSE_BASIS + n).
-    if not 0 <= body.weekday <= 6 or not (0 <= body.period <= 16 or PAUSE_BASIS <= body.period <= PAUSE_BASIS + 16):
+    if not 0 <= body.weekday <= 6 or not stunde_gueltig(body.period):
         raise HTTPException(400, "Ungueltige Stunde")
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
@@ -2565,6 +2586,7 @@ async def untis_vorschau(body: UntisAbrufIn, user: User = Depends(require_module
 class UntisSlotIn(BaseModel):
     weekday: int
     period: int
+    _stunde = field_validator("period")(_stunde_ok)
     title: str = ""
     kurs_id: Optional[int] = None
     class_id: Optional[int] = None
@@ -2629,7 +2651,7 @@ async def untis_uebernehmen(body: UntisUebernahmeIn, user: User = Depends(requir
 
     gesetzt = 0
     for s in body.slots[:200]:
-        if not 0 <= s.weekday <= 6 or s.period < 0:
+        if not 0 <= s.weekday <= 6 or not stunde_gueltig(s.period):
             continue
         kurs_id = s.kurs_id or nach_name.get((s.kurs_neu or "").strip().lower())
         await upsert_slot(SlotIn(weekday=s.weekday, period=s.period, title=(s.title or "")[:200],
