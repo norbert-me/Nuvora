@@ -257,6 +257,26 @@ def _ics_zeit(wert):
     return f"{hh}:{mm}"
 
 
+# Eine Stunde IN DER PAUSE traegt die Nummer PAUSE_BASIS + n: „Pause nach der
+# n. Stunde". Eine eigene Zahl statt einer Spalte, weil Ausfaelle, Eintraege,
+# Anwesenheit und CalDAV ihre Stunde ueberall als (Tag, Nummer) fuehren — eine
+# Pausen-Stunde laeuft damit durch jeden dieser Wege, ohne dass einer davon
+# eine zweite Angabe kennen muss. Die Zeit ist die der Pause selbst: vom Ende
+# der n. bis zum Anfang der naechsten Stunde.
+PAUSE_BASIS = 100
+
+
+def ist_pause(period) -> bool:
+    return isinstance(period, int) and period >= PAUSE_BASIS
+
+
+def stunden_rang(period) -> float:
+    """Sortierschluessel: die Pause nach der 2. steht zwischen 2. und 3."""
+    if period is None:
+        return -1
+    return (period - PAUSE_BASIS) + 0.5 if ist_pause(period) else period
+
+
 def stundenzeit(times, zero, period):
     """(start, ende) einer Stundennummer als "HH:MM" — oder ("", "").
 
@@ -268,6 +288,9 @@ def stundenzeit(times, zero, period):
     Blatt, damit die drei Leser (Kalender, ICS-Feed, CalDAV) dieselbe Regel
     benutzen — als Kopie liefe die dritte nach der ersten Aenderung anders.
     """
+    if ist_pause(period):
+        n = period - PAUSE_BASIS
+        return stundenzeit(times, zero, n)[1], stundenzeit(times, zero, n + 1)[0]
     z = zero if period == 0 else (
         times[period - 1] if isinstance(times, list) and 0 < period <= len(times) else None)
     if not isinstance(z, dict):

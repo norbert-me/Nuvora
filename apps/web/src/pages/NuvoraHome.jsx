@@ -12,7 +12,7 @@ import { alsJson, hol } from "../core/melden.js";
 import { WIDGETS } from "../components/Widgets.jsx";
 import { ZIELE } from "../core/ziele.js";
 import { hmToMin, ymd } from "../core/datum.js";
-import { stundenZeit, slotGiltAm } from "../core/stunden";
+import { stundenZeit, slotGiltAm, stundenRang, stundeKurz } from "../core/stunden";
 import { kursLabel } from "../core/kurslabel.js";
 
 // Modul-Kachel: dieselbe Karte wie überall, nur als Link (kein eigener Kasten).
@@ -187,7 +187,7 @@ function HeutePanel({ t }) {
   const slots = data.slots
     .filter((s) => s.weekday === wochentag() && activeToday(s) && !(data.entfallen || []).includes(s.period))
     .filter((s) => !vorbei(slotEnde(s.period)))
-    .sort((a, b) => a.period - b.period);
+    .sort((a, b) => stundenRang(a.period) - stundenRang(b.period));
   const alleSlots = data.slots.filter((s) => s.weekday === wochentag() && activeToday(s));
   // Liegt der Eintrag WIRKLICH heute? Das Fenster der Abfrage reicht dafuer
   // nicht: `/entries` gibt Serienkoepfe (ihr Datum ist der erste Termin, oft
@@ -226,7 +226,7 @@ function HeutePanel({ t }) {
     ...slots.map((s) => ({ art: "stunde", s, min: slotStart(s.period) })),
     ...extras.map((e) => ({ art: "termin", e, min: hmToMin(e.start_time) })),
   ].sort((a, b) => (a.min ?? OHNE_ZEIT) - (b.min ?? OHNE_ZEIT)
-                   || (a.art === "stunde" && b.art === "stunde" ? a.s.period - b.s.period : 0));
+                   || (a.art === "stunde" && b.art === "stunde" ? stundenRang(a.s.period) - stundenRang(b.s.period) : 0));
   const dateStr = new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" });
 
   return (
@@ -270,7 +270,7 @@ function HeutePanel({ t }) {
             return (
               <Link key={s.id} to={to} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px solid var(--border)", borderLeft: `4px solid ${s.class_id ? ccolor(s.class_id) : "var(--border2)"}`, borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
                 <div style={{ minWidth: 42, textAlign: "center" }}>
-                  <div style={{ fontSize: 14, fontWeight: 800 }}>{s.period}.</div>
+                  <div style={{ fontSize: 14, fontWeight: 800 }}>{stundeKurz(s.period)}</div>
                   <div style={{ fontSize: 11, color: "var(--text3)" }}>{zeit(s.period)}</div>
                 </div>
                 <div style={{ flex: 1, minWidth: 100 }}>

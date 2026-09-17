@@ -1,8 +1,29 @@
+// Eine Stunde IN DER PAUSE traegt die Nummer PAUSE_BASIS + n („nach der n.
+// Stunde") — dieselbe Regel wie im Server (app/caldav.py). Ausfaelle,
+// Eintraege und Anwesenheit fuehren ihre Stunde ueberall als Nummer; so laeuft
+// die Pausen-Stunde durch alle Wege, ohne dass einer eine zweite Angabe kennt.
+export const PAUSE_BASIS = 100;
+export const istPause = (p) => typeof p === "number" && p >= PAUSE_BASIS;
+// Sortierschluessel: die Pause nach der 2. steht zwischen 2. und 3.
+export const stundenRang = (p) => (p == null ? -1 : istPause(p) ? p - PAUSE_BASIS + 0.5 : p);
+// Kurze Beschriftung: „3." bzw. „P2" (Pause nach der 2.).
+export const stundeKurz = (p) => (istPause(p) ? `P${p - PAUSE_BASIS}` : `${p}.`);
+// Lange Beschriftung mit Uebersetzer: „3. Stunde" bzw. „Pause nach der 2.".
+export const stundeLabel = (p, t) => (istPause(p)
+  ? t("kalender.pauseNach", { n: p - PAUSE_BASIS })
+  : `${p}. ${t("kalender.period")}`);
+
 // Uhrzeit einer Stundennummer — dieselbe Regel wie im Server (app/caldav.py:
 // stundenzeit). Die Stunden 1..n stehen in `times` (Index = Nummer − 1), die
 // **0. Stunde** hat einen eigenen Platz (`zero`): eine verschobene Liste haette
 // jede gespeicherte Stundennummer um eins verrueckt.
 export function stundenZeit(times, zero, p) {
+  if (istPause(p)) {
+    // Stunde in der Pause: vom Ende der n. bis zum Anfang der naechsten.
+    const n = p - PAUSE_BASIS;
+    const a = stundenZeit(times, zero, n), b = stundenZeit(times, zero, n + 1);
+    return a || b ? { start: (a && a.end) || "", end: (b && b.start) || "" } : null;
+  }
   const w = p === 0 ? zero : (Array.isArray(times) ? times[p - 1] : null);
   return w && typeof w === "object" ? w : null;
 }

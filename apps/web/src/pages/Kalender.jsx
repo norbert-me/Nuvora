@@ -27,7 +27,7 @@ import { feiertage } from "../data/feiertage.js";
 // ymd/isoDay/hmToMin/startOfDay/addDays/mondayOf/isoWeek standen hier eigens —
 // dieselben Zeilen lagen in Zufall, Sitzplan, Anwesenheit und feiertage.js.
 import { addDays, hmToMin, minToHm, isoDay, isoWeek, mondayOf, parseYmd, startOfDay, wochentagMo0, ymd } from "../core/datum.js";
-import { stundenZeit, stundenListe, slotGiltAm } from "../core/stunden";
+import { stundenZeit, stundenListe, slotGiltAm, PAUSE_BASIS, stundenRang, stundeLabel } from "../core/stunden";
 import { useZielFilter } from "../core/modules.js";
 
 // Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
@@ -211,7 +211,8 @@ export default function Kalender() {
     const d = term === "2" ? sj.hj2 : (term === "1" || term === "jahr") ? sj.hj1 : "";
     return d ? new Date(d + "T00:00:00") : new Date();
   })();
-  const [showTimes, setShowTimes] = useState(false); // Uhrzeiten-Spalte im Stundenplan
+  const [bearbeiten, setBearbeiten] = useState(false); // Stundenplan im Bearbeiten-Modus
+  const ttEntwurf = useRef(null); // Entwurf des Editors — „Fertig" speichert ihn
   // WebUntis-Import: der Stundenplan der Schule steht schon in Untis — ihn
   // hier ein zweites Mal einzutragen ist die Arbeit, die dieses Modul
   // abnehmen soll. Der Dialog schreibt nichts, bevor jemand bestaetigt.
@@ -420,7 +421,7 @@ export default function Kalender() {
       const w = stundenZeit(tt.times, tt.zero, e.period);
       const m = w ? hmToMin(w.start) : null;
       // Ohne hinterlegte Uhrzeit bleibt die Stundennummer die Reihenfolge.
-      return m != null ? m : e.period * 60;
+      return m != null ? m : stundenRang(e.period) * 60;
     }
     return -1;
   };
@@ -573,7 +574,7 @@ export default function Kalender() {
       const s = tt.slots.find((x) => x.weekday === wochentagMo0(d) && x.period === c.period && slotActiveOn(x, d));
       return { ...c, d, name: (s && (slotName(s) || s.title)) || "" };
     }).filter((c) => ymd(c.d) >= von && ymd(c.d) <= bis)
-      .sort((x, y) => (x.d - y.d) || (x.period - y.period));
+      .sort((x, y) => (x.d - y.d) || (stundenRang(x.period) - stundenRang(y.period)));
     return { ext, stunden, anzahl: ext.length + stunden.length };
   })();
 
@@ -583,7 +584,7 @@ export default function Kalender() {
   const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || C.info; // Fallback (Einträge ohne Kurs)
   const kursColor = (id) => (kurse.find((k) => k.id === id) || {}).color || "";
   const slotColor = (s) => (s && s.kurs_id && kursColor(s.kurs_id)) || (s && s.class_id ? classColor(s.class_id) : C.info);
-  const slotsFor = (d) => tt.slots.filter((s) => s.weekday === wochentagMo0(d) && slotActiveOn(s, d) && !isCancelled(d, s.period)).sort((a, b) => a.period - b.period);
+  const slotsFor = (d) => tt.slots.filter((s) => s.weekday === wochentagMo0(d) && slotActiveOn(s, d) && !isCancelled(d, s.period)).sort((a, b) => stundenRang(a.period) - stundenRang(b.period));
   // Klick auf eine Stundenplan-Vorlage: gibt es an dem Tag schon einen Eintrag
   // dieser Klasse, wird der bearbeitet; sonst ein neuer aus der Vorlage.
   const fromSlot = (day, s) => {
@@ -807,10 +808,17 @@ export default function Kalender() {
               ))}
           </Segment>
         ) : null}>
-          <button onClick={() => setShowTimes((v) => !v)} className="icon-btn" title={t("kalender.timesShow")} aria-label={t("kalender.timesShow")}
-            style={{ ...toolbarIconBtn, border: showTimes ? "1px solid var(--accent)" : "1px solid var(--border2)" }}>
-            <Icon d={ICONS.clock} size={18} color={showTimes ? "var(--accent)" : "var(--text2)"} />
-          </button>
+          {bearbeiten ? (
+            <button onClick={async () => {
+              const e = ttEntwurf.current;
+              if (e && e.geaendert && !(await e.speichern())) return;
+              setBearbeiten(false);
+            }} style={toolbarBtnPrimary}>{t("common.done")}</button>
+          ) : (
+            <button onClick={() => setBearbeiten(true)} className="icon-btn" title={t("kalender.ttEdit")} aria-label={t("kalender.ttEdit")} style={toolbarIconBtn}>
+              <Icon d={ICONS.edit} size={18} color="var(--text2)" />
+            </button>
+          )}
         </Werkzeugleiste>
       )}
       {/* Datums-Navigator: ‹ [Auswahl] › Heute — in ALLEN Ansichten dieselbe
@@ -919,7 +927,7 @@ export default function Kalender() {
         <UntisImport onClose={() => setUntisOffen(false)} kurse={kurse} klassen={classes} periods={tt.periods}
           onFertig={() => { loadTt(); loadBreaks(); loadCancels(); }} />
       )}
-      {view === "timetable" && <TimetableView tt={tt} showTimes={showTimes} stichtag={stichtag} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
+      {view === "timetable" && <TimetableView tt={tt} bearbeiten={bearbeiten} entwurfRef={ttEntwurf} stichtag={stichtag} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} zeiten={tt.times || []} zeroZeit={tt.zero || null} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
@@ -987,7 +995,7 @@ function AusgeblendetModal({ ext, cancels, onExtBack, onSlotBack, onClose, t }) 
         <div style={{ marginBottom: 16 }}>
           <div style={{ ...sectionLabel, marginBottom: 4 }}>{t("kalender.hiddenSlots")}</div>
           {cancels.map((c) => zeile(c.d.toLocaleDateString(),
-            `${c.period}. ${t("kalender.period")}${c.name ? ` · ${c.name}` : ""}`,
+            `${stundeLabel(c.period, t)}${c.name ? ` · ${c.name}` : ""}`,
             false, () => onSlotBack(c.d, c.period), `${c.date}|${c.period}`))}
         </div>
       )}
@@ -1142,7 +1150,7 @@ function SlotGhosts({ list, entries, className, slotName, topicName, onSlot, day
   // dass ein Klick auf die Geister-Vorlage einen zweiten Eintrag anlegt.
   const belegt = new Set((entries || []).filter((e) => e.period != null).map((e) => e.period));
   return list.filter((s) => !belegt.has(s.period)).map((s) => {
-    const label = [s.period + ". " + t("kalender.period"), (slotName ? slotName(s) : className(s.class_id)) || s.title || topicName(s.topic_id)].filter(Boolean).join(" · ");
+    const label = [stundeLabel(s.period, t), (slotName ? slotName(s) : className(s.class_id)) || s.title || topicName(s.topic_id)].filter(Boolean).join(" · ");
     return (
       <button key={s.id} onClick={(e) => { e.stopPropagation(); onSlot(day, s); }} style={ghost} title={label + " — " + t("kalender.fromTimetable")}>{label}</button>
     );
@@ -1605,8 +1613,11 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   );
 }
 
-function TimetableView({ tt, showTimes = false, stichtag = null, className, slotName, slotColor, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
-  // Uhrzeiten-Umschalter liegt jetzt oben neben Export/Import (Prop showTimes).
+function TimetableView({ tt, bearbeiten = false, entwurfRef = null, stichtag = null, className, slotName, slotColor, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
+  // Bearbeiten ist ein MODUS (Stift in der Werkzeugleiste): nur darin lassen
+  // sich Stunden, Uhrzeiten, Pausen und die Belegung aendern. „Fertig" in der
+  // Leiste ist der Speichern-Knopf — dieselbe Bauform wie die Startseite.
+  const showTimes = bearbeiten;
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri")];
   // ── Ein Entwurf für Stundenzahl und Uhrzeiten ──
   // Beides schrieb bisher sofort: die Uhrzeit beim Verlassen des Feldes, die
@@ -1629,6 +1640,7 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
     frisch.current = true;
   });
   useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
+  if (entwurfRef) entwurfRef.current = entwurf;
   const anzahl = entwurf.wert.periods;
   // Die 0. Stunde ist der Vorspann vor der ersten — angehaengt, nicht
   // eingeschoben: sonst hiesse die bisherige erste Stunde ploetzlich anders.
@@ -1665,17 +1677,35 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
   // genau diese beiden Werte zurueck. Eintragbar ist sie damit auch dort, wo es
   // heute noch gar keine Luecke gibt: die Zeile steht bei angezeigten Uhrzeiten
   // zwischen allen Stunden.
+  const pauseSlot = (wd, p) => slot(wd, PAUSE_BASIS + p);
+  const pauseBelegt = (p) => wdays.some((_, wd) => pauseSlot(wd, p));
+  const zeitText = (p) => { const a = timeVal(idx(p), "start"), b = timeVal(idx(p), "end"); return a || b ? `${a}–${b}` : ""; };
+  const hatZeiten = periods.some((p) => zeitText(p));
+  const spalte = showTimes ? 78 : hatZeiten ? 56 : 26;
+  const zellKnopf = (s, h, onClick, titel, klein) => {
+    const col = s ? slotColor(s) : null;
+    const inhalt = s ? <div style={{ fontSize: klein ? 12 : 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{slotName(s) || "—"}</div>
+      : (bearbeiten ? <Icon d={ICONS.plus} size={klein ? 14 : 16} color="var(--text3)" /> : null);
+    const stil = { display: "flex", alignItems: "center", justifyContent: s ? "flex-start" : "center", gap: 6, width: "100%", height: "100%", minHeight: h, textAlign: "left", padding: klein ? "4px 8px" : "8px 12px", border: "none", boxSizing: "border-box",
+      borderLeft: col ? `4px solid ${col}` : "4px solid transparent",
+      background: col ? col + "22" : "transparent", color: col ? "var(--text)" : "var(--text3)" };
+    return bearbeiten
+      ? <button onClick={onClick} title={titel} style={{ ...stil, cursor: "pointer" }}>{inhalt}</button>
+      : <div style={stil}>{inhalt}</div>;
+  };
   const pauseMin = (p) => {
     const a = hmToMin(timeVal(idx(p), "end")), b = hmToMin(timeVal(idx(p + 1), "start"));
     return a != null && b != null && b > a ? b - a : 0;
   };
   return (
     <div>
-      <SpeicherBalken entwurf={entwurf} />
+      {/* Versteckt, aber eingehaengt: die Warnung beim Verlassen haengt daran.
+          Gespeichert wird mit „Fertig" in der Werkzeugleiste. */}
+      <SpeicherBalken entwurf={entwurf} style={{ display: "none" }} />
       <div>
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
           <thead><tr>
-            <th style={{ ...th, width: showTimes ? 78 : 26, minWidth: showTimes ? 78 : 26 }}></th>
+            <th style={{ ...th, width: spalte, minWidth: spalte }}></th>
             {wdays.map((w) => <th key={w} style={th}>{w}</th>)}
           </tr></thead>
           <tbody>
@@ -1688,8 +1718,9 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
                     {/* Senkrecht mittig: die Zahl stand oben in der Zelle,
                         waehrend die Stunde daneben mittig sitzt — bei einer
                         Doppelstunde lagen beide sichtbar auseinander. */}
-                    <td style={{ ...tdBase, textAlign: "center", verticalAlign: "middle", padding: showTimes ? 2 : "4px 0", background: "transparent", border: "none", width: showTimes ? 78 : 26, minWidth: showTimes ? 78 : 26 }}>
+                    <td style={{ ...tdBase, textAlign: "center", verticalAlign: "middle", padding: showTimes ? 2 : "4px 0", background: "transparent", border: "none", width: spalte, minWidth: spalte }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{p}.</div>
+                      {!showTimes && zeitText(p) && <div style={{ fontSize: 11, color: "var(--text3)", lineHeight: 1.3 }}>{timeVal(idx(p), "start")}<br />{timeVal(idx(p), "end")}</div>}
                       {showTimes && (<>
                         <input type="time" value={timeVal(idx(p), "start")} onChange={(e) => commitTime(idx(p), "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
                         <input type="time" value={timeVal(idx(p), "end")} onChange={(e) => commitTime(idx(p), "end", e.target.value)} style={timeInput} title={t("kalender.end")} />
@@ -1697,17 +1728,9 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
                     </td>
                     {wdays.map((_, wd) => {
                       const s = slot(wd, p);
-                      const label = s ? slotName(s) : "";
-                      const col = s ? slotColor(s) : null;
                       return (
                         <td key={wd} style={{ ...tdBase, padding: 0, height: h }}>
-                          <button onClick={() => onEdit(s ? { ...s } : { weekday: wd, period: p })} title={s ? t("kalender.editSlot") : t("kalender.addSlot")}
-                            style={{ display: "flex", alignItems: "center", justifyContent: s ? "flex-start" : "center", gap: 6, width: "100%", height: "100%", minHeight: h, textAlign: "left", padding: "8px 12px", border: "none", cursor: "pointer", boxSizing: "border-box",
-                              borderLeft: col ? `4px solid ${col}` : "4px solid transparent",
-                              background: col ? col + "22" : "transparent", color: col ? "var(--text)" : "var(--text3)" }}>
-                            {s ? <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label || "—"}</div>
-                              : <Icon d={ICONS.plus} size={16} color="var(--text3)" />}
-                          </button>
+                          {zellKnopf(s, h, () => onEdit(s ? { ...s } : { weekday: wd, period: p }), s ? t("kalender.editSlot") : t("kalender.addSlot"))}
                         </td>
                       );
                     })}
@@ -1716,8 +1739,8 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
                       Uhrzeiten bleibt sie der schraffierte Streifen von
                       frueher — dann gibt es keine Zeit, die man zeigen
                       koennte. */}
-                  {(showTimes ? p !== periods[periods.length - 1] : gap > 0) && (
-                    <tr style={{ height: Math.max(gap, showTimes ? 44 : 0) }}>
+                  {p !== periods[periods.length - 1] && (showTimes || gap > 0 || pauseBelegt(p)) && (
+                    <tr style={{ height: Math.max(gap, showTimes ? 44 : 0, pauseBelegt(p) ? 30 : 0) }}>
                       <td style={{ border: "none", background: "transparent", padding: showTimes ? 2 : 0, verticalAlign: "middle", textAlign: "center" }}>
                         {showTimes && (<>
                           <div style={{ fontSize: 11, color: "var(--text3)" }}>{t("kalender.pause")}</div>
@@ -1725,18 +1748,27 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
                             style={timeInput} title={t("kalender.pauseVon")} />
                           <input type="time" value={timeVal(idx(p + 1), "start")} onChange={(e) => commitTime(idx(p + 1), "start", e.target.value)}
                             style={timeInput} title={t("kalender.pauseBis")} />
+                          {pauseMin(p) > 0 && <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>{t("kalender.pauseDauer", { min: pauseMin(p) })}</div>}
                         </>)}
                       </td>
-                      <td colSpan={wdays.length} style={{ border: "none", textAlign: "center", fontSize: 11, color: "var(--text3)",
-                        background: "repeating-linear-gradient(45deg, var(--bg), var(--bg) 6px, transparent 6px, transparent 12px)" }}>
-                        {showTimes && pauseMin(p) > 0 ? t("kalender.pauseDauer", { min: pauseMin(p) }) : null}
-                      </td>
+                      {/* Auch in der Pause kann ein Kurs liegen (AG, Aufsicht,
+                          Nachhilfe) — Stundennummer PAUSE_BASIS + p. */}
+                      {wdays.map((_, wd) => {
+                        const s = pauseSlot(wd, p);
+                        return (
+                          <td key={wd} style={{ border: "none", padding: 2, verticalAlign: "middle",
+                            background: "repeating-linear-gradient(45deg, var(--bg), var(--bg) 6px, transparent 6px, transparent 12px)" }}>
+                            {(s || bearbeiten) && zellKnopf(s, 26, () => onEdit(s ? { ...s } : { weekday: wd, period: PAUSE_BASIS + p }),
+                              s ? t("kalender.editSlot") : t("kalender.pauseAdd"), true)}
+                          </td>
+                        );
+                      })}
                     </tr>
                   )}
                 </Fragment>
               );
             })}
-            <tr>
+            {bearbeiten && <tr>
               <td style={{ padding: 6, border: "none", textAlign: "center" }}>
                 <div style={{ display: "inline-flex", gap: 4 }}>
                   {anzahl > 1 && <button onClick={() => entwurf.setz({ periods: anzahl - 1 })} title={t("kalender.removePeriod")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>−</button>}
@@ -1745,7 +1777,7 @@ function TimetableView({ tt, showTimes = false, stichtag = null, className, slot
                 </div>
               </td>
               {wdays.map((_, wd) => <td key={wd} style={{ border: "none" }} />)}
-            </tr>
+            </tr>}
           </tbody>
         </table>
       </div>
@@ -2199,7 +2231,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onRau
   return (
     <Modal onClose={onClose} width={440} label={t("kalender.timetable")}>
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 2 }}>{t("kalender.timetable")}</h3>
-        <div style={{ fontSize: 12, color: "var(--text3)" }}>{wdays[slot.weekday]} · {slot.period}. {t("kalender.period")}</div>
+        <div style={{ fontSize: 12, color: "var(--text3)" }}>{wdays[slot.weekday]} · {stundeLabel(slot.period, t)}</div>
         <div style={lbl}>{t("kalender.kursOrClass")}</div>
         {/* kursValue ist der GEWAEHLTE Kurs, nicht der gespeicherte: mit
             `slot.kurs_id` sprang die Auswahl nach jedem Wechsel auf den alten
@@ -2489,7 +2521,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
           <div style={{ flex: 1 }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 5 }}>{!edit ? (title || clsName || t("kalender.entry")) : (entry.id ? t("kalender.editEntry") : t("kalender.newEntry"))}</h3>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              {entry.period != null && <span style={{ ...chipStyle, fontWeight: 700, background: "var(--accent)", color: C.aufAkzent }}>{entry.period}. {t("kalender.period")}</span>}
+              {entry.period != null && <span style={{ ...chipStyle, fontWeight: 700, background: "var(--accent)", color: C.aufAkzent }}>{stundeLabel(entry.period, t)}</span>}
               {/* Welcher Kurs — auch beim ANLEGEN aus einer Stunde. Dort stand
                   bisher nur „1. Stunde, 08:10, Montag"; die Ansicht daneben
                   zeigt den Kurs als Ueberschrift, und zwei Dialoge zur selben

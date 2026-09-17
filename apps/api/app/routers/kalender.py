@@ -18,7 +18,7 @@ from ..zeit import tagesbeginn
 # RRULE ist ICS-Grammatik; die Uebersetzung liegt in app/caldav.py (ohne
 # FastAPI, ohne Datenbank, testbar ohne Server). Eine zweite Fassung hier waere
 # die, in der eine Pruefung fehlt.
-from ..caldav import rrule_pruefen, stundenzeit
+from ..caldav import PAUSE_BASIS, rrule_pruefen, stunden_rang, stundenzeit
 from ..oeffentlich import basis as oeffentliche_basis
 from ..felder import ohne_leer, ohne_none
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
@@ -1177,7 +1177,7 @@ async def stundenplan_vorkommen(db: AsyncSession, user: User, start: date, ende:
     tag = start
     while tag < ende:
         if not any(von <= tag <= bis for von, bis in frei):
-            for s in sorted(je_wochentag.get(tag.weekday(), []), key=lambda x: x.period):
+            for s in sorted(je_wochentag.get(tag.weekday(), []), key=lambda x: stunden_rang(x.period)):
                 if (tag, s.period) in belegt or not _slot_active_on(s, tag):
                     continue
                 kurs = kurse.get(s.kurs_id) or kurse.get(
@@ -1548,7 +1548,8 @@ async def set_periods(body: PeriodsIn, user: User = Depends(require_module), db:
 @router.put("/timetable/slot", response_model=SlotOut)
 async def upsert_slot(body: SlotIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Setzt die Stunde an (weekday, period) — legt an oder aktualisiert."""
-    if not 0 <= body.weekday <= 6 or body.period < 0:
+    # Eine Stunde im Raster (0..16) oder in der Pause danach (PAUSE_BASIS + n).
+    if not 0 <= body.weekday <= 6 or not (0 <= body.period <= 16 or PAUSE_BASIS <= body.period <= PAUSE_BASIS + 16):
         raise HTTPException(400, "Ungueltige Stunde")
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)

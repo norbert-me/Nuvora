@@ -4,6 +4,7 @@ kurs_id riete die Anzeige den falschen Kurs (Bug: Kurs „mathe 7.5" gewählt,
 Plan zeigt Klassenname „7.5 LZ").
 """
 import pytest
+from fastapi import HTTPException
 
 from app.models import User, SchoolClass, Kurs, KursTag, UserModule
 from app.routers import kalender as KAL
@@ -407,6 +408,25 @@ async def test_nullte_stunde_hat_eigene_zeit(s):
     # Abschalten heisst: die Zeit ist weg, die uebrigen bleiben.
     tt = await KAL.set_times(KAL.TimesIn(times=times, zero=None), user=u, db=s)
     assert tt["zero"] is None and tt["times"] == times
+
+
+@pytest.mark.asyncio
+async def test_stunde_in_der_pause(s):
+    """Ein Kurs kann in der Pause liegen (AG, Aufsicht): Nummer PAUSE_BASIS + n
+    heisst „nach der n. Stunde", die Zeit ist die der Pause, und sortiert wird
+    sie zwischen n und n + 1."""
+    from app.caldav import PAUSE_BASIS, ist_pause, stunden_rang, stundenzeit
+    times = [{"start": "08:00", "end": "08:45"}, {"start": "09:05", "end": "09:50"}]
+    assert stundenzeit(times, None, PAUSE_BASIS + 1) == ("08:45", "09:05")
+    assert stundenzeit(times, {"start": "07:10", "end": "07:55"}, PAUSE_BASIS) == ("07:55", "08:00")
+    assert ist_pause(PAUSE_BASIS + 2) and not ist_pause(2)
+    assert sorted([2, PAUSE_BASIS + 1, 1], key=stunden_rang) == [1, PAUSE_BASIS + 1, 2]
+
+    u = User(email="pause@b.de", password_hash="x", name="L"); s.add(u); await s.commit()
+    out = await KAL.upsert_slot(KAL.SlotIn(weekday=1, period=PAUSE_BASIS + 1, title="AG"), user=u, db=s)
+    assert out.period == PAUSE_BASIS + 1
+    with pytest.raises(HTTPException):
+        await KAL.upsert_slot(KAL.SlotIn(weekday=1, period=50, title="x"), user=u, db=s)
 
 
 @pytest.mark.asyncio

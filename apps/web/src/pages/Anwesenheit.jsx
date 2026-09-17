@@ -14,7 +14,7 @@ import { useAktiv } from "../core/modules.js";
 import { swr , lastClass } from "../core/cache.js";
 import { useUrlClass } from "../core/klassenwahl.js";
 import { parseYmd, wochentagMo0, ymd } from "../core/datum.js";
-import { laufendeStunde, slotGiltAm } from "../core/stunden";
+import { laufendeStunde, slotGiltAm, stundenRang, stundeLabel } from "../core/stunden";
 import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api/anwesenheit";
@@ -72,7 +72,7 @@ export default function Anwesenheit() {
   const weekday = wochentagMo0(datum + "T00:00:00");
   const heutigeIds = useMemo(() => new Set(slots.filter((s) => s.weekday === weekday && s.class_id).map((s) => s.class_id)), [slots, weekday]);
   // Stunden dieser Klasse am gewählten Wochentag (für die optionale Stunden-Zuordnung).
-  const tagStunden = useMemo(() => [...new Set(slots.filter((s) => s.weekday === weekday && s.class_id === classId).map((s) => s.period))].sort((a, b) => a - b), [slots, weekday, classId]);
+  const tagStunden = useMemo(() => [...new Set(slots.filter((s) => s.weekday === weekday && s.class_id === classId).map((s) => s.period))].sort((a, b) => stundenRang(a) - stundenRang(b)), [slots, weekday, classId]);
   // Alle Stunden des Tages (Stunde → Klasse): in der Tag-Ansicht wählt man die
   // Stunde, das öffnet automatisch den zugehörigen Kurs/die Klasse.
   // Nur die am gewaehlten Tag gueltige Fassung je Stunde: der Stundenplan wird
@@ -84,7 +84,7 @@ export default function Anwesenheit() {
     const gueltig = slots.filter((s) => s.weekday === weekday && s.class_id && slotGiltAm(s, datum));
     const gesehen = new Set();
     return gueltig
-      .sort((a, b) => a.period - b.period || (b.valid_from || "").localeCompare(a.valid_from || ""))
+      .sort((a, b) => stundenRang(a.period) - stundenRang(b.period) || (b.valid_from || "").localeCompare(a.valid_from || ""))
       .filter((s) => { const k = `${s.period}:${s.class_id}`; if (gesehen.has(k)) return false; gesehen.add(k); return true; });
   }, [slots, weekday, datum]);
   const stundenWahl = kalenderAktiv && view === "tag" && tagSlots.length > 0;
@@ -309,7 +309,7 @@ export default function Anwesenheit() {
             style={{ ...selectStyle, minWidth: 200 }} title={t("anwesenheit.periodHint")}>
             {tagSlots.map((s) => (
               <option key={`${s.period}:${s.class_id}`} value={`${s.period}:${s.class_id}`}>
-                {s.period}. {t("kalender.period")} — {(classes.find((c) => c.id === s.class_id) || {}).name || ""}
+                {stundeLabel(s.period, t)} — {(classes.find((c) => c.id === s.class_id) || {}).name || ""}
               </option>
             ))}
           </select>
@@ -408,7 +408,7 @@ export default function Anwesenheit() {
                         <p style={{ fontSize: 13, color: "var(--text3)", margin: "4px 0" }}>{t("anwesenheit.noEntries")}</p>
                       ) : verlauf.map((e) => (
                         <div key={e.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
-                          <span style={{ flex: 1, fontSize: 13 }}>{new Date(e.date).toLocaleDateString()}{e.period ? ` · ${e.period}. ${t("kalender.period")}` : ""}</span>
+                          <span style={{ flex: 1, fontSize: 13 }}>{new Date(e.date).toLocaleDateString()}{e.period ? ` · ${stundeLabel(e.period, t)}` : ""}</span>
                           <StatusWahl wert={eV.wert[e.date] || e.status} onWahl={(st) => eV.setz({ [e.date]: st })} />
                         </div>
                       ))}

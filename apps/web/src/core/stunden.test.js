@@ -5,7 +5,7 @@
 // wohl — nur immer die ERSTE Stunde des Tages, und dort stand nichts, weil die
 // Lehrkraft in der 5. eingetragen hatte.
 import { describe, it, expect } from "vitest";
-import { laufendeStunde, slotGiltAm, stundenZeit } from "./stunden.js";
+import { laufendeStunde, slotGiltAm, stundenZeit, PAUSE_BASIS, istPause, stundenRang, stundeKurz, stundeLabel } from "./stunden.js";
 
 const ZEITEN = [
   { start: "08:00", end: "08:45" },  // 1.
@@ -46,5 +46,21 @@ describe("laufendeStunde", () => {
   it("slotGiltAm bleibt unberuehrt", () => {
     expect(slotGiltAm({ valid_from: "2026-02-01" }, "2026-01-31")).toBe(false);
     expect(slotGiltAm({ valid_from: "2026-02-01" }, "2026-02-01")).toBe(true);
+  });
+});
+
+describe("Stunde in der Pause", () => {
+  const times = [{ start: "08:00", end: "08:45" }, { start: "09:05", end: "09:50" }];
+  it("hat die Zeit der Pause", () => {
+    expect(stundenZeit(times, null, PAUSE_BASIS + 1)).toEqual({ start: "08:45", end: "09:05" });
+  });
+  it("steht zwischen ihren Stunden", () => {
+    expect([2, PAUSE_BASIS + 1, 1].sort((a, b) => stundenRang(a) - stundenRang(b))).toEqual([1, PAUSE_BASIS + 1, 2]);
+  });
+  it("heisst P<n> bzw. Pause nach der n.", () => {
+    expect(stundeKurz(PAUSE_BASIS + 2)).toBe("P2");
+    expect(stundeKurz(3)).toBe("3.");
+    expect(istPause(PAUSE_BASIS)).toBe(true);
+    expect(stundeLabel(PAUSE_BASIS + 2, (k, o) => `${k}:${o ? o.n : ""}`)).toBe("kalender.pauseNach:2");
   });
 });
