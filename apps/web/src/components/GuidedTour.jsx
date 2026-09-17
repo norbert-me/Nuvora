@@ -119,18 +119,32 @@ export const MODULE_TOURS = {
     { target: "ka-new", titleKey: "tour.klassenarbeit.new.t", textKey: "tour.klassenarbeit.new.x" },
     { target: null, titleKey: "tour.klassenarbeit.done.t", textKey: "tour.klassenarbeit.done.x" },
   ],
+  // Kein Schritt für die Kursauswahl: die Sammlung (Standard-Reiter) hat keine,
+  // die Auswahl steht nur bei Fortschritt und QR-Zugängen.
   karten: [
     { target: null, titleKey: "tour.karten.welcome.t", textKey: "tour.karten.welcome.x" },
-    { target: "karten-class", titleKey: "tour.karten.class.t", textKey: "tour.karten.class.x" },
     { target: "karten-new", titleKey: "tour.karten.new.t", textKey: "tour.karten.new.x" },
     { target: null, titleKey: "tour.karten.done.t", textKey: "tour.karten.done.x" },
   ],
 };
 
+// Welche Tour gehört zu diesem Ort? Auf /auswertung entscheidet der Reiter:
+// dieselbe Adresse zeigt Notenbuch oder Klassenarbeiten (?tab=…).
+export function tourFuerOrt(pathname, search = "") {
+  if (pathname.startsWith("/auswertung")) {
+    return new URLSearchParams(search).get("tab") === "klassenarbeit" ? "klassenarbeit" : "noten";
+  }
+  const hit = PATH_TOUR.find(([p]) => pathname.startsWith(p));
+  return hit ? hit[1] : null;
+}
+
 // Route-Präfix → Tour-Id (für Auto-Start beim ersten Besuch der Modulseite).
+// /auswertung steht hier mit der Notenbuch-Tour; den Reiter beachtet
+// `tourFuerOrt` — wer eine Tour zum Ort sucht, fragt dort.
+const auswertungTour = ["/auswertung", "noten"];
 export const PATH_TOUR = [
   ["/kalender", "kalender"],
-  ["/auswertung", "noten"],
+  auswertungTour,
   ["/karten", "karten"],
 ];
 

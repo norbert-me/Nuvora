@@ -30,13 +30,13 @@ Nuvora ist ausdrücklich **nicht**:
 - **kein Schulverwaltungsprogramm.** Keine Zeugnisse, keine Stundenpläne für
   ein Kollegium, keine Elternportale, kein Rollenmodell im eigentlichen Sinn —
   es gibt genau zwei Stufen: Lehrkraft und Administration (Konto 1 sowie jedes
-  Konto, das es dazu ernennt).
+  Konto, das dazu ernannt wird; Sicherungen bleiben dem Konto 1 vorbehalten).
 - **kein gehosteter Dienst.** Es gibt keine Nuvora-Cloud. Wer es nutzen will,
   betreibt es selbst — und ist damit im Sinne der DSGVO verantwortlich.
 - **kein Produkt mit Support.** Ein-Personen-Projekt ohne Einnahmen, ohne
   Zusage auf Antwortzeit und ohne Zusicherung, dass ein Modul erhalten bleibt.
 
-**Stand:** Version 4.3.7. Der Rahmen steht, 13 Module sitzen darauf, keins hat
+**Stand:** Version 4.4.2. Der Rahmen steht, 13 Module sitzen darauf, keins hat
 eigene Konten oder eine eigene Datenbank. Rund 300 API-Tests und 75
 Frontend-Tests laufen bei jedem Push; nach jedem Deploy benutzt ein Selbsttest
 jedes Modul einmal wirklich. Was das *nicht* heißt: dass jemand außer dem Autor
@@ -94,8 +94,8 @@ docker compose up -d --build
 
 **6. Ein Modul zuschalten.** Frisch ist die Shell fast leer — das ist Absicht:
 Module werden pro Lehrkraft aktiviert. Unter `/modules` eins auswählen, danach
-erscheint es in der Navigation. Dann unter `/classes` eine Klasse mit ein paar
-Schülern anlegen — fast jedes Modul arbeitet darauf.
+erscheint es in der Navigation. Dann unter `/kurse` einen Kurs mit ein paar
+Kindern anlegen (einzeln oder als Namensliste) — fast jedes Modul arbeitet darauf.
 
 (Beispielinhalte legt nur die **Registrierung** über `/login` an, nicht das
 Admin-Konto aus der `.env`. Lokal startet man also leer. Fertiges Material zum
@@ -105,11 +105,13 @@ Danach erreichbar:
 
 | Pfad          | Was                                                 |
 | ------------- | --------------------------------------------------- |
-| `/`           | Startseite — Module, Klassen, Kurse, Themen          |
+| `/`           | Startseite — Module, Kurse, Themen, Suche            |
 | `/modules`    | Module zuschalten und abschalten                    |
-| `/classes`    | Klassen und Schüler                                 |
+| `/kurse`      | Kurse und ihre Kinder (Namensliste, aus einem Kurs entwickeln, E/G) |
+| `/personen`   | Ein Kind quer über seine Kurse: Angaben, Foto, Noten, Themenstand |
+| `/classes`    | Klassen (Unterbau der Kurse, bis der Umbau abgeschlossen ist) |
 | `/papierkorb` | Gelöschtes aus Kern und Modulen                     |
-| `/backup`     | Sicherungen (nur Administration, Konto 1)           |
+| `/backup`     | Sicherungen (nur das Betreiberkonto, Konto 1)       |
 | Modulpfade    | siehe [Die Module](#die-module)                      |
 
 **Wenn etwas nicht geht:**
@@ -243,7 +245,7 @@ Web-Image wandert).
 
 ### Sicherungen
 
-Unter `/backup`, nur für die Administration (Konto 1) — eine Sicherung enthält
+Unter `/backup`, nur für das Betreiberkonto (Konto 1, nicht für weitere Administrationen) — eine Sicherung enthält
 die Daten aller Konten.
 
 **Was drin ist:** die Datenbank (inkl. Schülerfotos, Karten- und
@@ -320,15 +322,15 @@ abgeschaltet ist die Anzeige:
 | ----- | ---- | ----- |
 | CardVote | `/cardvote` | Abstimmen ohne Geräte: Lernende halten bedruckte Karten hoch, die Lehrkraft scannt sie (ArUco/OpenCV). Live-Ergebnisse, Spiel-Modus, Auswertung mit Notenschlüssel, Export (PDF/Excel/iDoceo), Marktplatz |
 | Lernpfad | `/lernpfad` | Aufgaben und Lernpfade (aus mehreren **Lernleitern**); der Generator verteilt differenziert. Lernleitern über den Marktplatz teilbar |
-| Karteikarten | `/karten` | Spaced Repetition (SM-2). Alle Stapel liegen in **einer Sammlung** (Ordner); die Klassenauswahl ist nur ein Filter. Ausgerollt wird über die **Stunde im Kalender** — wer einen Stapel dort einplant, gibt ihn damit dem Kurs dieser Stunde frei (ohne das Modul Kalender bleibt alles bedienbar, nur das Ausrollen entfällt). Lernende üben **ohne Konto** per QR-Code; Reifegrad sichtbar, Meisterung als Notenspalte übernehmbar. **E/G je Karte ist ein Schalter am Stapel** (wie am Quiz) — aus sehen alle alles, an ist eine **neue** Karte G, bis sie auf E geschaltet wird |
+| Karteikarten | `/karten` | Spaced Repetition (SM-2). Alle Stapel liegen in **einer Sammlung** (Ordner). Ausgerollt wird für einen oder mehrere Kurse — über die **Stunde im Kalender** (wer einen Stapel dort einplant, gibt ihn dem Kurs dieser Stunde frei) oder über die **Kursliste im Ausrollen-Menü** des Stapels. QR-Zugänge druckt der gleichnamige Reiter. Lernende üben **ohne Konto** per QR-Code; Reifegrad sichtbar, Meisterung als Notenspalte übernehmbar. **E/G je Karte ist ein Schalter am Stapel** (wie am Quiz) — aus sehen alle alles, an ist eine **neue** Karte G, bis sie auf E geschaltet wird |
 | Kalender | `/kalender` | Tag/Woche/Monat + wiederkehrender Stundenplan; **Serientermine** (täglich bis jährlich, mit Enddatum; einzelne Termine herausnehmbar); Ort je Termin; **Zeitleiste je Kurs** (Stunden, Themen, Freischaltungen und Klassenarbeiten senkrecht auf einer Achse); Quiz, Deck oder Lernleiter an eine Stunde planen; Klassenarbeitstermine mit ihren Themen; freie Tage; ICS-Feed raus, externer Kalender read-only rein (SSRF-gehärtet), fremde Termine auf Wunsch mit im Export, „Ausgeblendet“-Fläche über dem Kalender für Entfallenes und Weggeblendetes im gezeigten Zeitraum; freie Tage nach Kommende/Vergangene gefiltert; **Stundenplan aus WebUntis übernehmen** (API oder Abo-Link, mit Zuordnung je Stunde, nie zurückschreiben); **CalDAV** — Termine aus Apple/Outlook anlegen und ändern (Serien und Ort in beide Richtungen), mit Geräte-Passwörtern und **Ein-Klick-Einrichtung auf iPhone/iPad** (Konfigurationsprofil, unsigniert) |
-| Auswertung | `/auswertung` | Drei Sichten: **Notenbuch** (eigene Spalten mit Gewichten, gewichteter Schnitt, Trend je Schüler), **Klassenarbeit** (Punkte je Aufgabe/Teilaufgabe, Thema bis auf die Teilaufgabe, Arbeit + Erwartungshorizont als Anhang, Fehlerprofil, optional Fehlerarten je Zelle, Rückmeldebogen je Kind zum Ausdrucken) und **Vergleich** (dieselbe Arbeit über mehrere Klassen, je Aufgabe mit Trennschärfe, Nuller-Anteil und Streuung) |
-| Unterrichtsplanung | `/unterrichtsplanung` | Einstiege sammeln: Idee, Ablauf, Material, Dauer — themen-getaggt und an Kalender-Stunden zuweisbar |
+| Noten | `/auswertung` | Drei Sichten: **Notenbuch** (eigene Spalten mit Gewichten, gewichteter Schnitt, Trend je Schüler), **Klassenarbeit** (Punkte je Aufgabe/Teilaufgabe, Thema bis auf die Teilaufgabe, Arbeit + Erwartungshorizont als Anhang, Fehlerprofil, optional Fehlerarten je Zelle, Rückmeldebogen je Kind zum Ausdrucken) und **Vergleich** (dieselbe Arbeit über mehrere Klassen, je Aufgabe mit Trennschärfe, Nuller-Anteil und Streuung) |
+| Einstiege | `/unterrichtsplanung` | Einstiege sammeln: Idee, Ablauf, Material, Dauer — themen-getaggt und an Kalender-Stunden zuweisbar |
 | Code-Detektiv | `/code-detektiv` | Programmier-Rätsel: Code-Bausteine per Drag & Drop ordnen, allein oder in einer Klassen-Session (Beitritt per Code, ohne Login) |
-| Orga | `/orga` | Klassenführung in Reitern: Checklisten, Anwesenheit/Fehlzeiten (PDF-Report), Ausleihe, Sitzplan (Hervorheben von Gruppen; SEGEL-Stufen als abschaltbarer Teil) |
+| Orga | `/orga` | Klassenführung in Reitern: Checklisten, Anwesenheit/Fehlzeiten je Kurs und Stunde (PDF-Report), Ausleihe, Sitzplan (Hervorheben von Gruppen; SEGEL-Stufen als abschaltbarer Teil) |
 | Zufall | `/zufall` | Zufallsschüler (fair gewichtet nach Zeit seit dem letzten Ziehen) und Zufallsgruppen |
 | Notizbrett | `/notizbrett` | Notizzettel + To-do-Liste. Datierte Aufgaben erscheinen im Kalender. Nicht an Schüler gebunden |
-| Tafel | `/tafel` | Classroom-Screen für den Beamer: frei platzierbare Textfelder, Timer. Ohne Daten |
+| Tafel | `/tafel` | Classroom-Screen für den Beamer: frei platzierbare Textfelder, Timer, Lautstärke-Anzeige, mit dem Kalender der Verlaufsplan der laufenden Stunde. Mehrere Tafeln, am Konto gespeichert |
 | Mathespiele | `/mathespiele` | Aktuell Mathefußball: Kopfrechen-Duell für zwei Teams am Beamer |
 | PAP-Editor | `/pap` | Programmablaufpläne nach DIN 66001: frei zeichnen (ohne Zuordnung, im Browser gespeichert) oder als Aufgabe stellen — Lernende geben über ihren QR-Zugang ab |
 
@@ -378,6 +380,10 @@ fälligen Karten steht trotzdem da — sie zählt, sie bewertet nicht. Karten ha
 kein Datum und stehen deshalb nicht im Verlauf. Was ein Kind wegen E/G nie zu
 sehen bekommt, wird ihm auch nicht als Rückstand angerechnet.
 
+Zu sehen ist der Themenstand in der CardVote-Auswertung eines Kindes, im
+Karten-Fortschritt und auf der Personenseite (`/personen`) — nicht mehr in der
+Klassenarbeit, die nur noch auf ihn verweist.
+
 ### Reihenfolge der Lernenden
 
 Die Liste einer Klasse lässt sich per Ziehen sortieren — und diese Reihenfolge
@@ -424,8 +430,8 @@ Name selbst bleibt unverändert. Ein Kreis in der Kette wird abgewiesen.
 ### Zugangs-Codes für die Lernenden
 
 Karteikarten und die eigenen Testergebnisse erreichen Lernende **ohne Konto**
-über einen persönlichen Link (`/lernen/<token>`). Die Klassenseite druckt ihn
-als PDF: je Kind ein Zettel mit Name, QR-Code und dem Link im Klartext zum
+über einen persönlichen Link (`/lernen/<token>`). Das Modul Karteikarten druckt
+ihn im Reiter **QR-Zugänge** als PDF: je Kind ein Zettel mit Name, QR-Code und dem Link im Klartext zum
 Abtippen, acht pro Seite zum Ausschneiden.
 
 Drei Regeln halten das dicht:
@@ -437,8 +443,8 @@ Drei Regeln halten das dicht:
   etwas herausgeben darf. Dasselbe gilt für Code-Detektiv-Sitzungscodes.
 - **Jeder Zettel ist einmalig.** Die Token sind Zufall (24 Byte) und in der
   Datenbank eindeutig; zwei Kinder können nie denselben bekommen.
-- **Ein Link lässt sich zurückholen.** „Neu vergeben" macht alle alten Ausdrucke
-  sofort ungültig — nötig, sobald ein Link im Klassenchat gelandet ist.
+- **Ein Link lässt sich zurückholen.** „Zugänge neu vergeben" (⋯-Menü im Reiter
+  QR-Zugänge) macht alle alten Ausdrucke sofort ungültig — nötig, sobald ein Link im Klassenchat gelandet ist.
 
 Auch eine gelöschte oder archivierte Klasse schaltet ihre Zugänge ab.
 
@@ -473,13 +479,12 @@ Bedienelemente nebeneinander und in der Klassenmaske der Papierkorb direkt neben
 
 ### Etwas finden
 
-Oben links neben „Nuvora" steht der **Modulwechsler**: er zeigt, in welchem
-Modul man gerade ist, und führt mit einem Klick in jedes andere zugeschaltete.
-Die Reiter daneben gehören immer nur zum aktuellen Bereich — der Weg in ein
-anderes Modul führte vorher über die Startseite.
+Einen Modulwechsler in der Navigation gibt es nicht: das Logo führt zur
+Startseite, von dort geht es über die Kacheln oder die Suche weiter. Die Reiter
+in der Leiste gehören immer nur zum aktuellen Bereich.
 
-Oben rechts sitzt eine Lupe, überall erreichbar mit **⌘K / Strg+K**, auf der
-Startseite zusätzlich als Suchfeld. Sie sucht in drei Töpfen: Seiten und Reiter
+Die Suche ist überall mit **⌘K / Strg+K** erreichbar, auf der Startseite
+zusätzlich als Suchfeld. Sie sucht in drei Töpfen: Seiten und Reiter
 aller **zugeschalteten** Module, die eigenen Klassen und Kurse, die Themen
 (Treffer führt in die Themenansicht). Gesucht wird auch nach dem, was man tun
 will, nicht nur nach dem Namen des Reiters: „Fehlzeiten" findet die Anwesenheit,
@@ -509,7 +514,6 @@ Thema → Unterthema):
 - der Sitzplan kann Plätze färben: frei markieren (nur im Browser, nur für
   diesen Kurs), nach Niveau E/G oder nach Förderschwerpunkt — Letzteres
   standardmäßig aus, weil der Plan oft am Beamer hängt
-- der Elternkontakt zeigt die Fehltage des Kindes
 
 Fehlt das Gegenstück-Modul, ist die Verbindung nicht sichtbar und die API weist
 sie mit 403 ab. Genau das prüft der Systemtest für jede Brücke zweimal.
@@ -613,8 +617,8 @@ Tage, Spielsitzungen 1 bzw. 7 Tage).
   `nosniff`, Referrer-Policy); `server_tokens off`.
 - **Rate-Limits** gegen Brute-Force und Massenanlage auf schreibenden
   Endpunkten.
-- **Externer Kalender-Abruf SSRF-gehärtet** (private/lokale IPs und Redirects
-  gesperrt).
+- **Externer Kalender-Abruf SSRF-gehärtet** (private/lokale IPs gesperrt;
+  Weiterleitungen werden bis zu dreimal gefolgt und jedes Ziel neu geprüft).
 - **Secrets** liegen nur auf dem Server (`.env`, `chmod 600`);
   `POSTGRES_PASSWORD` und `TOKEN_SECRET` sind Pflicht, sonst startet der Stack
   nicht.

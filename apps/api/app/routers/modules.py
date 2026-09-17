@@ -106,8 +106,7 @@ REGISTRY: List[ModuleDef] = [
             "sich in eine andere Klasse kopieren und danach über die Klassen "
             "vergleichen — je Aufgabe mit Trennschärfe, Nuller-Anteil und Streuung, "
             "damit eine missverständliche Aufgabe von einer schweren zu unterscheiden "
-            "ist. Je Kind zeigt der Themenstand, wie sicher jedes Unterthema sitzt "
-            "und ob es besser wird — über alle Arbeiten und Quizze hinweg."
+            "ist."
         ),
         path="/auswertung",
         stage="stable",
@@ -146,15 +145,14 @@ REGISTRY: List[ModuleDef] = [
         name="Karteikarten",
         description=(
             "Karteikarten mit Spaced Repetition. Alle Stapel liegen in EINER "
-            "Sammlung; ausgerollt werden sie über die Stunde: wer einen Stapel "
-            "im Kalender einplant, gibt ihn damit für diesen Kurs frei. Ohne "
-            "das Modul Kalender lässt sich alles anlegen, ändern und drucken — "
-            "nur ausgerollt wird nichts. "
-            "Die Lernenden üben ohne Konto per QR-Code; ihren Reifegrad siehst "
-            "du im Modul. Optional an ein Thema gebunden (der Kalender schaltet "
-            "den Stapel am Tag frei); die Meisterung als Notenspalte "
-            "übernehmbar. Zugangs-Codes druckst du als PDF aus der Klasse (ein "
-            "QR je Kind); schaltest du das Modul ab, liefern sie nichts mehr. "
+            "Sammlung; ausgerollt werden sie für einen oder mehrere Kurse — "
+            "über die Planung im Kalender (der Stapel schaltet sich am Tag "
+            "frei) oder über die Kursliste im Ausrollen-Menü des Stapels. "
+            "Die Lernenden üben ohne Konto per QR-Code; ihren Reifegrad und "
+            "den Themenstand siehst du im Reiter Fortschritt. Optional an ein "
+            "Thema gebunden; die Meisterung als Notenspalte übernehmbar. "
+            "Zugangs-Codes druckst du im Reiter QR-Zugänge (ein QR je Kind); "
+            "schaltest du das Modul ab, liefern sie nichts mehr. "
             "E/G je Karte schaltest du am Stapel ein (wie am Quiz) — aus sehen "
             "alle alles, an ist eine neue Karte Grundstoff (G), bis du sie auf E "
             "schaltest. Ein ganzer Stapel kann zusätzlich nur für E oder nur "
@@ -180,10 +178,11 @@ REGISTRY: List[ModuleDef] = [
             "Unterrichtsplanung: Tag-, Wochen-, Monatsansicht und ein "
             "wiederkehrender Stundenplan. An einen Eintrag lässt sich ein Quiz, "
             "ein Karten-Deck oder eine Lernleiter planen; freie Tage blenden "
-            "Stunden aus. Ein Klassenarbeitstermin legt mit dem Modul To-do ein "
-            "Korrektur-To-do eine Woche danach an. Kalender-Sync in beide "
-            "Richtungen (eigener ICS-Feed zum Abonnieren + externer Kalender "
-            "read-only)."
+            "Stunden aus. Ein Klassenarbeitstermin legt mit dem Modul Notizbrett "
+            "ein Korrektur-To-do eine Woche danach an. Serien, Suche und eine "
+            "Zeitleiste je Kurs. Hinaus per Abo (ICS) und CalDAV (auch vom Handy "
+            "aus schreiben), herein per WebUntis-Import und fremde Kalender "
+            "(nur lesen)."
         ),
         path="/kalender",
         stage="stable",
@@ -304,7 +303,7 @@ REGISTRY: List[ModuleDef] = [
             "(Titel + Text, sortierbar) und eine To-do-Liste. Datierte Aufgaben "
             "erscheinen zusätzlich im Kalender; ein Klassenarbeitstermin legt "
             "hier von selbst ein Korrektur-To-do an. Nicht an Schüler gebunden "
-            "(das sind die Beobachtungen)."
+            "(Beobachtungen stehen im Notenbuch)."
         ),
         path="/notizbrett",
         stage="stable",
@@ -349,8 +348,10 @@ REGISTRY: List[ModuleDef] = [
         name="Tafel",
         description=(
             "Classroom-Screen für den Beamer: frei platzierbare Textfelder, in "
-            "Größe und Schriftgröße anpassbar. Für Arbeitsaufträge, Hinweise und "
-            "alles, was gerade an die Tafel soll. Reines Werkzeug, ohne Daten."
+            "Größe und Schriftgröße anpassbar, ein Timer und eine "
+            "Lautstärke-Anzeige; mit dem Modul Kalender auch der Verlaufsplan "
+            "der laufenden Stunde. Mehrere Tafeln werden unter einem Namen am "
+            "Konto gespeichert und stehen damit auch am Rechner im Klassenraum."
         ),
         path="/tafel",
         stage="beta",

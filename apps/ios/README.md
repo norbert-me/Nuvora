@@ -43,7 +43,7 @@ ersten Lauf und würde nach jedem Capacitor-Update auseinanderlaufen.
 denselben Schritten wie das Skript — ohne Signierung, weil kein
 Apple-Entwicklerzertifikat hinterlegt ist. Die Datei heißt
 `Nuvora-<Fassung>.ipa` und hängt am Release; im Profil unter „Apps" steht sie
-damit als ladbare Datei statt als „In Vorbereitung".
+damit als ladbare Datei.
 
 **Antippen genügt nicht.** iOS installiert nur signierte Apps. Drei Wege:
 

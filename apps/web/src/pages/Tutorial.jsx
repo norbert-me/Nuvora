@@ -13,7 +13,8 @@ const STORAGE_KEY = "nuvora_tutorial_done";
 
 const BEREICHE = [
   { key: "willkommen", ziel: "/modules" },
-  { key: "klasse", ziel: "/classes" },
+  // Kinder werden im Kurs gepflegt (Umbau auf Kurse) — einen eigenen
+  // Abschnitt „Klasse anlegen" gibt es deshalb nicht mehr.
   { key: "kurse", ziel: "/kurse" },
   { key: "themen", ziel: "/topics" },
   { key: "module", ziel: "/modules" },
@@ -24,7 +25,7 @@ const BEREICHE = [
   // sie nicht kennt, tippt seinen Stundenplan ab.
   { key: "kalender", ziel: "/kalender" },
   { key: "auswerten", ziel: "/auswertung?tab=klassenarbeit" },
-  { key: "jahresende", ziel: "/classes" },
+  { key: "jahresende", ziel: "/kurse" },
   { key: "loslegen", ziel: "/modules" },
 ];
 

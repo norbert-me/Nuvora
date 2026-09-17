@@ -8,11 +8,11 @@ import { useLanguage } from "../i18n/index.jsx";
 // Ausführlichere Erklärung je Modul für das Info-Popup in der Auswahl. Nutzt
 // die bereits vorhandenen Seiten-Intros wieder (die dort nicht mehr angezeigt
 // werden), sonst die Kurzbeschreibung.
+// Die Schlüssel sind die aus der REGISTRY (`m.key`) — nur die werden gefragt.
 const HELP_KEY = {
-  klassenarbeit: "klassenarbeit.hint",
-  methoden: "methoden.intro",
+  auswertung: "klassenarbeit.hint",
+  unterrichtsplanung: "methoden.intro",
   orga: "orga.hint",
-  ausleihe: "ausleihe.hint",
 };
 
 import { askConfirm } from "../core/dialog.jsx";

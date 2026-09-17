@@ -14,11 +14,12 @@ Learners need no devices and no accounts — they only appear as records the tea
 
 Nuvora is the base: account, classes, courses, students and topics live here. Modules are switched on and work on this data — they do not own it.
 
-> **Status: stable, still growing.** The frame stands — sign-in, home page, module management, classes, courses and topics are Nuvora. Thirteen modules sit on the core; none has its own accounts or database. Related tools are bundled under one module with **tabs** (e.g. Auswertung = gradebook + class tests, Notizbrett = notes + to-do, Orga = checklists + attendance + lending + seating plan). The shared **topic taxonomy** connects them: a topic students struggled with in CardVote or Code-Detektiv spawns a Karten practice deck or a Lernpfad revision task at the press of a button, test results become a grade column, and the topic view shows everything attached to a topic across the modules — including stored material.
+> **Status: stable, still growing.** The frame stands — sign-in, home page, module management, classes, courses and topics are Nuvora. Thirteen modules sit on the core; none has its own accounts or database. Related tools are bundled under one module with **tabs** (e.g. Noten = gradebook + class tests, Notizbrett = notes + tasks, Orga = seating plan + attendance + lending + checklists; single parts can be switched off in the profile under “Module parts”). The shared **topic taxonomy** connects them: a topic students struggled with in CardVote or Code-Detektiv spawns a Karten practice deck or a Lernpfad revision task at the press of a button, test results become a grade column, and the topic view shows everything attached to a topic across the modules — including stored material.
 
 ## Core
 
-- **Classes** = the group of students (the people). **Courses** = the subject; one class can belong to several courses (n:m). Module content hangs off the course, the students are shared.
+- **Courses** are the level you work on: a course is your learning group in one subject. Students are maintained in the course — one by one, as a name list, or by developing a new course from another one (the students come along, their grades and cards stay behind). Classes still run underneath until the move to courses is complete.
+- **Persons** — a student exists once: name, photo, level, support needs and notes belong to the person and apply in all of their courses. `/personen` shows one child across all courses (grades, topic overview).
 - **Topics** in three levels (subject → topic → subtopic) — the shared taxonomy every module points to.
 - **Material** per topic and per calendar period: store worksheets, PDFs etc. (in the account, private, not shared).
 - **Module registry** in code: a module exists only if there is code for it; the database only remembers who activated what.
@@ -48,23 +49,27 @@ The proven interface stayed — it is **built into the web project** (`apps/web/
 
 Vanilla JS, mounted in-page
 
-### Auswertung — gradebook + class tests
+### Noten (grades) — gradebook + class tests
 
 Assessment in one place, in two tabs.
 
 **Gradebook** — columns from your assessment scheme with weights; works like an empty spreadsheet. Computes the weighted average and shows how much of the scheme is covered — the report-card grade stays your decision, observations never count. A **per-student trend** (▲/▼) shows whether performance rises or falls over the term. Importable as a grade column: **CardVote** hit rate, **Karten** mastery and **Code-Detektiv** sessions (each via your grade scale).
 
-**Class tests** — create tasks with a topic and tick right/wrong (or partial points) per student. The evaluation shows points, a grade distribution with an adjustable key, boxplots and per-task discrimination — and **who needs to catch up on which topic**. From there you can trigger targeted revision (Karten deck / Lernpfad). Absent students are excluded from the stats without losing their grades.
+**Class tests** — enter points per task and subtask for each student; each subtask can carry its own topic. The test and its marking scheme hang on as files, optional error types per cell, a printable feedback sheet per child. The evaluation shows a grade distribution with an adjustable key, boxplots and per-task discrimination — and **who needs to catch up on which topic**. From there you can trigger targeted revision (Karten deck / Lernpfad). The same test can be copied to another class and compared across classes. Absent students are excluded from the stats without losing their grades.
+
+**Topic overview** — how firmly each subtopic sits for a child and whether it improves, weighted by points across tests, quizzes and flashcards. It is shown in a child's CardVote evaluation, in the flashcard progress and on the person page.
 
 ### Karten (cards)
 
-Flashcards with spaced repetition (SM-2). A deck belongs to a course; learners practise **without an account** via a QR code (a secret token per person), and the teacher sees their maturity progress. Optionally bound to a topic — then the calendar releases the deck automatically on the planned day. Mastery can be taken over as a grade column.
+Flashcards with spaced repetition (SM-2). All decks live in **one collection** (folders). A deck is rolled out for one or more courses — by planning it on a lesson in the calendar (it then unlocks on that day) or via the course list in the deck's roll-out menu. Learners practise **without an account** via a QR code (a secret token per person, printed in the “QR access” tab), and the teacher sees their maturity progress. E/G per card is a switch on the deck. Mastery can be taken over as a grade column.
 
 ### Kalender (calendar)
 
-Lesson planning: day, week and month views plus a recurring **timetable** (class per period, colours, times). A CardVote quiz, a Karten deck or a learning ladder can be planned onto an entry; **days off** (holidays) hide lessons. **Calendar sync** both ways: your own ICS feed to subscribe to (Apple/Google) and an external calendar shown read-only (SSRF-hardened).
+Lesson planning: day, week and month views plus a recurring **timetable** per half-year (one course per period, times, breaks). **Recurring events** (daily to yearly, with end date; single dates can be split off), multi-day events, location, search, and a **timeline per course** (lessons, topics, releases and class tests on one axis). A CardVote quiz, a Karten deck or a learning ladder can be planned onto an entry; **days off** (holidays) hide lessons.
 
-### Unterrichtsplanung — lesson starters
+**Calendar sync** — all in the ⋯ menu → “Subscribe”: your own ICS feed to subscribe to (Apple/Google), **CalDAV** to create and edit events from Apple or Outlook (entries and timetable lessons; device passwords; a one-tap configuration profile for iPhone/iPad), and external calendars shown read-only (SSRF-hardened). **WebUntis import** (API or subscription link) brings the timetable, cancellations and holidays; you assign each lesson to a course, nothing is ever written back.
+
+### Einstiege — lesson starters
 
 **Lesson starters** — ideas for opening a lesson: the idea, the procedure with materials, a materials list and an approximate duration. Reusable, assignable to calendar periods and topic-tagged: for a weak topic the home page suggests a matching starter.
 
@@ -77,7 +82,7 @@ Programming puzzles for computer-science lessons: drag & drop code blocks into t
 Class-management tools, in tabs:
 
 - **Checklists** — collective ticks (e.g. "seen the signature on the test")
-- **Attendance** — status per day, per-person overview, PDF report
+- **Attendance** — status per course and lesson (an earlier lesson that day is offered as a suggestion, never saved silently), per-person overview, PDF report
 - **Lending** — lend out items, keep returns and overdue in view
 - **Seating plan** — place and rotate tables freely; optional **SEGEL levels** (Helios concept Harbour → Coast → Sea → World) per student on the seat, for a quick glance during the lesson
 
@@ -89,17 +94,15 @@ Draws a random person from a class at the press of a button — fairly weighted 
 
 Two tabs: **Notes** (free jottings, sortable) and **Tasks** (a to-do list). Dated tasks also appear in the calendar. Not tied to students.
 
-### Klassenleitung (class leadership)
+Observations (formerly a module of their own) now live in the gradebook: a note per student that never counts towards a grade and needs no column. The former modules Klassenleitung and Beobachtungen no longer exist.
 
-Class-leadership duties — currently the **parent contacts** per student: date, channel (phone/mail/meeting) and note. Meets the documentation duty without paper.
+### PAP-Editor (flowcharts)
 
-### Beobachtungen (observations)
-
-Formative notes per student with a date (effort, social behaviour, progress) — **deliberately separate from the grade**. What the gradebook does not measure has its place here.
+Flowcharts according to DIN 66001. Two ways into the same editor: **unsupervised**, anyone with the link draws without an account (stored only in their own browser); **supervised**, you create an assignment, students open it via their QR access and hand in, and you see each child's state — including who has nothing yet.
 
 ### Tafel (board)
 
-Freely placeable text fields and a countdown timer for the projector. Move, resize and colour fields; fullscreen. A pure tool, no data.
+Freely placeable text fields, a countdown timer and a noise meter for the projector; with the calendar module also the lesson plan of the lesson running now. Several boards, saved by name to your account — so a board prepared at home is there on the classroom computer.
 
 ### Mathespiele (math games)
 
@@ -117,7 +120,7 @@ Nuvora is the base, modules are guests. Three rules every change keeps:
 
 1. **No module owns classes or students** — they live in the core, all modules share them.
 2. **No module has its own accounts** — the core authenticates, modules inherit.
-3. **Modules don't depend on each other** — CardVote runs without Lernpfad and without Auswertung. What connects them (shared topics, result import) is an add-on, never a prerequisite.
+3. **Modules don't depend on each other** — CardVote runs without Lernpfad and without Noten. What connects them (shared topics, result import) is an add-on, never a prerequisite.
 
 ```
 Nuvora core (apps/api, apps/web)
@@ -127,15 +130,15 @@ Nuvora core (apps/api, apps/web)
     ├── CardVote           /cardvote/*         voting, evaluation, marketplace
     ├── Lernpfad           /lernpfad           exercises & ladders (native in-page)
     ├── Karten             /karten             flashcards, spaced repetition
-    ├── Kalender           /kalender           planning, timetable, ICS sync
-    ├── Auswertung         /auswertung         gradebook + class tests
-    ├── Unterrichtsplanung /unterrichtsplanung lesson starters
+    ├── Kalender           /kalender           planning, timetable, ICS/CalDAV, WebUntis
+    ├── Noten              /auswertung         gradebook + class tests
+    ├── Einstiege          /unterrichtsplanung lesson starters
     ├── Code-Detektiv      /code-detektiv      programming puzzles (native)
     ├── Orga               /orga               checklists · attendance · lending · seating plan
     ├── Zufallsschüler     /zufall             draw a random student / groups
-    ├── Notizbrett         /notizbrett         notes + to-do
+    ├── Notizbrett         /notizbrett         notes + tasks
     ├── PAP-Editor         /pap                flowcharts (DIN 66001), hand-in via QR
-    ├── Tafel              /tafel              projector text fields + timer
+    ├── Tafel              /tafel              projector board: text, timer, noise meter
     └── Mathespiele        /mathespiele        math games (projector)
 ```
 
@@ -170,15 +173,15 @@ Please do not report vulnerabilities as public issues: [SECURITY.md](SECURITY.md
 - **Self-hosted, no cloud.** Student data never leaves your own server.
 - **Learners have no accounts** and never log in — they are records the teacher manages.
 - **Especially sensitive data** (support needs, notes — GDPR Art. 9) appear in **no export** and in no marketplace publication.
-- **Passwords** hashed and salted with PBKDF2 (SHA-256, 100,000 iterations); email confirmation required, reset via one-time link.
-- **External calendar fetch is SSRF-hardened** (private/local IPs and redirects blocked).
+- **Passwords** hashed with Argon2id (following OWASP); older PBKDF2 hashes are upgraded silently on the next login. Email confirmation required, reset via one-time link.
+- **External calendar fetch is SSRF-hardened** (private/local IPs blocked; redirects are followed up to three times, each target checked again).
 - **Security headers** set centrally at the proxy (CSP, `X-Frame-Options: SAMEORIGIN`, `nosniff`, Referrer-Policy); `server_tokens off`.
 - **Rate limits** against brute force and mass creation on all writing endpoints.
 - **Secrets** live only on the server (`.env`, `chmod 600`) and are never committed; `POSTGRES_PASSWORD` and `TOKEN_SECRET` are required or the stack won't start.
 
 ## Goal of bundling
 
-1. Create classes, courses and students once, use them in all modules.
+1. Create courses and students once, use them in all modules.
 2. Test results steer Lernpfad: weak topics generate matching exercises.
 3. One login, one domain.
 
@@ -211,10 +214,13 @@ Then on <http://localhost:8080>:
 
 | Path         | What                                              |
 | ------------ | ------------------------------------------------- |
-| `/`          | Nuvora — home, modules, classes, courses, topics  |
+| `/`          | Nuvora — home, modules, courses, topics, search   |
+| `/kurse`     | courses and their students                        |
+| `/personen`  | one child across all courses                      |
+| `/backup`    | backups (operator account only, account 1)        |
 | `/cardvote/` | CardVote module                                   |
 | `/lernpfad`  | Lernpfad module                                   |
-| `/auswertung`| Auswertung module (gradebook + class tests)       |
+| `/auswertung`| Noten module (gradebook + class tests)            |
 | others       | `/karten` · `/kalender` · `/unterrichtsplanung` · `/code-detektiv` · `/orga` · `/zufall` · `/notizbrett` · `/pap` · `/tafel` · `/mathespiele` |
 
 Without `POSTGRES_PASSWORD` and `TOKEN_SECRET` the stack deliberately won't start — default passwords must not accidentally end up in production. Generate a random value with `openssl rand -hex 32`.
