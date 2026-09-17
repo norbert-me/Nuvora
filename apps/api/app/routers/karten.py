@@ -423,6 +423,8 @@ async def list_card_folders(class_id: int, kurs_id: Optional[int] = None, user: 
 @router.post("/classes/{class_id}/card-folders", response_model=CardFolderOut, status_code=201)
 async def create_card_folder(class_id: int, body: CardFolderIn, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
+    if kurs_id is not None:
+        await eigener_kurs(db, user, kurs_id)
     if body.parent_id is not None:
         await _owned_card_folder(db, user, body.parent_id)
     f = CardFolder(owner_id=user.id, class_id=class_id, kurs_id=kurs_id, name=body.name.strip(), parent_id=body.parent_id)
@@ -558,6 +560,10 @@ async def create_deck(class_id: int, body: DeckIn, kurs_id: Optional[int] = None
     Die Sammlung legt ueber `POST /decks` an."""
     rate_limit("karten_deck", f"u{user.id}", 100, 60, "Zu viele Stapel. Bitte kurz warten.")
     await _owned_class(db, user, class_id)  # nur die Zugriffsprüfung, wirft bei fremder Klasse
+    if kurs_id is not None:
+        # Ein fremder Kurs haengte den Stapel an fremde Kinder: sie saehen die
+        # Karten hinter ihrem QR-Code, ihre Antworten laegen beim Anleger.
+        await eigener_kurs(db, user, kurs_id)
     last = (await db.execute(select(CardDeck.position).where(CardDeck.class_id == class_id).order_by(CardDeck.position.desc()))).scalars().first()
     deck = CardDeck(class_id=class_id, kurs_id=kurs_id, owner_id=user.id, name=body.name.strip(),
                     topic_id=body.topic_id, niveau=body.niveau if body.niveau in ("E", "G") else "",

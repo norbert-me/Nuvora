@@ -314,6 +314,7 @@ def _nach_pdf(daten: bytes, dateiname: str) -> bytes:
     eine Instanz je Profil zu) — der zweite Aufruf haengt dann bis zum Timeout.
     """
     import shutil
+    import os
     import subprocess
     import tempfile
     from pathlib import Path
@@ -333,6 +334,10 @@ def _nach_pdf(daten: bytes, dateiname: str) -> bytes:
                  f"-env:UserInstallation=file://{profil}",
                  "--convert-to", "pdf", "--outdir", tmp, str(quelle)],
                 check=True, timeout=90, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                # Keine geerbte Umgebung: sonst saehe ein Makro in einer
+                # hochgeladenen Datei TOKEN_SECRET, DATABASE_URL und das
+                # SMTP-Passwort.
+                env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": tmp, "LANG": "C.UTF-8"},
             )
         except subprocess.TimeoutExpired:
             raise HTTPException(504, "Die Umwandlung hat zu lange gedauert.")
