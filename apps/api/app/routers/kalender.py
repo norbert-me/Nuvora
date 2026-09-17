@@ -30,7 +30,7 @@ from ..kursmitglieder import class_kurs_ids, eigener_kurs
 from ..kurslabel import kurs_des_termins, kurs_label as _kurs_label
 from ..database import get_db
 from ..importe import geprueft
-from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, WorkAnalysis
+from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, ExternalEventArchive, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, WorkAnalysis
 # Optimistisches Sperren (siehe app/versionierung.py).
 from ..versionierung import VersionOut, pruefe
 from .auth import rate_limit
@@ -259,7 +259,9 @@ async def suche(q: str = "", limit: int = 30,
     # sonst der zuletzt gewesene. Sonst fuellt eine woechentliche Chorprobe die
     # ganze Liste.
     je_uid: dict = {}
-    for ev in await externe_ereignisse(user):
+    # Das Archiv zaehlt mit: „wann war der Elternabend vor zwei Jahren?" ist
+    # genau die Frage, fuer die es aufbewahrt wird.
+    for ev in await externe_ereignisse(user, db=db, archiv=True):
         if ev.get("hidden"):
             continue
         if not passt(ev.get("title"), ev.get("location"), ev.get("description")):
@@ -2058,8 +2060,11 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
     # eingeschaltet (users.feed_external). Sie sind hier Beifang und bleiben
     # read-only: aendern laesst sich ein fremder Termin ueber Nuvora nicht,
     # loeschen heisst „in Nuvora ausblenden" (das kann nur CalDAV).
+    # Nur das Live-Fenster, NICHT das Archiv: ein Abo, das fuenf Jahre
+    # Vergangenheit mitschickt, blaeht jeden Abruf auf, und das Handy hat die
+    # alten Termine ohnehin aus dem Originalkalender.
     if u.feed_external:
-        for ev in await externe_ereignisse(u):
+        for ev in await externe_ereignisse(u, db=db):
             if ev["hidden"]:
                 continue
             tag = _d_iso(ev["date"])
@@ -2340,7 +2345,8 @@ def _fetch_ics(url: str) -> str:
     return hole_mit_umleitung(url, timeout=6, max_bytes=2_000_000)
 
 
-async def externe_ereignisse(user: User, refresh: bool = False) -> list:
+async def externe_ereignisse(user: User, refresh: bool = False,
+                             db: Optional[AsyncSession] = None, archiv: bool = False) -> list:
     """ALLE Ereignisse aus den externen ICS-Feeds — auch die ausgeblendeten.
 
     Eine Quelle fuer drei Leser: die Kalenderansicht (`/external-events`), der
@@ -2351,24 +2357,35 @@ async def externe_ereignisse(user: User, refresh: bool = False) -> list:
     Ausgeblendetes faellt hier NICHT heraus, sondern traegt `hidden: True` —
     den Reiter „Ausgeblendet" gibt es nur, weil sich das Weggeblendete wieder
     finden lassen muss. Wer nur das Sichtbare will, filtert selbst.
+
+    Mit `db` wird beim frischen Abruf (nicht bei jedem Cache-Treffer)
+    Vergangenes ins Archiv geschrieben; mit `archiv=True` kommt das Archiv dazu
+    — Live gewinnt bei gleichem Schluessel. ICS-Feed und CalDAV nehmen das
+    Archiv bewusst NICHT (nur das Fenster).
     """
     import time
+    if not isinstance(db, AsyncSession):
+        db = None          # direkter Aufruf ohne Sitzung (Depends-Platzhalter)
     cals = _ext_calendars(user)
+    hidden = set(user.external_hidden or [])
+
+    async def _fertig(rows):
+        if archiv and db is not None:
+            rows = rows + await _aus_archiv(db, user, cals, {r["key"] for r in rows})
+            rows.sort(key=lambda x: (x["date"], x.get("time") or ""))
+        return [{**r, "hidden": r["key"] in hidden} for r in rows]
+
     if not cals:
         _EXT_CACHE.pop(user.id, None)
-        return []
+        return await _fertig([])
     # Cache-Signatur: URLs + Farben. Die ausgeblendeten Schluessel stehen
     # bewusst NICHT drin — sie werden erst beim Lesen angeheftet, sonst wuerde
     # jedes Ausblenden alle Feeds neu holen.
     sig = "|".join(f"{c['url']}~{c.get('color','')}" for c in cals)
-    hidden = set(user.external_hidden or [])
-
-    def _mit_stand(rows):
-        return [{**r, "hidden": r["key"] in hidden} for r in rows]
 
     hit = _EXT_CACHE.get(user.id)
     if not refresh and hit and hit[0] == sig and hit[1] > time.time():
-        return _mit_stand(hit[2])
+        return await _fertig(hit[2])
     import asyncio, hashlib
     from datetime import date, timedelta
     def _d(v):
@@ -2402,7 +2419,7 @@ async def externe_ereignisse(user: User, refresh: bool = False) -> list:
             # nicht (zwei Kalender duerfen dieselbe haben, und einer darf gar
             # keine).
             info = {"title": title, "time": e.get("time"), "endtime": e.get("endtime"),
-                    "cal": cal.get("url", ""),
+                    "cal": cal.get("url", ""), "cal_name": cal.get("name", ""),
                     "location": e.get("location", ""), "color": color, "uid": uid,
                     "description": e.get("description", ""), "start": d0.isoformat(), "end": last.isoformat()}
 
@@ -2427,20 +2444,191 @@ async def externe_ereignisse(user: User, refresh: bool = False) -> list:
     out.sort(key=lambda x: (x["date"], x.get("time") or ""))
     result = out[:20000]
     _EXT_CACHE[user.id] = (sig, time.time() + _EXT_TTL, result)
-    return _mit_stand(result)
+    if db is not None:
+        await archivieren(db, user, result)
+    return await _fertig(result)
+
+
+# ─── Archiv vergangener fremder Termine ───
+#
+# Aufbewahrt wird mindestens ARCHIV_MIN_JAHRE; `archiv_raeumen` nimmt erst,
+# was aelter als ARCHIV_RAEUMEN_JAHRE ist (ein Jahr Luft, damit die Zusage
+# „5 Jahre" auch am Tag des Aufraeumens stimmt).
+ARCHIV_MIN_JAHRE = 5
+ARCHIV_RAEUMEN_JAHRE = 6
+
+
+def cal_kennung(url: str) -> str:
+    """Stabile, nicht umkehrbare Kennung einer Abo-Adresse (die Adresse selbst
+    ist ein Geheimnis und wird nicht gespeichert)."""
+    return _hashlib.sha256((url or "").encode("utf-8")).hexdigest()[:24]
+
+
+def _archiv_sig(r: dict) -> str:
+    teile = [r.get(k) or "" for k in ("title", "time", "endtime", "location", "description",
+                                     "color", "start", "end", "cal_name")]
+    return _hashlib.md5("\x1f".join(str(t) for t in teile).encode("utf-8")).hexdigest()
+
+
+async def archivieren(db: AsyncSession, user: User, rows: list, heute: Optional[date] = None) -> int:
+    """Vergangene Ereignisse (Tag < heute) ins Archiv — idempotent.
+
+    Geschrieben wird nur, was neu ist oder sich geaendert hat (Fingerabdruck),
+    und nur beim frischen Abruf (der Aufrufer sitzt hinter dem 10-Min-Cache).
+    Ein Feed, der nicht zu holen war, liefert nichts — und loescht damit auch
+    nichts: das Archiv waechst nur."""
+    from sqlalchemy.exc import IntegrityError
+    heute = heute or date.today()
+    grenze = heute.isoformat()
+    vergangen = {}
+    for r in rows:
+        key = r.get("key") or ""
+        if r.get("date", "") < grenze and 0 < len(key) <= 260:
+            vergangen[key] = r
+    if not vergangen:
+        return 0
+    ab = date.fromisoformat(min(r["date"] for r in vergangen.values()))
+    bestand = {a.schluessel: a for a in (await db.execute(
+        select(ExternalEventArchive).where(ExternalEventArchive.owner_id == user.id,
+                                           ExternalEventArchive.date >= ab,
+                                           ExternalEventArchive.date < heute))).scalars().all()}
+    n = 0
+    try:
+        async with db.begin_nested():
+            for key, r in vergangen.items():
+                sig = _archiv_sig(r)
+                a = bestand.get(key)
+                if a is not None and a.sig == sig:
+                    continue
+                if a is None:
+                    a = ExternalEventArchive(owner_id=user.id, schluessel=key)
+                    db.add(a)
+                a.uid = (r.get("uid") or "")[:210]
+                a.cal_hash = cal_kennung(r.get("cal") or "")
+                a.cal_name = (r.get("cal_name") or "")[:60]
+                a.color = (r.get("color") or "")[:9]
+                a.date = date.fromisoformat(r["date"])
+                a.start_date = _d_iso(r.get("start") or "")
+                a.end_date = _d_iso(r.get("end") or "")
+                a.time = (r.get("time") or "")[:5]
+                a.endtime = (r.get("endtime") or "")[:5]
+                a.title = (r.get("title") or "")[:200]
+                a.location = (r.get("location") or "")[:200]
+                a.description = (r.get("description") or "")[:1000]
+                a.sig = sig
+                n += 1
+            await db.flush()
+    except IntegrityError:
+        # Zwei Abrufe gleichzeitig: der andere hat die Zeilen schon — beim
+        # naechsten frischen Abruf wird verglichen und ggf. nachgezogen.
+        return 0
+    if n:
+        await db.commit()
+    return n
+
+
+async def _aus_archiv(db: AsyncSession, user: User, cals: list, live_keys: set) -> list:
+    """Archivzeilen in derselben Form wie Live-Ereignisse. Ein noch abonnierter
+    Kalender bekommt als `cal` seine Adresse (der Ansichtsfilter `kal_ext_aus`
+    vergleicht damit) und seine aktuelle Farbe; ein abgemeldeter heisst
+    `archiv:<kennung>` und behaelt die gemerkte Farbe."""
+    kenn = {cal_kennung(c["url"]): c for c in cals}
+    out = []
+    for a in (await db.execute(select(ExternalEventArchive)
+                               .where(ExternalEventArchive.owner_id == user.id)
+                               .order_by(ExternalEventArchive.date)
+                               .limit(20000))).scalars().all():
+        if a.schluessel in live_keys:
+            continue            # Live gewinnt
+        cal = kenn.get(a.cal_hash)
+        tag = a.date.isoformat()
+        out.append({
+            "title": a.title, "time": a.time or None, "endtime": a.endtime or None,
+            "cal": cal["url"] if cal else f"archiv:{a.cal_hash}",
+            "cal_name": (cal.get("name") if cal else a.cal_name) or "",
+            "location": a.location, "color": ((cal.get("color") if cal else "") or a.color or ""),
+            "uid": a.uid, "description": a.description,
+            "start": (a.start_date or a.date).isoformat(), "end": (a.end_date or a.date).isoformat(),
+            "date": tag, "key": a.schluessel, "archiv": True,
+        })
+    return out
+
+
+async def archiv_raeumen(db: AsyncSession, heute: Optional[date] = None) -> int:
+    """Archivzeilen aelter als ARCHIV_RAEUMEN_JAHRE entfernen (alle Konten).
+    Fuer den taeglichen Aufraeumjob in main.py."""
+    from sqlalchemy import delete as sa_delete
+    heute = heute or date.today()
+    try:
+        grenze = heute.replace(year=heute.year - ARCHIV_RAEUMEN_JAHRE)
+    except ValueError:          # 29. Februar
+        grenze = heute.replace(year=heute.year - ARCHIV_RAEUMEN_JAHRE, day=28)
+    res = await db.execute(sa_delete(ExternalEventArchive).where(ExternalEventArchive.date < grenze))
+    await db.commit()
+    return res.rowcount or 0
+
+
+@router.get("/external-archive")
+async def external_archive(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Welche Kalender im Archiv stehen — mit Zahl, Zeitraum und ob sie noch
+    abonniert sind. Grundlage fuer „Archiv dieses Kalenders loeschen"."""
+    from sqlalchemy import func as sa_func
+    kenn = {cal_kennung(c["url"]): c for c in _ext_calendars(user)}
+    rows = (await db.execute(
+        select(ExternalEventArchive.cal_hash, sa_func.count(), sa_func.min(ExternalEventArchive.date),
+               sa_func.max(ExternalEventArchive.date), sa_func.max(ExternalEventArchive.cal_name))
+        .where(ExternalEventArchive.owner_id == user.id)
+        .group_by(ExternalEventArchive.cal_hash))).all()
+    out = []
+    for h, n, von, bis, name in rows:
+        cal = kenn.get(h)
+        out.append({"cal": cal["url"] if cal else f"archiv:{h}", "kennung": h,
+                    "name": (cal.get("name") if cal else name) or "", "abonniert": bool(cal),
+                    "anzahl": int(n), "von": von.isoformat() if von else None,
+                    "bis": bis.isoformat() if bis else None})
+    return out
+
+
+@router.delete("/external-archive")
+async def delete_external_archive(cal: str = "", user: User = Depends(require_module),
+                                  db: AsyncSession = Depends(get_db)):
+    """Archiv loeschen — eines Kalenders (`cal` = Abo-Adresse, `archiv:<kennung>`
+    oder die Kennung) oder, ohne `cal`, das ganze. Ein entfernter Kalender soll
+    nicht stumm weiterleben, ohne dass man ihn loswird."""
+    from sqlalchemy import delete as sa_delete
+    q = sa_delete(ExternalEventArchive).where(ExternalEventArchive.owner_id == user.id)
+    cal = (cal or "").strip()
+    if cal:
+        if cal.startswith("archiv:"):
+            h = cal[len("archiv:"):]
+        elif re.fullmatch(r"[0-9a-f]{24}", cal):
+            h = cal
+        else:
+            h = cal_kennung(cal.replace("webcal://", "https://", 1))
+        q = q.where(ExternalEventArchive.cal_hash == h)
+    res = await db.execute(q)
+    await db.commit()
+    return {"geloescht": res.rowcount or 0}
 
 
 @router.get("/external-events")
-async def external_events(refresh: bool = False, user: User = Depends(require_module)):
+async def external_events(refresh: bool = False, frm: Optional[str] = None, to: Optional[str] = None,
+                          user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Die SICHTBAREN Ereignisse der externen Kalender. Read-only, 10-Min-Cache;
     refresh=1 umgeht ihn. Ausgeblendetes (external_hidden, Schluessel
-    uid|Datum) faellt hier heraus und steht im Reiter „Ausgeblendet"."""
-    rows = await externe_ereignisse(user, refresh)
-    return [{k: v for k, v in r.items() if k != "hidden"} for r in rows if not r["hidden"]]
+    uid|Datum) faellt hier heraus und steht im Reiter „Ausgeblendet".
+    Vergangenes kommt aus dem Archiv dazu (`archiv: true`); `frm`/`to`
+    (YYYY-MM-DD) grenzen ein, damit nicht Jahre auf einmal kommen."""
+    rows = await externe_ereignisse(user, refresh, db=db, archiv=True)
+    von, bis = _d_iso(frm or ""), _d_iso(to or "")
+    return [{k: v for k, v in r.items() if k != "hidden"} for r in rows
+            if not r["hidden"]
+            and (von is None or r["date"] >= von.isoformat())
+            and (bis is None or r["date"] <= bis.isoformat())]
 
 
 @router.get("/external-hidden")
-async def external_hidden(user: User = Depends(require_module)):
+async def external_hidden(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Was ausgeblendet ist — mit Titel und Datum, nicht nur als Schluessel.
 
     Der Reiter „Ausgeblendet" muss zeigen, WAS da weggeblendet wurde; eine
@@ -2449,7 +2637,7 @@ async def external_hidden(user: User = Depends(require_module)):
     abgemeldet), stehen als `verwaist` dabei — sonst blieben sie fuer immer
     unsichtbar in der Liste stehen und liessen sich nie zurueckholen.
     """
-    rows = await externe_ereignisse(user)
+    rows = await externe_ereignisse(user, db=db, archiv=True)
     bekannt = {r["key"]: r for r in rows if r["hidden"]}
     out = [{k: v for k, v in r.items() if k != "hidden"} for r in bekannt.values()]
     for key in (user.external_hidden or []):

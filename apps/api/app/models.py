@@ -1266,6 +1266,42 @@ class SlotCancellation(Base):
     period: Mapped[int] = mapped_column(Integer)
 
 
+class ExternalEventArchive(Base):
+    """Vergangene Termine aus abonnierten Kalendern — eine read-only-Kopie.
+
+    Ein fremder Feed liefert oft nur ein paar Wochen Vergangenheit, und
+    `externe_ereignisse` zeigt ohnehin nur 60 Tage zurueck. Damit „was war am
+    14. Maerz vor drei Jahren?" beantwortbar bleibt, wird jeder Termin, dessen
+    Tag vorbei ist, hier festgehalten (mindestens 5 Jahre, geraeumt ab 6).
+
+    Die Abo-Adresse steht NICHT im Klartext hier: sie ist ein Geheimnis (wer sie
+    kennt, liest den Kalender). `cal_hash` genuegt, um die Zeile ihrem Kalender
+    zuzuordnen; Name und Farbe werden fuer die Anzeige mitgemerkt, damit ein
+    abgemeldeter Kalender noch erkennbar ist."""
+    __tablename__ = "external_event_archive"
+    __table_args__ = (UniqueConstraint("owner_id", "schluessel", name="uq_ext_archiv"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # "uid|YYYY-MM-DD" — derselbe Schluessel wie beim Ausblenden.
+    schluessel: Mapped[str] = mapped_column(String(260))
+    uid: Mapped[str] = mapped_column(String(210), default="", server_default="")
+    cal_hash: Mapped[str] = mapped_column(String(32), default="", server_default="", index=True)
+    cal_name: Mapped[str] = mapped_column(String(60), default="", server_default="")
+    color: Mapped[str] = mapped_column(String(9), default="", server_default="")
+    date: Mapped[PyDate] = mapped_column(Date, index=True)
+    start_date: Mapped[Optional[PyDate]] = mapped_column(Date, nullable=True)
+    end_date: Mapped[Optional[PyDate]] = mapped_column(Date, nullable=True)
+    time: Mapped[str] = mapped_column(String(5), default="", server_default="")
+    endtime: Mapped[str] = mapped_column(String(5), default="", server_default="")
+    title: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    location: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Fingerabdruck des Inhalts: nur Geaendertes wird neu geschrieben.
+    sig: Mapped[str] = mapped_column(String(32), default="", server_default="")
+    archived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class QuartalDivider(Base):
     """Optischer Quartalsstrich in der Notentabelle — nach welcher Spalte er
     steht. Mehrere je Klasse+Halbjahr moeglich, rein visuell."""

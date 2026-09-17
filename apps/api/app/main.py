@@ -1214,6 +1214,13 @@ async def _papierkorb_loop():
     laufen, wenn der Container nicht neu startet."""
     while True:
         await _fehlermeldungen_aufraeumen()  # 180 Tage — gleicher Takt
+        # Archiv fremder Termine: zugesagt sind 5 Jahre, geraeumt wird ab 6.
+        try:
+            from .routers.kalender import archiv_raeumen
+            async with async_session() as db:
+                await archiv_raeumen(db)
+        except Exception as e:
+            print(f"[WARN] Archiv fremder Termine nicht geraeumt: {e}", flush=True)
         await asyncio.sleep(6 * 3600)
         await _papierkorb_leeren()
 

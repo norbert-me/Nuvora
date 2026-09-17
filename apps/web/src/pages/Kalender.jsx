@@ -163,7 +163,16 @@ export default function Kalender() {
     if (r) { setAbo((a) => ({ ...a, url: r.url, webcal: r.webcal })); showAlert(t("kalender.resyncDone")); }
   };
   const [extBusy, setExtBusy] = useState(false);
-  const loadExt = (force = false) => { if (force) setExtBusy(true); return hol(`${API}/external-events${force ? "?refresh=1" : ""}`).then((d) => setExtEvents(Array.isArray(d) ? d : [])).finally(() => force && setExtBusy(false)); };
+  // Nur das angezeigte Fenster (plus eine Woche Rand): vergangene fremde
+  // Termine kommen aus dem Archiv, und das reicht Jahre zurueck.
+  const extFenster = useRef("");
+  const loadExt = (force = false) => {
+    if (force) setExtBusy(true);
+    const q = new URLSearchParams();
+    if (force) q.set("refresh", "1");
+    if (extFenster.current) { const [a, b] = extFenster.current.split("|"); q.set("frm", a); q.set("to", b); }
+    const qs = q.toString();
+    return hol(`${API}/external-events${qs ? `?${qs}` : ""}`).then((d) => setExtEvents(Array.isArray(d) ? d : [])).finally(() => force && setExtBusy(false)); };
   // Kalenderliste speichern (URL/Farbe je Kalender) und Events neu ziehen.
   const saveCals = async (cals, mitschicken) => {
     const clean = cals.filter((c) => (c.url || "").trim());
@@ -188,7 +197,7 @@ export default function Kalender() {
     loadHidden();
     loadExt(true);
   };
-  useEffect(() => { hol(`${API}/external`, {}).then((d) => { setExtCals(d.calendars || []); if ((d.calendars || []).length) loadExt(); }); }, []);
+  useEffect(() => { hol(`${API}/external`, {}).then((d) => { setExtCals(d.calendars || []); }); }, []);
   const extByDay = (d) => extEvents.filter((e) => e.date === ymd(d));
   const [entries, setEntries] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -348,6 +357,13 @@ export default function Kalender() {
     const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
     return [mondayOf(first), addDays(mondayOf(last), 6)];
   })();
+  // Fenster fuer die fremden Termine nachziehen, sobald geblaettert wird.
+  const extKey = `${ymd(addDays(range[0], -7))}|${ymd(addDays(range[1], 7))}`;
+  extFenster.current = extKey;   // vor den Effekten: jeder Abruf kennt das Fenster
+  useEffect(() => {
+    if (extCals.length) loadExt();
+  }, [extKey, extCals.length]);
+
 
   const load = useCallback(() => {
     const [a, b] = range;

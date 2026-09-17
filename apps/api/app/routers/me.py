@@ -153,6 +153,8 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
         "klassenarbeitstermine": await _rows(db, m.ExamDate, m.ExamDate.owner_id == uid),
         "segel_stufen": await _rows(db, m.SegelStatus, m.SegelStatus.owner_id == uid),
         "ausgefallene_stunden": await _rows(db, m.SlotCancellation, m.SlotCancellation.owner_id == uid),
+        # Kopien vergangener Termine aus abonnierten Kalendern (ohne Abo-Adresse).
+        "archiv_fremde_termine": await _rows(db, m.ExternalEventArchive, m.ExternalEventArchive.owner_id == uid),
         "planungs_wochen": await _rows(db, m.PlanWeek, m.PlanWeek.owner_id == uid),
         "planungs_bloecke": await _rows(db, m.PlanBlock, in_(m.PlanBlock, "week_id", week_ids)),
         "einstiege_ordner": await _rows(db, m.MethodFolder, m.MethodFolder.owner_id == uid),
