@@ -136,6 +136,8 @@ async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = 
 async def create_work(body: WorkIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("ka_work", f"u{user.id}", 100, 60, "Zu viele Arbeiten. Bitte kurz warten.")
     await _owned_class(db, user, body.class_id)
+    if body.kurs_id is not None:
+        await eigener_kurs(db, user, body.kurs_id)
     w = WorkAnalysis(owner_id=user.id, class_id=body.class_id, kurs_id=body.kurs_id,
                      name=(body.name or "Klassenarbeit").strip()[:200], tasks=[], results={},
                      niveau=body.niveau if body.niveau in ("E", "G") else "")

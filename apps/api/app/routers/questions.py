@@ -1,5 +1,7 @@
 import os
+import re
 import uuid
+from io import BytesIO
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -26,6 +28,10 @@ UPLOAD_DIR = os.environ.get("NUVORA_UPLOAD_DIR", "/app/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
+# Regel und Begruendung: uploads.BILD_URL (auch Import und Marktplatz).
+from ..uploads import BILD_URL as _BILD_URL
+
+
 class QuestionCreate(BaseModel):
     text: str
     question_type: str = "mc"
@@ -49,6 +55,11 @@ class QuestionCreate(BaseModel):
             raise ValueError("Ungültige richtige Antwort")
         if self.num_choices not in (2, 3, 4):
             raise ValueError("Ungültige Antwortanzahl")
+        if self.image_url and not _BILD_URL.fullmatch(self.image_url):
+            raise ValueError("Ungültige Bildadresse")
+        for v in (self.choice_images or {}).values():
+            if v and not (isinstance(v, str) and _BILD_URL.fullmatch(v)):
+                raise ValueError("Ungültige Bildadresse")
         if self.image_layout not in ("above", "left", "right", "below"):
             raise ValueError("Ungültiges Bildlayout")
         for k, v in self.choices.items():
@@ -93,11 +104,10 @@ async def create_question(body: QuestionCreate, user: User = Depends(get_current
 
 @router.put("/{question_id}", response_model=QuestionOut)
 async def update_question(question_id: int, body: QuestionCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    q = await db.get(Question, question_id)
-    if not q or q.deleted_at is not None:
+    # Schreibweg: streng (besitz.nur_eigenes) — eine besitzlose Frage ist nur lesbar.
+    q = await nur_eigenes(db, Question, question_id, user, None, "Kein Zugriff auf diese Frage")
+    if q.deleted_at is not None:
         raise HTTPException(404)
-    if q.owner_id and q.owner_id != user.id:
-        raise HTTPException(403, "Kein Zugriff auf diese Frage")
     await _check_topic(db, user, body.topic_id)
     # `exclude_unset`: nur schreiben, was die Anfrage wirklich genannt hat.
     # Vorher setzte jedes nicht gesendete Feld seinen Default — und weil der
@@ -311,6 +321,33 @@ async def purge_question(question_id: int, user: User, db: AsyncSession):
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
+def _ohne_metadaten(daten: bytes, ext: str) -> bytes:
+    """EXIF (GPS, Geraet, Aufnahmezeit) aus einem Fragenbild entfernen.
+
+    /api/uploads liegt ohne Anmeldung offen — ein Handyfoto vom Arbeitsblatt
+    truege sonst den Standort der Wohnung mit. Neu kodiert wird nur ohne
+    Metadaten; die Drehung aus EXIF wird vorher angewandt, sonst laege das
+    Bild danach auf der Seite. GIF traegt kein EXIF und bleibt, wie es ist
+    (Neukodieren zerstoerte Animationen). Faellt Pillow aus, bleibt das
+    Original — das Format ist oben bereits am Inhalt geprueft.
+    """
+    fmt = {"jpg": "JPEG", "png": "PNG", "webp": "WEBP"}.get(ext)
+    if not fmt:
+        return daten
+    try:
+        from PIL import Image, ImageOps
+        with Image.open(BytesIO(daten)) as bild:
+            bild = ImageOps.exif_transpose(bild)
+            if fmt == "JPEG" and bild.mode not in ("RGB", "L"):
+                bild = bild.convert("RGB")
+            puffer = BytesIO()
+            opts = {"quality": 92} if fmt in ("JPEG", "WEBP") else {"optimize": True}
+            bild.save(puffer, format=fmt, **opts)   # ohne exif=… -> keine Metadaten
+            return puffer.getvalue()
+    except Exception:
+        return daten
+
+
 @router.post("/upload-image")
 async def upload_image(file: UploadFile = File(...), user: User = Depends(get_current_user)):
     rate_limit("frage_bild", f"u{user.id}", 120, 60, "Zu viele Uploads. Bitte kurz warten.")
@@ -337,6 +374,7 @@ async def upload_image(file: UploadFile = File(...), user: User = Depends(get_cu
     # entscheidet am Inhalt und wird auf allen anderen Bildwegen ebenso benutzt.
     ext = {"image/jpeg": "jpg", "image/png": "png",
            "image/gif": "gif", "image/webp": "webp"}[bildtyp(content)]
+    content = _ohne_metadaten(content, ext)
     name = f"{uuid.uuid4().hex}.{ext}"
     with open(os.path.join(UPLOAD_DIR, name), "wb") as f:
         f.write(content)

@@ -16,6 +16,7 @@ from __future__ import annotations
 import ipaddress
 import socket
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -56,10 +57,34 @@ def _pruefe_ziel(url: str):
     except OSError:
         raise NetzFehler("Adresse nicht gefunden")
     for res in infos:
-        ip = ipaddress.ip_address(res[4][0])
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+        if not ip_erlaubt(res[4][0]):
             raise NetzFehler("Ziel-IP nicht erlaubt")
     return host, port, infos
+
+
+_NAT64 = ipaddress.ip_network("64:ff9b::/96")
+
+
+def ip_erlaubt(adresse: str) -> bool:
+    """Nur oeffentlich routbare Adressen.
+
+    Eine Positivliste (`is_global`) statt einer Aufzaehlung verbotener Netze:
+    die Aufzaehlung hatte CGNAT (100.64.0.0/10) vergessen, und in vielen
+    Heimnetzen und Clouds liegen genau dort interne Dienste. IPv6-Huellen um
+    eine IPv4-Adresse (::ffff:…, 6to4, NAT64) werden ausgepackt und die innere
+    Adresse geprueft — sonst waere `::ffff:127.0.0.1` der Umweg.
+    """
+    try:
+        ip = ipaddress.ip_address(adresse.split("%", 1)[0])
+    except ValueError:
+        return False
+    if ip.version == 6:
+        innen = ip.ipv4_mapped or ip.sixtofour
+        if innen is None and ip in _NAT64:
+            innen = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+        if innen is not None and not ip_erlaubt(str(innen)):
+            return False
+    return ip.is_global and not ip.is_multicast
 
 
 class _KeineWeiterleitung(urllib.request.HTTPRedirectHandler):
@@ -78,19 +103,21 @@ class _KeineWeiterleitung(urllib.request.HTTPRedirectHandler):
 
 def hole(url: str, *, daten: bytes = None, kopfzeilen: dict = None,
          timeout: int = 8, max_bytes: int = 2_000_000,
-         cookie_jar=None) -> str:
+         cookie_jar=None, frist: float = None) -> str:
     """Eine fremde URL abrufen und den Text zurueckgeben.
 
     `daten` macht daraus ein POST. `cookie_jar` ist ein `http.cookiejar.CookieJar`,
     falls der Aufrufer eine Sitzung ueber mehrere Aufrufe halten muss (WebUntis
     gibt seine Sitzung als JSESSIONID-Cookie zurueck).
-    """
-    host, port, infos = _pruefe_ziel(url)
 
-    def _festgenagelt(h, p, *a, **k):
-        if h == host and p == port:
-            return infos
-        return _ECHTES_GAI(h, p, *a, **k)
+    `timeout` gilt je Socket-Vorgang — ein Server, der alle sieben Sekunden ein
+    Byte schickt, liefe damit ewig und hielte einen Thread des Pools fest.
+    Deshalb zusaetzlich `frist`: ein Zeitpunkt (`time.monotonic()`), bis zu dem
+    der ganze Abruf fertig sein muss; ohne Angabe `GESAMTFRIST` ab jetzt.
+    """
+    if frist is None:
+        frist = time.monotonic() + GESAMTFRIST
+    host, port, infos = _pruefe_ziel(url)
 
     handler = [_KeineWeiterleitung()]
     if cookie_jar is not None:
@@ -99,28 +126,66 @@ def hole(url: str, *, daten: bytes = None, kopfzeilen: dict = None,
     kopf = {"User-Agent": "Nuvora"}
     kopf.update(kopfzeilen or {})
     req = urllib.request.Request(url, data=daten, headers=kopf)
-    # Der Nagel haelt prozessweit — deshalb EIN Schloss darum.
-    #
-    # Die Abrufe laufen im Threadpool (`run_in_executor` im Kalender). Ohne das
-    # Schloss sicherte sich ein zweiter Thread die BEREITS gepatchte Funktion
-    # als „echte" und stellte am Ende genau die wieder her: die Pin-Closure des
-    # ersten Abrufs blieb dauerhaft in `socket.getaddrinfo` stehen und
-    # beantwortete fortan jede Aufloesung dieses Hosts aus alten Daten.
-    # Nacheinander statt gleichzeitig ist hier billig: ein Kalenderabruf dauert
-    # Sekunden, und es sind eine Handvoll Feeds.
-    with _NAGEL_SCHLOSS:
-        socket.getaddrinfo = _festgenagelt
-        try:
-            with opener.open(req, timeout=timeout) as r:
-                return r.read(max_bytes).decode("utf-8", "replace")
-        finally:
-            socket.getaddrinfo = _ECHTES_GAI
+    rest = frist - time.monotonic()
+    if rest <= 0:
+        raise NetzFehler("Zeitüberschreitung beim Abruf")
+    # Der Nagel gilt nur fuer DIESEN Thread (siehe `_aufloesen`). Frueher wurde
+    # `socket.getaddrinfo` fuer die Dauer des ganzen Abrufs global ersetzt und
+    # ein Schloss darum gehalten — ein einziger langsamer Server legte damit
+    # jeden anderen Abruf (Kalender, Untis, Release-Liste) lahm.
+    _NAEGEL.pins = {(host, port): infos}
+    try:
+        with opener.open(req, timeout=min(timeout, rest)) as r:
+            teile, gelesen = [], 0
+            lesen = getattr(r, "read1", r.read)
+            while gelesen < max_bytes:
+                if time.monotonic() > frist:
+                    raise NetzFehler("Zeitüberschreitung beim Abruf")
+                stueck = lesen(min(65536, max_bytes - gelesen))
+                if not stueck:
+                    break
+                teile.append(stueck)
+                gelesen += len(stueck)
+            return b"".join(teile).decode("utf-8", "replace")
+    finally:
+        _NAEGEL.pins = None
 
 
-# Die echte Aufloesung, EINMAL beim Import gesichert — und das Schloss dazu
-# (siehe `hole`).
+# Die echte Aufloesung, EINMAL beim Import gesichert.
 _ECHTES_GAI = socket.getaddrinfo
-_NAGEL_SCHLOSS = threading.Lock()
+_NAEGEL = threading.local()
+
+# Obergrenze fuer einen ganzen Abruf samt Weiterleitungen (Sekunden).
+GESAMTFRIST = 20.0
+
+
+def _aufloesen(host, port, *a, **k):
+    """`socket.getaddrinfo` mit Nagel je Thread (DNS-Rebinding-Schutz).
+
+    Waehrend `hole()` laeuft, beantwortet dieser Thread die Aufloesung des
+    geprueften Hosts aus dem Ergebnis der Pruefung — ein zweiter DNS-Blick
+    koennte sonst eine interne Adresse liefern. Alle anderen Threads und alle
+    anderen Hosts gehen an die echte Funktion. Einmal beim Import eingesetzt
+    und nie zurueckgetauscht: damit gibt es keinen Wettlauf ums Wiederherstellen
+    mehr, und kein Schloss, das Abrufe hintereinander zwingt.
+    """
+    pins = getattr(_NAEGEL, "pins", None)
+    if pins:
+        try:
+            p = int(port) if port is not None else None
+        except (TypeError, ValueError):
+            p = port
+        infos = pins.get((host, p))
+        if infos is not None:
+            typ = k.get("type", a[1] if len(a) > 1 else 0)
+            if typ:
+                gefiltert = [i for i in infos if i[1] == typ]
+                return gefiltert or infos
+            return infos
+    return _ECHTES_GAI(host, port, *a, **k)
+
+
+socket.getaddrinfo = _aufloesen
 
 
 # Wie viele Weiterleitungen wir mitgehen. Drei reichen fuer jeden echten Fall
@@ -138,9 +203,11 @@ def hole_mit_umleitung(url: str, *, kopfzeilen: dict = None, timeout: int = 8,
     169.254.169.254 zeigt).
     """
     ziel = url
+    frist = time.monotonic() + GESAMTFRIST   # EINE Frist fuer alle Spruenge
     for _ in range(_MAX_UMLEITUNGEN + 1):
         try:
-            return hole(ziel, kopfzeilen=kopfzeilen, timeout=timeout, max_bytes=max_bytes)
+            return hole(ziel, kopfzeilen=kopfzeilen, timeout=timeout, max_bytes=max_bytes,
+                        frist=frist)
         except urllib.error.HTTPError as e:
             if e.code not in (301, 302, 303, 307, 308):
                 raise

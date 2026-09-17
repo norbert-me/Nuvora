@@ -64,15 +64,23 @@ async def test_zweite_administration_ernennen(s):
     """Vorher hing die Rolle allein an der ID: es gab genau eine
     Administration, und bei Krankheit oder Wechsel kam niemand mehr an sie."""
     from app.rollen import ist_admin
-    from app.routers.auth import AdminRolleIn, admin_list_users, admin_set_role
+    from app.routers.auth import AdminRolleIn, _buckets, _hash_pw, admin_list_users, admin_set_role
 
-    chef = User(email="chef@b.de", password_hash="x", name="A")
-    kollege = User(email="kollege@b.de", password_hash="x", name="B")
+    _buckets.clear()
+    chef = User(email="chef@b.de", password_hash=_hash_pw("Chef!Passwort1"), name="A")
+    kollege = User(email="kollege@b.de", password_hash=_hash_pw("Kollege!Pass1"), name="B")
     s.add_all([chef, kollege])
     await s.commit()
     assert chef.id == 1 and not ist_admin(kollege)
 
-    await admin_set_role(kollege.id, AdminRolleIn(admin=True), user=chef, db=s)
+    # Ohne das eigene Passwort geht es nicht — eine uebernommene Sitzung
+    # allein ernennt niemanden (dieselbe Huerde wie beim Kontoloeschen).
+    for falsch in ("", "Kollege!Pass1"):
+        with pytest.raises(Exception):
+            await admin_set_role(kollege.id, AdminRolleIn(admin=True, password=falsch), user=chef, db=s)
+    assert not ist_admin(kollege)
+
+    await admin_set_role(kollege.id, AdminRolleIn(admin=True, password="Chef!Passwort1"), user=chef, db=s)
     assert ist_admin(kollege)
     # Und die Ernannte darf selbst verwalten.
     zeilen = await admin_list_users(user=kollege, db=s)
@@ -80,7 +88,7 @@ async def test_zweite_administration_ernennen(s):
     # Konto 1 bleibt aussen vor — sonst koennte sich eine Installation
     # vollstaendig aussperren.
     with pytest.raises(Exception):
-        await admin_set_role(1, AdminRolleIn(admin=False), user=kollege, db=s)
+        await admin_set_role(1, AdminRolleIn(admin=False, password="Kollege!Pass1"), user=kollege, db=s)
 
-    await admin_set_role(kollege.id, AdminRolleIn(admin=False), user=chef, db=s)
+    await admin_set_role(kollege.id, AdminRolleIn(admin=False, password="Chef!Passwort1"), user=chef, db=s)
     assert not ist_admin(kollege)

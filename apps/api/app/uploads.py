@@ -9,6 +9,7 @@ Fuer Fragen-Bilder gibt es in questions.py bewusst einen eigenen Weg mit
 SVG-Sanitisierung (dort sind Vektorgrafiken erwuenscht). Schuelerfotos und
 Kartenbilder brauchen das nicht — sie sind Fotos.
 """
+import re
 from typing import Optional
 
 from fastapi import HTTPException
@@ -20,6 +21,25 @@ _MAGIC = [
     (b"GIF87a", "image/gif"),
     (b"GIF89a", "image/gif"),
 ]
+
+
+# Ein Fragenbild ist immer ein eigener Upload — eine fremde Adresse waere ein
+# Tracking-Pixel beim Beamer und bei jedem Kind. svg bleibt lesbar zugelassen:
+# Altbestand von vor dem SVG-Verbot soll sich weiter bearbeiten lassen.
+# Blatt, weil Fragen-Router, Import und Marktplatz dieselbe Regel brauchen.
+BILD_URL = re.compile(r"/api/uploads/[0-9a-f]{16,64}\.(?:jpg|jpeg|png|gif|webp|svg)")
+
+
+def eigenes_bild(url):
+    """Die Adresse, wenn sie ein eigener Upload ist — sonst None."""
+    return url if isinstance(url, str) and BILD_URL.fullmatch(url) else None
+
+
+def eigene_bilder(bilder):
+    """choice_images ohne fremde Adressen (fremde fallen still heraus)."""
+    if not isinstance(bilder, dict):
+        return None
+    return {k: v for k, v in bilder.items() if eigenes_bild(v)} or None
 
 
 def bildtyp(daten: bytes) -> str:

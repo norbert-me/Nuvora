@@ -336,6 +336,11 @@ async def update_question_set(set_id: int, body: QuestionSetCreate, user: User =
     if not qs:
         raise HTTPException(404)
     await ensure_set_access(db, qs, user.id)
+    # Besitz nachtragen, wo er eindeutig ist: das Quiz liegt (noch) in einem
+    # EIGENEN Ordner. Ohne owner_id gilt es sonst als Altbestand, den
+    # ensure_set_access jedem Konto oeffnet.
+    await _besitz_nachtragen(db, qs, user.id)
+    await _nur_eigenes_set(db, qs, user.id)
     await eigener_ordner(db, user.id, body.folder_id)
     # Dieselbe Pruefung wie beim Anlegen und beim Anhaengen: ohne sie liess sich
     # ein eigenes Quiz aus FREMDEN Fragen zusammenstellen, und die Antwort
@@ -370,14 +375,22 @@ async def delete_question_set(set_id: int, user: User = Depends(get_current_user
     if not qs:
         raise HTTPException(404)
     await ensure_set_access(db, qs, user.id)
+    await _besitz_nachtragen(db, qs, user.id)
+    # Loeschen kennt keine Nachsicht (besitz.nur_eigenes): ein besitzloses Quiz
+    # in einem besitzlosen Ordner darf nicht jedes Konto wegnehmen.
+    await _nur_eigenes_set(db, qs, user.id)
     # Welche Fragen haengen NUR an diesem Quiz? Nach dem Loeschen waeren sie
     # nirgends mehr erreichbar — an eine Frage kommt man ausschliesslich ueber
     # ein Quiz. Sie blieben unsichtbar in der Datenbank liegen und tauchten nur
     # noch in der Themen-Ansicht auf, wo sie neben ihrem Zwilling aus einem
     # anderen Quiz wie eine doppelte Zeile aussehen. Genau so sind die Reste
     # entstanden, die niemand mehr zuordnen konnte.
+    # Nur Fragen DIESES Kontos wandern in den Papierkorb — eine fremde oder
+    # besitzlose Frage, die im Quiz steht, bleibt unberuehrt.
     eigene = (await db.execute(
-        select(QuestionSetItem.question_id).where(QuestionSetItem.question_set_id == set_id)
+        select(QuestionSetItem.question_id)
+        .join(Question, Question.id == QuestionSetItem.question_id)
+        .where(QuestionSetItem.question_set_id == set_id, Question.owner_id == user.id)
     )).scalars().all()
     nur_hier = []
     if eigene:
@@ -401,7 +414,7 @@ async def delete_question_set(set_id: int, user: User = Depends(get_current_user
         # sein. Ein geloeschtes Quiz nimmt oft Fragen mit, die man doch noch
         # braucht — zurueckholbar ist das die halbe Miete.
         from datetime import datetime, timezone
-        await db.execute(sql_update(Question).where(Question.id.in_(nur_hier))
+        await db.execute(sql_update(Question).where(Question.id.in_(nur_hier), Question.owner_id == user.id)
                          .values(deleted_at=datetime.now(timezone.utc)))
     await db.commit()
 
@@ -446,6 +459,30 @@ async def ensure_set_access(db: AsyncSession, qs: QuestionSet, user_id: int):
             raise HTTPException(403, "Kein Zugriff auf dieses Frageset")
     elif qs.owner_id is not None and qs.owner_id != user_id:
         raise HTTPException(403, "Kein Zugriff auf dieses Frageset")
+
+
+async def _besitz_nachtragen(db: AsyncSession, qs: QuestionSet, user_id: int):
+    """owner_id setzen, wenn er fehlt und der AKTUELLE Ordner dem Konto gehoert.
+
+    Bewusst der aktuelle, nicht der Zielordner: sonst koennte jedes Konto ein
+    besitzloses Quiz durch Verschieben in den eigenen Ordner an sich ziehen.
+    """
+    if qs.owner_id is not None or qs.folder_id is None:
+        return
+    f = await db.get(Folder, qs.folder_id)
+    if f is not None and f.owner_id == user_id:
+        qs.owner_id = user_id
+
+
+async def _nur_eigenes_set(db: AsyncSession, qs: QuestionSet, user_id: int):
+    """Strenge Fassung von ensure_set_access fuer Schreib- und Loeschwege."""
+    if qs.owner_id == user_id:
+        return
+    if qs.owner_id is None and qs.folder_id is not None:
+        f = await db.get(Folder, qs.folder_id)
+        if f is not None and f.owner_id == user_id:
+            return
+    raise HTTPException(403, "Keine Berechtigung")
 
 
 def _niveau_of(niveaus: dict, qid: int) -> str:

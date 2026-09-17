@@ -697,6 +697,8 @@ async def _find_override(db, user, class_id, student_id, section_id, term, kurs_
 async def set_override(body: OverrideIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("noten_over", f"u{user.id}", 600, 60, "Zu viele Änderungen in kurzer Zeit. Bitte kurz warten.")
     await _owned_class(db, user, body.class_id)
+    if body.kurs_id is not None:
+        await eigener_kurs(db, user, body.kurs_id)
     if body.section_id is not None:
         await _owned_section(db, user, body.section_id)
     if not await _student_in_kurs(db, body.class_id, body.student_id, body.kurs_id):
@@ -1124,14 +1126,17 @@ async def import_code_session(body: ImportCodeBody, user: User = Depends(require
         raise HTTPException(400, "Die Session hat keine Rätsel")
 
     # Je Spieler die Menge geloester Raetsel (distinct puzzleId mit solved).
+    # Gezaehlt wird nur, was wirklich zu dieser Sitzung gehoert — die Meldungen
+    # kommen ohne Anmeldung herein, eine erfundene puzzleId darf nicht zaehlen.
+    gueltig = {str(p.get("id")) for p in (sess.puzzles or []) if isinstance(p, dict) and p.get("id") is not None}
     solved: dict[str, set] = {}
     for r in (sess.results or []):
         pn = r.get("playerName")
         if not pn:
             continue
         solved.setdefault(pn, set())
-        if r.get("solved"):
-            solved[pn].add(r.get("puzzleId"))
+        if r.get("solved") and str(r.get("puzzleId")) in gueltig:
+            solved[pn].add(str(r.get("puzzleId")))
 
     roster = await _kurs_roster(db, user, body.class_id, body.kurs_id)
     by_name = {}
@@ -1150,7 +1155,7 @@ async def import_code_session(body: ImportCodeBody, user: User = Depends(require
         if not sid:
             unmatched.append(pn)
             continue
-        pct = (len(done) / total) * 100
+        pct = min(100.0, (len(done) / total) * 100)
         db.add(GradeEntry(category_id=cat.id, student_id=sid, kind="grade",
                           value=_grade_from_pct(pct, scale), note="Aus Code-Detektiv (Vorschlag)"))
         angelegt += 1

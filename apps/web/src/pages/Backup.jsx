@@ -10,7 +10,7 @@
 // definiert (CLAUDE.md: einzige Design-Quelle).
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "../i18n/index.jsx";
-import { askConfirm } from "../core/dialog.jsx";
+import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import { alsJson } from "../core/melden.js";
 import {
   pageApp, pageTitle, pageIntro, panelStyle, cardStyle, btnPrimary, btnSecondary,
@@ -120,6 +120,15 @@ export default function Backup() {
     }
   };
 
+  // Herunterladen, Hochladen und Einspielen bewegen die Daten ALLER Konten —
+  // der Server verlangt dafür das eigene Passwort (wie beim Löschen eines
+  // Kontos). Gefragt wird als Passwortfeld: gesichert wird im Klassenraum,
+  // mit laufendem Beamer. `null` heißt abgebrochen.
+  const passwortFragen = async () => {
+    const pw = await askPrompt(t("profile.deleteUserPassword"), { typ: "password" });
+    return pw ? pw : null;
+  };
+
   const einstellen = async (feld, wert) => {
     setBusy(feld); setMeldung(null);
     try {
@@ -136,12 +145,15 @@ export default function Backup() {
 
   // Der Download läuft über den angemeldeten Endpunkt, nicht über eine feste
   // Adresse: ein <a href> würde den Token aus dem localStorage nicht
-  // mitschicken (der globale fetch-Interceptor in main.jsx tut es).
+  // mitschicken (der globale fetch-Interceptor in main.jsx tut es). POST, weil
+  // das Passwort im Rumpf mitgeht und nie in der Adresse stehen darf.
   const laden_datei = async (name) => {
+    const pw = await passwortFragen();
+    if (!pw) return;
     setBusy(name); setMeldung(null);
     try {
-      const r = await fetch(`${API}/${encodeURIComponent(name)}`);
-      if (!r.ok) throw new Error(r.status);
+      const r = await fetch(`${API}/${encodeURIComponent(name)}/herunterladen`, alsJson("POST", { password: pw }));
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status);
       const blob = await r.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -174,10 +186,13 @@ export default function Backup() {
     const datei = ereignis.target.files?.[0];
     ereignis.target.value = ""; // dieselbe Datei soll erneut wählbar bleiben
     if (!datei) return;
+    const pw = await passwortFragen();
+    if (!pw) return;
     setBusy("upload"); setMeldung(null); setPruefung(null); setProbe(null);
     try {
       const formular = new FormData();
       formular.append("file", datei);
+      formular.append("password", pw);
       const r = await fetch(`${API}/hochladen`, { method: "POST", body: formular });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.detail || r.status);
@@ -224,9 +239,12 @@ export default function Backup() {
 
   const einspielen = async () => {
     const name = dialog.name;
+    const pw = await passwortFragen();
+    if (!pw) return;
     setDialog((v) => ({ ...v, laeuft: true, fehler: "" }));
     try {
-      const r = await fetch(`${API}/${encodeURIComponent(name)}/zurueckspielen`, alsJson("POST", { bestaetigung: dialog.wort }));
+      const r = await fetch(`${API}/${encodeURIComponent(name)}/zurueckspielen`,
+        alsJson("POST", { bestaetigung: dialog.wort, password: pw }));
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.detail || r.status);
       // Neu laden, nicht neu rendern: die Oberfläche hält sonst Klassen, Namen

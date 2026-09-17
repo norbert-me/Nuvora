@@ -149,7 +149,22 @@ const raetselSenden = (p) =>
  * Seite: dort heißt 404 „Session nicht gefunden", hier 400 „läuft schon".
  */
 export function sessionBeitreten(code, name) {
-  return fetch(`${S_API}/${code}/join`, alsJson('POST', { name })).catch(() => null);
+  return fetch(`${S_API}/${code}/join`, alsJson('POST', { name }))
+    .then((r) => { if (r && r.ok) r.clone().json().then((d) => spielerTokenMerken(code, d)).catch(() => {}); return r; })
+    .catch(() => null);
+}
+
+// Der Server gibt beim ersten Beitritt unter einem Namen einen Spieler-Token
+// aus; nur wer ihn mitschickt, darf Ergebnisse unter diesem Namen melden.
+// sessionStorage: er gilt dieser Runde in diesem Tab, nicht dem Geraet.
+const TOKEN_KEY = (code) => `cd_spieler_${code}`;
+function spielerTokenMerken(code, antwort) {
+  const tok = antwort && antwort.player_token;
+  if (!tok) return;
+  try { sessionStorage.setItem(TOKEN_KEY(code), tok); } catch { /* egal */ }
+}
+function spielerToken(code) {
+  try { return sessionStorage.getItem(TOKEN_KEY(code)) || undefined; } catch { return undefined; }
 }
 
 /** Gibt es diese Session? (Öffentliche Seite prüft das vor dem Formular.) */
@@ -203,7 +218,10 @@ export function StoreProvider({ children }) {
       }
       case 'JOIN_SESSION':
         rawDispatch({ type: 'SET_USER', user: { name: action.name, role: 'player' } });
-        rufen(`${S_API}/${action.sessionId}/join`, alsJson('POST', { name: action.name }));
+        fetch(`${S_API}/${action.sessionId}/join`, alsJson('POST', { name: action.name }))
+          .then((r) => (r.ok ? r.json() : null))
+          .then((srv) => { if (!srv) return; spielerTokenMerken(action.sessionId, srv); applySession(srv); })
+          .catch(() => {});
         return;
       case 'START_SESSION':
         rufen(`${S_API}/${action.sessionId}/start`, { method: 'POST' });
@@ -218,7 +236,7 @@ export function StoreProvider({ children }) {
         rufen(`${S_API}/${action.sessionId}/remove`, alsJson('POST', { name: action.playerName }));
         return;
       case 'SUBMIT_RESULT':
-        rufen(`${S_API}/${action.sessionId}/result`, alsJson('POST', action.result));
+        rufen(`${S_API}/${action.sessionId}/result`, alsJson('POST', { ...action.result, playerToken: spielerToken(action.sessionId) }));
         return;
       default:
         return rawDispatch(action);

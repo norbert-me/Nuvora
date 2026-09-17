@@ -137,7 +137,7 @@ async def submit_scan(body: ScanCreate, user: User = Depends(get_current_user), 
                                         .with_for_update())).scalar_one_or_none()
         if not session or not session.current_question_id:
             raise HTTPException(400, "No active question in session")
-        if session.owner_id and session.owner_id != user.id:
+        if session.owner_id != user.id:   # Schreibweg: ohne Besitzer kein Zugriff
             raise HTTPException(403)
 
         existing = await db.execute(

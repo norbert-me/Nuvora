@@ -396,8 +396,6 @@ async def _check_verknuepfungen(db: AsyncSession, user: User, body) -> None:
             raise HTTPException(403, f"{klartext} lässt sich nicht verknüpfen: "
                                      f"das Modul {modul} ist nicht eingeschaltet")
         obj = await db.get(modell, wert)
-        # Die Lernleiter haengt am Pfad, nicht direkt am Konto — dort prueft der
-        # Lernpfad-Router; hier reicht, dass es sie gibt.
         if not obj:
             raise HTTPException(404, f"{klartext} nicht gefunden (Nr. {wert}) — "
                                      "vermutlich gelöscht; die Verknüpfung im Eintrag entfernen")
@@ -414,6 +412,15 @@ async def _check_verknuepfungen(db: AsyncSession, user: User, body) -> None:
                 ordner = await db.get(Folder, obj.folder_id)
                 besitzer = ordner.owner_id if ordner else None
             if besitzer != user.id:
+                raise HTTPException(404, f"{klartext} nicht gefunden (Nr. {wert}) — "
+                                         "gehört zu einem anderen Konto")
+        if modell is LearningLadder:
+            # Die Lernleiter haengt am Pfad, nicht direkt am Konto — der Besitz
+            # steht am Pfad. Vorher reichte hier, dass es sie gibt: eine fremde
+            # Leiter liess sich einplanen und am Kalendertag freischalten.
+            from ..models import LearningPath
+            pfad = await db.get(LearningPath, obj.path_id)
+            if pfad is None or pfad.owner_id != user.id:
                 raise HTTPException(404, f"{klartext} nicht gefunden (Nr. {wert}) — "
                                          "gehört zu einem anderen Konto")
 

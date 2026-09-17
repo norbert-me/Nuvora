@@ -16,7 +16,7 @@ from .models import AppSetting, Base, Kurs, Session as SessionModel, User
 from .admin import _require_admin, APP_VERSION  # noqa: F401 — Routen unten
 from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, caldav, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, pap, personen, tafel, trash, selftest, backup
 from . import websocket as ws
-from .routers.auth import _hash_pw, _verify_token, get_current_user, rate_limit, TOKEN_TTL
+from .routers.auth import _hash_pw, _token_teile, get_current_user, rate_limit, token_gueltig_bis
 from .routers.karten import uebernahme_deck_kurse
 from .personen import uebernahme_personen
 
@@ -933,6 +933,13 @@ async def startup():
                 FROM school_classes c
                 WHERE s.owner_id IS NULL AND s.class_id = c.id AND c.owner_id IS NOT NULL
             """),
+            # Sitzung ohne Klasse: ueber ihr Quiz. Sonst bliebe sie fuer immer
+            # schreibgesperrt (Schreibwege verlangen nur_eigenes).
+            ("Sitzung (Quiz)", """
+                UPDATE sessions s SET owner_id = qs.owner_id
+                FROM question_sets qs
+                WHERE s.owner_id IS NULL AND s.question_set_id = qs.id AND qs.owner_id IS NOT NULL
+            """),
             ("Frage", """
                 UPDATE questions q SET owner_id = t.owner_id
                 FROM (
@@ -1065,6 +1072,7 @@ async def startup():
     # erzeugt. Ein Marker in app_settings verhindert das dauerhaft.
     admin_email = os.environ.get("ADMIN_EMAIL", "")
     admin_pw = os.environ.get("ADMIN_PASSWORD", "")
+    admin_passwort_pruefen(admin_pw)
     if admin_email and admin_pw:
         async with async_session() as db:
             done = await db.get(AppSetting, "admin_bootstrapped")
@@ -1083,6 +1091,49 @@ async def startup():
     asyncio.create_task(_papierkorb_loop())           # Papierkorb, 30 Tage
     asyncio.create_task(_codesessions_aufraeumen())   # Code-Detektiv-Sitzungen
     asyncio.create_task(backup.plan_loop())           # geplante Sicherungen, stuendlich geprueft
+
+
+ADMIN_PW_MIN = 12
+ADMIN_PW_PLATZHALTER = {"bitte-aendern", "changeme", "admin", "password", "passwort"}
+
+
+def admin_passwort_pruefen(pw: str):
+    """Mit dem Platzhalter aus der Vorlage oder einem kurzen Passwort startet
+    die Installation nicht.
+
+    Das Passwort legt das Betreiberkonto an — das Konto mit Zugriff auf die
+    Sicherungen aller Lehrkraefte. „bitte-aendern" steht in jeder
+    `.env.example`; wer es vergisst, betreibt eine oeffentlich erreichbare
+    Installation mit einem Passwort, das im Repository steht. Leer bleibt
+    erlaubt: dann wird kein Konto angelegt (Bestandsinstallation).
+    Geprueft wird bei JEDEM Start, nicht nur beim ersten: sonst faellt der
+    Platzhalter erst auf, wenn es schon zu spaet ist.
+    """
+    if not pw:
+        return
+    if pw.strip().lower() in ADMIN_PW_PLATZHALTER or len(pw) < ADMIN_PW_MIN:
+        raise SystemExit(
+            f"[STARTUP-FEHLER] ADMIN_PASSWORD ist der Platzhalter oder kuerzer als "
+            f"{ADMIN_PW_MIN} Zeichen. Bitte in .env ein eigenes, langes Passwort setzen "
+            "(oder die Zeile leeren, wenn das Admin-Konto schon besteht) und neu starten.")
+
+
+# Fehlermeldungen haben eine Frist: sie tragen Screenshots, Protokoll und
+# Umgebung, und „an diesem Bericht wird noch gearbeitet" dauert kein halbes
+# Jahr. Die Datenschutzerklaerung nennt die Frist; hier laeuft sie.
+BUGREPORT_TAGE = 180
+
+
+async def _fehlermeldungen_aufraeumen():
+    from sqlalchemy import text
+    try:
+        async with async_session() as db:
+            await db.execute(text(
+                f"DELETE FROM bug_reports WHERE created_at < now() - interval '{BUGREPORT_TAGE} days'"
+            ))
+            await db.commit()
+    except Exception as e:
+        print(f"[WARN] Fehlermeldungen nicht aufgeraeumt: {type(e).__name__}: {e}", flush=True)
 
 
 # Arten des gemeinsamen Papierkorbs (routers/trash.py). Kinder zuerst, damit die
@@ -1130,6 +1181,7 @@ async def _papierkorb_loop():
     """Die 30-Tage-Frist steht in der Datenschutzerklaerung — also muss sie auch
     laufen, wenn der Container nicht neu startet."""
     while True:
+        await _fehlermeldungen_aufraeumen()  # 180 Tage — gleicher Takt
         await asyncio.sleep(6 * 3600)
         await _papierkorb_leeren()
 
@@ -1184,15 +1236,12 @@ async def _cleanup_unverified_loop():
 
 async def _ws_is_session_owner(token: str, session_id: int) -> bool:
     """Prueft, ob das Token zur Besitzer-Person der Session gehoert (fuer Steuerbefehle)."""
-    import time as _time
     if not token:
         return False
-    result = _verify_token(token)
-    if result is None:
+    result = _token_teile(token)
+    if result is None or not token_gueltig_bis(result):
         return False
-    user_id, tv, ts = result
-    if int(_time.time()) - ts > TOKEN_TTL:
-        return False
+    user_id, tv, _ts, _beginn = result
     async with async_session() as db:
         user = await db.get(User, user_id)
         if not user or tv != user.token_version:
@@ -1211,11 +1260,45 @@ async def _ws_is_session_owner(token: str, session_id: int) -> bool:
 @app.websocket("/ws/session/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: int):
     import json as _json
+
+    async def _schliessen(code: int):
+        try:
+            await websocket.close(code=code)
+        except Exception:
+            pass  # Gegenseite ist schon weg
+
     if not await ws.connect(session_id, websocket):
-        return  # Verbindungslimit für diese Session erreicht
-    # Authentifizierung per erster Nachricht (Token nicht in der URL -> nicht in Logs)
-    is_owner = False
+        return  # zu viele Wartende (Flut-Schutz)
+    # Authentifizierung per erster Nachricht (Token nicht in der URL -> nicht in Logs).
+    # Wer sich nicht innerhalb der Frist ausweist, fliegt: eine offene, stumme
+    # Leitung belegt sonst einen Platz, den ein echter Scanner braucht.
     try:
+        frist = asyncio.get_running_loop().time() + ws.AUSWEIS_FRIST
+        while True:
+            rest = frist - asyncio.get_running_loop().time()
+            if rest <= 0:
+                await _schliessen(1008)
+                return
+            try:
+                raw = await asyncio.wait_for(websocket.receive_text(), rest)
+            except asyncio.TimeoutError:
+                await _schliessen(1008)
+                return
+            try:
+                msg = _json.loads(raw)
+            except Exception:
+                continue
+            if not isinstance(msg, dict) or msg.get("type") != "auth":
+                continue
+            if not await _ws_is_session_owner(msg.get("token", ""), session_id):
+                await _schliessen(1008)  # falscher Ausweis: kein zweiter Versuch
+                return
+            # Erst jetzt in die Verteilerliste: wer sich nicht ausweist,
+            # hoert auch nicht mit (fremde Sitzungsnummer ist durchzaehlbar).
+            if not ws.freigeben(websocket, session_id):
+                await _schliessen(1013)  # Obergrenze je Sitzung erreicht
+                return
+            break
         while True:
             raw = await websocket.receive_text()
             try:
@@ -1224,20 +1307,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                 continue
             if not isinstance(msg, dict):
                 continue
-            if msg.get("type") == "auth":
-                is_owner = await _ws_is_session_owner(msg.get("token", ""), session_id)
-                # Erst jetzt in die Verteilerliste: wer sich nicht ausweist,
-                # hoert auch nicht mit (fremde Sitzungsnummer ist durchzaehlbar).
-                if is_owner:
-                    ws.freigeben(websocket)
-                continue
-            # Steuerbefehle nur von der authentifizierten Besitzer-Person weiterreichen
-            if not is_owner:
-                continue
             # remote: Scanner -> Host (Aufdecken/Weiter/...); host_state/session_finished: Host -> Scanner
             if msg.get("type") in ("remote", "host_state", "session_finished"):
                 await ws.broadcast(session_id, msg)
     except WebSocketDisconnect:
+        pass
+    finally:
         ws.disconnect(session_id, websocket)
 
 
@@ -1752,8 +1827,15 @@ async def bugreport_anhang(report_id: int, user=Depends(_require_admin), db=Depe
                           .options(undefer(BugReport.anhang)))).scalar_one_or_none()
     if not r or not r.anhang:
         raise HTTPException(404, "Kein Anhang")
+    # Immer als Download und nie „inline": der Anhang kommt von einem
+    # beliebigen angemeldeten Konto, Typ und Inhalt bestimmt der Melder. Inline
+    # mit „text/html" oder „image/svg+xml" liefe fremdes Skript unter unserer
+    # Herkunft — im Browser der Administration. nosniff verhindert zusaetzlich,
+    # dass der Browser einen harmlos deklarierten Typ selbst umdeutet.
     return _Resp(content=r.anhang, media_type=r.anhang_typ or "application/octet-stream",
-                 headers={"Content-Disposition": anhang_kopf(r.anhang_name or "anhang", "inline")})
+                 headers={"Content-Disposition": anhang_kopf(r.anhang_name or "anhang", "attachment"),
+                          "X-Content-Type-Options": "nosniff",
+                          "Cache-Control": "no-store, private"})
 
 
 @app.post("/api/contact")

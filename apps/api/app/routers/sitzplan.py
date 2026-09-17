@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import klasse_oder_403, kurs_oder_klasse
 from ..database import get_db
+from ..kursmitglieder import eigener_kurs
 from ..models import SchoolClass, SeatingPlan, SegelStatus, Student, User
 from .auth import rate_limit
 from .modules import modul_pflicht
@@ -65,6 +66,8 @@ def _num(v, default=0.0):
 async def put_plan(class_id: int, body: PlanIn, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("sitzplan", f"u{user.id}", 300, 60, "Zu viele Änderungen. Bitte kurz warten.")
     await _owned_class(db, user, class_id)
+    if kurs_id is not None:   # fremde Kurs-ID nicht in eigene Zeilen schreiben
+        await eigener_kurs(db, user, kurs_id)
     seats = []
     for s in (body.seats or [])[:400]:
         if not isinstance(s, dict) or not isinstance(s.get("sid"), (int, float)):
@@ -119,6 +122,8 @@ async def get_segel(class_id: int, kurs_id: Optional[int] = None, user: User = D
 async def set_segel(class_id: int, body: SegelIn, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("segel", f"u{user.id}", 300, 60, "Zu viele Änderungen. Bitte kurz warten.")
     await _owned_class(db, user, class_id)
+    if kurs_id is not None:   # fremde Kurs-ID nicht in eigene Zeilen schreiben
+        await eigener_kurs(db, user, kurs_id)
     if body.stage not in SEGEL_STAGES:
         raise HTTPException(400, "Ungültige SEGEL-Stufe")
     # Schueler muss der Lehrkraft gehoeren (ueber die Klasse).

@@ -4,6 +4,8 @@ Damit Rätsel themen-getaggt und im Kalender planbar sind, liegen die eigenen
 Rätsel der Lehrkraft im Kern (nicht mehr nur im Browser-localStorage). Die App
 arbeitet weiter mit ihrer stabilen `client_id`; upsert läuft darüber.
 """
+import hashlib
+import hmac
 import secrets
 from typing import List, Optional
 
@@ -90,7 +92,8 @@ def _session_public(s: CodeSession) -> dict:
     return {
         "code": s.code,
         "puzzles": s.puzzles or [],
-        "players": s.players or [],
+        # Ohne den Token-Hash: die Liste ist oeffentlich lesbar.
+        "players": [{k: v for k, v in p.items() if k != "tok"} for p in (s.players or [])],
         "results": s.results or [],
         "started": s.started,
         "ended": s.ended,
@@ -207,6 +210,15 @@ async def get_session(code: str, request: Request, db: AsyncSession = Depends(ge
     return _session_public(s)
 
 
+def _tok_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _raetsel_ids(s: CodeSession) -> set:
+    """Die IDs der Raetsel, die in DIESER Sitzung gespielt werden."""
+    return {str(p.get("id")) for p in (s.puzzles or []) if isinstance(p, dict) and p.get("id") is not None}
+
+
 class JoinIn(BaseModel):
     name: str
 
@@ -238,17 +250,25 @@ async def join_session(code: str, body: JoinIn, request: Request, db: AsyncSessi
             return _session_public(s)  # schon dabei
         if s.started:
             raise HTTPException(400, "Session läuft bereits")
-        players.append({"name": name, "joinedAt": _now().isoformat()})
+        # Spieler-Token: wird GENAU EINMAL ausgegeben, beim ersten Beitritt
+        # unter diesem Namen. Wer denselben Namen spaeter noch einmal nimmt,
+        # bekommt keinen — der Name gehoert dem ersten.
+        token = secrets.token_urlsafe(18)
+        players.append({"name": name, "joinedAt": _now().isoformat(), "tok": _tok_hash(token)})
         s.players = players
         flag_modified(s, "players")
         await db.commit()
-        return _session_public(s)
+        return {**_session_public(s), "player_token": token}
 
     return await mit_wiederholung(db, eintragen, versuche=8)
 
 
 class ResultIn(BaseModel):
     playerName: str
+    # Aus dem Beitritt (`player_token`). Optional, solange die App ihn noch
+    # nicht mitschickt: fehlt er, wird wie bisher angenommen; ist er da, muss
+    # er passen.
+    playerToken: Optional[str] = None
     puzzleId: str
     solved: bool = False
     attempts: int = 0
@@ -283,13 +303,21 @@ async def submit_result(code: str, body: ResultIn, request: Request, db: AsyncSe
         # konnte sonst waehrend des laufenden Spiels beliebige Namen in die Liste (und
         # damit in die Notenspalte) schreiben. Vor dem Start wird ein verlorener
         # Beitritt still nachgeholt, damit kein Kind sein Ergebnis verliert.
+        # Nur Raetsel dieser Sitzung zaehlen — sonst liessen sich mit erfundenen
+        # IDs beliebig viele „geloeste" Raetsel melden (und in die Note tragen).
+        if pid not in _raetsel_ids(s):
+            raise HTTPException(400, "Unbekanntes Rätsel")
         players = list(s.players or [])
-        if not any(p.get("name") == pn for p in players):
+        spieler = next((p for p in players if p.get("name") == pn), None)
+        if spieler is None:
             if s.started:
                 raise HTTPException(403, "Nicht in dieser Sitzung angemeldet")
             players.append({"name": pn, "joinedAt": _now().isoformat()})
             s.players = players
             flag_modified(s, "players")
+        elif body.playerToken is not None and spieler.get("tok") and not hmac.compare_digest(
+                spieler["tok"], _tok_hash(body.playerToken)):
+            raise HTTPException(403, "Nicht in dieser Sitzung angemeldet")
         results = list(s.results or [])
         if any(r.get("playerName") == pn and r.get("puzzleId") == pid for r in results):
             return _session_public(s)

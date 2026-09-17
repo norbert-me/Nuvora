@@ -168,7 +168,8 @@ async def _erkenne_und_speichere(image_bytes: bytes, session_id: int, save: bool
         return ScanImageResponse(cards=cards)
 
     session = await db.get(Session, session_id)
-    if session and session.owner_id and session.owner_id != user.id:
+    # Schreibweg: besitzlose Sitzungen nur lesen (siehe besitz.nur_eigenes).
+    if session and session.owner_id != user.id:
         raise HTTPException(403)
     if session and session.current_question_id:
         # Alle vorhandenen Scans dieser Frage EINMAL holen statt je Karte eine
@@ -266,7 +267,7 @@ async def confirm_scans(body: ConfirmScanRequest, user: User = Depends(get_curre
     session = await db.get(Session, body.session_id)
     if not session:
         raise HTTPException(404)
-    if session.owner_id and session.owner_id != user.id:
+    if session.owner_id != user.id:   # Schreibweg: ohne Besitzer kein Zugriff
         raise HTTPException(403)
     if not session.current_question_id:
         return {"ok": True}

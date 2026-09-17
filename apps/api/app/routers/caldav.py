@@ -52,7 +52,8 @@ from ..models import (CaldavToken, CalendarEntry, Kurs, SchoolClass,
                       SlotCancellation, TimetableSlot, User)
 from ..oeffentlich import site_url as _site_url
 from ..zeit import tagesbeginn
-from .auth import _hash_pw, _verify_pw, client_ip, rate_limit
+from .auth import (_DUMMY_PW_HASH, _hash_pw, _verify_pw, client_ip, fehlversuch_merken,
+                   fehlversuche_pruefen, rate_limit)
 from .kalender import (_d_iso, _kurs_label, ext_dateiname, ext_uid,
                        externe_ereignisse, stundenplan_vorkommen,
                        todo_dateiname, todo_termine, todo_uid)
@@ -230,9 +231,13 @@ async def _anmelden(request: Request, db: AsyncSession) -> User:
         raise _Unangemeldet("Anmeldekopf unvollstaendig")
     kennung, passwort = roh.split(":", 1)
 
-    # Bremse gegen Durchprobieren: ein CalDAV-Client meldet sich oft an, aber
-    # nicht hundertmal in der Minute mit wechselnden Passwoertern.
-    rate_limit("caldav", f"n{kennung.lower()[:80]}", 60, 60, "Zu viele Anmeldungen.")
+    # Bremse gegen Durchprobieren je Benutzername. Gezaehlt werden nur
+    # FEHLversuche: ein Client, der alle paar Minuten richtig anmeldet (und
+    # davon hat eine Lehrkraft mehrere), treibt den Zaehler nicht hoch — und
+    # ein Fremder, der richtig raten muesste, sperrt die echten Geraete nur
+    # mit Fehlversuchen aus, die hier gebremst werden.
+    name_schluessel = f"n{kennung.strip().lower()[:80]}"
+    fehlversuche_pruefen("caldav", name_schluessel, 30, 60, "Zu viele Anmeldungen.")
     # Und eine zweite je Adresse. Hier haengt Arbeit dran, die ein Angreifer
     # ohne jede Anmeldung ausloest: je Anfrage werden bis zu 20 Geraete-
     # Passwoerter mit Argon2id geprueft (19 MiB und ~14 ms das Stueck). Ohne
@@ -244,13 +249,20 @@ async def _anmelden(request: Request, db: AsyncSession) -> User:
 
     u = (await db.execute(select(User).where(User.email == kennung.strip().lower()))).scalar_one_or_none()
     if not u:
+        # Blindpruefung wie beim Login: sonst verraet die Antwortzeit, welche
+        # Adresse ein Konto hat (unbekannt ~0 ms, bekannt ~14 ms je Passwort).
+        _verify_pw(passwort, _DUMMY_PW_HASH)
+        fehlversuch_merken("caldav", name_schluessel)
         raise _Unangemeldet("Benutzername unbekannt")
     marken = (await db.execute(select(CaldavToken).where(CaldavToken.owner_id == u.id))).scalars().all()
+    if not marken:
+        _verify_pw(passwort, _DUMMY_PW_HASH)  # dieselbe Rechenzeit wie oben
     for m in marken:
         if _verify_pw(passwort, m.token_hash):
             m.last_used_at = datetime.now(timezone.utc)
             await db.commit()
             return u
+    fehlversuch_merken("caldav", name_schluessel)
     raise _Unangemeldet("Geraete-Passwort stimmt nicht"
                         if marken else "fuer dieses Konto gibt es kein Geraete-Passwort")
 

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import eigenes, klasse_oder_403, kurs_oder_klasse
 from ..database import get_db
+from ..kursmitglieder import eigener_kurs
 from ..schueler import in_klasse
 from ..models import OrgaItem, User
 from .auth import rate_limit
@@ -74,6 +75,8 @@ async def list_items(class_id: int, kurs_id: Optional[int] = None, user: User = 
 async def create_item(class_id: int, body: ItemIn, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("orga", f"u{user.id}", 200, 60, "Zu viele Punkte. Bitte kurz warten.")
     await _owned_class(db, user, class_id)
+    if kurs_id is not None:   # fremde Kurs-ID nicht in eigene Zeilen schreiben
+        await eigener_kurs(db, user, kurs_id)
     name = (body.name or "").strip()
     if not name:
         raise HTTPException(400, "Name darf nicht leer sein")

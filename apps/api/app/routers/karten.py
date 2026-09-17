@@ -24,7 +24,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..besitz import eigene_klasse, eigenes
+from ..besitz import eigene_klasse, eigenes, gehoert_optional
 from ..kursmitglieder import class_kurs_ids, eigener_kurs, student_kurs_ids
 from ..nebenlauf import mit_wiederholung
 from ..oeffentlich import basis as oeffentliche_basis
@@ -383,6 +383,20 @@ async def _owned_card_folder(db, user, folder_id):
     return await eigenes(db, CardFolder, folder_id, user, "Ordner nicht gefunden")
 
 
+async def _bindungen_pruefen(db, user, body):
+    """Thema und Ordner eines Stapels muessen dem Konto gehoeren.
+
+    Beide kamen als blosse Zahl aus dem Rumpf. Ein fremdes Thema haengte den
+    Stapel in den Themenstand und die Kalender-Freischaltung eines anderen
+    Kontos; ein fremder Ordner legte ihn in dessen Ablage.
+    """
+    from ..models import Topic
+    await gehoert_optional(db, Topic, body.topic_id, user.id, pflicht=True, code=400,
+                           name="Thema nicht gefunden")
+    await gehoert_optional(db, CardFolder, body.folder_id, user.id, pflicht=True, code=404,
+                           name="Ordner nicht gefunden")
+
+
 def _folder_scope(class_id, kurs_id):
     """Ordner hängen wie die Stapel am KURS (alle Fach-Klassen); ohne Kurs an der
     Klasse. So passen Ordner und Decks zusammen."""
@@ -564,6 +578,7 @@ async def create_deck(class_id: int, body: DeckIn, kurs_id: Optional[int] = None
         # Ein fremder Kurs haengte den Stapel an fremde Kinder: sie saehen die
         # Karten hinter ihrem QR-Code, ihre Antworten laegen beim Anleger.
         await eigener_kurs(db, user, kurs_id)
+    await _bindungen_pruefen(db, user, body)
     last = (await db.execute(select(CardDeck.position).where(CardDeck.class_id == class_id).order_by(CardDeck.position.desc()))).scalars().first()
     deck = CardDeck(class_id=class_id, kurs_id=kurs_id, owner_id=user.id, name=body.name.strip(),
                     topic_id=body.topic_id, niveau=body.niveau if body.niveau in ("E", "G") else "",
@@ -677,6 +692,7 @@ async def create_collection_deck(body: DeckIn, user: User = Depends(require_modu
     ist der Stapel angelegt, aber fuer niemanden ausgerollt."""
     rate_limit("karten_deck", f"u{user.id}", 100, 60, "Zu viele Stapel. Bitte kurz warten.")
     kurse = await _owned_kurs_ids(db, user, body.kurs_ids)
+    await _bindungen_pruefen(db, user, body)
     last = (await db.execute(select(CardDeck.position).where(CardDeck.owner_id == user.id)
                              .order_by(CardDeck.position.desc()))).scalars().first()
     deck = CardDeck(class_id=None, kurs_id=None, owner_id=user.id, name=body.name.strip(),
@@ -751,6 +767,7 @@ async def update_deck(deck_id: int, body: DeckIn, request: Request = None, user:
     """Name und/oder Thema des Stapels aendern."""
     deck = await _owned_deck(db, user, deck_id)
     pruefe(request, deck)
+    await _bindungen_pruefen(db, user, body)
     deck.name = body.name.strip()
     deck.topic_id = body.topic_id
     deck.niveau = body.niveau if body.niveau in ("E", "G") else ""
@@ -1439,7 +1456,12 @@ async def _student_by_token(db: AsyncSession, token: str, modul="karten") -> Stu
     # QR-Code selbst gilt naemlich, solange ueberhaupt etwas dahinter steht —
     # Karten ODER Testergebnisse.
     schluessel = (modul,) if isinstance(modul, str) else tuple(modul or ())
-    if cls.owner_id and schluessel:
+    if schluessel:
+        # Klasse ohne Besitzer (Altbestand): niemand, dessen Modul man fragen
+        # koennte — also auch kein Zugang. Vorher fiel die Modulpruefung hier
+        # still weg und der Zettel lieferte ohne jede Schranke aus.
+        if not cls.owner_id:
+            raise tot
         erlaubt = [k for k in schluessel if await is_active(db, cls.owner_id, k)]
         if not erlaubt:
             raise tot

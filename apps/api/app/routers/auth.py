@@ -15,14 +15,14 @@ from argon2 import PasswordHasher
 from argon2.low_level import Type as Argon2Type
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select, delete, update as sa_update
+from sqlalchemy import String, cast, delete, or_, select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..netz import client_ip as _client_ip
 from ..seed import seed_new_account
 from ..rollen import ist_admin
 from ..database import get_db
-from ..models import User, Question, MarketplaceQuiz
+from ..models import BugReport, CaldavToken, User, Question, MarketplaceQuiz
 from .. import mailer
 
 # Im Container /app/uploads (Volume). Ueberschreibbar, damit Tests und die
@@ -49,15 +49,27 @@ async def _purge_user_content(db: AsyncSession, user_id: int):
     #     dem Konto verschwindet) — die E-Mail-Adresse darin nicht. Sie ist die
     #     einzige Personenangabe im Datensatz und hat nach dem Löschen des
     #     Kontos keinen Zweck mehr; die Meldung bleibt ohne sie lesbar.
-    from ..models import BugReport as _BugReport
-    await db.execute(sa_update(_BugReport).where(_BugReport.user_id == user_id).values(email=""))
-    # 3) Dateien löschen — aber nur, wenn keine fremde Frage sie noch nutzt
-    #    (übernommene Kopien referenzieren dieselbe URL, sollen nicht kaputtgehen).
+    #     Dasselbe gilt fuer Anhang und Protokoll: der Anhang ist ein von der
+    #     Lehrkraft gewaehlter Screenshot (darauf stehen Namen), das Protokoll
+    #     ihre letzten Seitenwechsel. Beides gehoert der Person, nicht dem
+    #     Bericht — der Meldungstext bleibt fuer die Bearbeitung stehen.
+    await db.execute(sa_update(BugReport).where(BugReport.user_id == user_id).values(
+        email="", anhang=None, anhang_name="", anhang_typ="", log=""))
+    # 3) Dateien löschen — aber nur, wenn sie AUSSCHLIESSLICH diesem Konto
+    #    gehoeren. Uebernommene Kopien referenzieren dieselbe URL — als
+    #    Fragebild, als Antwortbild (choice_images) und in besitzlosen
+    #    Bestandsfragen (owner_id NULL, fuer alle lesbar). Vorher zaehlte nur
+    #    das Fragebild eines fremden Kontos; ein Antwortbild oder eine
+    #    Bestandsfrage verlor ihr Bild mit dem Konto eines anderen.
+    fremd = or_(Question.owner_id != user_id, Question.owner_id.is_(None))
     for url in urls:
         if not url.startswith("/api/uploads/"):
             continue
         andere = (await db.execute(
-            select(Question.id).where(Question.owner_id != user_id, Question.image_url == url).limit(1)
+            select(Question.id).where(fremd, or_(
+                Question.image_url == url,
+                cast(Question.choice_images, String).contains(url),
+            )).limit(1)
         )).scalar_one_or_none()
         if andere:
             continue
@@ -80,6 +92,12 @@ TOKEN_TTL = 86400 * 30  # 30 Tage; per Sliding-Renewal (siehe get_current_user)
                         # bekommt ein aktiver Nutzer laufend einen frischen Token,
                         # laeuft also praktisch nie ab. Nur echtes Nichtstun > 30 Tage
                         # (oder token_version-Wechsel) meldet ab.
+
+# Hoechstdauer einer Sitzung, gerechnet ab der ANMELDUNG. Die gleitende
+# Verlaengerung oben traegt den Beginn der Ursprungssitzung mit (vierter Teil
+# des Tokens) — ohne diese Grenze haette ein einmal abgegriffener Token bei
+# regelmaessiger Benutzung ewig gegolten. Nach 90 Tagen meldet man sich neu an.
+TOKEN_MAX = 86400 * 90
 
 MAX_LOGIN_ATTEMPTS = 5
 LOGIN_WINDOW = 60
@@ -222,14 +240,21 @@ def _pw_veraltet(stored: str) -> bool:
     return _split_pw(stored) is not None
 
 
-def _make_token(user_id: int, token_version: int = 0) -> str:
+def _make_token(user_id: int, token_version: int = 0, beginn: Optional[int] = None) -> str:
+    """`beginn` ist der Zeitpunkt der Anmeldung, zu der dieser Token gehoert —
+    bei der gleitenden Verlaengerung der alte, sonst jetzt."""
     ts = int(time.time())
-    payload = f"{user_id}:{token_version}:{ts}"
+    payload = f"{user_id}:{token_version}:{ts}:{int(beginn if beginn is not None else ts)}"
     sig = hmac.new(SECRET.encode(), payload.encode(), "sha256").hexdigest()[:32]
     return f"{payload}:{sig}"
 
 
-def _verify_token(token: str) -> Optional[tuple[int, int]]:
+def _token_teile(token: str) -> Optional[tuple[int, int, int, int]]:
+    """(user_id, token_version, ausgestellt, anmeldung) — oder None.
+
+    Aeltere Tokens tragen keinen Anmeldezeitpunkt; fuer sie gilt der
+    Ausstellungszeitpunkt (die Hoechstdauer zaehlt dann ab der letzten
+    Verlaengerung, danach traegt der neue Token den Beginn mit)."""
     try:
         parts = token.rsplit(":", 1)
         if len(parts) != 2:
@@ -239,15 +264,30 @@ def _verify_token(token: str) -> Optional[tuple[int, int]]:
         if not hmac.compare_digest(sig, expected):
             return None
         segments = payload.split(":")
+        if len(segments) == 4:
+            user_id, tv, ts, beginn = segments
+            return int(user_id), int(tv), int(ts), int(beginn)
         if len(segments) == 3:
             user_id, tv, ts = segments
-            return int(user_id), int(tv), int(ts)
+            return int(user_id), int(tv), int(ts), int(ts)
         elif len(segments) == 2:
             user_id, ts = segments
-            return int(user_id), 0, int(ts)
+            return int(user_id), 0, int(ts), int(ts)
         return None
     except Exception:
         return None
+
+
+def _verify_token(token: str) -> Optional[tuple[int, int, int]]:
+    teile = _token_teile(token)
+    return teile[:3] if teile else None
+
+
+def token_gueltig_bis(teile: tuple[int, int, int, int], jetzt: Optional[int] = None) -> bool:
+    """Frist UND Hoechstdauer — eine Stelle fuer HTTP und WebSocket."""
+    jetzt = int(time.time()) if jetzt is None else jetzt
+    _uid, _tv, ts, beginn = teile
+    return jetzt - ts <= TOKEN_TTL and jetzt - beginn <= TOKEN_MAX
 
 
 def _make_reset_token(user: User) -> str:
@@ -297,29 +337,22 @@ def _verify_msg(payload: str, user: User) -> bytes:
     return f"verify:{payload}:{user.email}:{(user.password_hash or '')[-24:]}".encode()
 
 
-def _decode_id_sig(token: str):
-    """Base64-Token "<user_id>:<sig>" zerlegen; None, wenn etwas nicht stimmt.
-
-    War wortgleich zweimal da (_decode_verify_token, _decode_email_change_token):
-    gleiche Form, nur die Signatur meint etwas anderes — und die prueft ohnehin
-    erst der Endpunkt. Die beiden Namen bleiben als sprechende Aliase.
-    """
-    try:
-        pad = "=" * (-len(token) % 4)
-        raw = base64.urlsafe_b64decode(token + pad).decode()
-        user_id, sig = raw.split(":")
-        return int(user_id), sig
-    except Exception:
-        return None
+# Der Link zum Adresswechsel galt unbegrenzt: wer ihn Monate spaeter in einem
+# alten Postfach fand, stellte das Konto noch um. Jetzt mit Zeitstempel in der
+# Signatur (dieselbe Bauform wie VERIFY_TTL) — ein Tag reicht fuer eine Mail,
+# die man gerade selbst angefordert hat.
+EMAIL_CHANGE_TTL = 86400
 
 
-_decode_verify_token = _decode_id_sig
-_decode_email_change_token = _decode_id_sig
+def _email_change_sig(user_id: int, ts: int, pending: str) -> str:
+    return hmac.new(SECRET.encode(), f"emailchange:{user_id}:{ts}:{pending}".encode(),
+                    "sha256").hexdigest()[:32]
 
 
 def _make_email_change_token(user: User) -> str:
-    sig = hmac.new(SECRET.encode(), f"emailchange:{user.id}:{user.pending_email}".encode(), "sha256").hexdigest()[:32]
-    return base64.urlsafe_b64encode(f"{user.id}:{sig}".encode()).decode().rstrip("=")
+    ts = int(time.time())
+    sig = _email_change_sig(user.id, ts, user.pending_email or "")
+    return base64.urlsafe_b64encode(f"{user.id}:{ts}:{sig}".encode()).decode().rstrip("=")
 
 
 async def _send_verify_mail(user: User):
@@ -362,11 +395,11 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(401, "Nicht angemeldet")
-    result = _verify_token(auth[7:])
+    result = _token_teile(auth[7:])
     if result is None:
         raise HTTPException(401, "Token ungültig oder abgelaufen")
-    user_id, tv, ts = result
-    if int(time.time()) - ts > TOKEN_TTL:
+    user_id, tv, ts, beginn = result
+    if not token_gueltig_bis(result):
         raise HTTPException(401, "Token abgelaufen")
     user = await db.get(User, user_id)
     if not user:
@@ -378,7 +411,7 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
     # verlaengert sich das Fenster bei jeder Nutzung — aktive Konten fliegen
     # nicht mehr nach fester Frist raus.
     if int(time.time()) - ts > TOKEN_TTL // 2:
-        response.headers["X-Refresh-Token"] = _make_token(user.id, user.token_version)
+        response.headers["X-Refresh-Token"] = _make_token(user.id, user.token_version, beginn)
     return user
 
 
@@ -396,6 +429,55 @@ def _check_rate_limit(ip: str):
 
 # Generischer, wiederverwendbarer Sliding-Window-Limiter (pro IP + Bucket)
 _buckets: dict[str, list[float]] = defaultdict(list)
+
+
+def fehlversuche_pruefen(bucket: str, kennung: str, max_hits: int, window: int,
+                         msg: str = "Zu viele Fehlversuche. Bitte kurz warten."):
+    """Wie `rate_limit`, zaehlt aber NICHT mit — gezaehlt wird nur ueber
+    `fehlversuch_merken`, also nach einem falschen Passwort.
+
+    Fuer die Bremse je KONTO: zaehlte sie jede Anmeldung, reichte ein
+    fremdes Skript mit beliebigen Passwoertern, um die echte Lehrkraft
+    auszusperren — und deren eigene erfolgreiche Anmeldungen (mehrere Geraete,
+    CalDAV alle paar Minuten) trieben den Zaehler zusaetzlich hoch.
+    """
+    now = time.time()
+    _buckets_auskehren(now)
+    key = f"{bucket}:{kennung}"
+    hits = [t for t in _buckets.get(key, ()) if now - t < window]
+    if hits:
+        _buckets[key] = hits
+    if len(hits) >= max_hits:
+        retry = max(1, int(window - (now - min(hits))))
+        raise HTTPException(429, msg, headers={"Retry-After": str(retry)})
+
+
+def fehlversuch_merken(bucket: str, kennung: str):
+    _buckets[f"{bucket}:{kennung}"].append(time.time())
+
+
+# Adressen, von denen aus sich ein Konto zuletzt erfolgreich angemeldet hat.
+# Die Konto-Bremse zaehlt nur Fehlversuche — die kann ein Fremder trotzdem
+# anhaeufen und die Lehrkraft damit fuer ein paar Minuten aussperren. Von
+# einer Adresse, die fuer dieses Konto schon einmal das richtige Passwort
+# kannte, gilt die Konto-Bremse deshalb nicht (die Bremse je Adresse gilt
+# weiter). Nur im Arbeitsspeicher und begrenzt: nach einem Neustart greift die
+# Bremse eben wieder fuer alle, bis zur ersten Anmeldung.
+_BEKANNT_TTL = 86400 * 30
+_BEKANNT_MAX = 20_000
+_bekannte_adressen: dict[tuple[str, str], float] = {}
+
+
+def _adresse_bekannt(email: str, ip: str) -> bool:
+    t = _bekannte_adressen.get((email, ip))
+    return bool(t) and time.time() - t < _BEKANNT_TTL
+
+
+def _adresse_merken(email: str, ip: str):
+    if len(_bekannte_adressen) >= _BEKANNT_MAX:
+        for k in sorted(_bekannte_adressen, key=_bekannte_adressen.get)[: _BEKANNT_MAX // 2]:
+            _bekannte_adressen.pop(k, None)
+    _bekannte_adressen[(email, ip)] = time.time()
 
 
 # Stand hier und in main.py wortgleich; die Rechnung liegt jetzt in app/netz.py.
@@ -587,18 +669,24 @@ async def login(body: LoginBody, request: Request, db: AsyncSession = Depends(ge
     email = body.email.lower().strip()
     # Zweite Bremse, und zwar je KONTO: das Limit je Adresse allein hilft nicht
     # gegen verteiltes Ausprobieren — wer ueber viele Adressen kommt, hat gegen
-    # ein bekanntes Konto beliebig viele Versuche.
-    rate_limit("login_konto", email, 20, 300,
-               "Zu viele Anmeldeversuche für dieses Konto. Bitte kurz warten.")
+    # ein bekanntes Konto beliebig viele Versuche. Gezaehlt werden nur
+    # FEHLversuche (siehe fehlversuche_pruefen), und von einer Adresse, die
+    # dieses Konto schon erfolgreich benutzt hat, gilt sie nicht.
+    if not _adresse_bekannt(email, ip):
+        fehlversuche_pruefen("login_konto", email, 20, 300,
+                             "Zu viele Anmeldeversuche für dieses Konto. Bitte kurz warten.")
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user:
         # Blindpruefung, damit eine unbekannte Adresse genauso lange braucht
         # wie eine bekannte (siehe _DUMMY_PW_HASH).
         _verify_pw(body.password, _DUMMY_PW_HASH)
+        fehlversuch_merken("login_konto", email)
         raise HTTPException(401, "E-Mail oder Passwort falsch")
     if not _verify_pw(body.password, user.password_hash):
+        fehlversuch_merken("login_konto", email)
         raise HTTPException(401, "E-Mail oder Passwort falsch")
+    _adresse_merken(email, ip)
     if not user.email_verified:
         raise HTTPException(403, "E-Mail noch nicht bestätigt. Bitte prüfe dein Postfach (auch Spam).")
     if _pw_veraltet(user.password_hash):
@@ -664,14 +752,48 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
     return {"ok": True}
 
 
+async def _zugaenge_widerrufen(db: AsyncSession, user: User):
+    """Alles, was NEBEN dem Passwort ohne Anmeldung Zugang gibt, zuruecknehmen.
+
+    Ein Passwortwechsel ist fast immer die Antwort auf „jemand anderes koennte
+    es kennen". Wer es kannte, konnte sich aber auch ein CalDAV-Geraete-
+    Passwort anlegen oder die Kalender-Abo-Adresse abschreiben — beides galt
+    nach dem Wechsel unveraendert weiter, und beides liefert Kurs- und
+    Klassennamen. Die Geraete-Passwoerter werden geloescht (jedes Geraet
+    bekommt ein neues), die Abo-Adresse wird neu gewuerfelt, wenn es eine gibt
+    (ohne Abo bleibt es ohne).
+    """
+    await db.execute(delete(CaldavToken).where(CaldavToken.owner_id == user.id))
+    if user.calendar_token:
+        user.calendar_token = secrets.token_urlsafe(24)
+
+
 @router.post("/change-password")
 async def change_password(body: ChangePasswordBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     if not _verify_pw(body.old_password, user.password_hash):
         raise HTTPException(400, "Altes Passwort falsch")
     user.password_hash = _hash_pw(body.new_password)
+    # Alle anderen Sitzungen fliegen raus; die eigene bekommt in der Antwort
+    # einen frischen Token (die Oberflaeche uebernimmt ihn).
     user.token_version = (user.token_version or 0) + 1
+    await _zugaenge_widerrufen(db, user)
     await db.commit()
     return {"ok": True, "token": _make_token(user.id, user.token_version)}
+
+
+@router.post("/logout")
+async def logout(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Serverseitig abmelden: `token_version` steigt, jeder ausgestellte Token
+    dieses Kontos ist danach wertlos.
+
+    Die Tokens sind zustandslos — einen EINZELNEN zurueckzunehmen hiesse, eine
+    Sperrliste zu fuehren. Deshalb gilt das Abmelden fuer alle Geraete dieses
+    Kontos. Vorher raeumte der Knopf nur den Browser; ein abgegriffener Token
+    galt danach unveraendert bis zu seiner Frist weiter.
+    """
+    user.token_version = (user.token_version or 0) + 1
+    await db.commit()
+    return {"ok": True}
 
 
 class ForgotPasswordBody(BaseModel):
@@ -729,6 +851,7 @@ async def reset_password(body: ResetPasswordBody, request: Request, db: AsyncSes
         raise HTTPException(400, "Ungültiger oder bereits verwendeter Link")
     user.password_hash = _hash_pw(body.new_password)
     user.token_version = (user.token_version or 0) + 1  # meldet bestehende Sitzungen ab
+    await _zugaenge_widerrufen(db, user)
     await db.commit()
     return {"ok": True}
 
@@ -835,16 +958,19 @@ class ConfirmEmailChangeBody(BaseModel):
 @router.post("/confirm-email-change")
 async def confirm_email_change(body: ConfirmEmailChangeBody, request: Request, db: AsyncSession = Depends(get_db)):
     rate_limit("confirmemailchange", client_ip(request), 20, 600)
-    dec = _decode_email_change_token(body.token)
+    # Form „id:ts:sig" wie beim Zuruecksetzen. Die alte Form ohne Zeitstempel
+    # zerlegt das gar nicht erst — sie hatte keine Frist und wird neu angefordert.
+    dec = _decode_reset_token(body.token)
     if not dec:
         raise HTTPException(400, "Ungültiger Bestätigungslink")
-    user_id, sig = dec
+    user_id, ts, sig = dec
     user = await db.get(User, user_id)
     if not user or not user.pending_email:
         raise HTTPException(400, "Kein offener Änderungswunsch gefunden")
-    expected = hmac.new(SECRET.encode(), f"emailchange:{user.id}:{user.pending_email}".encode(), "sha256").hexdigest()[:32]
-    if not hmac.compare_digest(sig, expected):
+    if not hmac.compare_digest(sig, _email_change_sig(user.id, ts, user.pending_email)):
         raise HTTPException(400, "Ungültiger Bestätigungslink")
+    if int(time.time()) - ts > EMAIL_CHANGE_TTL:
+        raise HTTPException(400, "Der Bestätigungslink ist abgelaufen. Bitte die Änderung erneut anfordern.")
     # Zieladresse koennte inzwischen von jemand anderem belegt worden sein
     result = await db.execute(select(User).where(User.email == user.pending_email, User.id != user.id))
     if result.scalar_one_or_none():
@@ -989,6 +1115,8 @@ async def admin_list_users(user: User = Depends(get_current_user), db: AsyncSess
 
 class AdminRolleIn(BaseModel):
     admin: bool
+    # Das EIGENE Passwort der Administration (wie beim Loeschen eines Kontos).
+    password: str = ""
 
 
 @router.put("/admin/users/{user_id}/admin")
@@ -998,11 +1126,19 @@ async def admin_set_role(user_id: int, body: AdminRolleIn, user: User = Depends(
 
     Konto 1 bleibt aussen vor: IDs werden nicht wiederverwendet, und ohne
     dieses Konto koennte sich eine Installation vollstaendig aussperren.
+
+    Dieselben Riegel wie `admin_delete_user`: das eigene Passwort und eine
+    Bremse. Eine Ernennung gibt einem fremden Konto die Kontenverwaltung samt
+    Loeschen — mit einer uebernommenen Sitzung allein darf das nicht gehen.
     """
     if not ist_admin(user):
         raise HTTPException(403, "Nur Admin")
+    rate_limit("admin_set_role", f"u{user.id}", 10, 600,
+               "Zu viele Rollenänderungen in kurzer Zeit. Bitte kurz warten.")
     if user_id == 1:
         raise HTTPException(400, "Das erste Konto bleibt die Administration")
+    if not _verify_pw(body.password, user.password_hash):
+        raise HTTPException(400, "Passwort falsch")
     ziel = await db.get(User, user_id)
     if not ziel:
         raise HTTPException(404)

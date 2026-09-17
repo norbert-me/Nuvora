@@ -1,6 +1,6 @@
 """Sicherungen: bestimmt die Anfrage, welche Datei angefasst wird?
 
-Die Antwort muss „nein" sein. Ein Endpunkt wie `GET /api/admin/backup/{name}`
+Die Antwort muss „nein" sein. Ein Endpunkt wie `POST /api/admin/backup/{name}/herunterladen`
 ist die klassische Stelle für einen Pfadwechsel: wer `../../etc/passwd`
 unterbringt, liest Dateien, die ihn nichts angehen. Dass hier ohnehin nur die
 Administration hinkommt, ist kein Ersatz für die Prüfung — sondern der Grund,
@@ -83,7 +83,8 @@ async def test_gueltiger_name_funktioniert_weiter(welt):  # noqa: F811
     assert voll.endswith(eintrag["name"])
     assert backup._liegt_in(voll, str(welt["sicherungen"]))
 
-    r = await _ruf("GET", f"/api/admin/backup/{eintrag['name']}")
+    r = await _ruf("POST", f"/api/admin/backup/{eintrag['name']}/herunterladen",
+                   {"password": test_backup.ADMIN_PW})
     assert r.status == 200 and r.body[:2] == b"PK"
     r = await _ruf("POST", f"/api/admin/backup/{eintrag['name']}/pruefen")
     assert r.status == 200 and r.json()["ok"] is True, r.json()
@@ -98,10 +99,11 @@ async def test_routen_liefern_nichts_und_loeschen_nichts(welt):  # noqa: F811
     fremden Pfad wäre der teuerste der drei Fehler."""
     eintrag = await _sichern()
     for name in BOESE:
-        for methode, pfad in (("GET", f"/api/admin/backup/{name}"),
+        for methode, pfad in (("POST", f"/api/admin/backup/{name}/herunterladen"),
                               ("POST", f"/api/admin/backup/{name}/pruefen"),
                               ("DELETE", f"/api/admin/backup/{name}")):
-            r = await _ruf(methode, pfad)
+            r = await _ruf(methode, pfad, {"password": test_backup.ADMIN_PW}
+                           if pfad.endswith("/herunterladen") else None)
             assert r.status in (400, 404, 405, 307), f"{methode} {name!r} -> {r.status}"
             assert b"root:" not in r.body, f"{methode} {name!r} hat /etc/passwd ausgeliefert"
     # Und die echte Sicherung liegt unversehrt da.
@@ -122,7 +124,8 @@ async def test_symlink_aus_dem_ordner_heraus_wird_nicht_ausgeliefert(welt):  # n
         backup._vorhandene_datei(str(welt["sicherungen"]), link.name)
     assert raus.value.status_code == 404
 
-    r = await _ruf("GET", f"/api/admin/backup/{link.name}")
+    r = await _ruf("POST", f"/api/admin/backup/{link.name}/herunterladen",
+                   {"password": test_backup.ADMIN_PW})
     assert r.status == 404
     assert b"GEHEIM" not in r.body
 

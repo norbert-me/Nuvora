@@ -37,11 +37,14 @@ from app.database import get_db
 from app.main import _global_hits, app
 from app.models import Base, User
 from app.routers import backup
-from app.routers.auth import _buckets, get_current_user
+from app.routers.auth import _buckets, _hash_pw, get_current_user
 
 NOTIZ = "ZZBACKUP-NOTIZ-4711"
 DETAIL = "ZZBACKUP-MASSNAHME-4711"
 UPLOAD_INHALT = b"ZZBACKUP-BILD-4711-bytes"
+# Das Betreiberkonto bestaetigt Herunterladen, Hochladen und Einspielen mit
+# seinem eigenen Passwort.
+ADMIN_PW = "Betreiber!4711"
 
 
 # ── Winziger ASGI-Aufruf (wie test_keine_lecks.py) ───────────────────────────
@@ -124,7 +127,7 @@ async def welt(tmp_path, monkeypatch):
     async with Sitzung() as s:
         # Nutzer 1 ist die Administration (siehe _require_admin in main.py),
         # Nutzer 2 die ganz normale Lehrkraft, die hier nichts zu suchen hat.
-        s.add(User(email="admin@test.de", password_hash="x", name="Admin", email_verified=True))
+        s.add(User(email="admin@test.de", password_hash=_hash_pw(ADMIN_PW), name="Admin", email_verified=True))
         s.add(User(email="lehrkraft@test.de", password_hash="x", name="Lehrkraft", email_verified=True))
         # Nutzer 3 ist zur Administration ERNANNT — an die Sicherung kommt er
         # trotzdem nicht: sie traegt die Daten aller Konten.
@@ -222,14 +225,15 @@ async def test_normales_konto_kommt_an_keinen_endpunkt(welt, uid):
     wege = [
         ("GET", "/api/admin/backup"),
         ("POST", "/api/admin/backup"),
-        ("GET", f"/api/admin/backup/{eintrag['name']}"),
+        ("POST", f"/api/admin/backup/{eintrag['name']}/herunterladen"),
         ("POST", f"/api/admin/backup/{eintrag['name']}/pruefen"),
         ("DELETE", f"/api/admin/backup/{eintrag['name']}"),
         ("PUT", "/api/admin/backup/einstellungen"),
     ]
     offen = []
     for methode, pfad in wege:
-        r = await _ruf(methode, pfad, {} if methode in ("POST", "PUT") else None)
+        rumpf = {"password": ADMIN_PW} if methode in ("POST", "PUT") else None
+        r = await _ruf(methode, pfad, rumpf)
         if r.status not in (401, 403):
             offen.append(f"{methode} {pfad} -> {r.status}")
     assert not offen, f"Ohne Administrationsrechte erreichbar: {offen}"
@@ -240,7 +244,8 @@ async def test_normales_konto_kommt_an_keinen_endpunkt(welt, uid):
 @pytest.mark.asyncio
 async def test_download_liefert_das_archiv_nur_der_administration(welt):
     eintrag = await _sichern()
-    r = await _ruf("GET", f"/api/admin/backup/{eintrag['name']}")
+    r = await _ruf("POST", f"/api/admin/backup/{eintrag['name']}/herunterladen",
+                   {"password": ADMIN_PW})
     assert r.status == 200
     assert r.headers.get("content-type", "").startswith("application/zip")
     assert "no-store" in r.headers.get("cache-control", "")
@@ -255,7 +260,7 @@ async def test_dateiname_ist_nicht_ratbar_und_nicht_manipulierbar(welt):
     await _sichern()
     for boese in ("..%2F..%2Fetc%2Fpasswd", "nuvora-2026.zip", "beliebig.zip",
                   "nuvora-20260101-000000.zip.sha256"):
-        r = await _ruf("GET", f"/api/admin/backup/{boese}")
+        r = await _ruf("POST", f"/api/admin/backup/{boese}/herunterladen", {"password": ADMIN_PW})
         assert r.status in (400, 404), f"{boese} -> {r.status}"
 
 
@@ -456,17 +461,20 @@ async def test_anleitung_nennt_die_wegwerf_datenbank_zuerst():
 GRENZE = "----ZZBACKUPGRENZE4711"
 
 
-def _formular(dateiname: str, inhalt: bytes) -> tuple[bytes, str]:
-    """Ein multipart/form-data-Rumpf mit genau einem Feld `file`."""
+def _formular(dateiname: str, inhalt: bytes, passwort: str = ADMIN_PW) -> tuple[bytes, str]:
+    """Ein multipart/form-data-Rumpf mit den Feldern `password` und `file`."""
     kopf = (f"--{GRENZE}\r\n"
+            'Content-Disposition: form-data; name="password"\r\n\r\n'
+            f"{passwort}\r\n"
+            f"--{GRENZE}\r\n"
             f'Content-Disposition: form-data; name="file"; filename="{dateiname}"\r\n'
             f"Content-Type: application/zip\r\n\r\n").encode()
     rumpf = kopf + inhalt + f"\r\n--{GRENZE}--\r\n".encode()
     return rumpf, f"multipart/form-data; boundary={GRENZE}"
 
 
-async def _hochladen(dateiname: str, inhalt: bytes):
-    rumpf, typ = _formular(dateiname, inhalt)
+async def _hochladen(dateiname: str, inhalt: bytes, passwort: str = ADMIN_PW):
+    rumpf, typ = _formular(dateiname, inhalt, passwort)
     return await _ruf("POST", "/api/admin/backup/hochladen", roh=rumpf, typ=typ)
 
 
@@ -687,7 +695,7 @@ async def test_zurueckspielen_sichert_vorher_und_meldet_die_zahlen(welt, monkeyp
     eintrag = await _sichern()
 
     r = await _ruf("POST", f"/api/admin/backup/{eintrag['name']}/zurueckspielen",
-                   {"bestaetigung": "zurueckspielen"})  # Groß/klein egal
+                   {"bestaetigung": "zurueckspielen", "password": ADMIN_PW})  # Groß/klein egal
     assert r.status == 200, r.body[:400]
     d = r.json()
     assert d["tabellen"]["students"] == 1
@@ -721,7 +729,7 @@ async def test_hochladen_probelauf_und_einspielen_nur_fuer_die_administration(we
         offen.append(f"hochladen -> {r.status}")
     for weg, rumpf in ((f"/api/admin/backup/{eintrag['name']}/probelauf", {}),
                        (f"/api/admin/backup/{eintrag['name']}/zurueckspielen",
-                        {"bestaetigung": backup.BESTAETIGUNG})):
+                        {"bestaetigung": backup.BESTAETIGUNG, "password": ADMIN_PW})):
         r = await _ruf("POST", weg, rumpf)
         if r.status not in (401, 403):
             offen.append(f"{weg} -> {r.status}")
@@ -738,3 +746,47 @@ async def test_status_nennt_das_bestaetigungswort(welt):
     stand = (await _ruf("GET", "/api/admin/backup")).json()
     assert stand["bestaetigung"] == backup.BESTAETIGUNG
     assert stand["upload_max_mb"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_herunterladen_hochladen_einspielen_verlangen_das_passwort(welt, monkeypatch):
+    """Ein Token allein reicht nicht fuer die Daten ALLER Konten — dieselbe
+    Huerde wie beim Loeschen eines fremden Kontos. Und das Passwort steht nie
+    in der Adresse: der alte GET-Weg ist weg."""
+    monkeypatch.setattr(backup, "DATABASE_URL",
+                        f"sqlite+aiosqlite:///{welt['tmp'] / 'niemals-pw.db'}")
+    eintrag = await _sichern()
+    name = eintrag["name"]
+
+    r = await _ruf("GET", f"/api/admin/backup/{name}")
+    assert r.status == 405, f"GET-Download gibt es noch: {r.status}"
+    for pw in ("", "falsch"):
+        r = await _ruf("POST", f"/api/admin/backup/{name}/herunterladen", {"password": pw})
+        assert r.status == 400 and r.body[:2] != b"PK", f"Download mit {pw!r} -> {r.status}"
+        r = await _ruf("POST", f"/api/admin/backup/{name}/zurueckspielen",
+                       {"bestaetigung": backup.BESTAETIGUNG, "password": pw})
+        assert r.status == 400, f"Einspielen mit {pw!r} -> {r.status}"
+    r = await _hochladen("nuvora.zip", (welt["sicherungen"] / name).read_bytes(), passwort="falsch")
+    assert r.status == 400, f"Hochladen mit falschem Passwort -> {r.status}"
+    assert not (welt["tmp"] / "niemals-pw.db").exists()
+    assert len([n for n in os.listdir(welt["sicherungen"]) if n.endswith(".zip")]) == 1
+
+
+@pytest.mark.asyncio
+async def test_zip_slip_nimmt_keine_nachbarordner(welt, tmp_path):
+    """`startswith` hielt /x/uploads-alt fuer einen Teil von /x/uploads."""
+    eintrag = await _sichern()
+    archiv = tmp_path / "boese.zip"
+    with zipfile.ZipFile(welt["sicherungen"] / eintrag["name"]) as alt, \
+            zipfile.ZipFile(archiv, "w") as neu:
+        for info in alt.infolist():
+            neu.writestr(info, alt.read(info))
+        neu.writestr("uploads/../uploads-alt/boese.txt", b"x")
+        neu.writestr("uploads/../../boese2.txt", b"x")
+    ziel = tmp_path / "uploads"
+    bericht = await backup.zurueckspielen(
+        str(archiv), f"sqlite+aiosqlite:///{tmp_path / 'slip.db'}", str(ziel))
+    assert bericht["dateien"] == 1, bericht["dateien"]
+    assert (ziel / "frage-4711.png").is_file()
+    assert not (tmp_path / "uploads-alt").exists(), "Zip-Slip in den Nachbarordner"
+    assert not (tmp_path.parent / "boese2.txt").exists()

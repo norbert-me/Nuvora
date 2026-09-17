@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Modal, DialogKopf, Toggle, btnSecondary, btnSmall, cardStyle, COLORS as C,
-  Icon, ICONS, iconBtn, sectionLabel,
+  Icon, ICONS, iconBtn, linkBtn, sectionLabel,
 } from "./Icons.jsx";
 import { askConfirm } from "../core/dialog.jsx";
 import AuthImage from "./AuthImage.jsx";
@@ -59,6 +59,19 @@ export default function BugAdmin() {
     setListe((l) => [...(l || []), ...weiter]);
   };
 
+  // Der Anhang kommt als Download (der Server liefert ihn nie „inline" — Typ
+  // und Inhalt bestimmt der Melder). Ein <a href> schickte zudem den Token
+  // nicht mit; geholt wird deshalb per fetch, gespeichert ueber einen Blob.
+  const anhangLaden = async (r) => {
+    const res = await fetch(`/api/admin/bugreports/${r.id}/anhang`).catch(() => null);
+    if (!res || !res.ok) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(await res.blob());
+    a.download = r.anhang_name || "anhang";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   const loeschen = async (r) => {
     if (!(await askConfirm(t("bugadmin.loeschenFrage")))) return;
     await fetch(`/api/admin/bugreports/${r.id}`, { method: "DELETE" }).catch(() => {});
@@ -112,10 +125,10 @@ export default function BugAdmin() {
                   <div style={{ ...sectionLabel, margin: "0 0 4px" }}>{r.seite} · {r.fassung}</div>
                   <div style={{ color: "var(--text3)", overflowWrap: "anywhere" }}>{r.browser}</div>
                   {r.anhang_name && (
-                    <a href={`/api/admin/bugreports/${r.id}/anhang`} target="_blank" rel="noreferrer"
-                      style={{ color: "var(--accent)", display: "inline-block", marginTop: 6 }}>
+                    <button type="button" onClick={() => anhangLaden(r)}
+                      style={{ ...linkBtn, display: "inline-block", marginTop: 6 }}>
                       {r.anhang_name}
-                    </a>
+                    </button>
                   )}
                   {(r.umgebung || r.log) && (
                     <pre style={{ maxHeight: 220, overflow: "auto", fontSize: 11, lineHeight: 1.5,

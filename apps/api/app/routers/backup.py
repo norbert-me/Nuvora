@@ -67,8 +67,9 @@ import shutil
 import tempfile
 import zipfile
 from datetime import datetime, date, timezone
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -79,7 +80,7 @@ from ..rollen import ist_betreiber
 from ..database import DATABASE_URL, async_session, get_db
 from ..models import AppSetting, Base
 from ..spalten import fuellwert
-from .auth import get_current_user, rate_limit
+from .auth import _verify_pw, get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/admin/backup", tags=["backup"])
 
@@ -826,9 +827,14 @@ async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None 
                     if not eintrag.startswith("uploads/") or eintrag.endswith("/"):
                         continue
                     rel = eintrag[len("uploads/"):]
-                    ziel_datei = os.path.normpath(os.path.join(uploads_nach, rel))
-                    if not ziel_datei.startswith(os.path.abspath(uploads_nach)):
-                        continue  # Zip-Slip
+                    # Zip-Slip: aufgeloest vergleichen, nicht als Zeichenkette.
+                    # `startswith` liess `/app/uploads-alt/…` als „in
+                    # /app/uploads" durch und sah keine Symlinks.
+                    basis = Path(uploads_nach).resolve()
+                    ziel_pfad = (basis / rel).resolve()
+                    if ziel_pfad == basis or not ziel_pfad.is_relative_to(basis):
+                        continue
+                    ziel_datei = str(ziel_pfad)
                     os.makedirs(os.path.dirname(ziel_datei), exist_ok=True)
                     with zf.open(eintrag) as q, open(ziel_datei, "wb") as z:
                         shutil.copyfileobj(q, z)
@@ -942,6 +948,21 @@ async def nur_admin(user=Depends(get_current_user)):
     return user
 
 
+def _passwort_bestaetigt(user, password: str):
+    """Das eigene Passwort des Betreiberkontos — dieselbe Huerde wie beim
+    Loeschen eines fremden Kontos (`admin_delete_user`).
+
+    Herunterladen, Hochladen und Zurueckspielen bewegen die Daten ALLER
+    Konten. Eine uebernommene Sitzung (offener Rechner, abgegriffener Token)
+    reicht dafuer nicht mehr aus."""
+    if not _verify_pw(password or "", user.password_hash):
+        raise HTTPException(400, "Passwort falsch")
+
+
+class PasswortIn(BaseModel):
+    password: str = ""
+
+
 class Einstellungen(BaseModel):
     ziel: str | None = None
     plan: str | None = None
@@ -949,6 +970,7 @@ class Einstellungen(BaseModel):
 
 class Rueckspiel(BaseModel):
     bestaetigung: str = ""
+    password: str = ""
 
 
 @router.get("")
@@ -1018,7 +1040,8 @@ async def jetzt_sichern(user=Depends(nur_admin), db=Depends(get_db)):
 
 
 @router.post("/hochladen", status_code=201)
-async def hochladen(file: UploadFile = File(...), user=Depends(nur_admin), db=Depends(get_db)):
+async def hochladen(file: UploadFile = File(...), password: str = Form(""),
+                    user=Depends(nur_admin), db=Depends(get_db)):
     """Eine Sicherung von außen in den Ablageordner legen.
 
     Der Weg für den Ernstfall: neuer Server, leere Datenbank, die Sicherung
@@ -1031,6 +1054,7 @@ async def hochladen(file: UploadFile = File(...), user=Depends(nur_admin), db=De
     """
     rate_limit("backup_upload", f"u{user.id}", 10, 600,
                "Zu viele Uploads. Bitte kurz warten.")
+    _passwort_bestaetigt(user, password)
     ziel = await aktuelles_ziel(db)
     ordner = _ordner(ziel)
     grenze = UPLOAD_MAX_MB * 1024 * 1024
@@ -1152,6 +1176,7 @@ async def einspielen(name: str, body: Rueckspiel, user=Depends(nur_admin), db=De
     if (body.bestaetigung or "").strip().upper() != BESTAETIGUNG:
         raise HTTPException(400, f"Bitte „{BESTAETIGUNG}“ zur Bestätigung eintippen — "
                                  "das Zurückspielen ersetzt ALLE Daten dieser Installation")
+    _passwort_bestaetigt(user, body.password)
     ziel = await aktuelles_ziel(db)
     voll = _vorhandene_datei(_pfad_fuer(ziel), name)
     manifest_lesen(voll)
@@ -1216,8 +1241,14 @@ async def einstellungen(body: Einstellungen, user=Depends(nur_admin), db=Depends
     return await status(user, db)
 
 
-@router.get("/{name}")
-async def herunterladen(name: str, user=Depends(nur_admin), db=Depends(get_db)):
+@router.post("/{name}/herunterladen")
+async def herunterladen(name: str, body: PasswortIn, user=Depends(nur_admin), db=Depends(get_db)):
+    # POST mit Passwort im Rumpf — nicht in der Adresse, sonst stuende es im
+    # Zugriffsprotokoll. Vorher ein blankes GET: ein Token genuegte, um die
+    # Daten aller Konten mitzunehmen.
+    rate_limit("backup_download", f"u{user.id}", 10, 600,
+               "Zu viele Downloads. Bitte kurz warten.")
+    _passwort_bestaetigt(user, body.password)
     # Welche Datei ausgeliefert wird, entscheidet der Ordner, nicht die Anfrage:
     # `_vorhandene_datei()` gleicht den gewuenschten Namen mit den wirklich
     # vorhandenen Sicherungen ab und gibt den Verzeichniseintrag zurueck.

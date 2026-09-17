@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 # Die Standard-Notenskala stand hier ein zweites Mal (wortgleich, nur ohne
 # Unterstrich im Namen) und in noten.py ein drittes Mal mit Text-Schluesseln.
 # Es gibt eine: die in scoring.py, wo auch gerechnet wird.
+from ..uploads import eigene_bilder, eigenes_bild
 from ..scoring import DEFAULT_SCALE, bewerte, e_modus_von, gefehlt_von, status_of
 from ..uploads import anhang_kopf
 from ..schueler import sortiert
@@ -111,10 +112,12 @@ def _question_from_import(qdata, owner_id) -> Question:
         text=qdata.text,
         choices=qdata.choices,
         correct_answer=qdata.correct_answer,
-        image_url=qdata.image_url,
+        # Nur eigene Uploads — eine Importdatei darf keine fremden Adressen
+        # (Tracking-Pixel) in den Beamer tragen.
+        image_url=eigenes_bild(qdata.image_url),
         image_layout=qdata.image_layout,
         num_choices=qdata.num_choices,
-        choice_images=qdata.choice_images,
+        choice_images=eigene_bilder(qdata.choice_images),
         owner_id=owner_id,
     )
 
@@ -221,22 +224,95 @@ async def class_xlsx_template():
 MAX_XLSX_BYTES = 5 * 1024 * 1024
 
 
-def _arbeitsblatt(data: bytes):
-    """Excel-Datei oeffnen und das erste Blatt liefern.
+# Entpackte Groesse einer .xlsx. Eine Datei unter 5 MB kann entpackt Gigabytes
+# ergeben (Zip-Bombe) — openpyxl liest das Blatt-XML ohne eigene Grenze.
+MAX_XLSX_ENTPACKT = 50 * 1024 * 1024
+# Mehr Zeilen hat keine Klasse und kein Quiz; die Grenze haelt den Thread kurz.
+MAX_XLSX_ZEILEN = 5000
+
+_NICHT_LESBAR = "Die Datei laesst sich nicht lesen — bitte eine Excel-Datei (.xlsx) hochladen."
+
+
+def _zeilen_lesen(data: bytes) -> list:
+    """Synchron: Datei pruefen, oeffnen und die Zeilen ab Zeile 2 liefern.
+
+    Laeuft im Threadpool (`_arbeitsblatt`) — Entpacken und Parsen sind reine
+    Rechenarbeit und blockierten vorher die ganze Ereignisschleife.
+    """
+    import zipfile
+    from openpyxl import load_workbook
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            entpackt = sum(max(0, i.file_size) for i in z.infolist())
+    except Exception:
+        raise HTTPException(400, _NICHT_LESBAR)
+    if entpackt > MAX_XLSX_ENTPACKT:
+        raise HTTPException(400, "Die Excel-Datei ist entpackt zu gross")
+    try:
+        # read_only: das Blatt wird gestreamt statt als Objektbaum aufgebaut.
+        wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    except Exception:
+        raise HTTPException(400, _NICHT_LESBAR)
+    try:
+        ws = wb.active
+        if ws is None:
+            raise HTTPException(400, "Die Excel-Datei enthaelt kein Tabellenblatt")
+        zeilen = []
+        try:
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if len(zeilen) >= MAX_XLSX_ZEILEN:
+                    raise HTTPException(400, f"Zu viele Zeilen (max {MAX_XLSX_ZEILEN})")
+                zeilen.append(row)
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(400, _NICHT_LESBAR)
+        return zeilen
+    finally:
+        wb.close()
+
+
+async def _arbeitsblatt(data: bytes) -> list:
+    """Excel-Datei oeffnen und die Datenzeilen (ab Zeile 2) des ersten Blatts liefern.
 
     Ohne diesen Mantel endete jede Datei, die keine .xlsx ist (eine .csv, eine
     abgeschnittene Uebertragung, eine .numbers-Datei) als HTTP 500 mit einem
     openpyxl-Traceback — die Lehrkraft erfuhr nicht, dass schlicht das Format
     nicht passt."""
-    from openpyxl import load_workbook
-    try:
-        wb = load_workbook(io.BytesIO(data))
-    except Exception:
-        raise HTTPException(400, "Die Datei laesst sich nicht lesen — bitte eine Excel-Datei (.xlsx) hochladen.")
-    ws = wb.active
-    if ws is None:
-        raise HTTPException(400, "Die Excel-Datei enthaelt kein Tabellenblatt")
-    return ws
+    from starlette.concurrency import run_in_threadpool
+    return await run_in_threadpool(_zeilen_lesen, data)
+
+
+_FORMEL_ANFANG = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _zelle(ws, row: int, column: int, wert):
+    """Zelle schreiben — Text, der wie eine Formel anfaengt, bleibt Text.
+
+    Ein Fragen- oder Schuelername „=HYPERLINK(…)" wuerde sonst beim Oeffnen
+    ausgewertet (Formel-Injektion); openpyxl haelt jede Zeichenkette mit „="
+    sogar selbst fuer eine Formel. Die Zelle wird deshalb als Text markiert und
+    bekommt das Text-Praefix, das Excel wie ein fuehrendes ' behandelt, aber
+    nicht in den Wert schreibt — der Inhalt kommt ueber den Import unveraendert
+    zurueck. Zahlen bleiben unberuehrt.
+    """
+    c = ws.cell(row=row, column=column, value=wert)
+    if isinstance(wert, str) and wert.startswith(_FORMEL_ANFANG):
+        c.value = wert
+        c.data_type = "s"
+        c.quotePrefix = True
+    return c
+
+
+def _csv_text(wert) -> str:
+    """CSV-Feld: Anfuehrungszeichen verdoppeln, Formelanfang mit ' entschaerfen."""
+    if isinstance(wert, (int, float)):
+        t = str(wert)
+    else:
+        t = "" if wert is None else str(wert)
+        if t.startswith(_FORMEL_ANFANG):
+            t = "'" + t
+    return '"' + t.replace('"', '""') + '"'
 
 
 def _skala(config: dict) -> dict:
@@ -259,14 +335,14 @@ async def import_class_xlsx(name: str = "Neue Klasse", file: UploadFile = File(.
     data = await file.read(MAX_XLSX_BYTES + 1)
     if len(data) > MAX_XLSX_BYTES:
         raise HTTPException(400, "Datei zu gross (max 5 MB)")
-    ws = _arbeitsblatt(data)
+    zeilen = await _arbeitsblatt(data)
 
     sc = SchoolClass(name=name, owner_id=user.id)
     db.add(sc)
     await db.flush()
 
     count = 0
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for row in zeilen:
         if not row or len(row) < 2:
             continue
         card_id_val, name_val = row[0], row[1]
@@ -322,7 +398,7 @@ async def export_question_set_xlsx(set_id: int, user: User = Depends(get_current
         werte = [q.text, auswahl.get("A", ""), auswahl.get("B", ""), auswahl.get("C", ""),
                  auswahl.get("D", ""), q.correct_answer or "", it.niveau or ""]
         for spalte, wert in enumerate(werte, start=1):
-            ws.cell(row=zeile, column=spalte, value=wert)
+            _zelle(ws, zeile, spalte, wert)
 
     ws.column_dimensions["A"].width = 30
     for col in ["B", "C", "D", "E"]:
@@ -382,7 +458,7 @@ async def import_questions_xlsx(name: str = "Neues Frageset", folder_id: Optiona
     data = await file.read(MAX_XLSX_BYTES + 1)
     if len(data) > MAX_XLSX_BYTES:
         raise HTTPException(400, "Datei zu gross (max 5 MB)")
-    ws = _arbeitsblatt(data)
+    zeilen = await _arbeitsblatt(data)
 
     # owner_id: sonst ist das importierte Set fuer JEDES Konto lesbar
     # (ensure_set_access laesst owner-lose Sets als Altbestand durch).
@@ -393,7 +469,7 @@ async def import_questions_xlsx(name: str = "Neues Frageset", folder_id: Optiona
 
     pos = 0
     mit_e = False
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for row in zeilen:
         if not row or not row[0] or not str(row[0]).strip():
             continue
         text = str(row[0]).strip()
@@ -797,7 +873,7 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
         # Wer als krank gilt, steht nicht in der Liste; eine gewertete 0 schon.
         if status_of(student.card_id, has_any, config) == "krank":
             continue
-        ws.cell(row=row, column=1, value=student.name).font = Font(bold=True)
+        _zelle(ws, row, 1, student.name).font = Font(bold=True)
         for i, q in enumerate(questions):
             answer = scan_map.get((student.card_id, q.id))
             cell = ws.cell(row=row, column=i + 2, value=answer or "–")
@@ -847,7 +923,7 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
     scale = _skala(config)
     # Gewichte gehen unten direkt an bewerte(weights=...); kein eigener Zugriff nötig.
 
-    esc = lambda v: f'"{v}"'
+    esc = _csv_text
 
     set_name = ""
     if session.question_set_id:

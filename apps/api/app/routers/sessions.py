@@ -70,7 +70,7 @@ async def get_active_sessions(user: User = Depends(get_current_user), db: AsyncS
 
 @router.post("/{session_id}/finish")
 async def finish_session(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    s = await oder_403(db, Session, session_id, user)
+    s = await nur_eigenes(db, Session, session_id, user)
     s.status = "finished"
     await db.commit()
     return {"ok": True}
@@ -169,7 +169,7 @@ class QuestionMapIn(RootModel[Dict[str, Optional[str]]]):
 @router.put("/{session_id}/question-map")
 async def save_question_map(session_id: int, body: dict, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """`body: dict` in der Signatur ist Absicht — siehe app/importe.py."""
-    s = await oder_403(db, Session, session_id, user)
+    s = await nur_eigenes(db, Session, session_id, user)
     s.question_map = geprueft(QuestionMapIn, body, "Loesungen").model_dump()
     await db.commit()
     return {"ok": True}
@@ -227,7 +227,7 @@ async def next_question(session_id: int, user: User = Depends(get_current_user),
 
 @router.post("/{session_id}/set-question")
 async def set_question(session_id: int, question_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    s = await oder_403(db, Session, session_id, user)
+    s = await nur_eigenes(db, Session, session_id, user)
     # Auch die Frage gehoert geprueft: eine unbekannte ID wurde zum
     # Fremdschluesselfehler und damit zu HTTP 500.
     gehoert = (await db.execute(select(QuestionSetItem.id).where(
@@ -299,7 +299,7 @@ async def gefehlt_vorschlag(session_id: int, user: User = Depends(get_current_us
     Antwort: {"<card_id>": [topic_id, ...]}
     """
     from .modules import is_active   # lokal: modules importiert Router-Sachen nicht umgekehrt
-    s = await oder_403(db, Session, session_id, user)
+    s = await nur_eigenes(db, Session, session_id, user)
     if not s.class_id or not s.question_set_id:
         return {}
     if not (await is_active(db, user.id, "kalender") and await is_active(db, user.id, "orga")):
@@ -358,7 +358,7 @@ async def gefehlt_vorschlag(session_id: int, user: User = Depends(get_current_us
 @router.put("/{session_id}/eval-config")
 async def save_eval_config(session_id: int, body: dict, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """`body: dict` in der Signatur ist Absicht — siehe app/importe.py."""
-    s = await oder_403(db, Session, session_id, user)
+    s = await nur_eigenes(db, Session, session_id, user)
     geprueft(EvalConfigIn, body, "Einstellungen")
     s.eval_config = body
     await db.commit()
@@ -367,7 +367,7 @@ async def save_eval_config(session_id: int, body: dict, user: User = Depends(get
 
 @router.post("/{session_id}/archive")
 async def toggle_archive(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    s = await oder_403(db, Session, session_id, user)
+    s = await nur_eigenes(db, Session, session_id, user)
     s.archived = not s.archived
     await db.commit()
     return {"ok": True, "archived": s.archived}

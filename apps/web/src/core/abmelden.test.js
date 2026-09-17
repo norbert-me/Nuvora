@@ -20,6 +20,7 @@ describe("raeumeBrowser", () => {
     vi.resetModules();
     globalThis.localStorage = fakeSpeicher();
     globalThis.caches = undefined;
+    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200 }));
   });
 
   it("nimmt Token, Namen und Entwuerfe mit", async () => {
@@ -57,5 +58,30 @@ describe("raeumeBrowser", () => {
     globalThis.localStorage = undefined;
     const { raeumeBrowser } = await import("./abmelden.js");
     await expect(raeumeBrowser()).resolves.toBeUndefined();
+  });
+
+  it("meldet NICHT alle Geraete ab — Abmelden gilt diesem Browser", async () => {
+    const ls = globalThis.localStorage;
+    ls.setItem("token", "1:0:1:1:abc");
+    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200 }));
+    const { raeumeBrowser } = await import("./abmelden.js");
+    await raeumeBrowser();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(ls.getItem("token")).toBeNull();
+  });
+
+  it("raeumt auch, wenn der Server nicht antwortet", async () => {
+    const ls = globalThis.localStorage;
+    ls.setItem("token", "t");
+    globalThis.fetch = vi.fn(async () => { throw new Error("offline"); });
+    const { raeumeBrowser } = await import("./abmelden.js");
+    await raeumeBrowser();
+    expect(ls.getItem("token")).toBeNull();
+  });
+
+  it("ohne Token geht keine Anfrage hinaus", async () => {
+    const { raeumeBrowser } = await import("./abmelden.js");
+    await raeumeBrowser();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

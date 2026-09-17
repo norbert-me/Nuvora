@@ -118,7 +118,11 @@ services:
     restart: unless-stopped
     logging: *logs
     ports:
-      - "${PORT:-8080}:80"
+      # NUVORA_BIND="127.0.0.1:" (MIT Doppelpunkt) bindet nur lokal — richtig,
+      # wenn ein Proxy auf demselben Rechner davorsteht. Leer (Vorgabe) heisst
+      # wie bisher: alle Schnittstellen, IPv4 und IPv6. Eine Vorgabe
+      # „0.0.0.0" haette IPv6 still abgeklemmt.
+      - "${NUVORA_BIND:-}${PORT:-8080}:80"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       # Liefert /site.json aus — CardVotes Impressum liest dieselbe Datei,

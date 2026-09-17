@@ -76,7 +76,7 @@ async def seed_new_account(db: AsyncSession, user_id: int) -> None:
     db.add(ordner)
     await db.flush()
 
-    qset = QuestionSet(name=BEISPIEL_SET, folder_id=ordner.id, shuffle_questions=False, shuffle_answers=False)
+    qset = QuestionSet(name=BEISPIEL_SET, folder_id=ordner.id, owner_id=user_id, shuffle_questions=False, shuffle_answers=False)
     db.add(qset)
     await db.flush()
 

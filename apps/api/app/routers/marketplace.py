@@ -7,6 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..uploads import eigene_bilder, eigenes_bild
 from ..austauschformat import quiz_schnappschuss
 from ..besitz import eigenes
 from ..rollen import ist_admin
@@ -440,10 +441,10 @@ async def copy_quiz(quiz_id: int, body: Optional[CopyBody] = None, user: User = 
             text=qdata.get("text", ""),
             choices=qdata.get("choices", {"A": "", "B": "", "C": "", "D": ""}),
             correct_answer=qdata.get("correct_answer"),
-            image_url=qdata.get("image_url"),
+            image_url=eigenes_bild(qdata.get("image_url")),
             image_layout=qdata.get("image_layout", "above"),
             num_choices=qdata.get("num_choices", 4),
-            choice_images=qdata.get("choice_images"),
+            choice_images=eigene_bilder(qdata.get("choice_images")),
             owner_id=user.id,
         )
         db.add(q)

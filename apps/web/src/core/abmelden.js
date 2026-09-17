@@ -13,9 +13,11 @@
 // einmal nachgezogen wurde. Und `Legal.jsx` sagt den Betroffenen zu, dass die
 // Ablagen „beim Abmelden wieder entfernt" werden; das muss stimmen.
 //
-// Drei Abmeldewege gibt es (Knopf im Profil, 401 im Dashboard, 401 in der
-// Klassenliste) — sie rufen alle hierher, statt die Liste dreimal zu fuehren.
-import { loesche, schluessel } from "./speicher.js";
+// Vier Abmeldewege gibt es (Knopf, 401 im fetch-Interceptor, 401 in Dashboard
+// und Klassenliste, Konto loeschen) — sie rufen alle hierher, statt die Liste
+// viermal zu fuehren. Bei den 401-Wegen ist der Token schon tot; der Aufruf am
+// Server kostet dann eine Anfrage und aendert nichts.
+import { lies, loesche, schluessel } from "./speicher.js";
 
 // Einzelne Schluessel mit personenbezogenem Inhalt.
 const SCHLUESSEL = [
@@ -70,13 +72,44 @@ export async function apiVorratWegwerfen() {
 }
 
 /**
+ * Den Token am SERVER zuruecknehmen — best effort, vor dem Loeschen.
+ *
+ * Vorher raeumte das Abmelden nur den Browser: ein abgegriffener Token galt
+ * bis zu seiner Frist weiter. `/api/auth/logout` erhoeht die Token-Version
+ * des Kontos. Fehler (kein Netz, Token ohnehin ungueltig) sind egal — dann
+ * gibt es nichts zurueckzunehmen oder es geht eben nicht; das Raeumen im
+ * Browser laeuft trotzdem. Der Pfad enthaelt „/auth/", deshalb loest eine
+ * 401-Antwort im fetch-Interceptor kein zweites Abmelden aus. Mit Frist,
+ * damit ein haengendes Netz das Abmelden nicht aufhaelt.
+ */
+export async function amServerAbmelden() {
+  const token = lies("token") || "";
+  if (!token || typeof globalThis.fetch !== "function") return;
+  const abbruch = typeof AbortController === "function" ? new AbortController() : null;
+  const uhr = abbruch ? setTimeout(() => abbruch.abort(), 3000) : null;
+  try {
+    await globalThis.fetch("/api/auth/logout", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      signal: abbruch?.signal,
+    });
+  } catch { /* best effort */ } finally {
+    if (uhr) clearTimeout(uhr);
+  }
+}
+
+/**
  * Alles Personenbezogene aus dem Browser nehmen.
  *
  * Die Outbox-Warteschlange (IndexedDB) raeumt der Aufrufer VORHER, wenn er sie
  * kennt — sie enthaelt ungespeicherte Arbeit, und die wegzuwerfen ist eine
  * andere Entscheidung als das Vergessen eines Zwischenspeichers.
  */
-export function raeumeBrowser() {
+export async function raeumeBrowser() {
+  // Bewusst KEIN amServerAbmelden(): das erhoeht die Token-Version des
+  // Kontos und meldete damit auch Tablet und Handy ab — wer am Rechner
+  // „Abmelden" drueckt, meint diesen Rechner. Gegen einen abgegriffenen
+  // Token wirkt die Hoechstdauer (TOKEN_MAX, 90 Tage) im Server.
   SCHLUESSEL.forEach(loesche);
   PRAEFIXE.forEach((p) => schluessel(p).forEach(loesche));
   return apiVorratWegwerfen();
