@@ -335,8 +335,21 @@
     // Gibt das Versprechen des Abgleichs ZURUECK: wer auf „ist es beim Server
     // angekommen?" warten muss (der Fortschrittsbalken beim Aufraeumen), kann
     // das dann auch. Alle uebrigen Aufrufer ignorieren es wie bisher.
+    // Foerderschwerpunkte und Notizen sind Art-9-Angaben (CLAUDE.md): sie
+    // bleiben im Arbeitsspeicher, weil Generator und Klassenansicht sie
+    // brauchen, gehen aber NICHT in den localStorage — der ueberlebt das
+    // Schliessen des Fensters und liegt auf geteilten Rechnern offen. Nach
+    // einem Start aus dem Cache sind sie leer, bis loadUserData sie vom Server
+    // holt (die Oberflaeche kommt mit leeren Werten zurecht).
+    function schuelerFuerCache(liste) {
+        return (liste || []).map(({ foerder, notizen, ...rest }) => rest);
+    }
+    function cacheText(key, data) {
+        return JSON.stringify(key === STORAGE_KEYS.schueler ? schuelerFuerCache(data) : data);
+    }
+
     function save(key, data, opt) {
-        cacheSetzen(key, JSON.stringify(data));
+        cacheSetzen(key, cacheText(key, data));
         if (key === STORAGE_KEYS.aufgaben) return syncAufgaben(data, opt);
         // schueler/klassen gehoeren dem Kern und werden unter /classes gepflegt —
         // von hier aus wird nichts zurueckgeschrieben.
@@ -771,7 +784,9 @@
     // Cache (Cache-First vor dem Load) beim naechsten save() echte Aufgaben
     // wegreissen (Datenverlust). Vor dem Load: nur anlegen/aendern, nie loeschen.
     let aufgabenVomServer = false;
-    let schueler = load(STORAGE_KEYS.schueler);
+    // Aus dem Cache kommen sie ohne Art-9-Felder (schuelerFuerCache) — hier auf
+    // die Form bringen, die die Oberflaeche erwartet (s.foerder.includes …).
+    let schueler = load(STORAGE_KEYS.schueler).map(s => ({ ...s, foerder: s.foerder || [], notizen: s.notizen || '' }));
     let klassen = load(STORAGE_KEYS.klassen);
     let kurseData = [];   // geladene Kurse (mit .classes) — für Kursliste + Roster je Kurs
     // Temp-_id (uid(), z.B. "mrvmr…") -> echte Server-id. Neu erstellte Aufgaben
@@ -930,7 +945,7 @@
         await checkKartenModul();
         lernpfade = [];
         cacheSetzen(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
-        cacheSetzen(STORAGE_KEYS.schueler, JSON.stringify(schueler));
+        cacheSetzen(STORAGE_KEYS.schueler, cacheText(STORAGE_KEYS.schueler, schueler));
         cacheSetzen(STORAGE_KEYS.klassen, JSON.stringify(klassen));
         overviewKlasse = '';
         renderAufgaben(); renderKlassen(); renderSchueler(); updateFilters();
@@ -4839,15 +4854,18 @@
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
         a.download = name; a.click(); URL.revokeObjectURL(a.href);
     }
-    // Struktur OHNE Schülerdaten: Thema/Config/Notizen je Lernleiter + die
+    // Struktur OHNE Schülerdaten: Thema/Config je Lernleiter + die
     // referenzierten Aufgaben. Beim Import legt der Server neue IDs an.
     function llSnapshot(ll) {
-        return { thema: ll.thema, unterthema: ll.unterthema || '', notizen: ll.notizen || '', config: ll.config || null };
+        return { thema: ll.thema, unterthema: ll.unterthema || '', config: ll.config || null };
     }
-    // full=true: mit Schülerzuweisungen (Name + Aufgaben-IDs) — vollständig, für
-    // eigenes Backup/Transfer. full=false: Vorlage ohne Schülerdaten (teilbar).
+    // full=true: mit Schülerzuweisungen (Name + Aufgaben-IDs) und Notizen —
+    // vollständig, für eigenes Backup/Transfer. full=false: Vorlage ohne
+    // Schülerdaten (teilbar) — die Notizen der Lernleiter bleiben draußen, weil
+    // darin erfahrungsgemäß Namen und Förderhinweise stehen.
     function llFull(ll, full) {
         const snap = llSnapshot(ll);
+        if (full) snap.notizen = ll.notizen || '';
         if (full) snap.schueler = (ll.schueler || []).map(s => ({ name: s.name, aufgabenIds: (s.aufgabenIds || []).map(String) }));
         return snap;
     }

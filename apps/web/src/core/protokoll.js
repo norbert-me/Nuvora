@@ -45,7 +45,12 @@ const hoerer = new Set();
 export function anonym(pfad) {
   return String(pfad).split("?")[0].replace(/\/\d+(?=\/|$)/g, "/{id}")
     // Tokens und Codes sind lang und zufällig — auch die haben hier nichts zu suchen.
-    .replace(/\/[A-Za-z0-9_-]{16,}(?=\/|$)/g, "/{token}");
+    .replace(/\/[A-Za-z0-9_-]{16,}(?=\/|$)/g, "/{token}")
+    // Sitzungscodes des Code-Detektivs sind kurz (6 Zeichen), öffnen aber eine
+    // Spielrunde samt Namen der Mitspielenden — die lange Regel oben fängt sie nicht.
+    .replace(/(\/cd|\/codedetektiv\/sessions)\/[A-Za-z0-9]{6}(?=\/|$)/gi, "$1/{code}")
+    // Die Spielseite nennt ihn ein zweites Mal: /cd/<CODE>/play/<CODE>.
+    .replace(/(\/cd\/\{code\}\/play)\/[A-Za-z0-9]{6}(?=\/|$)/gi, "$1/{code}");
 }
 
 function melde() {
