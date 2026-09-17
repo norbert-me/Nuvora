@@ -9,7 +9,7 @@ import ThemenWahl from "../components/ThemenWahl.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
 import Zeitleiste from "../components/Zeitleiste.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
-import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import UntisImport from "../components/UntisImport.jsx";
 import KalenderAdresseHilfe from "../components/KalenderAdresseHilfe.jsx";
 import CaldavZugaenge from "../components/CaldavZugaenge.jsx";
@@ -1873,14 +1873,6 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
   const [eKursId, setEKursId] = useState(null);
   const [ePeriod, setEPeriod] = useState("");
   const pOpts = stundenListe(Math.max(1, periods), hatNull);
-  // Wonach die Liste sortiert ist. Vorgabe bleibt das Datum — das ist die
-  // Frage „was kommt als Naechstes?". Wer mehrere Faecher unterrichtet, plant
-  // die Arbeiten dagegen fachweise; innerhalb eines Fachs zaehlt wieder das
-  // Datum. Im Browser gemerkt: es ist eine Ansicht, kein Inhalt.
-  const [sortierung, setSortierung] = useState(() => {
-    try { return localStorage.getItem("kal_exam_sort") === "fach" ? "fach" : "datum"; } catch { return "datum"; }
-  });
-  const setzeSortierung = (v) => { setSortierung(v); try { localStorage.setItem("kal_exam_sort", v); } catch { /* egal */ } };
   // Suche und Kurs-Filter. Die Liste waechst mit jedem Halbjahr, und die Frage
   // ist fast immer „was steht in DIESEM Kurs an?" oder „wo war noch mal die
   // Arbeit ueber Dreiecke?". Gesucht wird in Titel, Kurs/Klasse und den Themen
@@ -1903,10 +1895,9 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
       .filter(Boolean).join(" ").toLowerCase();
     return heu.includes(q);
   });
-  const liste = sortierung === "fach"
-    ? [...gefiltert].sort((a, b) => (a.fach || "\uffff").localeCompare(b.fach || "\uffff", undefined, { sensitivity: "base" })
-        || new Date(a.date) - new Date(b.date))
-    : gefiltert;
+  // Sortiert nach Datum („was kommt als Naechstes?"). Der Umschalter auf
+  // „Fach" ist auf Wunsch entfernt — der Kurs-Filter beantwortet dieselbe Frage.
+  const liste = gefiltert;
   const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); setEPeriod(e.period ? String(e.period) : ""); setENotiz(e.notiz || ""); setEThemen(e.topic_ids || []); setEErsetzen(e.ersetzt_stunde !== false); };
   const saveEdit = (e) => {
     if (!eDate || !eClassId) return;
@@ -1968,13 +1959,6 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
               {kursListe.map((k) => <option key={k} value={k}>{k}</option>)}
             </select>
           )}
-          <Segment>
-            {[["datum", t("kalender.sortDate")], ["fach", t("kalender.sortFach")]].map(([k, label]) => (
-              <button key={k} onClick={() => setzeSortierung(k)}
-                style={{ ...segmentBtn, fontWeight: sortierung === k ? 700 : 500,
-                  color: sortierung === k ? "var(--accent)" : "var(--text2)" }}>{label}</button>
-            ))}
-          </Segment>
         </div>
       )}
 
@@ -2010,8 +1994,14 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
                   </label>
                 )}
               </div>
-              <button onClick={() => saveEdit(e)} style={toolbarBtnPrimary}>{t("common.save")}</button>
-              <button onClick={() => setEditId(null)} style={toolbarBtn}>{t("common.abort")}</button>
+              {/* Symbole statt Worte: die Zeile ist ohnehin voll Felder.
+                  Loeschen steht nur hier, im Bearbeiten — nicht mehr hinter ⋯. */}
+              <button onClick={() => saveEdit(e)} className="icon-btn" style={{ ...toolbarIconBtn, background: "var(--accent)", border: "1px solid var(--accent)" }}
+                title={t("common.save")} aria-label={t("common.save")}><Icon d={ICONS.check} size={18} color={C.aufAkzent} /></button>
+              <button onClick={() => setEditId(null)} className="icon-btn" style={toolbarIconBtn}
+                title={t("common.abort")} aria-label={t("common.abort")}><Icon d={ICONS.close} size={18} color="var(--text2)" /></button>
+              <button onClick={() => loeschen(e)} className="icon-btn" style={toolbarIconBtn}
+                title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
             </>
           ) : (
             <>
@@ -2046,11 +2036,6 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
                 </Link>
               )}
               <button onClick={() => startEdit(e)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
-              {/* Löschen ins Menü und mit Rückfrage: es stand direkt neben
-                  „Bearbeiten" und löschte den Termin ohne ein Wort. */}
-              <MehrMenu eintraege={[
-                { key: "del", label: t("common.delete"), icon: ICONS.trash, gefahr: true, onClick: () => loeschen(e) },
-              ]} />
             </>
           )}
          </div>
