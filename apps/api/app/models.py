@@ -1501,6 +1501,11 @@ class WorkAnalysis(Base):
     # abwesend heisst „aus der Klassenstatistik rausrechnen", loescht aber die
     # erreichten Punkte NICHT — kommt der SuS zurueck, sind sie noch da.
     absent: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Niveau dieser Arbeit: "" (alle), "E" oder "G". Kurse mit E/G schreiben
+    # ZWEI Arbeiten — verschiedene Blaetter, verschiedene Punkte. Mit dem Niveau
+    # zeigt die Auswertung nur die Kinder, die dieses Blatt geschrieben haben;
+    # die Statistik rechnet ohnehin nur ueber die eingetragenen Ergebnisse.
+    niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")
     # Notenschlüssel dieser Arbeit ({"1":87,…}). NULL = Voreinstellung aus dem
     # Profil (users.grade_scale). Der Schlüssel ist eine paedagogische Wahl je
     # Arbeit, darum ueberschreibbar — Default bleibt das Profil.

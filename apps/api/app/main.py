@@ -240,6 +240,7 @@ def _ensure_columns(sync_conn):
         ("users", "tours_done", "JSON"),
         ("exercises", "quelle_id", "INTEGER"),
         ("exam_dates", "ersetzt_stunde", "BOOLEAN DEFAULT true NOT NULL"),
+        ("work_analyses", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("users", "ansichten", "JSON"),
         ("timetable_slots", "raum", "VARCHAR(60) DEFAULT '' NOT NULL"),
         ("todos", "notiz", "TEXT DEFAULT '' NOT NULL"),

@@ -133,7 +133,8 @@ export default function Klassenarbeit() {
   const [kursId, setKursId] = useState(Number(params.get("kurs")) || null);
   // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen.
   useUrlClass(setClassId, setKursId);
-  const [students, setStudents] = useState([]);
+  // Rohliste der Klasse; `students` weiter unten ist die Liste DIESER Arbeit.
+  const [alleStudents, setAlleStudents] = useState([]);
   // Kern-Themen aus core/topics.js — dieselbe Zeile stand auf sechs Seiten.
   const topics = useThemen();
   const [works, setWorks] = useState([]);
@@ -161,10 +162,10 @@ export default function Klassenarbeit() {
   const ladenr = useRef(0);
   useEffect(() => {
     if (classId) rememberClass(classId);
-    if (!classId) { setStudents([]); setWorks([]); zeigeArbeit(null); return; }
+    if (!classId) { setAlleStudents([]); setWorks([]); zeigeArbeit(null); return; }
     const meine = ++ladenr.current;   // nur die jüngste Antwort darf schreiben
     hol(`${API}/classes/${classId}/students`).then((d) => {
-      if (meine === ladenr.current) setStudents(Array.isArray(d) ? d : []);
+      if (meine === ladenr.current) setAlleStudents(Array.isArray(d) ? d : []);
     });
     hol(`${API}/classes/${classId}/works${kq}`).then((d) => {
       if (meine !== ladenr.current) return;
@@ -200,6 +201,14 @@ export default function Klassenarbeit() {
   });
   useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
   const work = entwurf.wert;
+  // Die SuS DIESER Arbeit: bei einer E- oder G-Arbeit nur die des Niveaus — sie
+  // haben das Blatt geschrieben, die anderen ein anderes. Ohne Niveau alle.
+  // Gerechnet wird ohnehin nur ueber die eingetragenen Ergebnisse (_profile),
+  // die Liste bestimmt, wer ueberhaupt zum Eintragen dasteht.
+  const students = useMemo(() => {
+    const n = (work && work.niveau) || "";
+    return n ? alleStudents.filter((s) => (s.niveau || "") === n) : alleStudents;
+  }, [alleStudents, work]);
   // Der Name bleibt: jede Geste geht weiter denselben einen Weg — nur endet er
   // jetzt im Entwurf statt beim Server.
   const persist = (next) => entwurf.setz(next);
@@ -217,16 +226,40 @@ export default function Klassenarbeit() {
     fn();
   };
 
-  const neueArbeit = async () => {
-    const cid = classId;
-    const kid = kursId;
-    if (!cid) return;
-    // Datum mitgeben: der Server markiert daraus die Kinder, die heute fehlen,
-    // gleich als abwesend (nur mit Modul Orga). Vergisst man das von Hand,
-    // rutschen Nullen in die Wertung.
-    const res = await fetch(`${API}/works`,
-      alsJson("POST", { class_id: cid, kurs_id: kid, name: t("klassenarbeit.newName"), datum: new Date().toISOString() })).catch(() => null);
-    if (res && res.ok) { const w = await res.json(); setWorks((p) => [w, ...p]); zeigeArbeit(w); }
+  // Eine Arbeit anlegen. `niveau` "" (alle), "E" oder "G".
+  // Datum mitgeben: der Server markiert daraus die Kinder, die heute fehlen,
+  // gleich als abwesend (nur mit Modul Orga). Vergisst man das von Hand,
+  // rutschen Nullen in die Wertung.
+  const legeAn = async (name, niveau) => {
+    const res = await fetch(`${API}/works`, alsJson("POST", {
+      class_id: classId, kurs_id: kursId, niveau,
+      name: (name || t("klassenarbeit.newName")).trim() || t("klassenarbeit.newName"),
+      datum: new Date().toISOString(),
+    })).catch(() => null);
+    if (!res || !res.ok) return null;
+    return res.json();
+  };
+  const [neuOffen, setNeuOffen] = useState(false);
+  const anlegen = async (name, art) => {
+    if (!classId) return;
+    if (art === "eg") {
+      // ZWEI Blaetter, zwei Arbeiten: E und G schreiben verschiedene Aufgaben
+      // und verschiedene Punkte. Nacheinander, damit die Reihenfolge in der
+      // Liste steht (E oben) und ein Fehlschlag nicht die Haelfte verschluckt.
+      const g = await legeAn(name, "G");
+      const e = await legeAn(name, "E");
+      const neu = [e, g].filter(Boolean);
+      if (!neu.length) return;
+      setWorks((p) => [...neu, ...p]);
+      setNeuOffen(false);
+      zeigeArbeit(neu[0]);
+      return;
+    }
+    const w = await legeAn(name, "");
+    if (!w) return;
+    setWorks((p) => [w, ...p]);
+    setNeuOffen(false);
+    zeigeArbeit(w);
   };
   const [kopieOffen, setKopieOffen] = useState(false);
   // Kopie in eine andere Klasse: Aufgaben, Themen, Notenschluessel und die
@@ -575,11 +608,11 @@ export default function Klassenarbeit() {
         <Werkzeugleiste style={{ marginBottom: 16 }}
           links={(
             <select value={work?.id || ""} onChange={(e) => { const w = works.find((x) => String(x.id) === e.target.value) || null; wechseln(() => zeigeArbeit(w)); }} style={{ ...selectStyle, minWidth: 180 }}>
-              {works.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              {works.map((w) => <option key={w.id} value={w.id}>{w.niveau ? `${w.name} (${w.niveau})` : w.name}</option>)}
             </select>
           )}
           mehr={work ? [{ key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true, onClick: loeschen }] : []}>
-          <button data-tour="ka-new" onClick={neueArbeit} style={toolbarBtn}>{t("klassenarbeit.new")}</button>
+          <button data-tour="ka-new" onClick={() => setNeuOffen(true)} style={toolbarBtn}>{t("klassenarbeit.new")}</button>
           {/* Parallelklassen schreiben dieselbe Arbeit — sie zweimal einzutippen
               ist dieselbe Arbeit zweimal. */}
           {work && <button onClick={() => setKopieOffen(true)} className="icon-btn" style={toolbarIconBtn} title={t("klassenarbeit.copyTo")} aria-label={t("klassenarbeit.copyTo")}><Icon d={ICONS.duplicate} /></button>}
@@ -1077,7 +1110,9 @@ export default function Klassenarbeit() {
           )}
         </>
       )}
-      {hasRoster && works.length === 0 && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={neueArbeit} />}
+      {neuOffen && <NeueArbeitModal t={t} onClose={() => setNeuOffen(false)} onAnlegen={anlegen}
+        vorschlag={t("klassenarbeit.newName")} />}
+      {hasRoster && works.length === 0 && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={() => setNeuOffen(true)} />}
       {/* Themenstand: die Arbeit sagt „diese Klassenarbeit", der Themenstand
           „dieses Unterthema ueber die Zeit". Rechnet ueber alle Arbeiten und
           Quizze der Klasse — deshalb hier unter der Einzelauswertung. */}
@@ -1259,7 +1294,7 @@ export function KlassenarbeitVergleich() {
         <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
         {works.length > 0 && (
           <select value={workId || ""} onChange={(e) => setWorkId(Number(e.target.value))} style={{ ...selectStyle, minWidth: 180 }}>
-            {works.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            {works.map((w) => <option key={w.id} value={w.id}>{w.niveau ? `${w.name} (${w.niveau})` : w.name}</option>)}
           </select>
         )}
       </div>
@@ -1485,6 +1520,39 @@ function KopieModal({ work, onClose, onCopy, t }) {
 
       {fehler && <p style={{ color: C.danger, fontSize: 13, margin: "10px 0 0" }}>{fehler}</p>}
       <DialogFuss onSpeichern={los} onAbbrechen={onClose} aus={!classId || busy} speichern={t("klassenarbeit.copyGo")} />
+    </Modal>
+  );
+}
+
+/**
+ * Neue Arbeit anlegen — Name und Art in einem Popup.
+ *
+ * Der Plus-Knopf legte vorher sofort eine „Klassenarbeit" an; benannt wurde
+ * hinterher. Bei E/G braucht es aber ZWEI Arbeiten mit demselben Namen, und die
+ * Entscheidung faellt vor dem Anlegen, nicht danach: E und G schreiben
+ * verschiedene Blaetter mit verschiedenen Punkten, also zwei Auswertungen. Die
+ * Kinder sind im Kurs bereits eingeteilt (`students.niveau`) — die jeweilige
+ * Arbeit zeigt nur die ihren.
+ */
+function NeueArbeitModal({ t, onClose, onAnlegen, vorschlag }) {
+  const [name, setName] = useState(vorschlag || "");
+  const [art, setArt] = useState("eine");
+  const [busy, setBusy] = useState(false);
+  const los = async () => { setBusy(true); await onAnlegen(name, art); setBusy(false); };
+  return (
+    <Modal onClose={onClose} width={420} label={t("klassenarbeit.new")}>
+      <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px" }}>{t("klassenarbeit.new")}</h3>
+      <div style={{ fontSize: 12, color: "var(--text3)", margin: "12px 0 4px" }}>{t("klassenarbeit.newNameLabel")}</div>
+      <input autoFocus value={name} onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && !busy) los(); }}
+        style={{ ...inputStyle, width: "100%" }} />
+      <div style={{ fontSize: 12, color: "var(--text3)", margin: "12px 0 4px" }}>{t("klassenarbeit.newArt")}</div>
+      <Tabs value={art} onChange={setArt}
+        options={[["eine", t("klassenarbeit.newArtEine")], ["eg", t("klassenarbeit.newArtEG")]]} />
+      <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8, lineHeight: 1.5 }}>
+        {art === "eg" ? t("klassenarbeit.newArtEGHint") : t("klassenarbeit.newArtEineHint")}
+      </div>
+      <DialogFuss onSpeichern={los} onAbbrechen={onClose} aus={busy} speichern={t("klassenarbeit.new")} />
     </Modal>
   );
 }

@@ -69,6 +69,8 @@ class WorkIn(BaseModel):
     class_id: int
     kurs_id: Optional[int] = None
     name: str = ""
+    # "" (alle), "E" oder "G" — siehe WorkAnalysis.niveau.
+    niveau: str = ""
     # Tag der Arbeit — nur, um die Abwesenden vorzubelegen (Bruecke zu Orga).
     datum: Optional[str] = None
 
@@ -93,6 +95,7 @@ class WorkOut(BaseModel):
     scale: Optional[dict] = None
     absent: list = []
     fehler: dict = {}
+    niveau: str = ""
     model_config = {"from_attributes": True}
 
 
@@ -109,7 +112,9 @@ def _keyw(user, class_id, kurs_id):
 @router.get("/classes/{class_id}/students")
 async def roster(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
-    return [{"id": s.id, "name": s.name} for s in await _roster(db, class_id)]
+    # `niveau` gehoert dazu: eine E- oder G-Arbeit zeigt nur die Kinder, die
+    # dieses Blatt geschrieben haben.
+    return [{"id": s.id, "name": s.name, "niveau": s.niveau or ""} for s in await _roster(db, class_id)]
 
 
 @router.get("/kurse/{kurs_id}/students")
@@ -117,21 +122,23 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
     """SuS eines Kurses — inkl. der EINZELN hinzugefügten (Kurse aus Teilen von
     Klassen). Deduplikat per Name wie beim Klassen-Roster."""
     await eigener_kurs(db, user, kurs_id)
-    return [{"id": s.id, "name": s.name, "class_id": s.class_id} for s in await _kanon_kurs(db, kurs_id)]
+    return [{"id": s.id, "name": s.name, "class_id": s.class_id, "niveau": s.niveau or ""} for s in await _kanon_kurs(db, kurs_id)]
 
 
 @router.get("/classes/{class_id}/works", response_model=List[WorkOut])
 async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     rows = (await db.execute(select(WorkAnalysis).where(*_keyw(user, class_id, kurs_id)).order_by(WorkAnalysis.created_at.desc()))).scalars().all()
-    return [WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}) for w in rows]
+    return [WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, niveau=w.niveau or "") for w in rows]
 
 
 @router.post("/works", response_model=WorkOut, status_code=201)
 async def create_work(body: WorkIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("ka_work", f"u{user.id}", 100, 60, "Zu viele Arbeiten. Bitte kurz warten.")
     await _owned_class(db, user, body.class_id)
-    w = WorkAnalysis(owner_id=user.id, class_id=body.class_id, kurs_id=body.kurs_id, name=(body.name or "Klassenarbeit").strip()[:200], tasks=[], results={})
+    w = WorkAnalysis(owner_id=user.id, class_id=body.class_id, kurs_id=body.kurs_id,
+                     name=(body.name or "Klassenarbeit").strip()[:200], tasks=[], results={},
+                     niveau=body.niveau if body.niveau in ("E", "G") else "")
 
     # Wer am Tag der Arbeit gefehlt hat, ist hier gleich als abwesend markiert
     # (Bruecke zu Orga, nur mit aktivem Modul). Vergisst man das, rutschen
@@ -144,7 +151,7 @@ async def create_work(body: WorkIn, user: User = Depends(require_module), db: As
     await db.commit()
     await db.refresh(w)
     return WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id,
-                   name=w.name, tasks=[], results={}, absent=w.absent or [])
+                   name=w.name, tasks=[], results={}, absent=w.absent or [], niveau=w.niveau or "")
 
 
 async def _abwesende_am_tag(db, user, class_id: int, datum: Optional[str]) -> list:
@@ -204,6 +211,9 @@ async def copy_work(work_id: int, body: WorkCopyIn, user: User = Depends(require
         # So ist die Gruppe „dieselbe Arbeit" eine ID-Abfrage und keine Suche.
         source_id=quelle.source_id or quelle.id,
         name=((body.name or quelle.name or "Klassenarbeit").strip()[:200]),
+        # Das Niveau gehoert zum BLATT, nicht zur Klasse: eine E-Arbeit bleibt
+        # eine E-Arbeit, auch in der Parallelklasse.
+        niveau=quelle.niveau or "",
         # Tief kopieren: sonst zeigen beide Arbeiten auf dieselben Listen, und
         # eine geaenderte Aufgabe waere still in beiden geaendert.
         tasks=_copy.deepcopy(quelle.tasks or []),
@@ -224,7 +234,8 @@ async def copy_work(work_id: int, body: WorkCopyIn, user: User = Depends(require
     await db.commit()
     await db.refresh(ziel)
     return WorkOut(id=ziel.id, source_id=ziel.source_id, class_id=ziel.class_id, kurs_id=ziel.kurs_id, name=ziel.name,
-                   tasks=ziel.tasks or [], results={}, scale=ziel.scale, absent=[], fehler={})
+                   tasks=ziel.tasks or [], results={}, scale=ziel.scale, absent=[], fehler={},
+                   niveau=ziel.niveau or "")
 
 
 @router.put("/works/{work_id}", response_model=WorkOut)
@@ -317,7 +328,7 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
         w.absent = list({str(x)[:40] for x in body.absent[:400]}) or None
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {})
+    return WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, niveau=w.niveau or "")
 
 
 @router.delete("/works/{work_id}", status_code=204)
