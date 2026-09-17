@@ -266,7 +266,7 @@ import GuidedTour, { PATH_TOUR, tourFor } from "./components/GuidedTour.jsx";
 import { uebernehmen as ansichtenUebernehmen, vergessen as ansichtenVergessen } from "./core/ansichten.js";
 import Suche from "./components/Suche.jsx";
 import { useModules, useZielFilter } from "./core/modules.js";
-import { istAdmin } from "./core/admin.js";
+import { istAdmin, istBetreiber } from "./core/admin.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";
@@ -560,7 +560,7 @@ const getModuleNavItems = (t, location, user) => {
     // Sicherungen enthalten die Daten ALLER Konten (inkl. DSGVO Art. 9) —
     // nur die Administration sieht den Punkt ueberhaupt. Die Schranke sitzt
     // trotzdem im Server (_require_admin), nicht hier.
-    ...(istAdmin(user) ? [{ to: "/backup", label: t("nav.backup") }] : []),
+    ...(istBetreiber(user) ? [{ to: "/backup", label: t("nav.backup") }] : []),
   ];
 };
 
@@ -1136,7 +1136,7 @@ function AppRoutes({ user, setUser, logout }) {
           {/* Der Navigationspunkt war bereits auf die Administration beschraenkt,
               die Route nicht: jede Lehrkraft sah eine Seite voller Absagen der
               API. Dieselbe Quelle (`istAdmin`) entscheidet jetzt beides. */}
-          <Route path="/backup" element={user ? (istAdmin(user) ? <Backup /> : <NurAdministration />) : <Landing />} />
+          <Route path="/backup" element={user ? (istBetreiber(user) ? <Backup /> : <NurAdministration />) : <Landing />} />
           <Route path="/thema/:id" element={user ? <ThemaAnsicht /> : <Landing />} />
           <Route path="/login" element={user ? <NuvoraHome user={user} /> : <Login onLogin={handleLogin} />} />
           <Route path="/reset-password" element={<ResetPassword />} />

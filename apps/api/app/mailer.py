@@ -83,16 +83,25 @@ def _send_sync(to: str, subject: str, body: str, reply_to: str = "",
     return True
 
 
+def _adresse_kurz(adresse: str) -> str:
+    """Adresse fuers Serverprotokoll: bereinigt UND gekuerzt („no…@schule.de").
+    Fuer „an wen ging es nicht raus?" genuegt der Anfang — dieselbe Regel wie
+    bei den CalDAV-Zugriffen (`routers/caldav._log_kennung`)."""
+    roh = _fuer_log(adresse)
+    name, _, domain = roh.partition("@")
+    return f"{name[:2]}…@{domain}" if domain else (name[:3] + "…")
+
+
 async def send_email(to: str, subject: str, body: str, reply_to: str = "",
                      anhang: tuple | None = None) -> bool:
     """Versendet best-effort — wirft nie, blockiert nie den Request (läuft im Threadpool)."""
     if not email_configured():
-        logger.info("SMTP nicht konfiguriert — E-Mail an %s übersprungen", _fuer_log(to))
+        logger.info("SMTP nicht konfiguriert — E-Mail an %s übersprungen", _adresse_kurz(to))
         return False
     try:
         return await asyncio.to_thread(_send_sync, to, subject, body, reply_to, anhang)
     except Exception as e:
-        logger.warning("E-Mail-Versand an %s fehlgeschlagen: %s", _fuer_log(to), _fuer_log(str(e), 300))
+        logger.warning("E-Mail-Versand an %s fehlgeschlagen: %s", _adresse_kurz(to), _fuer_log(str(e), 300))
         return False
 
 

@@ -22,7 +22,8 @@ Daten legt, hat beides zusammen verloren, sobald eine Sicherung abhandenkommt.
 **Diese Dateien enthalten DSGVO-Art.-9-Daten** (`students.foerder`,
 `students.massnahmen`, `students.notizen`). Daraus folgt:
 
-  * Alles hier hängt an `_require_admin` (Nutzer-ID 1). Kein Lehrkraft-Konto.
+  * Alles hier hängt an `nur_admin` → `rollen.ist_betreiber` (Nutzer-ID 1) —
+    auch keine ernannte Administration: die Sicherung trägt ALLE Konten.
   * Der Ablageordner liegt **außerhalb** von `NUVORA_UPLOAD_DIR` — der ist über
     `/api/uploads` als StaticFiles gemountet und damit ohne Anmeldung lesbar.
     `test_backup.py` prüft genau das; der Proxy (nginx.conf) kennt ohnehin nur
@@ -74,6 +75,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.responses import FileResponse
 
 from ..admin import APP_VERSION, _require_admin
+from ..rollen import ist_betreiber
 from ..database import DATABASE_URL, async_session, get_db
 from ..models import AppSetting, Base
 from ..spalten import fuellwert
@@ -928,13 +930,16 @@ async def plan_loop():
 
 # ── API ──────────────────────────────────────────────────────────────────────
 async def nur_admin(user=Depends(get_current_user)):
-    """Sicherungen enthalten DSGVO-Art.-9-Daten — nur die Administration.
+    """Sicherungen enthalten DSGVO-Art.-9-Daten ALLER Konten — nur Konto 1.
 
-    Die Prüfung selbst steht in `app/admin.py` und wird von dort geholt, nicht
-    hier kopiert: eine zweite Fassung wäre die Stelle, an der die beiden eines
-    Tages auseinanderlaufen.
+    Nicht jede ernannte Administration: die dürfte sonst die Schülerdaten
+    aller anderen Lehrkräfte herunterladen oder überschreiben. Die Regel steht
+    in `app/rollen.py` (`ist_betreiber`), nicht hier kopiert.
     """
-    return await _require_admin(user)
+    await _require_admin(user)
+    if not ist_betreiber(user):
+        raise HTTPException(403, "Sicherungen nur für das Betreiberkonto")
+    return user
 
 
 class Einstellungen(BaseModel):

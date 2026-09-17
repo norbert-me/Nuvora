@@ -7,6 +7,18 @@ und der braucht die Antwort selbst — ein Importring.
 """
 
 
+def ist_betreiber(user) -> bool:
+    """Nur Konto 1 — der Betreiber der Installation.
+
+    Sicherungen enthalten die Daten ALLER Konten samt Art-9-Angaben. Seit sich
+    weitere Konten zur Administration ernennen lassen, hiesse „jede
+    Administration" auch: jede ernannte Kollegin zieht die Schuelerdaten aller
+    anderen Lehrkraefte. Das bleibt deshalb dem einen Konto, das die
+    Installation aufgesetzt hat und das sich nicht herabstufen laesst.
+    """
+    return bool(user) and getattr(user, "id", None) == 1
+
+
 def ist_admin(user) -> bool:
     """Konto 1 immer, alle weiteren ueber `users.is_admin`.
 

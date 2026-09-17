@@ -126,6 +126,9 @@ async def welt(tmp_path, monkeypatch):
         # Nutzer 2 die ganz normale Lehrkraft, die hier nichts zu suchen hat.
         s.add(User(email="admin@test.de", password_hash="x", name="Admin", email_verified=True))
         s.add(User(email="lehrkraft@test.de", password_hash="x", name="Lehrkraft", email_verified=True))
+        # Nutzer 3 ist zur Administration ERNANNT — an die Sicherung kommt er
+        # trotzdem nicht: sie traegt die Daten aller Konten.
+        s.add(User(email="ernannt@test.de", password_hash="x", name="Ernannt", email_verified=True, is_admin=True))
         await s.commit()
 
     async def _db():
@@ -210,11 +213,12 @@ async def test_keine_secrets_in_der_sicherung(welt, monkeypatch):
 
 # ── Zugriff ──────────────────────────────────────────────────────────────────
 @pytest.mark.asyncio
-async def test_normales_konto_kommt_an_keinen_endpunkt(welt):
+@pytest.mark.parametrize("uid", [2, 3])
+async def test_normales_konto_kommt_an_keinen_endpunkt(welt, uid):
     """Sicherungen enthalten die Daten ALLER Konten. Eine Lehrkraft, die ihre
     eigene Sicherung zieht, hätte damit auch die aller anderen."""
     eintrag = await _sichern()
-    welt["zustand"]["user_id"] = 2  # jetzt die normale Lehrkraft
+    welt["zustand"]["user_id"] = uid  # normale Lehrkraft bzw. ernannte Administration
     wege = [
         ("GET", "/api/admin/backup"),
         ("POST", "/api/admin/backup"),
@@ -396,7 +400,7 @@ async def test_zurueckspielen_in_eine_wegwerf_datenbank(welt):
         str(zurueck_uploads),
     )
     assert bericht["tabellen"]["students"] == 1
-    assert bericht["tabellen"]["users"] == 2
+    assert bericht["tabellen"]["users"] == 3
     assert bericht["dateien"] == 1
     assert (zurueck_uploads / "frage-4711.png").read_bytes() == UPLOAD_INHALT
 
@@ -414,7 +418,7 @@ async def test_zurueckspielen_in_eine_wegwerf_datenbank(welt):
             assert [k.name for k in klassen] == ["ZZ-Backup 7a"]
             assert klassen[0].created_at is not None, "Zeitstempel ging beim Zurückspielen verloren"
             nutzer = (await s.execute(select(m.User))).scalars().all()
-            assert {u.email for u in nutzer} == {"admin@test.de", "lehrkraft@test.de"}
+            assert {u.email for u in nutzer} == {"admin@test.de", "lehrkraft@test.de", "ernannt@test.de"}
     finally:
         await probe.dispose()
 
@@ -569,7 +573,7 @@ async def test_probelauf_zeigt_die_zahlen_und_laesst_die_datenbank_in_ruhe(welt)
     d = r.json()
     assert d["tabellen"]["students"] == 1
     assert d["tabellen"]["school_classes"] == 1
-    assert d["tabellen"]["users"] == 2
+    assert d["tabellen"]["users"] == 3
     assert d["zeilen"] >= 4
     assert d["uploads_anzahl"] == 1
     assert d["nuvora"], "Der Probelauf nennt die Fassung aus dem Manifest nicht"

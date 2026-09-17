@@ -45,7 +45,7 @@ def _dump(row) -> dict:
     ungeladen = sa_inspect(row).unloaded
     out = {}
     for c in row.__table__.columns:
-        if c.name in ("password_hash",):
+        if c.name in ("password_hash", "calendar_token"):
             continue
         if c.name in ungeladen:
             out[c.name] = "(Datei — im Modul herunterladbar)"

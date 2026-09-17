@@ -36,6 +36,8 @@ const SCHLUESSEL = [
   // Zuletzt gewaehlte Klasse, eingeklappte Abschnitte, ausgeblendete fremde
   // Kalender (deren URLs sind die Abo-Adressen der Lehrkraft).
   "nuvora_selected_class", "noten_collapsed", "noten_agg", "kal_ext_aus",
+  // Startseiten-Einrichtung: der Knopf raeumte sie, 401 und Kontoloeschung nicht.
+  "nuvora_ansichten",
 ];
 
 // Ganze Familien. `sitzplan_mark_*` haelt Markierungen je Schueler-ID,
