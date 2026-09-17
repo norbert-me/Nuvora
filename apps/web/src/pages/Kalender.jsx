@@ -918,7 +918,7 @@ export default function Kalender() {
           onClose={() => setHiddenOffen(false)} t={t} />
       )}
 
-      {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
+      {view === "month" && <MonthGrid beginnMin={beginnMin} extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
         <div style={{ ...cardStyle, marginBottom: 12, padding: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("kalender.wdhTitle")}</div>
@@ -934,7 +934,7 @@ export default function Kalender() {
           </div>
         </div>
       )}
-      {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
+      {view === "week" && <WeekView beginnMin={beginnMin} extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
       {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} onCancelSlot={cancelSlot} frei={frei} className={className} slotName={slotName} eintragName={eintragName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {untisOffen && (
         <UntisImport onClose={() => setUntisOffen(false)} kurse={kurse} klassen={classes} periods={tt.periods}
@@ -1233,7 +1233,7 @@ function EntryChips({ list, className, kursName = () => "", topicName, onOpen, c
 }
 
 
-function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo, slotsFor, onSlot, frei, className, kursName, slotName, topicName, classColor, onAdd, onOpen, onExt, onDayView, onWeekView, t }) {
+function MonthGrid({ beginnMin, extColor, range, cursor, byDay, extByDay, todoByDay, onTodo, slotsFor, onSlot, frei, className, kursName, slotName, topicName, classColor, onAdd, onOpen, onExt, onDayView, onWeekView, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
@@ -1292,9 +1292,7 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo
                     </div>
                     {/* Siehe WeekView: frei blendet nur den Stundenplan aus. */}
                     {f && <FreiMarker label={f.label} t={t} />}
-                    <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} tag={ymd(d)} />
-                    <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} tag={ymd(d)} />
-                    {!f && slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
+                    <TagesChips d={d} byDay={byDay} extByDay={extByDay} slots={!f && slotsFor ? slotsFor(d) : []} beginnMin={beginnMin} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onOpen={onOpen} onExt={onExt} onSlot={onSlot} extColor={extColor} imRaster t={t} />
                     {/* To-dos zeigen auch an freien Tagen (Ferien/Feiertag). */}
                     <TodoChips list={todoByDay && todoByDay(d)} onOpen={onTodo} />
                     </>)}
@@ -1310,7 +1308,31 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo
   );
 }
 
-function WeekView({ extColor, range, byDay, extByDay, todoByDay, onTodo, slotsFor, frei, className, kursName, slotName, classColor, topicName, onAdd, onOpen, onExt, onSlot, onDayView, t }) {
+// Ein Tag im Raster, von oben nach unten nach Uhrzeit: eigene Eintraege,
+// abonnierte Termine und die noch offenen Stundenplan-Stunden in EINER
+// Reihenfolge. Vorher standen die Stunden immer ganz oben — die 4. Stunde
+// ueber einem Termin um 7:50.
+function TagesChips({ d, byDay, extByDay, slots, beginnMin, className, kursName, slotName, topicName, classColor, onOpen, onExt, onSlot, extColor, imRaster, t }) {
+  const eintraege = byDay(d);
+  const belegt = new Set(eintraege.filter((e) => e.period != null).map((e) => e.period));
+  const extern = (extByDay && extByDay(d)) || [];
+  const teile = [
+    ...eintraege.map((e) => ({ art: "e", min: beginnMin(e), x: e, key: "e" + e.id })),
+    ...extern.map((ev, i) => ({ art: "x", min: hmToMin(ev.time) ?? -1, x: ev, key: "x" + i })),
+    ...(slots || []).filter((s) => !belegt.has(s.period))
+      .map((s) => ({ art: "s", min: beginnMin({ period: s.period }), x: s, key: "s" + s.id })),
+  ].sort((a, b) => a.min - b.min);
+  const tag = ymd(d);
+  return teile.map((p) => (
+    <Fragment key={p.key}>
+      {p.art === "e" && <EntryChips list={[p.x]} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} tag={tag} imRaster={imRaster} />}
+      {p.art === "x" && <ExtChips list={[p.x]} onOpen={onExt} extColor={extColor} tag={tag} imRaster={imRaster} />}
+      {p.art === "s" && <SlotGhosts list={[p.x]} entries={eintraege} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
+    </Fragment>
+  ));
+}
+
+function WeekView({ beginnMin, extColor, range, byDay, extByDay, todoByDay, onTodo, slotsFor, frei, className, kursName, slotName, classColor, topicName, onAdd, onOpen, onExt, onSlot, onDayView, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   return (
@@ -1330,13 +1352,10 @@ function WeekView({ extColor, range, byDay, extByDay, todoByDay, onTodo, slotsFo
               ganzen Tag leergeraeumt hat — auch die externen Termine aus dem
               Abo. Ferien heissen „kein Unterricht", nicht „keine Termine". */}
           {f && <FreiMarker label={f.label} t={t} />}
-          {!f && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
           {/* In der Woche stehen die Tage als eigene Karten mit Abstand — ein
               durchgehender Streifen ginge dort ins Leere. Also dieselbe
-              Information mit Pfeilen: „‹ Klassenfahrt ›" heisst, dass es davor
-              und danach weitergeht. */}
-          <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} tag={ymd(d)} imRaster={false} />
-          <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} tag={ymd(d)} imRaster={false} />
+              Information mit Pfeilen (imRaster=false). */}
+          <TagesChips d={d} byDay={byDay} extByDay={extByDay} slots={f ? [] : slotsFor(d)} beginnMin={beginnMin} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onOpen={onOpen} onExt={onExt} onSlot={onSlot} extColor={extColor} imRaster={false} t={t} />
           {/* To-dos auch an freien Tagen. */}
           <TodoChips list={todoByDay && todoByDay(d)} onOpen={onTodo} />
         </div>
