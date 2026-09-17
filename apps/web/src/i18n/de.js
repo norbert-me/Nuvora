@@ -1112,7 +1112,7 @@ export default {
   "kalender.start": "Beginn",
   "kalender.end": "Ende",
   "kalender.addPeriod": "Stunde hinzufügen",
-  "kalender.zeroPeriodOn": "0. Stunde",
+  "kalender.zeroPeriodOn": "0. Stunde hinzufügen",
   "kalender.zeroPeriodOff": "0. Stunde entfernen",
   "kalender.zeroPeriodHint": "Eine Stunde vor der ersten — Frühunterricht, AG, Vertretung",
   "kalender.removePeriod": "Letzte Stunde entfernen",

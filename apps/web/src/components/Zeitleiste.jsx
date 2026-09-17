@@ -16,6 +16,7 @@ import KursKlasseSelect from "./KursKlasseSelect.jsx";
 import Werkzeugleiste from "./Werkzeugleiste.jsx";
 import { hol } from "../core/melden.js";
 import { heuteYmd } from "../core/datum.js";
+import { stundeKurz } from "../core/stunden.js";
 import { useLanguage } from "../i18n/index.jsx";
 
 // Eine Farbe je Art — dieselbe Bedeutung wie im Kalender: Arbeiten sind das,
@@ -111,7 +112,7 @@ export default function Zeitleiste({ onStunde }) {
                       <span key={`s${i}`} title={t("zeitleiste.stunde")}
                         style={{ ...chipStyle, display: "inline-flex", padding: "1px 8px", marginRight: 4, marginBottom: 4,
                           fontSize: 11, color: "var(--text3)", background: "var(--bg2)" }}>
-                        {p.period ? `${p.period}.` : "—"}
+                        {p.period != null ? stundeKurz(p.period) : "—"}
                       </span>
                     );
                   }

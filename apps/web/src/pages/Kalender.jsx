@@ -1740,7 +1740,7 @@ function TimetableView({ tt, bearbeiten = false, entwurfRef = null, stichtag = n
                       frueher — dann gibt es keine Zeit, die man zeigen
                       koennte. */}
                   {p !== periods[periods.length - 1] && (showTimes || gap > 0 || pauseBelegt(p)) && (
-                    <tr style={{ height: Math.max(gap, showTimes ? 44 : 0, pauseBelegt(p) ? 30 : 0) }}>
+                    <tr style={{ height: Math.max(gap, showTimes ? 44 : 0, pauseBelegt(p) ? 36 : 0) }}>
                       <td style={{ border: "none", background: "transparent", padding: showTimes ? 2 : 0, verticalAlign: "middle", textAlign: "center" }}>
                         {showTimes && (<>
                           <div style={{ fontSize: 11, color: "var(--text3)" }}>{t("kalender.pause")}</div>
@@ -1758,7 +1758,7 @@ function TimetableView({ tt, bearbeiten = false, entwurfRef = null, stichtag = n
                         return (
                           <td key={wd} style={{ border: "none", padding: 2, verticalAlign: "middle",
                             background: "repeating-linear-gradient(45deg, var(--bg), var(--bg) 6px, transparent 6px, transparent 12px)" }}>
-                            {(s || bearbeiten) && zellKnopf(s, 26, () => onEdit(s ? { ...s } : { weekday: wd, period: PAUSE_BASIS + p }),
+                            {(s || bearbeiten) && zellKnopf(s, 32, () => onEdit(s ? { ...s } : { weekday: wd, period: PAUSE_BASIS + p }),
                               s ? t("kalender.editSlot") : t("kalender.pauseAdd"), true)}
                           </td>
                         );
@@ -1769,14 +1769,13 @@ function TimetableView({ tt, bearbeiten = false, entwurfRef = null, stichtag = n
               );
             })}
             {bearbeiten && <tr>
-              <td style={{ padding: 6, border: "none", textAlign: "center" }}>
-                <div style={{ display: "inline-flex", gap: 4 }}>
+              <td colSpan={wdays.length + 1} style={{ padding: 6, border: "none" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {anzahl > 1 && <button onClick={() => entwurf.setz({ periods: anzahl - 1 })} title={t("kalender.removePeriod")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>−</button>}
                   <button onClick={() => entwurf.setz({ periods: anzahl + 1 })} title={t("kalender.addPeriod")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>+</button>
                   <button onClick={() => entwurf.setz({ null: !hatNull })} title={t("kalender.zeroPeriodHint")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>{hatNull ? t("kalender.zeroPeriodOff") : t("kalender.zeroPeriodOn")}</button>
                 </div>
               </td>
-              {wdays.map((_, wd) => <td key={wd} style={{ border: "none" }} />)}
             </tr>}
           </tbody>
         </table>
@@ -1898,7 +1897,7 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
   // Sortiert nach Datum („was kommt als Naechstes?"). Der Umschalter auf
   // „Fach" ist auf Wunsch entfernt — der Kurs-Filter beantwortet dieselbe Frage.
   const liste = gefiltert;
-  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); setEPeriod(e.period ? String(e.period) : ""); setENotiz(e.notiz || ""); setEThemen(e.topic_ids || []); setEErsetzen(e.ersetzt_stunde !== false); };
+  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); setEPeriod(e.period != null ? String(e.period) : ""); setENotiz(e.notiz || ""); setEThemen(e.topic_ids || []); setEErsetzen(e.ersetzt_stunde !== false); };
   const saveEdit = (e) => {
     if (!eDate || !eClassId) return;
     const [y, m, d] = eDate.split("-").map(Number);
@@ -2010,7 +2009,7 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
                 {/* Die Kalenderwoche steht dabei: Schulen planen in Wochen ("die
                     Arbeit liegt in KW 9"), und aus einem Datum liest man sie
                     nicht ab. */}
-                <div style={{ fontSize: 12, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · {t("kalender.kw")} {isoWeek(new Date(e.date)).week}{e.period ? ` · ${e.period}. ${t("kalender.period")}` : ""}</div>
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · {t("kalender.kw")} {isoWeek(new Date(e.date)).week}{e.period != null ? ` · ${stundeLabel(e.period, t)}` : ""}</div>
                 {/* Die Themen der Arbeit: beim Vorbereiten steht damit da,
                     worüber geschrieben wird — und beim Planen der letzten
                     Stunden davor, was noch drankommen muss. */}

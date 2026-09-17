@@ -1128,7 +1128,7 @@ export default {
   "kalender.start": "Inicio",
   "kalender.end": "Fin",
   "kalender.addPeriod": "Añadir hora",
-  "kalender.zeroPeriodOn": "Hora 0",
+  "kalender.zeroPeriodOn": "Añadir hora 0",
   "kalender.zeroPeriodOff": "Quitar la hora 0",
   "kalender.zeroPeriodHint": "Una hora antes de la primera",
   "kalender.removePeriod": "Quitar última hora",

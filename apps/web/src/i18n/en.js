@@ -1127,7 +1127,7 @@ export default {
   "kalender.start": "Start",
   "kalender.end": "End",
   "kalender.addPeriod": "Add period",
-  "kalender.zeroPeriodOn": "Period 0",
+  "kalender.zeroPeriodOn": "Add period 0",
   "kalender.zeroPeriodOff": "Remove period 0",
   "kalender.zeroPeriodHint": "A lesson before the first one",
   "kalender.removePeriod": "Remove last period",
