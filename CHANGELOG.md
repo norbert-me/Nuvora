@@ -16,6 +16,26 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+## 4.4.2 — 17.09.2026
+
+- **Stundenplan im Bearbeiten-Modus.** Der Stift schaltet Uhrzeiten,
+  Stundenzahl, 0. Stunde, Pausen und Belegung frei; „Fertig" speichert.
+- **Kurse auch in der Pause.** Im Bearbeiten-Modus hat jede Pausenzeile ein
+  Plus; die Stunde erscheint mit der Pausenzeit in Kalender, Anwesenheit und
+  auf dem Handy.
+- **Korrektur-To-do nennt den Kurs** („Mathe · 7.5: 2. KA korrigieren") und
+  verlinkt Termin und Auswertung.
+- Klassenarbeiten: Speichern/Abbrechen als Symbole, Löschen nur im
+  Bearbeiten, Umschalter Datum/Fach entfernt.
+- Anwesenheit: die 0. Stunde zählt als Stunde, nicht mehr als ganzer Tag;
+  Nachtragen im Verlauf ändert genau die eine Zeile.
+- Sicherheit: Sicherungen nur für das Betreiberkonto; mehrere Wege zu
+  fremden Daten geschlossen (Beobachtungen, Schülernamen, Kartenstapel);
+  eine fremde Registrierung kann kein Konto mehr übernehmen; eine ungültige
+  Stundennummer legt den Server nicht mehr lahm.
+- Datenschutz: Schülerzugänge stehen nicht mehr im Referer des
+  Protokolls, die Datenauskunft enthält die Abo-Adresse nicht mehr.
+
 ## 4.4.1 — 17.09.2026
 
 - **Klassenarbeit mit E und G in einem Griff.** Das Plus öffnet ein kleines
