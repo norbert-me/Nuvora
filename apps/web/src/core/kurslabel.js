@@ -9,7 +9,7 @@
 // (Kalender, Stundenplan) und im ICS-Feed, den Apple und Outlook anzeigen.
 // Zwei Fassungen davon hiessen: derselbe Termin heisst im Browser anders als
 // im Handykalender. Die Server-Seite hat ihr Gegenstueck in
-// `_kurs_label` (apps/api/app/routers/kalender.py) und muss mitgezogen werden.
+// `kurs_label` (apps/api/app/kurslabel.py) und muss mitgezogen werden.
 
 /** "Mathe · 7.5" — Fach zuerst, Kursname dahinter. */
 export function kursLabel(kurs) {

@@ -25,6 +25,9 @@ from ..felder import ohne_leer, ohne_none
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
 from ..besitz import eigenes, gehoert_optional
 from ..kursmitglieder import class_kurs_ids, eigener_kurs
+# Beschriftung "Fach · Kurs" — ein Blatt, weil auch das Notizbrett sie braucht
+# (siehe app/kurslabel.py). Der alte Name bleibt: caldav.py holt ihn von hier.
+from ..kurslabel import kurs_des_termins, kurs_label as _kurs_label
 from ..database import get_db
 from ..importe import geprueft
 from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, WorkAnalysis
@@ -957,6 +960,13 @@ async def _korrektur_todo(db, user, e: ExamDate, verschieben: bool = False) -> N
     # lesen. Ohne Notiz bleibt der Titel, ohne beides „Klassenarbeit".
     notiz = (e.notiz or "").strip().splitlines()[0][:80] if (e.notiz or "").strip() else ""
     titel = notiz or (e.title or "").strip() or "Klassenarbeit"
+    # „2. KA korrigieren" kann jede Arbeit sein — der Kurs gehoert davor
+    # („Mathe · 7.5: 2. KA korrigieren"), sonst ist die Zeile auf dem
+    # Notizbrett bei drei Kursen ein Raetsel. Ohne eindeutigen Kurs bleibt es
+    # beim Titel allein.
+    lab = _kurs_label(await kurs_des_termins(db, user.id, e.kurs_id, e.class_id))
+    if lab and lab.lower() not in titel.lower():
+        titel = f"{lab}: {titel}"
     schon = (await db.execute(select(Todo).where(
         Todo.owner_id == user.id, Todo.text.like(f"%{marke}%")))).scalars().first()
     if schon:
@@ -1696,28 +1706,6 @@ def _ics_falten(zeile: str) -> str:
         grenze = 74  # Fortsetzungszeilen tragen ein fuehrendes Leerzeichen
     teile.append(rest.decode("utf-8"))
     return "\r\n ".join(teile)
-
-
-def _kurs_label(kurs) -> str:
-    """"Mathe · 7.5" — Fach zuerst, Kursname dahinter.
-
-    Gegenstueck zu `kursLabel` in apps/web/src/core/kurslabel.js und muss mit
-    ihm zusammen geaendert werden: zwei Fassungen hiessen, dass derselbe Termin
-    im Handykalender anders heisst als im Browser. Steht das Fach schon im
-    Namen ("Mathe 7.5"), waere "Mathe · Mathe 7.5" doppelt gemoppelt — viele
-    Konten benennen ihre Kurse genau so.
-    """
-    if kurs is None:
-        return ""
-    fach = (getattr(kurs, "fach", "") or "").strip()
-    name = (getattr(kurs, "name", "") or "").strip()
-    if not fach:
-        return name
-    if not name:
-        return fach
-    if fach.lower() in name.lower():
-        return name
-    return f"{fach} · {name}"
 
 
 # ─── Fremde Termine im eigenen Export ───

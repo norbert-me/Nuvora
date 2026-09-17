@@ -1,6 +1,8 @@
 """Modul To-do — einfache Aufgabenliste der Lehrkraft.
 
 Eigenstaendig (Regel 3): eigene Tabelle, keine Abhaengigkeit zu anderen Modulen.
+Einzige Leseseite nach draussen: das Korrektur-To-do einer Klassenarbeit
+(`#ka<id>`) wird bei aktivem Kalender aufgeloest (`_klassenarbeiten`).
 Ein Eintrag kann ein Datum (und optional eine Uhrzeit) tragen; solche Eintraege
 liefert `calendar` an das Kalender-Modul, das sie mit anzeigt — reine Zusatz-
 Bruecke. Ohne Kalender funktioniert die Liste voll, ohne To-do der Kalender.
@@ -18,10 +20,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
 from ..besitz import eigenes
 from ..database import get_db
-from ..models import Todo, User
+from ..kurslabel import kurs_des_termins, kurs_label
+from ..models import ExamDate, Todo, User
+from ..zeit import schul_datum
 # Optimistisches Sperren (siehe app/versionierung.py).
 from ..versionierung import VersionOut, pruefe, stand
-from .modules import modul_pflicht
+from .modules import is_active, modul_pflicht, option_an
 
 router = APIRouter(prefix="/api/todo", tags=["todo"])
 MODULE_KEY = "notizbrett"
@@ -53,6 +57,11 @@ class TodoOut(VersionOut):
     due_date: Optional[str] = None
     due_time: str = ""
     position: int = 0
+    # Nur beim Korrektur-To-do einer Klassenarbeit (Marke „#ka<id>") und nur
+    # mit aktivem Kalender: der Text ohne Marke, mit Kurs davor, und wohin der
+    # Link fuehrt. Sonst leer — die Liste funktioniert ohne (Regel 3).
+    anzeige: str = ""
+    klassenarbeit: Optional[dict] = None
     model_config = {"from_attributes": True}
 
 
@@ -77,7 +86,52 @@ def _clean_time(v):
 def _out(t: Todo) -> dict:
     return {"id": t.id, "text": t.text, "notiz": t.notiz or "", "done": t.done,
             "due_date": t.due_date.isoformat() if t.due_date else None,
-            "due_time": t.due_time or "", "position": t.position, **stand(t)}
+            "due_time": t.due_time or "", "position": t.position,
+            "anzeige": "", "klassenarbeit": None, **stand(t)}
+
+
+KA_MARKE = re.compile(r"\s*#ka(\d+)\b")
+
+
+async def _klassenarbeiten(db: AsyncSession, user: User, rows) -> dict:
+    """Korrektur-To-dos aufloesen: {todo_id: {anzeige, klassenarbeit}}.
+
+    Die Marke „#ka<id>" setzt der Kalender beim Anlegen eines Arbeitstermins.
+    Roh sagt „2. KA korrigieren #ka9" nicht, welche Arbeit gemeint ist — beim
+    Lesen kommt deshalb der Kurs davor und die Marke weg, und die Oberflaeche
+    bekommt, was sie fuer den Link braucht. Nur mit aktivem Kalender (Regel 3):
+    sonst bleibt der Text, wie er ist, ohne Fehler. Die Auswertung verlinkt
+    nur, wer das Modul samt Teil „Klassenarbeit" an hat.
+    """
+    ids = {}
+    for t in rows:
+        m = KA_MARKE.search(t.text or "")
+        if m:
+            ids[t.id] = int(m.group(1))
+    if not ids or not await is_active(db, user.id, "kalender"):
+        return {}
+    termine = {e.id: e for e in (await db.execute(select(ExamDate).where(
+        ExamDate.owner_id == user.id, ExamDate.id.in_(set(ids.values()))))).scalars().all()}
+    auswertung = await option_an(db, user.id, "auswertung", "klassenarbeit")
+    aus = {}
+    for tid, eid in ids.items():
+        e = termine.get(eid)
+        if not e:
+            continue           # Termin geloescht: der Text bleibt, wie er ist
+        kurs = await kurs_des_termins(db, user.id, e.kurs_id, e.class_id)
+        lab = kurs_label(kurs)
+        t = next(x for x in rows if x.id == tid)
+        text = KA_MARKE.sub("", t.text).strip() or (e.title or "Klassenarbeit")
+        if lab and lab.lower() not in text.lower():
+            text = f"{lab}: {text}"
+        aus[tid] = {"anzeige": text, "klassenarbeit": {
+            "id": e.id, "titel": e.title or "", "kurs": lab,
+            "datum": schul_datum(e.date).isoformat() if e.date else None,
+            "entry_id": e.entry_id, "class_id": e.class_id,
+            "kurs_id": kurs.id if kurs else e.kurs_id,
+            "work_id": e.work_id if auswertung else None,
+        }}
+    return aus
 
 
 @router.get("", response_model=List[TodoOut])
@@ -85,7 +139,8 @@ async def list_todos(user: User = Depends(require_module), db: AsyncSession = De
     rows = (await db.execute(
         select(Todo).where(Todo.owner_id == user.id).order_by(Todo.done, Todo.position, Todo.id)
     )).scalars().all()
-    return [_out(t) for t in rows]
+    ka = await _klassenarbeiten(db, user, rows)
+    return [{**_out(t), **ka.get(t.id, {})} for t in rows]
 
 
 @router.post("", response_model=TodoOut, status_code=201)

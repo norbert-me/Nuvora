@@ -2,14 +2,14 @@
 // datierte Einträge erscheinen zusätzlich im Kalender (Regel 3: reine Zusatz-
 // Brücke, die Liste läuft eigenständig).
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { pageTitle, cardStyle, chipStyle, sectionLabel, toolbarBtn, toolbarBtnPrimary, toolbarInput, CONTROL_R, Icon, ICONS, iconBtn, toolbarIconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { alsJson, hol, sende } from "../core/melden.js";
-import { useAktiv } from "../core/modules.js";
+import { useAktiv, useModulOption } from "../core/modules.js";
 import { heuteYmd, ymd } from "../core/datum.js";
 import { useZiehVorschau } from "../core/ziehsortieren.js";
 
@@ -35,6 +35,11 @@ export default function Todo({ embedded } = {}) {
   // also darf der Hinweis darauf auch nicht erscheinen.
   const aktiv = useAktiv();
   const kalenderAktiv = aktiv("kalender");
+  // Korrektur-To-do einer Klassenarbeit: der Server loest die Marke nur bei
+  // aktivem Kalender auf; der Sprung in die Auswertung braucht zusaetzlich
+  // deren Teil „Klassenarbeit" (Regel 3 — sonst kein Link statt eines toten).
+  const arbeitsTeilAn = useModulOption("auswertung", "klassenarbeit");
+  const arbeitenAn = aktiv("auswertung") && arbeitsTeilAn;
   const [items, setItems] = useState([]);
   const [text, setText] = useState("");
   const [date, setDate] = useState("");
@@ -232,7 +237,30 @@ export default function Todo({ embedded } = {}) {
           ...(markiert === it.id ? { border: "1px solid var(--accent)", boxShadow: "inset 3px 0 0 var(--accent)" } : {}) }}>
         {dnd && <span className="drag-handle" title={t("todo.reorderHint")} style={{ color: "var(--text3)", flexShrink: 0, display: "inline-flex", cursor: "grab" }}><Icon d={ICONS.grip} size={15} /></span>}
         <input type="checkbox" checked={istErledigt(it)} onChange={() => toggle(it)} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
-        <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: istErledigt(it) ? "line-through" : "none", color: istErledigt(it) ? "var(--text3)" : "var(--text)" }}>{it.text}</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: istErledigt(it) ? "line-through" : "none", color: istErledigt(it) ? "var(--text3)" : "var(--text)" }}>{it.anzeige || it.text}</span>
+        {/* Verweis auf die Klassenarbeit, aus der die Aufgabe entstand — der
+            rohe „#ka9" im Text sagte niemandem etwas. */}
+        {it.klassenarbeit && kalenderAktiv && (() => {
+          const ka = it.klassenarbeit;
+          const q = new URLSearchParams();
+          if (ka.datum) q.set("date", ka.datum);
+          if (ka.entry_id) q.set("entry", String(ka.entry_id));
+          const w = new URLSearchParams({ tab: "klassenarbeit", work: String(ka.work_id || "") });
+          if (ka.class_id) w.set("class", String(ka.class_id));
+          if (ka.kurs_id) w.set("kurs", String(ka.kurs_id));
+          return (<>
+            <Link to={`/kalender?${q}`} className="icon-btn" style={{ ...iconBtn, padding: 4, display: "inline-flex" }}
+              title={t("todo.openExam")} aria-label={t("todo.openExam")}>
+              <Icon d={ICONS.calendar} size={15} />
+            </Link>
+            {ka.work_id && arbeitenAn && (
+              <Link to={`/auswertung?${w}`} className="icon-btn" style={{ ...iconBtn, padding: 4, display: "inline-flex" }}
+                title={t("todo.openWork")} aria-label={t("todo.openWork")}>
+                <Icon d={ICONS.chart} size={15} />
+              </Link>
+            )}
+          </>);
+        })()}
         {it.due_date && (() => {
           // Erledigtes bleibt neutral: eine abgehakte Aufgabe ist nicht mehr
           // ueberfaellig, ein rotes Etikett daneben waere nur Laerm.
