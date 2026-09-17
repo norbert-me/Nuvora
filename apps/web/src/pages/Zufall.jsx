@@ -165,7 +165,7 @@ export default function Zufall() {
         links={<>
           <KursKlasseSelect value={classId} onChange={setClassId} />
           {tab === "ziehen" && (
-            <select value={niveau} onChange={(e) => setNiveau(e.target.value)} title={t("zufall.niveauHint")} style={selectStyle}>
+            <select data-tour="zufall-niveau" value={niveau} onChange={(e) => setNiveau(e.target.value)} title={t("zufall.niveauHint")} style={selectStyle}>
               <option value="">{t("zufall.niveauAll")}</option>
               <option value="G">{t("zufall.niveauG")}</option>
               <option value="E">{t("zufall.niveauE")}</option>
@@ -236,7 +236,7 @@ export default function Zufall() {
           </div>
 
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <button onClick={ziehen} disabled={rollt} style={{ ...btnPrimary, fontSize: 16, padding: "12px 26px", opacity: rollt ? 0.6 : 1 }}>{t("zufall.draw")}</button>
+            <button data-tour="zufall-ziehen" onClick={ziehen} disabled={rollt} style={{ ...btnPrimary, fontSize: 16, padding: "12px 26px", opacity: rollt ? 0.6 : 1 }}>{t("zufall.draw")}</button>
             {ohneWdh && (
               <span style={{ fontSize: 13, color: "var(--text3)" }}>
                 {t("zufall.progress", { done: gezogen.length, total: basis.length })}

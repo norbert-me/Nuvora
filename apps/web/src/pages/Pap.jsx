@@ -52,7 +52,7 @@ function FreiesBlatt() {
     try { localStorage.setItem(ENTWURF_KEY, JSON.stringify(next)); } catch { /* voll oder gesperrt */ }
   };
   return (
-    <div style={{ ...cardStyle, padding: 16 }}>
+    <div data-tour="pap-blatt" style={{ ...cardStyle, padding: 16 }}>
       <Werkzeugleiste style={{ marginBottom: 12 }}>
         <button onClick={() => setDrucken(true)} style={toolbarBtn}>{t("pap.drucken")}</button>
         {/* „Neues Blatt" hiess es zuerst — und beschrieb, was danach da ist,
@@ -78,7 +78,7 @@ function Austeilen() {
   useEffect(() => { oeffentlicheBasis().then(setBasis); }, []);
   const link = `${basis}/pap-frei`;
   return (
-    <div style={{ ...panelStyle, padding: 12, marginTop: 16 }}>
+    <div data-tour="pap-austeilen" style={{ ...panelStyle, padding: 12, marginTop: 16 }}>
       <div style={{ ...sectionLabel, margin: "0 0 8px" }}>{t("pap.austeilen")}</div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <span style={{ fontSize: 13, color: "var(--text2)" }}>{t("pap.linkFrei")}</span>
@@ -148,7 +148,7 @@ function Aufgaben() {
 
   return (
     <>
-      <div style={{ ...cardStyle, padding: 16, marginBottom: 16 }}>
+      <div data-tour="pap-aufgabe-neu" style={{ ...cardStyle, padding: 16, marginBottom: 16 }}>
         <Werkzeugleiste>
           <KursKlasseSelect value={wahl.classId} kursValue={wahl.kursId}
             onChange={(classId, kursId) => setWahl({ classId, kursId })} />

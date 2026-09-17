@@ -126,13 +126,110 @@ export const MODULE_TOURS = {
     { target: "karten-new", titleKey: "tour.karten.new.t", textKey: "tour.karten.new.x" },
     { target: null, titleKey: "tour.karten.done.t", textKey: "tour.karten.done.x" },
   ],
+  cardvote: [
+    { target: null, titleKey: "tour.cardvote.welcome.t", textKey: "tour.cardvote.welcome.x" },
+    { target: "cv-ordner", titleKey: "tour.cardvote.folders.t", textKey: "tour.cardvote.folders.x" },
+    { target: "cv-neu", titleKey: "tour.cardvote.new.t", textKey: "tour.cardvote.new.x" },
+    { target: null, titleKey: "tour.cardvote.done.t", textKey: "tour.cardvote.done.x" },
+  ],
+  // Anker in public/lp/index.html, nur im Reiter „Aufgaben“. Die Statik wird
+  // erst nach dem Seitenaufruf eingehaengt; bis „Weiter“ steht sie.
+  lernpfad: [
+    { target: null, titleKey: "tour.lernpfad.welcome.t", textKey: "tour.lernpfad.welcome.x" },
+    { target: "lp-neu", titleKey: "tour.lernpfad.new.t", textKey: "tour.lernpfad.new.x" },
+    { target: "lp-liste", titleKey: "tour.lernpfad.list.t", textKey: "tour.lernpfad.list.x" },
+    { target: null, titleKey: "tour.lernpfad.done.t", textKey: "tour.lernpfad.done.x" },
+  ],
+  // Nur der Reiter „Checklisten“ traegt Anker; die anderen Reiter sind eigene
+  // Seiten (tourFuerOrt startet die Tour nur dort).
+  orga: [
+    { target: null, titleKey: "tour.orga.welcome.t", textKey: "tour.orga.welcome.x" },
+    { target: "orga-neu", titleKey: "tour.orga.new.t", textKey: "tour.orga.new.x" },
+    { target: null, titleKey: "tour.orga.done.t", textKey: "tour.orga.done.x" },
+  ],
+  personen: [
+    { target: null, titleKey: "tour.personen.welcome.t", textKey: "tour.personen.welcome.x" },
+    { target: "personen-suche", titleKey: "tour.personen.search.t", textKey: "tour.personen.search.x" },
+    { target: "personen-neu", titleKey: "tour.personen.new.t", textKey: "tour.personen.new.x" },
+    { target: "personen-kind", titleKey: "tour.personen.list.t", textKey: "tour.personen.list.x" },
+    { target: null, titleKey: "tour.personen.done.t", textKey: "tour.personen.done.x" },
+  ],
+  pap: [
+    { target: null, titleKey: "tour.pap.welcome.t", textKey: "tour.pap.welcome.x" },
+    { target: "pap-blatt", titleKey: "tour.pap.blatt.t", textKey: "tour.pap.blatt.x" },
+    { target: "pap-austeilen", titleKey: "tour.pap.austeilen.t", textKey: "tour.pap.austeilen.x" },
+    { target: null, titleKey: "tour.pap.done.t", textKey: "tour.pap.done.x" },
+  ],
+  papAufgaben: [
+    { target: null, titleKey: "tour.papAufgaben.welcome.t", textKey: "tour.papAufgaben.welcome.x" },
+    { target: "pap-aufgabe-neu", titleKey: "tour.papAufgaben.new.t", textKey: "tour.papAufgaben.new.x" },
+    { target: null, titleKey: "tour.papAufgaben.done.t", textKey: "tour.papAufgaben.done.x" },
+  ],
+  tafel: [
+    { target: null, titleKey: "tour.tafel.welcome.t", textKey: "tour.tafel.welcome.x" },
+    { target: "tafel-text", titleKey: "tour.tafel.text.t", textKey: "tour.tafel.text.x" },
+    { target: "tafel-timer", titleKey: "tour.tafel.timer.t", textKey: "tour.tafel.timer.x" },
+    { target: "tafel-speichern", titleKey: "tour.tafel.save.t", textKey: "tour.tafel.save.x" },
+    { target: null, titleKey: "tour.tafel.done.t", textKey: "tour.tafel.done.x" },
+  ],
+  zufall: [
+    { target: null, titleKey: "tour.zufall.welcome.t", textKey: "tour.zufall.welcome.x" },
+    { target: "zufall-niveau", titleKey: "tour.zufall.niveau.t", textKey: "tour.zufall.niveau.x" },
+    { target: "zufall-ziehen", titleKey: "tour.zufall.draw.t", textKey: "tour.zufall.draw.x" },
+    { target: null, titleKey: "tour.zufall.done.t", textKey: "tour.zufall.done.x" },
+  ],
+  notizbrett: [
+    { target: null, titleKey: "tour.notizbrett.welcome.t", textKey: "tour.notizbrett.welcome.x" },
+    { target: "nb-neu", titleKey: "tour.notizbrett.new.t", textKey: "tour.notizbrett.new.x" },
+    { target: null, titleKey: "tour.notizbrett.done.t", textKey: "tour.notizbrett.done.x" },
+  ],
+  todo: [
+    { target: null, titleKey: "tour.todo.welcome.t", textKey: "tour.todo.welcome.x" },
+    { target: "todo-neu", titleKey: "tour.todo.new.t", textKey: "tour.todo.new.x" },
+    { target: null, titleKey: "tour.todo.done.t", textKey: "tour.todo.done.x" },
+  ],
+  unterrichtsplanung: [
+    { target: null, titleKey: "tour.einstiege.welcome.t", textKey: "tour.einstiege.welcome.x" },
+    { target: "ein-neu", titleKey: "tour.einstiege.new.t", textKey: "tour.einstiege.new.x" },
+    { target: "ein-ordner", titleKey: "tour.einstiege.ordner.t", textKey: "tour.einstiege.ordner.x" },
+    { target: null, titleKey: "tour.einstiege.done.t", textKey: "tour.einstiege.done.x" },
+  ],
+  mathespiele: [
+    { target: null, titleKey: "tour.mathespiele.welcome.t", textKey: "tour.mathespiele.welcome.x" },
+    { target: "ms-zahlenraum", titleKey: "tour.mathespiele.range.t", textKey: "tour.mathespiele.range.x" },
+    { target: "ms-rechenarten", titleKey: "tour.mathespiele.ops.t", textKey: "tour.mathespiele.ops.x" },
+    { target: "ms-feld", titleKey: "tour.mathespiele.feld.t", textKey: "tour.mathespiele.feld.x" },
+    { target: null, titleKey: "tour.mathespiele.done.t", textKey: "tour.mathespiele.done.x" },
+  ],
+  "code-detektiv": [
+    { target: null, titleKey: "tour.cd.welcome.t", textKey: "tour.cd.welcome.x" },
+    { target: "cd-form", titleKey: "tour.cd.form.t", textKey: "tour.cd.form.x" },
+    { target: "cd-loesung", titleKey: "tour.cd.loesung.t", textKey: "tour.cd.loesung.x" },
+    { target: "cd-session", titleKey: "tour.cd.session.t", textKey: "tour.cd.session.x" },
+    { target: null, titleKey: "tour.cd.done.t", textKey: "tour.cd.done.x" },
+  ],
 };
 
 // Welche Tour gehört zu diesem Ort? Auf /auswertung entscheidet der Reiter:
 // dieselbe Adresse zeigt Notenbuch oder Klassenarbeiten (?tab=…).
 export function tourFuerOrt(pathname, search = "") {
+  const tab = new URLSearchParams(search).get("tab");
   if (pathname.startsWith("/auswertung")) {
-    return new URLSearchParams(search).get("tab") === "klassenarbeit" ? "klassenarbeit" : "noten";
+    return tab === "klassenarbeit" ? "klassenarbeit" : "noten";
+  }
+  // Auch hier entscheidet der Reiter: eine Tour, deren Anker auf einem anderen
+  // Reiter stehen, zeigte nur zentrierte Karten.
+  // /pap-frei ist die offene Seite ohne Konto — dort gibt es keine Tour.
+  if (pathname.startsWith("/pap")) return pathname === "/pap" ? (tab === "aufgaben" ? "papAufgaben" : "pap") : null;
+  if (pathname.startsWith("/notizbrett")) {
+    return tab === "aufgaben" || new URLSearchParams(search).get("todo") ? "todo" : "notizbrett";
+  }
+  if (pathname.startsWith("/orga")) return !tab || tab === "checklisten" ? "orga" : null;
+  if (pathname.startsWith("/lernpfad")) return !tab || tab === "aufgaben" ? "lernpfad" : null;
+  if (pathname.startsWith("/zufall")) return tab === "gruppen" ? null : "zufall";
+  // Code-Detektiv: nur „Rätsel erstellen" (Start und /admin) trägt Anker.
+  if (pathname.startsWith("/code-detektiv")) {
+    return /^\/code-detektiv(\/admin)?\/?$/.test(pathname) ? "code-detektiv" : null;
   }
   const hit = PATH_TOUR.find(([p]) => pathname.startsWith(p));
   return hit ? hit[1] : null;
@@ -146,6 +243,18 @@ export const PATH_TOUR = [
   ["/kalender", "kalender"],
   auswertungTour,
   ["/karten", "karten"],
+  // CardVote: nur die Fragen-Seite hat Anker, nicht Session, Scanner, Tests.
+  ["/cardvote/questions", "cardvote"],
+  ["/lernpfad", "lernpfad"],
+  ["/orga", "orga"],
+  ["/personen", "personen"],
+  ["/pap", "pap"],
+  ["/tafel", "tafel"],
+  ["/zufall", "zufall"],
+  ["/notizbrett", "notizbrett"],
+  ["/unterrichtsplanung", "unterrichtsplanung"],
+  ["/mathespiele", "mathespiele"],
+  ["/code-detektiv", "code-detektiv"],
 ];
 
 export function tourFor(id) {

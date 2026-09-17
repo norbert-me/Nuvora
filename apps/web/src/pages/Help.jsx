@@ -188,6 +188,18 @@ function TafelHilfe({ t }) {
   );
 }
 
+// Modul PAP: zwei Wege in denselben Editor — frei zeichnen und Aufgabe mit Abgabe.
+function PapHilfe({ t }) {
+  return (
+    <>
+      <Section title={t("help.pap.whatT")}>{t("help.pap.what")}</Section>
+      <Section title={t("help.pap.drawT")}>{t("help.pap.draw")}</Section>
+      <Section title={t("help.pap.freiT")}>{t("help.pap.frei")}</Section>
+      <Section title={t("help.pap.aufgabenT")}>{t("help.pap.aufgaben")}</Section>
+    </>
+  );
+}
+
 function MathespieleHilfe({ t }) {
   return <Section title={t("help.ms.whatT")}>{t("help.ms.what")}</Section>;
 }
@@ -199,7 +211,7 @@ const AREA_COMP = {
   auswertung: AuswertungHilfe, kalender: KalenderHilfe, unterrichtsplanung: UnterrichtsplanungHilfe,
   "code-detektiv": DetektivHilfe, orga: OrgaHilfe, zufall: ZufallHilfe,
   notizbrett: NotizbrettHilfe,
-  tafel: TafelHilfe, mathespiele: MathespieleHilfe,
+  tafel: TafelHilfe, mathespiele: MathespieleHilfe, pap: PapHilfe,
 };
 
 export default function Help() {

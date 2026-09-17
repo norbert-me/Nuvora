@@ -215,16 +215,16 @@ export default function Tafel() {
         mehr={[
           offene && { key: "loeschen", label: t("tafel.loeschen"), icon: ICONS.trash, gefahr: true, onClick: tafelLoeschen },
         ]}>
-        <button onClick={tafelSpeichern} style={toolbarBtn} title={t("tafel.speichern")}>
+        <button data-tour="tafel-speichern" onClick={tafelSpeichern} style={toolbarBtn} title={t("tafel.speichern")}>
           <Icon d={ICONS.check} size={15} /> {gespeichert && offene ? t("tafel.gespeichert") : t("tafel.speichern")}
         </button>
         <span style={{ flex: 1 }} />
         {/* Je Elementart ein Symbol, der Name steht im title (Werkzeugleisten-
             Regel). Vier Knöpfe mit „+ Wort" drückten die Leiste in die zweite
             Zeile; das Textfeld bleibt der hervorgehobene Haupthandgriff. */}
-        <button onClick={add} style={{ ...toolbarIconBtn, background: "var(--text)", borderColor: "var(--text)" }}
+        <button data-tour="tafel-text" onClick={add} style={{ ...toolbarIconBtn, background: "var(--text)", borderColor: "var(--text)" }}
           title={t("tafel.add")} aria-label={t("tafel.add")}><Icon d={ICONS.note} size={17} color="var(--bg)" /></button>
-        <button onClick={addTimer} className="icon-btn" style={toolbarIconBtn} title={t("tafel.addTimer")} aria-label={t("tafel.addTimer")}>
+        <button data-tour="tafel-timer" onClick={addTimer} className="icon-btn" style={toolbarIconBtn} title={t("tafel.addTimer")} aria-label={t("tafel.addTimer")}>
           <Icon d={ICONS.hourglass} size={17} /></button>
         <button onClick={addLaerm} className="icon-btn" style={toolbarIconBtn} title={t("tafel.addLaerm")} aria-label={t("tafel.addLaerm")}>
           <Icon d={ICONS.volume} size={17} /></button>

@@ -232,9 +232,9 @@ export default function Personen() {
       {/* Links die Suche (was gerade gezeigt wird), daneben der eine
           haeufige Handgriff: ein Kind anlegen. */}
       <Werkzeugleiste style={{ marginBottom: 16 }}
-        links={<input value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("personen.suche")}
+        links={<input data-tour="personen-suche" value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("personen.suche")}
           aria-label={t("personen.suche")} style={{ ...toolbarInput, flex: "1 1 200px", minWidth: 0, maxWidth: 320 }} />}>
-        <input value={neuName} onChange={(e) => setNeuName(e.target.value)}
+        <input data-tour="personen-neu" value={neuName} onChange={(e) => setNeuName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") personAnlegen(); }}
           placeholder={t("personen.neuName")} aria-label={t("personen.neuName")}
           style={{ ...toolbarInput, flex: "1 1 160px", minWidth: 0, maxWidth: 240 }} />
@@ -250,7 +250,7 @@ export default function Personen() {
               „Auswertung" daneben war ein dritter Weg zum selben Ort — und die
               Zeile stand voller Angaben (Kurs, E/G), die man beim Suchen nicht
               liest, auf dem Handy aber umbricht. */}
-          <button onClick={() => zeigen(p)}
+          <button data-tour="personen-kind" onClick={() => zeigen(p)}
             style={{ display: "flex", alignItems: "center", gap: 12, width: "100%",
               border: "none", background: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
             <Portrait key={`${p.id}-${fotoVer}`} student={{ id: p.id, name: p.name, has_photo: p.has_photo }} size={34} form="eckig" quelle="person" />

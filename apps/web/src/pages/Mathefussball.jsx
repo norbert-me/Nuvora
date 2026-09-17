@@ -66,13 +66,13 @@ export default function Mathefussball() {
           Zuruecksetzen standen zuletzt in drei verschiedenen Hoehen
           nebeneinander. */}
       <Werkzeugleiste style={{ marginBottom: 16 }} links={
-        <label style={{ fontSize: 13, color: "var(--text2)", display: "inline-flex", alignItems: "center", gap: 8 }}>
+        <label data-tour="ms-zahlenraum" style={{ fontSize: 13, color: "var(--text2)", display: "inline-flex", alignItems: "center", gap: 8 }}>
           {t("mathefussball.range")}
           <input type="number" min="10" max="1000" value={max} onChange={(e) => setMax(Math.max(5, Number(e.target.value) || 20))} style={{ ...toolbarInput, width: 90 }} />
         </label>
       }>
         {["+", "-", "×", ":"].map((o) => (
-          <button key={o} onClick={() => toggleOp(o)} style={{ ...toolbarBtn, fontWeight: 700, background: ops.includes(o) ? "var(--accent)" : undefined, color: ops.includes(o) ? C.aufAkzent : undefined }}>{o}</button>
+          <button key={o} data-tour={o === "+" ? "ms-rechenarten" : undefined} onClick={() => toggleOp(o)} style={{ ...toolbarBtn, fontWeight: 700, background: ops.includes(o) ? "var(--accent)" : undefined, color: ops.includes(o) ? C.aufAkzent : undefined }}>{o}</button>
         ))}
         <span style={{ flex: 1 }} />
         <button onClick={resetGame} style={toolbarBtn}><Icon d={ICONS.refresh} size={15} /> {t("mathefussball.reset")}</button>
@@ -85,7 +85,7 @@ export default function Mathefussball() {
       </div>
 
       {/* Spielfeld */}
-      <div style={{ display: "flex", alignItems: "stretch", gap: 4, marginBottom: 24 }}>
+      <div data-tour="ms-feld" style={{ display: "flex", alignItems: "stretch", gap: 4, marginBottom: 24 }}>
         {/* Torpfosten: reine Grafik, der Radius ist die halbe Kante (10/2). */}
         <div style={{ width: 10, borderRadius: 5, background: "var(--accent)" }} title={names[0]} />
         <div style={{ flex: 1, display: "flex", gap: 4 }}>

@@ -324,7 +324,7 @@ export default function Admin() {
             )}
           </h2>
 
-          <div className="admin-form" style={{ marginBottom: 16 }}>
+          <div data-tour="cd-form" className="admin-form" style={{ marginBottom: 16 }}>
             <div className="form-group">
               <label>{t('cd.admin.hex_label', 'MakeCode .hex importieren')}</label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -424,7 +424,7 @@ export default function Admin() {
                 </div>
               )}
 
-              <div className="solution-area">
+              <div data-tour="cd-loesung" className="solution-area">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {!toolboxOpen && (
@@ -478,7 +478,7 @@ export default function Admin() {
         <div className="cd-zweispaltig" style={{ display: 'grid', gap: 24, alignItems: 'start' }}>
           <div>
             <h2 style={{ marginBottom: 16 }}>{t('cd.admin.session_erstellen', 'Session erstellen')}</h2>
-            <div style={{ ...cardStyle, padding: 20 }}>
+            <div data-tour="cd-session" style={{ ...cardStyle, padding: 20 }}>
               <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 12 }}>{t('cd.admin.session_auswahl', 'Wähle Rätsel für die Session aus:')}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                 {state.puzzles.map(puzzle => (

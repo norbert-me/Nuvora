@@ -8,29 +8,47 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Icon, ICONS, btnPrimary, btnSecondary, cardStyle, pageTitle, COLORS as C, pageApp} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { useAktiv } from "../core/modules.js";
 
 const STORAGE_KEY = "nuvora_tutorial_done";
 
+// `modul`: der Abschnitt erscheint nur, wenn das Modul fuer diese Lehrkraft
+// laeuft (Regel 3) — eine Anleitung zu einem Werkzeug, das man nicht hat,
+// schickt auf eine Seite, die das ModuleGate gleich wieder verlaesst.
 const BEREICHE = [
   { key: "willkommen", ziel: "/modules" },
   // Kinder werden im Kurs gepflegt (Umbau auf Kurse) — einen eigenen
   // Abschnitt „Klasse anlegen" gibt es deshalb nicht mehr.
   { key: "kurse", ziel: "/kurse" },
+  { key: "personen", ziel: "/personen" },
   { key: "themen", ziel: "/topics" },
   { key: "module", ziel: "/modules" },
-  // Beides gehoert in die Tour, weil es die Fragen sind, die nach ein paar
-  // Wochen kommen: „Was sagen mir die Zahlen?" und „Wohin mit dem alten Jahr?"
+  { key: "cardvote", ziel: "/cardvote/questions", modul: "cardvote" },
+  { key: "lernpfad", ziel: "/lernpfad", modul: "lernpfad" },
+  { key: "karten", ziel: "/karten", modul: "karten" },
   // Der Kalender in beide Richtungen: fremde Termine herein, Nuvora hinaus.
   // Es ist die haeufigste Rueckfrage — beide Wege liegen hinter Menues, und wer
   // sie nicht kennt, tippt seinen Stundenplan ab.
-  { key: "kalender", ziel: "/kalender" },
-  { key: "auswerten", ziel: "/auswertung?tab=klassenarbeit" },
+  { key: "kalender", ziel: "/kalender", modul: "kalender" },
+  // „Was sagen mir die Zahlen?" — die Frage, die nach ein paar Wochen kommt.
+  { key: "auswerten", ziel: "/auswertung?tab=klassenarbeit", modul: "auswertung" },
+  { key: "orga", ziel: "/orga", modul: "orga" },
+  { key: "pap", ziel: "/pap", modul: "pap" },
+  { key: "tafel", ziel: "/tafel", modul: "tafel" },
+  { key: "zufall", ziel: "/zufall", modul: "zufall" },
+  { key: "notizbrett", ziel: "/notizbrett", modul: "notizbrett" },
+  { key: "einstiege", ziel: "/unterrichtsplanung", modul: "unterrichtsplanung" },
+  { key: "mathespiele", ziel: "/mathespiele", modul: "mathespiele" },
+  { key: "codedetektiv", ziel: "/code-detektiv", modul: "code-detektiv" },
+  // „Wohin mit dem alten Jahr?"
   { key: "jahresende", ziel: "/kurse" },
   { key: "loslegen", ziel: "/modules" },
 ];
 
 export default function Tutorial() {
   const { t } = useLanguage();
+  const aktiv = useAktiv();
+  const bereiche = BEREICHE.filter((b) => !b.modul || aktiv(b.modul));
   const [done, setDone] = useState({});
   const [offen, setOffen] = useState(BEREICHE[0].key);
 
@@ -47,13 +65,13 @@ export default function Tutorial() {
   const neu = () => { merke({}); setOffen(BEREICHE[0].key); };
 
   const kb = (b) => b.keyBase || b.key;
-  const fertig = BEREICHE.filter((b) => done[b.key]).length;
+  const fertig = bereiche.filter((b) => done[b.key]).length;
 
   return (
     <div style={{ ...pageApp }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
         <h1 style={pageTitle}>{t("tut.title")}</h1>
-        <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("tut.progress", { n: fertig, total: BEREICHE.length })}</span>
+        <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("tut.progress", { n: fertig, total: bereiche.length })}</span>
         {fertig > 0 && (
           <button onClick={neu} style={{ marginLeft: "auto", ...btnSecondary }}>{t("tut.restart")}</button>
         )}
@@ -64,7 +82,7 @@ export default function Tutorial() {
       <button onClick={() => window.dispatchEvent(new Event("nuvora:start-tour"))}
         style={{ ...btnPrimary, marginBottom: 22 }}>{t("tour.startGuided")}</button>
 
-      {BEREICHE.map((b, i) => {
+      {bereiche.map((b, i) => {
         const auf = offen === b.key;
         const erledigt = !!done[b.key];
         return (

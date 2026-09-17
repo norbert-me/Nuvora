@@ -133,7 +133,7 @@ export default function Notizblock({ embedded } = {}) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         {embedded ? <span style={{ flex: 1 }} /> : <h1 style={{ ...pageTitle, marginBottom: 4, flex: 1 }}>{t("notizblock.title")}</h1>}
         <Speicherleiste entwurf={entwurf} />
-        <button onClick={add} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 4 }}><Icon d={ICONS.plus} size={15} color="var(--bg)" /> {t("notizblock.new")}</button>
+        <button data-tour="nb-neu" onClick={add} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 4 }}><Icon d={ICONS.plus} size={15} color="var(--bg)" /> {t("notizblock.new")}</button>
       </div>
 
       {view.length === 0 ? (

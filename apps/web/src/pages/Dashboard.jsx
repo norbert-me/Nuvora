@@ -620,7 +620,7 @@ export default function Dashboard() {
     <div style={{ ...pageApp }}>
       <h1 style={pageTitle}>{t("nav.questions")}</h1>
 
-      <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 16, fontSize: 14 }}>
+      <div data-tour="cv-ordner" style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 16, fontSize: 14 }}>
         <span onClick={() => goToPath(-1)} style={{ cursor: "pointer", color: path.length === 0 ? "var(--text)" : "var(--accent)", fontWeight: path.length === 0 ? 600 : 400 }}>
           {t("dash.root")}
         </span>
@@ -879,7 +879,7 @@ export default function Dashboard() {
             </button>
           </>
         ) : (
-          <span style={{ position: "relative", display: "inline-flex" }}>
+          <span data-tour="cv-neu" style={{ position: "relative", display: "inline-flex" }}>
             <AddButton onClick={() => setAddMenuOpen((v) => !v)} title={t("common.add")} />
             {addMenuOpen && (<>
               <div onClick={() => setAddMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />

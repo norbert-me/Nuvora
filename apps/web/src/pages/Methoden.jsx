@@ -213,7 +213,7 @@ export default function Methoden({ embedded } = {}) {
         { key: "import", label: t("methoden.importFile"), icon: ICONS.import, onClick: () => dateiWaehlen(doImport) },
         { key: "vorlage", label: t("methoden.jsonTemplate"), icon: ICONS.download, onClick: () => { const a = document.createElement("a"); a.href = "/beispiel-einstiege.json"; a.download = "beispiel-einstiege.json"; a.click(); } },
       ]}>
-        <div style={{ position: "relative", display: "inline-flex" }}>
+        <div data-tour="ein-neu" style={{ position: "relative", display: "inline-flex" }}>
           <AddButton onClick={() => setAddOpen((v) => !v)} title={t("methoden.new")} />
           {addOpen && (
             <>
@@ -228,7 +228,7 @@ export default function Methoden({ embedded } = {}) {
       </Werkzeugleiste>
 
       {/* Breadcrumb: Wurzel + Pfad. Jeder Teil ist Drop-Ziel zum Hochschieben. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 12, fontSize: 13 }}>
+      <div data-tour="ein-ordner" style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 12, fontSize: 13 }}>
         <button onClick={() => setCurrent(null)} {...ablage.props(null)}
           style={{ ...crumbBtn, ...(ablage.ziel === null ? crumbDrop : {}), fontWeight: current == null ? 700 : 500 }}>{t("methoden.root")}</button>
         {crumbs.map((f) => (
