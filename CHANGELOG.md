@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Bestehende Klassenarbeit in E und G teilen:** Knopf „E/G“ in der Leiste;
+  die Aufgaben gehen in beide Blätter, die Punkte der G-Kinder ins G-Blatt.
+
 ## 4.4.3 — 17.09.2026
 
 - **Klassenarbeit mit E und G ist eine Arbeit:** in der Auswahl steht sie

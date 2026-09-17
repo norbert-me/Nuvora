@@ -312,6 +312,21 @@ export default function Klassenarbeit() {
     zeigeArbeit(neu);
   };
 
+  // Eine Arbeit fuer alle nachtraeglich in E- und G-Blatt teilen (Server
+  // kopiert die Aufgaben, die Punkte der G-Kinder wandern mit).
+  const hatNiveaus = alleStudents.some((s) => s.niveau === "E" || s.niveau === "G");
+  const teilen = async () => {
+    if (!work || work.niveau) return;
+    if (!(await askConfirm(t("klassenarbeit.teilenFrage", { name: work.name }), { ok: t("klassenarbeit.teilen") }))) return;
+    if (entwurf.geaendert && !(await entwurf.speichern())) return;
+    const r = await fetch(`${API}/works/${work.id}/teilen`, { method: "POST" }).catch(() => null);
+    if (!r || !r.ok) { showAlert(t("common.notWork")); return; }
+    const [e, g] = await r.json();
+    setWorks((ws) => [...ws.map((x) => (x.id === e.id ? e : x)), g]);
+    setBlatt("E");
+    zeigeArbeit(e);
+  };
+
   const loeschen = async () => {
     if (!work) return;
     // Ein Paar geht zusammen: ein einzelnes Blatt ohne sein Gegenstueck ist
@@ -668,6 +683,10 @@ export default function Klassenarbeit() {
                 );
               })}
             </Segment>
+          )}
+          {work && !work.niveau && (
+            <button onClick={teilen} disabled={!hatNiveaus} style={{ ...toolbarBtn, ...(hatNiveaus ? {} : { opacity: 0.5, cursor: "default" }) }}
+              title={hatNiveaus ? t("klassenarbeit.teilen") : t("klassenarbeit.teilenOhneNiveau")}>E/G</button>
           )}
           <button data-tour="ka-new" onClick={() => setNeuOffen(true)} style={toolbarBtn}>{t("klassenarbeit.new")}</button>
           {/* Parallelklassen schreiben dieselbe Arbeit — sie zweimal einzutippen

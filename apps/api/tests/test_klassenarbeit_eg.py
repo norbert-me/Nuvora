@@ -42,3 +42,25 @@ async def test_gleiches_niveau_wird_abgewiesen(s):
     ohne = await KA.create_work(KA.WorkIn(class_id=c.id, name="Alle"), user=u, db=s)
     with pytest.raises(HTTPException):
         await KA.create_work(KA.WorkIn(class_id=c.id, niveau="G", partner_id=ohne.id), user=u, db=s)
+
+
+@pytest.mark.asyncio
+async def test_bestehende_arbeit_teilen(s):
+    """Eine Arbeit fuer alle wird nachtraeglich E + G; die Punkte der G-Kinder
+    wandern mit ins G-Blatt."""
+    from app.models import Student
+    u, c = await _grund(s)
+    e_kind = Student(card_id=1, name="Ella", class_id=c.id, niveau="E")
+    g_kind = Student(card_id=2, name="Gus", class_id=c.id, niveau="G")
+    s.add_all([e_kind, g_kind]); await s.commit()
+    w = await KA.create_work(KA.WorkIn(class_id=c.id, name="Brueche"), user=u, db=s)
+    await KA.update_work(w.id, KA.WorkPut(tasks=[{"id": "t1", "label": "1", "max": 4}],
+                                          results={str(e_kind.id): {"t1": 3}, str(g_kind.id): {"t1": 2}},
+                                          absent=[str(g_kind.id)]), user=u, db=s)
+    e, g = await KA.split_work(w.id, user=u, db=s)
+    assert (e.niveau, g.niveau) == ("E", "G") and e.partner_id == g.id and g.partner_id == e.id
+    assert list(e.results) == [str(e_kind.id)] and list(g.results) == [str(g_kind.id)]
+    assert g.absent == [str(g_kind.id)] and e.absent == []
+    assert g.tasks == e.tasks and g.name == "Brueche"
+    with pytest.raises(HTTPException):
+        await KA.split_work(w.id, user=u, db=s)

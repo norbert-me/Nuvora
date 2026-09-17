@@ -364,6 +364,51 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
     return WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, niveau=w.niveau or "")
 
 
+@router.post("/works/{work_id}/teilen", response_model=List[WorkOut])
+async def split_work(work_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Eine Arbeit fuer alle nachtraeglich in E- und G-Blatt teilen.
+
+    Die Arbeit selbst wird das E-Blatt, das G-Blatt entsteht mit denselben
+    Aufgaben und demselben Notenschluessel (die Blaetter unterscheiden sich
+    meist nur in einzelnen Aufgaben — sie abzutippen waere doppelte Arbeit).
+    Was G-Kinder schon eingetragen haben (Punkte, Abwesenheit, Fehlerarten),
+    wandert mit ins G-Blatt; sonst stuende es unsichtbar im E-Blatt.
+    Antwort: [E-Blatt, G-Blatt].
+    """
+    import copy as _copy
+    w = await _owned_work(db, user, work_id)
+    if w.niveau or w.partner_id:
+        raise HTTPException(400, "Die Arbeit ist schon nach E und G getrennt")
+    kinder = await (_kanon_kurs(db, w.kurs_id) if w.kurs_id else _roster(db, w.class_id))
+    g_ids = {str(k.id) for k in kinder if (k.niveau or "") == "G"}
+
+    def teile(d):
+        d = dict(d or {})
+        return {k: v for k, v in d.items() if k not in g_ids}, {k: v for k, v in d.items() if k in g_ids}
+
+    res_e, res_g = teile(w.results)
+    feh_e, feh_g = teile(w.fehler)
+    abw = [str(x) for x in (w.absent or [])]
+    g = WorkAnalysis(owner_id=user.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name,
+                     niveau="G", tasks=_copy.deepcopy(w.tasks or []),
+                     scale=_copy.deepcopy(w.scale) if w.scale else None,
+                     results=res_g, fehler=feh_g or None,
+                     absent=[x for x in abw if x in g_ids] or None)
+    db.add(g)
+    await db.flush()
+    w.niveau = "E"
+    w.results = res_e
+    w.fehler = feh_e or None
+    w.absent = [x for x in abw if x not in g_ids] or None
+    w.partner_id, g.partner_id = g.id, w.id
+    await db.commit()
+    await db.refresh(w)
+    await db.refresh(g)
+    return [WorkOut(id=x.id, partner_id=x.partner_id, source_id=x.source_id, class_id=x.class_id, kurs_id=x.kurs_id,
+                    name=x.name, tasks=x.tasks or [], results=x.results or {}, scale=x.scale,
+                    absent=x.absent or [], fehler=x.fehler or {}, niveau=x.niveau or "") for x in (w, g)]
+
+
 @router.delete("/works/{work_id}", status_code=204)
 async def delete_work(work_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     from sqlalchemy import delete as sa_delete
