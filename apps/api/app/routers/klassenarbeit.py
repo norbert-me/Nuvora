@@ -20,7 +20,7 @@ from ..database import get_db
 # `roster_kurs` heisst hier unten schon ein Endpunkt — deshalb umbenannt
 # importiert, sonst ueberdeckt der Endpunkt den Helfer.
 from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
-from ..models import WorkAnalysis, Student, Topic, User
+from ..models import SchoolClass, WorkAnalysis, Student, Topic, User
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
 from .anwesenheit import get_day as _tag
@@ -289,8 +289,16 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
             if isinstance(p, bool) or not isinstance(p, (int, float)):
                 return 0
             return max(0.0, min(float(p), umax[uid])) if uid in umax else max(0.0, float(p))
+        # Nur eigene Kinder als Schluessel — eine fremde ID waere der Weg zu
+        # ihrem Namen (die Auswertung loest die IDs auf).
+        roh_ids = {int(k) for k in list(body.results.keys())[:400] if str(k).isdigit()}
+        eigene = set((await db.execute(
+            select(Student.id).join(SchoolClass, Student.class_id == SchoolClass.id)
+            .where(Student.id.in_(roh_ids), SchoolClass.owner_id == user.id))).scalars().all()) if roh_ids else set()
         out = {}
         for k, v in list(body.results.items())[:400]:
+            if str(k).isdigit() and int(k) not in eigene:
+                continue
             if v == "abwesend":
                 out[str(k)] = "abwesend"                 # abwesend: zählt nicht in die Auswertung
             elif isinstance(v, dict):
@@ -480,7 +488,12 @@ async def analysis(work_id: int, user: User = Depends(require_module), db: Async
     # Je SuS schwache Themen (< 50 % der Punkte erreicht). Zeilen ohne saubere
     # Schueler-ID (Altbestand) werden uebergangen, nicht mit einem Fehler quittiert.
     ids = {sid: int(sid) for sid in prof if str(sid).lstrip("-").isdigit()}
-    studs = {s.id: s.name for s in (await db.execute(select(Student).where(Student.id.in_(list(ids.values()))))).scalars().all()} if ids else {}
+    # Nur Kinder aus EIGENEN Klassen: die Schluessel in `results` kommen aus dem
+    # Rumpf, und ohne Filter nannte die Auswertung die Namen beliebiger IDs.
+    studs = {s.id: s.name for s in (await db.execute(
+        select(Student).join(SchoolClass, Student.class_id == SchoolClass.id)
+        .where(Student.id.in_(list(ids.values())), SchoolClass.owner_id == user.id))).scalars().all()} if ids else {}
+    ids = {k: v for k, v in ids.items() if v in studs}
     per_student = []
     for sid, pr in prof.items():
         if sid not in ids:

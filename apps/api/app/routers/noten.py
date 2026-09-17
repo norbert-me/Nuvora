@@ -545,6 +545,10 @@ def kurs_oder_klasse_ohne_owner(class_id, kurs_id):
 @router.get("/classes/{class_id}/entries", response_model=List[EntryOut])
 async def list_entries(class_id: int, kurs_id: Optional[int] = None, term: str = "", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
+    if kurs_id is not None:
+        # Beobachtungen haengen ohne owner_id am Kurs — der Kurs gehoert geprueft,
+        # sonst liest ein fremder kurs_id Freitexte ueber fremde Kinder.
+        await eigener_kurs(db, user, kurs_id)
     # Noten hängen (über Spalte→Abschnitt) am Kurs (Fach): nur die des Kurses.
     r = await db.execute(
         select(GradeEntry)
@@ -756,6 +760,10 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
     """Berechnet die Uebersicht eines Halbjahrs. Gibt (sections, out) zurueck.
     agg steuert nur, wie mehrere Einzelnoten zusammengefasst werden.
     Abschnitte/Endnoten hängen am Kurs (Fach)."""
+    if kurs_id is not None:
+        # Beobachtungen haengen ohne owner_id am Kurs — der Kurs gehoert geprueft,
+        # sonst liest ein fremder kurs_id Freitexte ueber fremde Kinder.
+        await eigener_kurs(db, user, kurs_id)
     sections = (await db.execute(
         select(GradeSection).where(*_sec_kurs_where(user, class_id, kurs_id), GradeSection.term == term)
         .order_by(GradeSection.position, GradeSection.id)
@@ -1161,6 +1169,10 @@ async def import_code_session(body: ImportCodeBody, user: User = Depends(require
 
 @router.get("/classes/{class_id}/export")
 async def export_noten(class_id: int, term: str = "1", kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    if kurs_id is not None:
+        # Beobachtungen haengen ohne owner_id am Kurs — der Kurs gehoert geprueft,
+        # sonst liest ein fremder kurs_id Freitexte ueber fremde Kinder.
+        await eigener_kurs(db, user, kurs_id)
     await _owned_class(db, user, class_id)
     secs = (await db.execute(
         select(GradeSection).options(selectinload(GradeSection.categories))

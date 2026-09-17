@@ -282,8 +282,19 @@ VERIFY_TTL = 86400 * 14
 def _make_verify_token(user: User) -> str:
     ts = int(time.time())
     payload = f"{user.id}:{ts}"
-    sig = hmac.new(SECRET.encode(), f"verify:{payload}:{user.email}".encode(), "sha256").hexdigest()[:32]
+    sig = hmac.new(SECRET.encode(), _verify_msg(payload, user), "sha256").hexdigest()[:32]
     return base64.urlsafe_b64encode(f"{payload}:{sig}".encode()).decode().rstrip("=")
+
+
+def _verify_msg(payload: str, user: User) -> bytes:
+    """Der Link haengt am PASSWORT des Kontos, nicht nur an der Adresse.
+
+    Registriert jemand eine fremde Adresse, bekommt die echte Besitzerin die
+    Bestaetigungsmail. Registriert sie sich danach selbst, gilt ihr Passwort
+    (siehe `register`) — und nur noch der Link, der zu DIESEM Passwort
+    gehoert. Vorher bestaetigte ihr Klick das Konto des anderen, samt dessen
+    Passwort."""
+    return f"verify:{payload}:{user.email}:{(user.password_hash or '')[-24:]}".encode()
 
 
 def _decode_id_sig(token: str):
@@ -618,6 +629,15 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
         if vorhanden.email_verified:
             await _send_schon_vergeben_mail(vorhanden)
         else:
+            # Noch unbestaetigt: die NEUE Anmeldung gilt. Sonst bestaetigte die
+            # echte Besitzerin mit ihrem Klick das Konto, das ein Fremder mit
+            # seinem Passwort unter ihrer Adresse angelegt hat. Frueher
+            # ausgestellte Links verfallen damit (sie haengen am Passwort).
+            vorhanden.password_hash = _hash_pw(body.password)
+            vorhanden.name = body.name
+            vorhanden.salutation = body.salutation
+            vorhanden.token_version = (vorhanden.token_version or 0) + 1
+            await db.commit()
             await _send_verify_mail(vorhanden)
         return {"ok": True}
     # changelog_seen von Anfang an auf die laufende Fassung: ein neues Konto
@@ -740,7 +760,7 @@ async def verify_email(body: VerifyEmailBody, request: Request, db: AsyncSession
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(400, "Ungültiger Link")
-    expected = hmac.new(SECRET.encode(), f"verify:{user.id}:{ts}:{user.email}".encode(),
+    expected = hmac.new(SECRET.encode(), _verify_msg(f"{user.id}:{ts}", user),
                         "sha256").hexdigest()[:32]
     if not hmac.compare_digest(sig, expected):
         raise HTTPException(400, "Ungültiger Bestätigungslink")

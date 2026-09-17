@@ -108,3 +108,18 @@ async def test_beobachtung_ohne_halbjahr_steht_in_jedem(s):
         rows = await N.list_entries(cls.id, term=hj, user=u, db=s)
         assert [r.note for r in rows] == ["hat geholfen"], hj
         assert [x.observations for x in await N.summary(cls.id, term=hj, user=u, db=s)] == [1]
+
+
+@pytest.mark.asyncio
+async def test_fremder_kurs_liest_keine_beobachtungen(s):
+    """Beobachtungen haengen ohne owner_id am Kurs: ein fremder kurs_id im
+    Aufruf darf keine Freitexte ueber fremde Kinder liefern."""
+    from app.models import Kurs
+    u, cls, max_ = await _grund(s)
+    fremd = User(email="f@b.de", password_hash="x", name="F"); s.add(fremd); await s.flush()
+    k = Kurs(name="Fremd", owner_id=fremd.id); s.add(k); await s.flush()
+    s.add(GradeEntry(student_id=max_.id, class_id=cls.id, kurs_id=k.id, kind="observation", tendency=1, note="geheim"))
+    await s.commit()
+    with pytest.raises(HTTPException) as e:
+        await N.list_entries(cls.id, kurs_id=k.id, user=u, db=s)
+    assert e.value.status_code in (403, 404)
