@@ -33,8 +33,23 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   fremden Daten geschlossen (Beobachtungen, Schülernamen, Kartenstapel);
   eine fremde Registrierung kann kein Konto mehr übernehmen; eine ungültige
   Stundennummer legt den Server nicht mehr lahm.
-- Datenschutz: Schülerzugänge stehen nicht mehr im Referer des
-  Protokolls, die Datenauskunft enthält die Abo-Adresse nicht mehr.
+- Datenschutz: Schülerzugänge stehen nicht mehr im Protokoll, die
+  Datenauskunft enthält die Abo-Adresse nicht mehr, Förderangaben und
+  Notizen liegen nicht mehr im Browser-Speicher des Lernpfads.
+- **Datenschutzerklärung überarbeitet:** Protokolle, Sicherungen,
+  Fehlermeldungen (Löschung nach 180 Tagen) und Übermittlungen an
+  WebUntis und Kalenderdienste sind jetzt beschrieben.
+- **Passwort nötig** für Sicherungen und das Ernennen zur Administration.
+- Nach einem Passwortwechsel müssen Kalender-Geräte neu eingerichtet werden;
+  eine Anmeldung gilt höchstens 90 Tage.
+- Weitere Sicherheitskorrekturen: Live-Abstimmung nicht mehr blockierbar,
+  Konto-Sperre nur nach eigenen Fehlversuchen, Formeln in Exporten
+  entschärft, fremde Bildadressen und Server-Adressen abgewiesen.
+- Oberfläche: größere Knöpfe, Suchfelder für Themen und Kurse, Notenbuch
+  und Personen mit gemeinsamer Werkzeugleiste, Tafel mit Symbolen,
+  Speichern-Knopf für Marktplatz-Name und Modulteile im Profil.
+- Hilfe, Touren und Tutorials an die heutige Oberfläche angepasst; die
+  Klassenarbeit-Tour startet wieder.
 
 ## 4.4.1 — 17.09.2026
 
