@@ -15,18 +15,21 @@ Konfigurationszustand.
 import asyncio
 import os
 import pathlib
+import re
 import secrets
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..admin import APP_VERSION
 from ..rollen import ist_admin
 from ..database import get_db
-from ..models import Base
-from .auth import get_current_user
+from ..models import Base, User, UserModule
+from .auth import _hash_pw, _purge_user_content, client_ip, get_current_user, rate_limit
 from .backup import BACKUP_DIR, BACKUP_DIR_EXTERN
 from .modules import REGISTRY
 
@@ -620,3 +623,148 @@ async def selftest(request: Request, db: AsyncSession = Depends(get_db),
     fehler = sum(1 for c in checks if not c.ok and c.schwere == "fehler")
     warnungen = sum(1 for c in checks if not c.ok and c.schwere == "warnung")
     return SelftestOut(ok=fehler == 0, fehler=fehler, warnungen=warnungen, checks=checks)
+
+
+# ─────────────────────── Wegwerf-Konto je Testlauf ───────────────────────
+#
+# Der Selbsttest lief jahrelang auf EINEM festen Konto aus .deploy.env — mit
+# allem, was daran haengt: Reste abgebrochener Laeufe, ein Modulzustand, den
+# der naechste Lauf fuer den Ausgangszustand haelt, und ein Konto, das es in
+# der Produktivdatenbank dauerhaft gibt. Jetzt legt jeder Lauf sich ein Konto
+# an und loescht es am Ende wieder (selftest.sh, trap).
+#
+# Die Tuer ist NUR das SELFTEST_TOKEN — nicht die Administration: ein Weg, der
+# bestaetigte Konten ohne E-Mail erzeugt, gehoert dem Deploy, nicht einer
+# Sitzung im Browser. Und das Loeschen trifft ausschliesslich Adressen genau
+# dieses Musters; `.invalid` ist nach RFC 2606 reserviert und kann keinem
+# echten Konto gehoeren.
+
+WEGWERF_DOMAIN = "selftest.invalid"
+WEGWERF_MUSTER = re.compile(r"selftest-[0-9a-f]{16}@selftest\.invalid")
+# Ein Konto, das nach einem Tag noch da ist, gehoert zu einem Lauf, dessen
+# trap nicht mehr lief (kill -9, Rechner zugeklappt). Es wird beim naechsten
+# Anlegen mit abgeraeumt.
+WEGWERF_MAX_ALTER = timedelta(days=1)
+# Jede Tour, die sich sonst beim ersten Besuch ueber die Seite legt
+# (GuidedTour.jsx: KERN_TOUR + MODULE_TOURS). Das ist nur die Grundausstattung:
+# scripts/wegwerfkonto.py liest die IDs zur Laufzeit aus GuidedTour.jsx und
+# schickt sie mit (`touren`), damit eine neue Tour nicht erst hier nachgetragen
+# werden muss. Das Willkommen (FirstRun) steht nur im localStorage und wird von
+# den Browser-Laeufen selbst vorbelegt.
+WEGWERF_TOUREN = [
+    "kern", "kalender", "noten", "klassenarbeit", "karten", "cardvote", "lernpfad",
+    "orga", "personen", "pap", "papAufgaben", "tafel", "zufall", "notizbrett", "todo",
+    "unterrichtsplanung", "mathespiele", "code-detektiv",
+]
+_TOUR_ID = re.compile(r"[A-Za-z0-9_-]{1,40}")
+
+
+def _nur_token(request: Request) -> None:
+    """Nur das Selbsttest-Token zaehlt — in konstanter Zeit verglichen."""
+    token = (os.environ.get("SELFTEST_TOKEN") or "").strip()
+    mitgeschickt = (request.headers.get("X-Selftest-Token") or "").strip()
+    # Beide Vergleiche laufen immer, auch ohne gesetztes Token: die Antwortzeit
+    # soll nicht verraten, ob die Installation eines kennt.
+    gleich = secrets.compare_digest((token or "-").encode(), (mitgeschickt or "").encode())
+    if not (token and mitgeschickt and gleich):
+        raise HTTPException(403, "Nur mit gültigem SELFTEST_TOKEN")
+
+
+def ist_wegwerf_adresse(email: str) -> bool:
+    return bool(WEGWERF_MUSTER.fullmatch((email or "").strip().lower()))
+
+
+async def _konto_tilgen(db: AsyncSession, user: User) -> None:
+    """Dieselbe Loeschung wie `delete_account` / `admin_delete_user` in auth.py."""
+    await _purge_user_content(db, user.id)
+    await db.delete(user)
+
+
+def _zu_alt(erstellt, jetzt: datetime) -> bool:
+    if erstellt is None:
+        return True
+    if erstellt.tzinfo is None:
+        erstellt = erstellt.replace(tzinfo=timezone.utc)
+    return jetzt - erstellt > WEGWERF_MAX_ALTER
+
+
+async def _verwaiste_tilgen(db: AsyncSession) -> int:
+    jetzt = datetime.now(timezone.utc)
+    kandidaten = (await db.execute(select(User).where(
+        User.email.like(f"selftest-%@{WEGWERF_DOMAIN}")))).scalars().all()
+    n = 0
+    for u in kandidaten:
+        # Das Muster wird hier ein zweites Mal geprueft: LIKE kennt `_` und `%`
+        # als Platzhalter, die Entscheidung faellt am regulaeren Ausdruck.
+        if u.id == 1 or ist_admin(u) or not ist_wegwerf_adresse(u.email):
+            continue
+        if _zu_alt(u.created_at, jetzt):
+            await _konto_tilgen(db, u)
+            n += 1
+    if n:
+        await db.commit()
+    return n
+
+
+class WegwerfKontoIn(BaseModel):
+    # Weitere Tour-IDs, die als gesehen gelten sollen (siehe WEGWERF_TOUREN).
+    touren: List[str] = []
+
+
+def _touren(extra: List[str]) -> List[str]:
+    gueltig = [t for t in (extra or [])[:100] if isinstance(t, str) and _TOUR_ID.fullmatch(t)]
+    # Dieselbe Obergrenze wie /api/auth/tour-done.
+    return list(dict.fromkeys(WEGWERF_TOUREN + gueltig))[:100]
+
+
+class WegwerfKontoOut(BaseModel):
+    email: str
+    passwort: str
+    module: List[str]
+    verwaiste_geloescht: int = 0
+
+
+@router.post("/konto", response_model=WegwerfKontoOut, status_code=201)
+async def wegwerf_konto_anlegen(request: Request, body: WegwerfKontoIn = None,
+                                db: AsyncSession = Depends(get_db)):
+    """Ein bestaetigtes Testkonto fuer genau einen Lauf — alle Module an."""
+    _nur_token(request)
+    rate_limit("selftest_konto", client_ip(request), 10, 600,
+               "Zu viele Testkonten in kurzer Zeit. Bitte kurz warten.")
+    verwaist = await _verwaiste_tilgen(db)
+    email = f"selftest-{secrets.token_hex(8)}@{WEGWERF_DOMAIN}"
+    passwort = secrets.token_urlsafe(24)
+    user = User(
+        email=email, password_hash=_hash_pw(passwort), name="ZZ-Selbsttest Wegwerfkonto",
+        email_verified=True, is_admin=False, changelog_seen=APP_VERSION,
+        tours_done=_touren(body.touren if body else []),
+        # Nichts nachzuziehen: die Start-Uebernahmen gelten Bestandskonten.
+        modules_initialized=True, karten_kurse_initialized=True,
+    )
+    db.add(user)
+    await db.flush()
+    module = [m.key for m in REGISTRY if m.available]
+    for key in module:
+        db.add(UserModule(user_id=user.id, module_key=key))
+    await db.commit()
+    return WegwerfKontoOut(email=email, passwort=passwort, module=module,
+                           verwaiste_geloescht=verwaist)
+
+
+@router.delete("/konto/{email}")
+async def wegwerf_konto_loeschen(email: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Ein Wegwerf-Konto tilgen — und NUR ein solches."""
+    _nur_token(request)
+    rate_limit("selftest_konto_weg", client_ip(request), 20, 600,
+               "Zu viele Löschungen in kurzer Zeit. Bitte kurz warten.")
+    email = (email or "").strip().lower()
+    if not ist_wegwerf_adresse(email):
+        raise HTTPException(400, "Nur Wegwerf-Konten des Selbsttests lassen sich hier löschen")
+    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, "Kein solches Konto")
+    if user.id == 1 or ist_admin(user):
+        raise HTTPException(400, "Konten der Administration werden hier nie gelöscht")
+    await _konto_tilgen(db, user)
+    await db.commit()
+    return {"ok": True, "geloescht": email}

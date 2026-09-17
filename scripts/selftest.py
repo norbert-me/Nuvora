@@ -42,7 +42,8 @@ PRAEFIX = "ZZ-Selbsttest"
 # auseinander. Von dort importiert nichts zurueck (siehe Modulkopf).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gemeinsam import (  # noqa: E402
-    Api, Bericht, Kernumgebung, melde_an, standard_argumente, vorgeschalteter_blocker,
+    Api, Bericht, Kernumgebung, ist_wegwerf, melde_an, standard_argumente,
+    vorgeschalteter_blocker,
 )
 # Das Abraeumen sitzt in aufraeumen.py — dort steht das Netz (Klasse `Fund`),
 # das ausschliesslich Testpraefixe loescht. Der Import steht seit der
@@ -2028,13 +2029,23 @@ BESTAND_DATEI = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
                              ".selftest-bestand.json")
 
 
-def teste_bestand(api, b):
+def teste_bestand(api, b, email=None):
     """Fruehwarnung: ist ueber Nacht Datenbestand verschwunden?
 
     Eine Kaskade, die zu viel mitreisst, faellt sonst erst auf, wenn jemand
     seine Noten sucht. Der Selbsttest merkt sich nach jedem Lauf die Zahlen und
     vergleicht beim naechsten Mal. Gemessen wird VOR den Testdaten.
+
+    Auf einem Wegwerf-Konto (selftest.sh legt je Lauf eines an) gibt es keinen
+    Bestand: es ist frisch und leer, und ein Vergleich mit den Zahlen des
+    festen Kontos meldete jedes Mal „alles verschwunden". Dann wird weder
+    verglichen noch gemerkt — der gemerkte Stand des festen Kontos bleibt fuer
+    den naechsten Lauf ohne Wegwerf-Konto stehen.
     """
+    if ist_wegwerf(email):
+        b.add("Bestand", "Vergleich", True,
+              "Wegwerf-Konto dieses Laufs — kein Bestand zum Vergleichen")
+        return
     quellen = {
         "Klassen": ("/api/classes", len),
         "Schueler": ("/api/classes", lambda d: sum(len(k.get("students", [])) for k in d)),
@@ -2198,7 +2209,7 @@ def main():
             # blockieren.
             raeume_reste(api, b)
             # Vor den Testdaten messen, sonst zaehlt der Test seine eigene Klasse mit.
-            teste_bestand(api, b)
+            teste_bestand(api, b, args.email)
             u = Umgebung(api, b)
             if b.pruefe("Kern", "Testdaten anlegen", u.aufbauen):
                 try:

@@ -28,6 +28,19 @@ import urllib.request
 
 TIMEOUT = 30
 
+# Wegwerf-Konten des Selbsttests (POST /api/selftest/konto): eines je Lauf,
+# am Ende wieder geloescht. `.invalid` ist reserviert (RFC 2606) und kann
+# keinem echten Konto gehoeren. Dasselbe Muster prueft der Server
+# (WEGWERF_MUSTER in apps/api/app/routers/selftest.py).
+WEGWERF_DOMAIN = "selftest.invalid"
+
+
+def ist_wegwerf(email=None):
+    """Laeuft der Test auf einem Wegwerf-Konto? Ohne Angabe: SELFTEST_EMAIL."""
+    if email is None:
+        email = os.environ.get("SELFTEST_EMAIL", "")
+    return (email or "").strip().lower().endswith("@" + WEGWERF_DOMAIN)
+
 # nginx drosselt /api/ (limit_req, siehe nginx.conf) und antwortet dann mit 429.
 # Das ist kein Anwendungsfehler, sondern der Proxy vor der Anwendung. Wir warten
 # gestaffelt und versuchen es erneut — hoechstens so oft:
@@ -540,6 +553,10 @@ def melde_an(api, email, passwort, url):
     """
     status, text = api.call("POST", "/api/auth/login",
                             {"email": email, "password": passwort}, roh=True)
+    if status == 401 and ist_wegwerf(email):
+        raise AssertionError(
+            f"Wegwerf-Konto '{email}' gibt es nicht (mehr) — wurde es waehrend "
+            "des Laufs geloescht (zweiter Lauf, Aufraeumen nach einem Tag)?")
     if status == 401:
         raise AssertionError(
             f"Konto '{email}' gibt es nicht (oder das Passwort stimmt nicht). "

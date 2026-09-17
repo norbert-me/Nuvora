@@ -27,10 +27,17 @@
 # ebenfalls da — ein gruener Lauf ohne vollen Umfang ist keine Aussage ueber
 # die Seite, und das soll man sehen, statt es zu ahnen.
 #
-# Zugang kommt aus .deploy.env:
-#   SELFTEST_EMAIL / SELFTEST_PASSWORD  Konto, mit dem geprueft wird
-#   SELFTEST_URL                        Adresse (sonst SITE_URL)
-# Ohne Zugangsdaten laufen nur die Checks ohne Login.
+# Zugang:
+#   SELFTEST_TOKEN   (aus .deploy.env) — damit legt jeder Lauf ein eigenes
+#                    Wegwerf-Konto an (selftest-…@selftest.invalid, alle
+#                    Module an) und loescht es am Ende wieder, auch nach
+#                    Strg-C. Alle Teillaeufe benutzen dieses Konto.
+#   SELFTEST_EMAIL / SELFTEST_PASSWORD  festes Konto — nur noch der Rueckfall,
+#                    wenn kein Token da ist oder der Server den Weg nicht
+#                    kennt (alter Stand)
+#   SELFTEST_URL     Adresse (sonst SITE_URL)
+# Ohne beides laufen nur die Checks ohne Login. Nach jedem Lauf raeumt
+# scripts/aufraeumen.py --loeschen alles mit Praefix "ZZ-" ab.
 #
 # Nutzung: ./selftest.sh                 ALLES: API, Systemtest, Browser, Desktop
 #          ./selftest.sh --schnell      nur der API-Selbsttest (bewusst weniger)
@@ -108,7 +115,7 @@ while [ $# -gt 0 ]; do
     --url) URL="${2:-}"; [ -z "$URL" ] && { echo "Fehler: --url braucht eine Adresse."; exit 1; }
            ARGS[${#ARGS[@]}]="--url"; ARGS[${#ARGS[@]}]="$URL"; shift 2 ;;
     --url=*) URL="${1#*=}"; ARGS[${#ARGS[@]}]="--url"; ARGS[${#ARGS[@]}]="$URL"; shift ;;
-    -h|--help) sed -n '2,46p' "$0" | sed 's|^# \{0,1\}||'; exit 0 ;;
+    -h|--help) sed -n '2,48p' "$0" | sed 's|^# \{0,1\}||'; exit 0 ;;
     *) ARGS[${#ARGS[@]}]="$1"; shift ;;
   esac
 done
@@ -120,17 +127,6 @@ export SELFTEST_PASSWORD="${SELFTEST_PASSWORD:-}"
 # (siehe .deploy.env). ./deploy.sh erzeugt es beim ersten Lauf selbst.
 export SELFTEST_TOKEN="${SELFTEST_TOKEN:-}"
 
-if [ -z "$SELFTEST_EMAIL" ] || [ -z "$SELFTEST_PASSWORD" ]; then
-  echo "Hinweis: SELFTEST_EMAIL/SELFTEST_PASSWORD fehlen in .deploy.env —"
-  echo "         Module und Einrichtung bleiben ungeprueft."
-  echo ""
-  echo "         Das Testkonto muss einmalig von Hand angelegt werden:"
-  echo "         unter $URL/login registrieren, E-Mail bestaetigen,"
-  echo "         dann beide Werte in .deploy.env eintragen. (Der Selbsttest"
-  echo "         legt es nicht selbst an — die Bestaetigung kann kein Skript"
-  echo "         ersetzen.)"
-  echo ""
-fi
 
 # ─── Immer nur EIN Lauf ───
 # Alle Laeufe benutzen dasselbe Testkonto und schalten dessen Module um; zwei
@@ -153,16 +149,102 @@ if ! mkdir "$SPERRE" 2>/dev/null; then
   mkdir "$SPERRE" || { echo "✗ Sperre $SPERRE laesst sich nicht anlegen."; exit 1; }
 fi
 echo "$$" > "$SPERRE/pid"
-trap 'rm -rf "$SPERRE"' EXIT
+
+# ─── Wegwerf-Konto und Schluss ───
+# Jeder Lauf bekommt sein eigenes Konto und loescht es wieder: keine Reste
+# eines abgebrochenen Laufs, kein Modulzustand, den der naechste fuer den
+# Ausgangszustand haelt, kein Testkonto, das dauerhaft in der Datenbank liegt.
+# Der Schluss laeuft als EXIT-trap — also auch nach Strg-C, kill und
+# Fehlern — und in dieser Reihenfolge: Testdaten weg (nur beim festen Konto;
+# ein Wegwerf-Konto geht als Ganzes), Konto weg, DANN die Sperre. Andersherum
+# koennte ein zweiter Lauf starten, waehrend der erste noch aufraeumt.
+WEGWERF_EMAIL=""
+ENDE_AUFGERAEUMT=0
+
+aufraeumen_danach() {
+  # Nach JEDEM Lauf: alles mit Praefix "ZZ-" weg. Beim Wegwerf-Konto ist das
+  # zugleich die Probe, ob die Teillaeufe hinter sich aufgeraeumt haben —
+  # was hier noch gefunden wird, steht im Protokoll.
+  ENDE_AUFGERAEUMT=1
+  [ -n "$SELFTEST_EMAIL" ] && [ -n "$SELFTEST_PASSWORD" ] || return 0
+  if python3 "$DIR/scripts/aufraeumen.py" --url "$URL" --loeschen --module-an > "$SPERRE/aufraeumen-danach.log" 2>&1; then
+    grep -E "Geloescht|Testreste" "$SPERRE/aufraeumen-danach.log" | sed 's/^/  /'
+    return 0
+  fi
+  echo "  ⚠ Aufraeumen danach unvollstaendig:"
+  tail -5 "$SPERRE/aufraeumen-danach.log" | sed 's/^/    /'
+  return 1
+}
+
+schluss() {
+  local rc=$?
+  # Ein zweites Strg-C darf das Aufraeumen nicht mittendrin abbrechen.
+  trap '' INT TERM
+  if [ "$ENDE_AUFGERAEUMT" = "0" ] && [ -z "$WEGWERF_EMAIL" ]; then
+    echo ""
+    echo "→ Abbruch — Testdaten des Kontos abraeumen..."
+    aufraeumen_danach || true
+  fi
+  if [ -n "$WEGWERF_EMAIL" ]; then
+    if python3 "$DIR/scripts/wegwerfkonto.py" loeschen "$WEGWERF_EMAIL" --url "$URL" \
+         > "$SPERRE/wegwerf-weg.log" 2>&1; then
+      echo "  Wegwerf-Konto $WEGWERF_EMAIL geloescht."
+    else
+      echo "  ⚠ Wegwerf-Konto $WEGWERF_EMAIL liess sich nicht loeschen:"
+      sed 's/^/    /' "$SPERRE/wegwerf-weg.log"
+      echo "    Es wird beim naechsten Lauf nach einem Tag mit abgeraeumt."
+      [ "$rc" = "0" ] && rc=1
+    fi
+  fi
+  rm -rf "$SPERRE"
+  exit "$rc"
+}
+trap schluss EXIT
 trap 'exit 130' INT TERM
 
-# ─── Vorher aufraeumen ───
+if [ -n "$SELFTEST_TOKEN" ]; then
+  echo "→ Wegwerf-Konto fuer diesen Lauf anlegen..."
+  WW_RC=0
+  WW_AUSGABE="$(python3 "$DIR/scripts/wegwerfkonto.py" anlegen --url "$URL" 2> "$SPERRE/wegwerf.log")" || WW_RC=$?
+  WW_MAIL="$(printf '%s\n' "$WW_AUSGABE" | sed -n 1p)"
+  WW_PW="$(printf '%s\n' "$WW_AUSGABE" | sed -n 2p)"
+  if [ "$WW_RC" = "0" ] && [ -n "$WW_MAIL" ] && [ -n "$WW_PW" ]; then
+    WEGWERF_EMAIL="$WW_MAIL"
+    export SELFTEST_EMAIL="$WW_MAIL"
+    export SELFTEST_PASSWORD="$WW_PW"
+    echo "  $WW_MAIL (wird am Ende geloescht)"
+    sed 's/^/  /' "$SPERRE/wegwerf.log"
+  else
+    if [ "$WW_RC" = "3" ]; then
+      echo "  Server bietet es nicht an — Rueckfall auf das feste Konto aus .deploy.env."
+    else
+      echo "  ⚠ Anlegen fehlgeschlagen — Rueckfall auf das feste Konto aus .deploy.env."
+    fi
+    sed 's/^/    /' "$SPERRE/wegwerf.log"
+  fi
+  unset WW_AUSGABE WW_PW
+  echo ""
+fi
+
+if [ -z "$SELFTEST_EMAIL" ] || [ -z "$SELFTEST_PASSWORD" ]; then
+  echo "Hinweis: kein Testkonto — Module und Einrichtung bleiben ungeprueft."
+  echo ""
+  echo "         Am einfachsten: SELFTEST_TOKEN in .deploy.env (./deploy.sh"
+  echo "         erzeugt es selbst), dann legt jeder Lauf ein Wegwerf-Konto an."
+  echo "         Sonst ein festes Konto unter $URL/login registrieren,"
+  echo "         E-Mail bestaetigen und SELFTEST_EMAIL/SELFTEST_PASSWORD in"
+  echo "         .deploy.env eintragen."
+  echo ""
+fi
+
+# ─── Vorher aufraeumen (nur festes Konto) ───
 # Ein abgebrochener Lauf hinterlaesst Testdaten und ein Konto mit
 # abgeschalteten Modulen; der naechste Lauf hielt genau das fuer den
 # Ausgangszustand und stellte es am Ende brav wieder her. Deshalb vor JEDEM
 # Lauf: Reste mit Testpraefix weg, alle Module an (das Testkonto soll alles
-# pruefen koennen). Geloescht wird nur, was ein Testpraefix traegt.
-if [ -n "$SELFTEST_EMAIL" ] && [ -n "$SELFTEST_PASSWORD" ]; then
+# pruefen koennen). Geloescht wird nur, was ein Testpraefix traegt. Ein
+# Wegwerf-Konto ist frisch und hat schon alle Module an.
+if [ -z "$WEGWERF_EMAIL" ] && [ -n "$SELFTEST_EMAIL" ] && [ -n "$SELFTEST_PASSWORD" ]; then
   echo "→ Testkonto vorbereiten (Reste weg, alle Module an)..."
   if python3 "$DIR/scripts/aufraeumen.py" --url "$URL" --loeschen --module-an > "$SPERRE/aufraeumen.log" 2>&1; then
     grep -E "Geloescht|Testreste|Gesetzt" "$SPERRE/aufraeumen.log" | sed 's/^/  /'
@@ -281,6 +363,18 @@ if [ "$MIT_DESKTOP" = "1" ]; then
   fi
 else
   def_aus "Desktop-App: Rundgang, Offline, Fehlerfall" "mit --schnell/--ohne-desktop abgeschaltet"
+fi
+
+if [ -n "$SELFTEST_EMAIL" ] && [ -n "$SELFTEST_PASSWORD" ]; then
+  echo ""
+  echo "→ Testdaten abraeumen (alles mit Praefix ZZ-)..."
+  aufraeumen_danach && def_ok "Aufraeumen danach: keine Testdaten mehr" \
+    || { STATUS=1; def_rot "Aufraeumen danach: es blieb etwas liegen"; }
+  if [ -n "$WEGWERF_EMAIL" ]; then
+    def_ok "Wegwerf-Konto $WEGWERF_EMAIL (wird jetzt geloescht)"
+  fi
+else
+  ENDE_AUFGERAEUMT=1
 fi
 
 echo ""

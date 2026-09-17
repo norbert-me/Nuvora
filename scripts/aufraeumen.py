@@ -3,7 +3,7 @@
 
 Die Testskripte (selftest.py, systemtest.py und ihre Browser-Gegenstuecke)
 schalten zum Pruefen Module des Testkontos zu und legen Daten mit dem Praefix
-ZZ-Selbsttest bzw. ZZ-Systemtest an. Am Ende raeumen sie beides wieder ab —
+"ZZ-" an (ZZ-Selbsttest, ZZ-Systemtest, ZZ-Desktop, ...). Am Ende raeumen sie beides wieder ab —
 ausser der Lauf bricht ab (Strg-C, abgestuerzter Browser, Netz weg). Dann steht
 das Konto mit fremder Modul-Aktivierung und liegengebliebenen Testdaten da.
 
@@ -36,6 +36,7 @@ Nur Standardbibliothek — Bericht und Api kommen aus gemeinsam.py.
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime
 
@@ -44,13 +45,18 @@ from datetime import datetime
 # selftest.py, das umgekehrt von hier holt; das war ein Ring. Jetzt zeigen
 # beide auf dasselbe Blatt (siehe Modulkopf von gemeinsam.py).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from gemeinsam import Api, Bericht  # noqa: E402
+from gemeinsam import Api, Bericht, ist_wegwerf  # noqa: E402
 
 WURZEL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Beide Testskripte, beide Praefixe. Wer ein drittes Testskript baut, traegt
-# sein Praefix hier ein — sonst raeumt niemand hinter ihm auf.
-PRAEFIXE = ("ZZ-Selbsttest", "ZZ-Systemtest")
+# Jedes Testskript benennt seine Daten mit "ZZ-" vorneweg (ZZ-Selbsttest,
+# ZZ-Systemtest, ZZ-Desktop, ZZ-Desktop-Offline, ZZ-Lasttest, ...). Frueher
+# standen hier zwei feste Namen, und was ein drittes Skript anlegte, blieb
+# liegen. Jetzt gilt die Familie — aber nur als eigenes Wort: "ZZ-" am Anfang
+# oder nach einem Nicht-Buchstaben, gefolgt von einem Buchstaben. "XYZZ-7"
+# oder "ZZ-" allein sind keine Testdaten.
+PRAEFIXE = ("ZZ-",)
+_PRAEFIX_MUSTER = re.compile(r"(?<![0-9A-Za-zÄÖÜäöüß])ZZ-[A-Za-zÄÖÜäöü]")
 
 # Ausgangszustand der Module, je Instanz — genau wie .selftest-bestand.json.
 MODUL_DATEI = os.path.join(WURZEL, ".selftest-module.json")
@@ -64,6 +70,13 @@ TRASH_REIHENFOLGE = ["card", "ladder", "deck", "path", "class", "kurs", "questio
 
 
 # ────────────────── Gemerkter Modulzustand (Datei) ──────────────────
+
+def _datei_gilt():
+    """Wegwerf-Konten merken sich keinen Modulzustand: das Konto ist nach dem
+    Lauf weg, und ein gemerkter Stand wuerde sonst beim naechsten Lauf auf das
+    feste Konto derselben Instanz angewandt."""
+    return not ist_wegwerf()
+
 
 def _lies_datei():
     try:
@@ -80,6 +93,8 @@ def merke_module(basis, aktiv):
     Von den Testskripten aufzurufen. Je Instanz getrennt: Test- und
     Produktivinstanz haben verschiedene Modulzustaende.
     """
+    if not _datei_gilt():
+        return
     alle = _lies_datei()
     alle[basis.rstrip("/")] = {"aktiv": sorted(aktiv), "zeit": datetime.now().isoformat(timespec="seconds")}
     with open(MODUL_DATEI, "w") as f:
@@ -92,6 +107,8 @@ def vergiss_module(basis):
     Ohne das wuerde dieses Werkzeug spaeter einen alten Stand wiederherstellen
     und dabei glauben, es tue etwas Gutes.
     """
+    if not _datei_gilt():
+        return
     alle = _lies_datei()
     if alle.pop(basis.rstrip("/"), None) is None:
         return
@@ -100,6 +117,8 @@ def vergiss_module(basis):
 
 
 def lies_module(basis):
+    if not _datei_gilt():
+        return None
     return _lies_datei().get(basis.rstrip("/"))
 
 
@@ -120,7 +139,7 @@ class Aufraeumbericht(Bericht):
 # ────────────────── Funde ──────────────────
 
 def mit_praefix(text):
-    return any(p in (text or "") for p in PRAEFIXE)
+    return bool(_PRAEFIX_MUSTER.search(text or ""))
 
 
 LABEL_FELDER = ("name", "title", "text", "label", "aufgabentext", "front", "filename")
@@ -436,7 +455,7 @@ def lies_deploy_env():
 
 def main():
     p = argparse.ArgumentParser(
-        description="Testreste (ZZ-Selbsttest / ZZ-Systemtest) finden und den Modulzustand "
+        description="Testreste (alles mit Praefix ZZ-) finden und den Modulzustand "
                     "zurueckstellen. Ohne --loeschen wird nur aufgelistet.")
     p.add_argument("--url", default=os.environ.get("SELFTEST_URL") or os.environ.get("SITE_URL"))
     p.add_argument("--email", default=os.environ.get("SELFTEST_EMAIL"))
@@ -499,8 +518,7 @@ def main():
         s = Sammler(api, b)
         funde = s.alles()
         if not funde:
-            b.add("Suche", "Testreste", True, "nichts mit Praefix "
-                  + " / ".join(PRAEFIXE) + " gefunden")
+            b.add("Suche", "Testreste", True, "nichts mit Praefix ZZ- gefunden")
         else:
             for gruppe in dict.fromkeys(f.gruppe for f in funde):
                 for f in [x for x in funde if x.gruppe == gruppe]:
