@@ -986,6 +986,7 @@ export default function Kalender() {
                 onMit={(v) => setAbo((a) => ({ ...a, mit: v }))}
                 onSave={(cals, mit) => { saveCals(cals, mit); setAbo((a) => ({ ...a, cals, mit })); }} t={t} />
             </div>
+            <ExtArchiv onGeaendert={() => loadExt()} t={t} />
 
             <div style={{ marginTop: 16, textAlign: "right" }}>
               <button onClick={() => setAbo(null)} style={btnSecondary}>{t("common.close")}</button>
@@ -1082,6 +1083,42 @@ function ExtInfoModal({ ev, onClose, onHide, t }) {
 
 // Editor für mehrere externe Kalender: je Zeile URL + Farbe + Löschen. „Speichern"
 // schreibt die ganze Liste (leere URLs fallen weg).
+// Archiv vergangener fremder Termine (external_event_archive): je Kalender
+// Zahl und Zeitraum, und ein Weg, es loszuwerden — sonst lebte ein
+// abgemeldeter Kalender still weiter. Erscheint nur, wenn es etwas gibt.
+function ExtArchiv({ onGeaendert, t }) {
+  const [liste, setListe] = useState([]);
+  const laden = () => hol(`${API}/external-archive`, []).then((d) => setListe(Array.isArray(d) ? d : []));
+  useEffect(() => { laden(); }, []); // eslint-disable-line
+  if (!liste.length) return null;
+  const datum = (x) => (x ? new Date(x + "T00:00:00").toLocaleDateString() : "");
+  const weg = async (a) => {
+    const name = a.name || t("kalender.archivOhneName");
+    if (!(await askConfirm(t("kalender.archivLoeschenFrage", { name }), { danger: true, ok: t("common.delete") }))) return;
+    await sende(`${API}/external-archive?cal=${encodeURIComponent(a.cal)}`, { method: "DELETE" }, t("common.delete"));
+    laden(); onGeaendert && onGeaendert();
+  };
+  return (
+    <div style={{ borderTop: "1px solid var(--border)", marginTop: 24, paddingTop: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("kalender.archivT")}</div>
+      {liste.map((a) => (
+        <div key={a.kennung} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {a.name || t("kalender.archivOhneName")}
+              {!a.abonniert && <span style={{ ...chipStyle, marginLeft: 8, fontWeight: 500 }}>{t("kalender.archivNichtMehr")}</span>}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text3)" }}>{t("kalender.archivAnzahl", { n: a.anzahl, von: datum(a.von), bis: datum(a.bis) })}</div>
+          </div>
+          <button onClick={() => weg(a)} className="icon-btn" style={toolbarIconBtn} title={t("kalender.archivLoeschen")} aria-label={t("kalender.archivLoeschen")}>
+            <Icon d={ICONS.trash} size={16} color={C.danger} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ExtCalEditor({ cals, mit, onChange, onMit, onSave, t }) {
   const rows = cals.length ? cals : [{ url: "", color: "", name: "" }];
   const [hilfe, setHilfe] = useState(false);
