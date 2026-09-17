@@ -4,7 +4,7 @@
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Boxplot, COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, selectStyle, td as tdBase, th as thBase, toolbarBtn, toolbarIconBtn } from "../components/Icons.jsx";
+import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, selectStyle, td as tdBase, th as thBase, toolbarBtn, toolbarIconBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
@@ -13,6 +13,7 @@ import MaterialPanel from "../components/MaterialPanel.jsx";
 import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import SuchSelect from "../components/SuchSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
@@ -35,7 +36,9 @@ const FEHLER = [
   { key: "ansatz", ab: "A", color: C.danger },
   { key: "rechnen", ab: "R", color: C.warning },
   { key: "fluechtig", ab: "F", color: C.info },
-  { key: "darstellung", ab: "D", color: "#7c3aed" },
+  // Violett aus der vorhandenen Palette (ANTWORT_COLORS.B) statt eines
+  // eigenen Hex-Werts — die vier COLORS-Toenungen sind schon vergeben.
+  { key: "darstellung", ab: "D", color: ANTWORT_COLORS.B },
   { key: "leer", ab: "–", color: "var(--text3)" },
 ];
 const FEHLER_CYCLE = ["", ...FEHLER.map((f) => f.key)];
@@ -78,8 +81,8 @@ function StatRow({ row, t, expandable, open, onToggle, small }) {
         <span style={{ fontSize: 13, fontWeight: 800, color: col, minWidth: 40, textAlign: "right" }}>{row.pct}%</span>
       </div>
       {/* Balken: Radius = halbe Hoehe (Balken-Kappe), reine Grafik. */}
-      <div style={{ marginTop: 4, height: 8, background: "var(--card)", borderRadius: 5, overflow: "hidden" }}>
-        <span style={{ display: "block", width: `${row.pct}%`, height: "100%", background: col, borderRadius: 5 }} />
+      <div style={{ marginTop: 4, height: 8, background: "var(--card)", borderRadius: 4, overflow: "hidden" }}>
+        <span style={{ display: "block", width: `${row.pct}%`, height: "100%", background: col, borderRadius: 4 }} />
       </div>
       {(row.disc != null || row.ciLow != null || row.nullAnteil != null) && (
         <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--text3)", marginTop: 4, flexWrap: "wrap" }}>
@@ -183,6 +186,8 @@ export default function Klassenarbeit() {
   // dann in der Reihenfolge des Servers (position, name), also alphabetisch
   // nach dem UNTERthema: „… / 1 Kreis" landete zwischen fremden Oberthemen.
   const themen = themenIndex(topics);
+  // Einmal je Render fuer alle Themen-Auswahlen (Aufgabe und Teilaufgabe).
+  const themenOptionen = themen.geordnet.map((tp) => ({ wert: String(tp.id), label: themen.label(tp) }));
   const topicLabel = (id) => themen.labelFuerId(id);
 
   // ── Ein Entwurf für die ganze Arbeit ──
@@ -607,9 +612,9 @@ export default function Klassenarbeit() {
            ins Mehr-Menue, wo Gefaehrliches selbst nach unten sortiert. */
         <Werkzeugleiste style={{ marginBottom: 16 }}
           links={(
-            <select value={work?.id || ""} onChange={(e) => { const w = works.find((x) => String(x.id) === e.target.value) || null; wechseln(() => zeigeArbeit(w)); }} style={{ ...selectStyle, minWidth: 180 }}>
-              {works.map((w) => <option key={w.id} value={w.id}>{w.niveau ? `${w.name} (${w.niveau})` : w.name}</option>)}
-            </select>
+            <SuchSelect value={work?.id ? String(work.id) : ""} style={{ minWidth: 0, maxWidth: 320 }}
+              onChange={(v) => { const w = works.find((x) => String(x.id) === v) || null; wechseln(() => zeigeArbeit(w)); }}
+              optionen={works.map((w) => ({ wert: String(w.id), label: w.niveau ? `${w.name} (${w.niveau})` : w.name }))} />
           )}
           mehr={work ? [{ key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true, onClick: loeschen }] : []}>
           <button data-tour="ka-new" onClick={() => setNeuOffen(true)} style={toolbarBtn}>{t("klassenarbeit.new")}</button>
@@ -658,11 +663,9 @@ export default function Klassenarbeit() {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, color: "var(--text3)", width: 24, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
                   <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.taskOptional", { n: i + 1 })} title={t("klassenarbeit.taskOptionalHint")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: "1 1 150px", minWidth: 0 }} />
-                  <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })}
-                    style={{ ...selectStyle, fontSize: 13, padding: "7px 9px", flex: "1 1 180px", minWidth: 0, maxWidth: 340 }}>
-                    <option value="">{t("klassenarbeit.topicNone")}</option>
-                    {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
-                  </select>
+                  <SuchSelect value={task.topic_id ? String(task.topic_id) : ""} onChange={(v) => setTask(task.id, { topic_id: v ? Number(v) : null })}
+                    leerLabel={t("klassenarbeit.topicNone")} style={{ flex: "1 1 180px", minWidth: 0, maxWidth: 340 }}
+                    optionen={themenOptionen} />
                   {hasParts ? (
                     <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap", flexShrink: 0 }}>{t("klassenarbeit.maxPoints")}: <b>{taskMax(task)}</b></span>
                   ) : (
@@ -692,11 +695,11 @@ export default function Klassenarbeit() {
                       }} />
                     {t("klassenarbeit.form")}
                   </label>
-                  <button onClick={() => addPart(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }}
+                  <button onClick={() => addPart(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4, minWidth: 32, minHeight: 32, flexShrink: 0 }}
                     title={t("klassenarbeit.addPartHint")} aria-label={t("klassenarbeit.addPart")}>
                     <Icon d={ICONS.plus} size={15} color="var(--accent)" />
                   </button>
-                  <button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+                  <button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4, minWidth: 32, minHeight: 32, flexShrink: 0 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
                 </div>
                 {hasParts && (
                   /* Eine Zeile je Teilaufgabe statt Chips nebeneinander: jede
@@ -709,13 +712,11 @@ export default function Klassenarbeit() {
                     {units(task).map((u) => (
                       <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", background: "var(--bg2)", borderRadius: CONTROL_R, padding: "4px 6px" }}>
                         <input value={u.label} onChange={(e) => setPart(task.id, u.id, { label: e.target.value })} title={t("klassenarbeit.partLabel")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 34, textAlign: "center" }} />
-                        <select value={u.topic_id || ""} onChange={(e) => setPart(task.id, u.id, { topic_id: e.target.value ? Number(e.target.value) : null })}
-                          title={t("klassenarbeit.partTopicHint")} style={{ ...selectStyle, fontSize: 12, padding: "5px 7px", flex: 1, minWidth: 120 }}>
-                          <option value="">{t("klassenarbeit.partTopicInherit")}</option>
-                          {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
-                        </select>
+                        <SuchSelect value={u.topic_id ? String(u.topic_id) : ""} onChange={(v) => setPart(task.id, u.id, { topic_id: v ? Number(v) : null })}
+                          title={t("klassenarbeit.partTopicHint")} leerLabel={t("klassenarbeit.partTopicInherit")}
+                          style={{ flex: "1 1 120px", minWidth: 0 }} optionen={themenOptionen} />
                         <input type="number" min="0.5" step="0.5" value={u.max} onChange={(e) => setPart(task.id, u.id, { max: Math.max(0.5, Number(e.target.value) || 0.5) })} title={t("klassenarbeit.maxPoints")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 48, textAlign: "center" }} />
-                        <button onClick={() => delPart(task.id, u.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
+                        <button onClick={() => delPart(task.id, u.id)} className="icon-btn" style={{ ...iconBtn, padding: 3, minWidth: 32, minHeight: 32 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
                       </div>
                     ))}
                   </div>
@@ -799,7 +800,8 @@ export default function Klassenarbeit() {
                                 „auswaehlen" aus. */}
                             <button onClick={() => toggleAbsent(s.id)} title={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")}
                               aria-label={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")} aria-pressed={abw}
-                              style={{ border: "none", background: "none", cursor: "pointer", color: abw ? C.warning : "var(--text3)", padding: 0, display: "inline-flex" }}><Icon d={abw ? ICONS.eyeOff : ICONS.eye} size={15} /></button>
+                              style={{ border: "none", background: "none", cursor: "pointer", color: abw ? C.warning : "var(--text3)", padding: 0, display: "inline-flex",
+                                alignItems: "center", justifyContent: "center", minWidth: 32, minHeight: 32, margin: "-4px 0 -4px -8px" }}><Icon d={abw ? ICONS.eyeOff : ICONS.eye} size={15} /></button>
                             {s.name}
                           </span>
                         </td>
@@ -810,7 +812,7 @@ export default function Klassenarbeit() {
                               {/* Abwesende bleiben editierbar — Punkte werden nur nicht in die
                                   Klassenstatistik gerechnet, aber nicht gelöscht. */}
                               <input type="number" min="0" step="0.5" max={unitMax(u)} value={pointsOf(s.id, u.id)} onChange={(e) => setPoints(s.id, u.id, e.target.value === "" ? "" : Math.min(unitMax(u), Math.max(0, Number(e.target.value))))}
-                                style={{ width: 42, height: 30, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
+                                style={{ width: 42, height: 32, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
                               {/* Die Fehlerart steht nur da, wo Punkte fehlen —
                                   an einer Aufgabe mit voller Punktzahl gibt es
                                   keinen Fehler zu benennen. Genau dieselbe
@@ -904,7 +906,7 @@ export default function Klassenarbeit() {
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("klassenarbeit.byTopic")}</div>
               {analyse.topics.length === 0 ? <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("klassenarbeit.noTopics")}</p> : analyse.topics.map((tp) => (
                 <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
-                  <span style={{ flex: 1, fontSize: 13 }}>{tp.label}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{tp.label}</span>
                   {/* Balken: Radius = halbe Hoehe (Balken-Kappe), reine Grafik. */}
                   <span style={{ width: 120, height: 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tp.pct}%`, height: "100%", background: tp.pct < 50 ? C.danger : tp.pct < 75 ? C.warning : C.success }} /></span>
                   <span style={{ fontSize: 13, fontWeight: 700, minWidth: 38, textAlign: "right" }}>{tp.pct}%</span>
@@ -922,7 +924,7 @@ export default function Klassenarbeit() {
                   {analyse.weakGroups.map((g) => (
                     <div key={g.label} style={{ border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: "8px 10px" }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>{g.label}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0 }}>{g.label}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: g.anteil >= 50 ? C.danger : C.warning }}>
                           {t("klassenarbeit.weakCount", { n: g.namen.length, all: analyse.gradedCount })}
                         </span>
@@ -1112,7 +1114,7 @@ export default function Klassenarbeit() {
       )}
       {neuOffen && <NeueArbeitModal t={t} onClose={() => setNeuOffen(false)} onAnlegen={anlegen}
         vorschlag={t("klassenarbeit.newName")} />}
-      {hasRoster && works.length === 0 && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={() => setNeuOffen(true)} />}
+      {hasRoster && works.length === 0 && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={() => setNeuOffen(true)} actionTour="ka-new" />}
       {/* Der Themenstand stand hier einmal als ganzes Panel (mit eigener
           SuS-Auswahl) — die falsche Stelle: eine Klassenarbeit zeigt EINEN Tag,
           „wackelt das Thema dauerhaft?" gehoert zum Kind. Geblieben ist der
@@ -1304,9 +1306,8 @@ export function KlassenarbeitVergleich() {
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
         {works.length > 0 && (
-          <select value={workId || ""} onChange={(e) => setWorkId(Number(e.target.value))} style={{ ...selectStyle, minWidth: 180 }}>
-            {works.map((w) => <option key={w.id} value={w.id}>{w.niveau ? `${w.name} (${w.niveau})` : w.name}</option>)}
-          </select>
+          <SuchSelect value={workId ? String(workId) : ""} onChange={(v) => setWorkId(Number(v))} style={{ minWidth: 0, maxWidth: 320 }}
+            optionen={works.map((w) => ({ wert: String(w.id), label: w.niveau ? `${w.name} (${w.niveau})` : w.name }))} />
         )}
       </div>
 
@@ -1560,9 +1561,11 @@ function NeueArbeitModal({ t, onClose, onAnlegen, vorschlag }) {
       <div style={{ fontSize: 12, color: "var(--text3)", margin: "12px 0 4px" }}>{t("klassenarbeit.newArt")}</div>
       <Tabs value={art} onChange={setArt}
         options={[["eine", t("klassenarbeit.newArtEine")], ["eg", t("klassenarbeit.newArtEG")]]} />
-      <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8, lineHeight: 1.5 }}>
-        {art === "eg" ? t("klassenarbeit.newArtEGHint") : t("klassenarbeit.newArtEineHint")}
-      </div>
+      {/* Nur die E/G-Variante braucht einen Satz: dass daraus ZWEI Arbeiten
+          entstehen, sieht man dem Reiter nicht an. */}
+      {art === "eg" && (
+        <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8, lineHeight: 1.5 }}>{t("klassenarbeit.newArtEGHint")}</div>
+      )}
       <DialogFuss onSpeichern={los} onAbbrechen={onClose} aus={busy} speichern={t("klassenarbeit.new")} />
     </Modal>
   );

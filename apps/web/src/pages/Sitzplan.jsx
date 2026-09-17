@@ -863,7 +863,6 @@ export default function Sitzplan() {
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("sitzplan.zoom")}</span>
             <Segment style={{ height: ZOOM_H }}>
               <button onClick={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))} style={zoomBtnStyle} title={t("sitzplan.zoomOut")} aria-label={t("sitzplan.zoomOut")}><Icon d={ICONS.minus} size={15} /></button>
               <span style={{ ...zoomBtnStyle, cursor: "default", minWidth: 46 }}>{Math.round(zoom * 100)}%</span>
@@ -955,13 +954,18 @@ export default function Sitzplan() {
                       {!seat.empty && segelTeil && segelOn && (() => {
                         const st = SEGEL.find((x) => x.key === segel[String(seat.sid)]);
                         return (
+                          // Sichtbar 18 px, getroffen 32: das Polster vergroessert
+                          // die Flaeche, der negative Rand nimmt es optisch zurueck.
                           <button onPointerDown={(e) => e.stopPropagation()} onClick={() => cycleStage(seat.sid)}
                             title={st ? `SEGEL: ${st.label}` : t("sitzplan.segelSet")}
-                            style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, lineHeight: 1,
-                              display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                            aria-label={st ? `SEGEL: ${st.label}` : t("sitzplan.segelSet")}
+                            style={{ flexShrink: 0, padding: 7, margin: -7, border: "none", background: "transparent", cursor: "pointer", display: "flex" }}>
+                            <span style={{ width: 18, height: 18, borderRadius: 9, fontSize: 11, fontWeight: 700, lineHeight: 1,
+                              display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box",
                               background: st ? st.color : "var(--card)", color: st ? C.aufAkzent : "var(--text3)",
                               border: st ? "none" : "1px dashed var(--border2)" }}>
-                            {st ? st.ab : "+"}
+                              {st ? st.ab : "+"}
+                            </span>
                           </button>
                         );
                       })()}
@@ -980,19 +984,25 @@ export default function Sitzplan() {
                   </div>
                   {/* Der Name ueber die ganze Breite — er ist die Angabe, auf
                       die es ankommt, und bekommt deshalb die breiteste Zeile.
-                      Lange Namen brechen um, statt abgeschnitten zu werden. */}
+                      Eine Zeile, zu lange Namen enden mit „…"; der volle Name
+                      steht im Tooltip. */}
                   {/* Dreh-Griff wieder an der Ecke oben rechts: dort sucht ihn
                       die Hand, und in der Knopfreihe stand er neben dem
                       Loeschen — zwei Handgriffe mit sehr verschiedenen Folgen
                       duerfen nicht nebeneinander liegen. Innen statt ueber der
                       Kante, weil der Kasten seit dem randlosen Bild
                       abschneidet. */}
+                  {/* Griffflaeche 24 x 32 (die Breite ist der freigehaltene
+                      Rand der Knopfreihe), sichtbar bleibt der 18-px-Kreis. */}
                   <span onPointerDown={(e) => onRotDown(e, seat)} title={t("sitzplan.rotate")}
-                    style={{ position: "absolute", right: 2, top: 2, width: 18, height: 18, borderRadius: 9,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      background: "var(--card)", border: "1px solid var(--border2)", color: "var(--text2)",
+                    style={{ position: "absolute", right: 0, top: 0, width: 24, height: 32, padding: 2, boxSizing: "border-box",
+                      display: "flex", alignItems: "flex-start", justifyContent: "flex-end",
                       cursor: "grab", touchAction: "none" }}>
-                    <Icon d={ICONS.rotate} size={11} />
+                    <span style={{ width: 18, height: 18, borderRadius: 9, boxSizing: "border-box",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      background: "var(--card)", border: "1px solid var(--border2)", color: "var(--text2)" }}>
+                      <Icon d={ICONS.rotate} size={11} />
+                    </span>
                   </span>
                   <span title={seat.empty ? t("sitzplan.emptySeat") : s.name}
                     style={{ height: NAME_H, display: "flex", alignItems: "center", justifyContent: "center",

@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import {
-  pageApp, cardStyle, panelStyle, btnPrimary, btnSecondary, btnSmall,
-  toolbarBtn, toolbarInput, inputStyle, Icon, ICONS, COLORS as C, CONTROL_R, badge, sectionLabel,
+  pageApp, cardStyle, panelStyle, btnSecondary, btnSmall, iconBtn,
+  toolbarBtn, toolbarBtnPrimary, toolbarInput, inputStyle, Icon, ICONS, COLORS as C, CONTROL_R, badge, sectionLabel,
 } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -154,7 +154,7 @@ function Aufgaben() {
             onChange={(classId, kursId) => setWahl({ classId, kursId })} />
           <input value={titel} onChange={(e) => setTitel(e.target.value)} placeholder={t("pap.aufgabeTitel")}
             style={{ ...toolbarInput, flex: 1, minWidth: 160 }} />
-          <button onClick={anlegen} style={{ ...btnPrimary, opacity: fehlt ? 0.5 : 1 }}
+          <button onClick={anlegen} style={{ ...toolbarBtnPrimary, opacity: fehlt ? 0.5 : 1 }}
             title={fehlt || undefined}>{t("common.add")}</button>
         </Werkzeugleiste>
         <textarea value={beschreibung} onChange={(e) => setBeschreibung(e.target.value.slice(0, 4000))}
@@ -167,12 +167,12 @@ function Aufgaben() {
       {liste.map((a) => (
         <div key={a.id} style={{ ...cardStyle, padding: 12, marginBottom: 8 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ fontWeight: 600, flex: 1 }}>{a.title}</span>
+            <span style={{ fontWeight: 600, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{a.title}</span>
             <span style={badge(a.abgaben ? C.success : "var(--text3)")}>{t("pap.abgabenZahl", { n: a.abgaben })}</span>
             <button onClick={() => setOffen(offen && offen.id === a.id ? null : a)} style={{ ...btnSecondary, ...btnSmall }}>
               {t("pap.abgabenZeigen")}
             </button>
-            <button onClick={() => loeschen(a.id)} className="icon-btn" style={{ padding: 4 }}
+            <button onClick={() => loeschen(a.id)} className="icon-btn" style={{ ...iconBtn, minWidth: 32, minHeight: 32 }}
               title={t("common.delete")} aria-label={t("common.delete")}>
               <Icon d={ICONS.trash} size={15} color={C.danger} />
             </button>
@@ -209,7 +209,7 @@ function Abgaben({ aufgabe }) {
         {zeilen.map((z) => (
           <div key={z.student_id} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
             <span style={{ color: "var(--text3)", width: 28 }}>{z.card_id}</span>
-            <span style={{ flex: 1 }}>{z.name}</span>
+            <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{z.name}</span>
             {z.leer ? <span style={{ color: "var(--text3)" }}>{t("pap.nochNichts")}</span> : (
               <>
                 {z.abgegeben && <span style={badge(C.success)}>{t("pap.abgegeben")}</span>}

@@ -262,7 +262,7 @@ import { createBrowserRouter, RouterProvider, Routes, Route, NavLink, Link, Navi
 import Login from "./pages/Login.jsx";
 import Landing from "./pages/Landing.jsx";
 import NuvoraHome from "./pages/NuvoraHome.jsx";
-import GuidedTour, { PATH_TOUR, tourFor } from "./components/GuidedTour.jsx";
+import GuidedTour, { tourFor, tourFuerOrt } from "./components/GuidedTour.jsx";
 import { uebernehmen as ansichtenUebernehmen, vergessen as ansichtenVergessen } from "./core/ansichten.js";
 import Suche from "./components/Suche.jsx";
 import { useModules, useZielFilter } from "./core/modules.js";
@@ -803,9 +803,9 @@ function Nav({ user, onLogout }) {
   }, []);
   useEffect(() => {
     if (!user) return;
-    const hit = PATH_TOUR.find(([p]) => location.pathname.startsWith(p));
-    if (!hit) return;
-    const id = hit[1];
+    // Nach Ort UND Reiter: /auswertung?tab=klassenarbeit hat eine eigene Tour.
+    const id = tourFuerOrt(location.pathname, location.search);
+    if (!id) return;
     if (tourGesehen(id)) return;
     const timer = setTimeout(() => setTourId((cur) => {
       if (cur) return cur;
@@ -813,7 +813,7 @@ function Nav({ user, onLogout }) {
       return id;
     }), 900);
     return () => clearTimeout(timer);
-  }, [location.pathname, user]);
+  }, [location.pathname, location.search, user]);
   // Gesehen heisst: sie ist gelaufen — nicht „sie wurde bis zum letzten Schritt
   // durchgeklickt". Wer sie wegklickt, das Fenster schliesst oder mitten in der
   // Tour auf einen Reiter geht, hat sie trotzdem gesehen; wurde sie erst am Ende
@@ -858,10 +858,6 @@ function Nav({ user, onLogout }) {
           .nav-links-desktop { display: none !important; }
           .nav-burger { display: flex !important; }
           .nav-profile-name { display: none !important; }
-          /* Auf dem Handy nur die Lupe: mit Beschriftung schob der Suchknopf
-             den Profil-Eintrag aus dem Bild (der Rundgang meldete 14 px
-             waagerechtes Scrollen). */
-          .nav-suche-text { display: none !important; }
           .nav-page-title { display: block !important; }
           .page-title { display: none !important; }
         }
@@ -869,7 +865,6 @@ function Nav({ user, onLogout }) {
           .nav-links-desktop { display: flex !important; }
           .nav-burger { display: none !important; }
           .nav-profile-name { display: inline !important; }
-          .nav-suche-text { display: inline !important; }
           .nav-page-title { display: none !important; }
           .nav-mobile-menu { display: none !important; }
         }
@@ -923,7 +918,13 @@ function Nav({ user, onLogout }) {
           <button
             className="nav-burger"
             onClick={() => setMenuOpen(!menuOpen)}
-            style={{ ...iconBtn, display: "none", color: "var(--text)" }}
+            // Ohne Beschriftung war der Knopf fuer Screenreader ein namenloses
+            // Bild. Der Satz „Menü öffnen" faellt auf „Mehr" zurueck, bis das
+            // Woerterbuch ihn kennt.
+            title={menuOpen ? t("common.close") : t("nav.menuOpen")}
+            aria-label={menuOpen ? t("common.close") : t("nav.menuOpen")}
+            aria-expanded={menuOpen}
+            style={{ ...iconBtn, display: "none", color: "var(--text)", minWidth: 32, minHeight: 32 }}
           >
             {menuOpen ? (
               <Icon d={ICONS.close} size={20} color="currentColor" />
@@ -956,7 +957,9 @@ function Nav({ user, onLogout }) {
                 key={item.to}
                 to={item.to}
                 style={{
-                  padding: "6px 12px",
+                  // 32 px Tippziel: mit dem Polster allein war der Reiter 29 hoch.
+                  padding: "6px 12px", minHeight: 32, boxSizing: "border-box",
+                  display: "inline-flex", alignItems: "center",
                   borderRadius: chipStyle.borderRadius,
                   textDecoration: "none",
                   fontSize: 14,
@@ -1007,7 +1010,10 @@ function Nav({ user, onLogout }) {
           borderRadius: "unset", border: "none", borderTop: "1px solid var(--border)",
           background: "var(--nav-bg)", backdropFilter: "saturate(180%) blur(20px)",
           WebkitBackdropFilter: "saturate(180%) blur(20px)",
-          padding: 8,
+          // Viele Module = laengere Liste als der Bildschirm; unten bleibt der
+          // Wischstrich des iPhones frei.
+          overflowY: "auto", WebkitOverflowScrolling: "touch",
+          padding: 8, paddingBottom: "max(16px, env(safe-area-inset-bottom))",
         }}>
           {navItems.map((item) => {
             const isActive = item.active !== undefined ? item.active : location.pathname.startsWith(item.to.split("?")[0]) && !item.to.includes("?");

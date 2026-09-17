@@ -21,9 +21,10 @@ import { Link } from "react-router-dom";
 import { FOERDER, MASSNAHMEN } from "../core/foerderung.js";
 import { alsJson, hol, sende } from "../core/melden.js";
 import Speicherleiste, { useEntwurf } from "./Speichern.jsx";
-import { COLORS as C, ICONS, Icon, NiveauToggle, chipStyle, iconBtn, inputStyle, selectStyle, toolbarInput } from "./Icons.jsx";
+import { COLORS as C, ICONS, Icon, NiveauToggle, btnSecondary, btnSmall, chipStyle, iconBtn, inputStyle, sectionLabel, selectStyle, toolbarInput } from "./Icons.jsx";
 
-const titel = { fontSize: 13, fontWeight: 600, color: "var(--text)", margin: "14px 0 6px" };
+// Abschnittsueberschrift aus dem Kern (sectionLabel), nur mit Abstand.
+const titel = { ...sectionLabel, margin: "14px 0 6px" };
 
 /**
  * `nurLesen`: dieselbe Quelle, nur zum ANSEHEN.
@@ -149,7 +150,7 @@ export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau =
           return (
             <label key={wert} title={erklaerung}
               style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", fontSize: 13,
-                cursor: "pointer", userSelect: "none",
+                minHeight: 32, boxSizing: "border-box", cursor: "pointer", userSelect: "none",
                 border: on ? "1px solid var(--accent)" : "1px solid var(--border2)",
                 background: on ? "var(--accent-bg)" : "var(--bg)", color: on ? "var(--accent)" : "var(--text2)" }}>
               <input type="checkbox" checked={on} onChange={() => toggleFoerder(wert)} style={{ margin: 0, cursor: "pointer" }} />
@@ -188,20 +189,20 @@ export default function SchuelerAngaben({ studentId, kursId = null, ohneNiveau =
                 {MASSNAHMEN.map(([wert]) => <option key={wert} value={wert}>{wert}</option>)}
               </select>
               <input value={m.detail || ""} onChange={(ev) => setM(i, "detail", ev.target.value)}
-                placeholder={t("classes.measureDetail")} maxLength={300} style={{ ...toolbarInput, flex: 1, minWidth: 120 }} />
+                placeholder={t("classes.measureDetail")} maxLength={300} style={{ ...toolbarInput, flex: "1 1 120px" }} />
               <label style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text2)", cursor: "pointer" }}
                 title={t("classes.measureExamHint")}>
                 <input type="checkbox" checked={!!m.arbeit} onChange={(ev) => setM(i, "arbeit", ev.target.checked)} style={{ margin: 0 }} />
                 {t("classes.measureExam")}
               </label>
               <button onClick={() => e.setz((v) => ({ massnahmen: v.massnahmen.filter((_, j) => j !== i) }))}
-                className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}>
+                className="icon-btn" style={{ ...iconBtn, minWidth: 32, minHeight: 32 }} title={t("common.delete")} aria-label={t("common.delete")}>
                 <Icon d={ICONS.trash} size={14} color={C.danger} />
               </button>
             </div>
           ))}
           <button onClick={() => e.setz((v) => ({ massnahmen: [...v.massnahmen, { art: MASSNAHMEN[0][0], detail: "", arbeit: true }] }))}
-            style={{ ...chipStyle, alignSelf: "flex-start", cursor: "pointer", border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text2)", fontSize: 13 }}>
+            style={{ ...btnSecondary, ...btnSmall, alignSelf: "flex-start" }}>
             {t("classes.measureAdd")}
           </button>
         </div>

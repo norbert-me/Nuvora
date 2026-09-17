@@ -10,7 +10,7 @@
 // fertigen Punkte (dieselbe Stundenrechnung wie überall, dieselbe
 // Kurs-Zuordnung). Die Seite ordnet nur nach Tagen und malt.
 import { useEffect, useState } from "react";
-import { COLORS as C, CONTROL_R, cardStyle, chipStyle, Empty, Icon, ICONS, pageApp, panelStyle } from "./Icons.jsx";
+import { COLORS as C, CONTROL_R, cardStyle, chipStyle, Empty, Icon, ICONS, pageApp, panelStyle, Segment, segmentBtn } from "./Icons.jsx";
 import { Link } from "react-router-dom";
 import KursKlasseSelect from "./KursKlasseSelect.jsx";
 import Werkzeugleiste from "./Werkzeugleiste.jsx";
@@ -61,11 +61,15 @@ export default function Zeitleiste({ onStunde }) {
       <Werkzeugleiste
         links={<KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={kursId}
           onChange={(id, kid) => { setClassId(id ?? ""); setKursId(kid ?? null); }} onKurs={setKursId} />}>
-        <select value={term} onChange={(e) => setTerm(e.target.value)} style={{ ...chipStyle, cursor: "pointer", padding: "6px 10px" }}>
-          <option value="">{t("kalender.termNow")}</option>
-          <option value="1">{t("kalender.term1")}</option>
-          <option value="2">{t("kalender.term2")}</option>
-        </select>
+        {/* Dieselbe Bauform wie der Zeitraum am Stundenplan. „Jahr" fehlt:
+            die Zeitleiste rechnet je Halbjahr (`_halbjahr` im Server). */}
+        <Segment>
+          {[["", t("kalender.termNow")], ["1", t("kalender.term1")], ["2", t("kalender.term2")]].map(([k, label]) => (
+            <button key={k || "now"} onClick={() => setTerm(k)} aria-pressed={term === k}
+              style={{ ...segmentBtn, fontWeight: term === k ? 700 : 500,
+                color: term === k ? "var(--accent)" : "var(--text2)" }}>{label}</button>
+          ))}
+        </Segment>
       </Werkzeugleiste>
 
       {/* Ohne gepflegtes Schuljahr gibt es keine Halbjahre: die Leiste laeuft
@@ -121,7 +125,7 @@ export default function Zeitleiste({ onStunde }) {
                       borderLeft: `3px solid ${art.farbe}`, borderRadius: CONTROL_R,
                       display: "flex", alignItems: "center", gap: 8 }}>
                       {art.icon && <Icon d={art.icon} size={14} color={art.farbe} />}
-                      <span style={{ fontSize: 13, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {p.titel}
                       </span>
                       <span style={{ fontSize: 12, color: "var(--text3)", marginLeft: "auto", whiteSpace: "nowrap" }}>

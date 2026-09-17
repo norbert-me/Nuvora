@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { COLORS as C, cardStyle, inputStyle as feld, btnPrimary as knopf, pageForm, SHADOW } from "../components/Icons.jsx";
+import { COLORS as C, cardStyle, inputStyle as feld, btnPrimary, linkBtn, pageForm, SHADOW } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { schreib, schreibJson } from "../core/speicher.js";
 import { alsJson } from "../core/melden.js";
@@ -103,11 +103,11 @@ export default function Login({ onLogin }) {
 
           {error && <div style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</div>}
           {showResend && (
-            <button type="button" onClick={resendVerification} style={{ ...linkBtn, marginBottom: 12, display: "block" }}>{t("login.resendVerification")}</button>
+            <button type="button" onClick={resendVerification} style={{ ...formLink, marginBottom: 12, display: "block" }}>{t("login.resendVerification")}</button>
           )}
           {message && <div style={{ color: C.success, fontSize: 13, marginBottom: 12 }}>{message}</div>}
 
-          <button type="submit" style={btnPrimary}>
+          <button type="submit" style={formBtn}>
             {mode === "login" ? t("login.submitLogin") : mode === "register" ? t("login.submitRegister") : t("login.submitForgot")}
           </button>
         </form>
@@ -115,12 +115,12 @@ export default function Login({ onLogin }) {
         <div style={{ textAlign: "center", marginTop: 20, display: "flex", flexDirection: "column", gap: 8 }}>
           {mode === "login" && (
             <>
-              <button onClick={() => { setMode("register"); setError(""); setMessage(""); }} style={linkBtn}>{t("login.createAccountLink")}</button>
-              <button onClick={() => { setMode("forgot"); setError(""); setMessage(""); }} style={{ ...linkBtn, fontSize: 13, color: "var(--text3)", padding: "8px 0", margin: "-8px 0" }}>{t("login.forgotPassword")}</button>
+              <button onClick={() => { setMode("register"); setError(""); setMessage(""); }} style={formLink}>{t("login.createAccountLink")}</button>
+              <button onClick={() => { setMode("forgot"); setError(""); setMessage(""); }} style={{ ...formLink, fontSize: 13, color: "var(--text3)" }}>{t("login.forgotPassword")}</button>
             </>
           )}
           {mode !== "login" && (
-            <button onClick={() => { setMode("login"); setError(""); setMessage(""); }} style={linkBtn}>{t("login.backToLogin")}</button>
+            <button onClick={() => { setMode("login"); setError(""); setMessage(""); }} style={formLink}>{t("login.backToLogin")}</button>
           )}
         </div>
       </div>
@@ -132,12 +132,10 @@ export default function Login({ onLogin }) {
 // Design-Quelle, damit Rahmen, Ecken und Farben dieselben sind wie ueberall.
 const inputStyle = { ...feld, display: "block", width: "100%", marginBottom: 12 };
 
-const btnPrimary = { ...knopf, width: "100%", padding: 12, fontSize: 16 };
+// Anders benannt als der Baustein: die lokale Fassung hiess frueher
+// `btnPrimary` und ueberschattete ihn.
+const formBtn = { ...btnPrimary, width: "100%", padding: 12, fontSize: 16 };
 
-// Polster wie beim Baustein in Icons.jsx: „Konto erstellen" war 18 px hoch,
-// „Passwort vergessen" 16 — beide auf dem Handy zu flach zum Treffen. Die
-// Zeile bleibt, wo sie war (die Reihe hat ihren eigenen `gap`).
-const linkBtn = {
-  background: "none", border: "none", color: "var(--accent)", fontSize: 14,
-  cursor: "pointer", fontWeight: 500, padding: "7px 0", margin: "-7px 0",
-};
+// `linkBtn` aus Icons.jsx, nur etwas leichter. Anders benannt, damit der
+// Baustein nicht ueberschattet wird.
+const formLink = { ...linkBtn, fontWeight: 500, textAlign: "center" };

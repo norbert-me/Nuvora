@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   pageApp, pageTitle, cardStyle, panelStyle, badge, Icon, ICONS,
-  COLORS as C, sectionLabel, toolbarInput,
+  COLORS as C, sectionLabel, toolbarInput, toolbarIconBtn, AddButton,
 } from "../components/Icons.jsx";
+import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
+import SuchSelect from "../components/SuchSelect.jsx";
 import Portrait from "../components/Portrait.jsx";
 import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
 import BildZuschnitt from "../components/BildZuschnitt.jsx";
@@ -227,16 +229,18 @@ export default function Personen() {
   return (
     <div style={pageApp}>
       <h1 style={pageTitle}>{t("personen.titel")}</h1>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        <input value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("personen.suche")}
-          style={{ ...toolbarInput, flex: 1, minWidth: 200, maxWidth: 320 }} />
-        <span style={{ flex: 1 }} />
+      {/* Links die Suche (was gerade gezeigt wird), daneben der eine
+          haeufige Handgriff: ein Kind anlegen. */}
+      <Werkzeugleiste style={{ marginBottom: 16 }}
+        links={<input value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("personen.suche")}
+          aria-label={t("personen.suche")} style={{ ...toolbarInput, flex: "1 1 200px", minWidth: 0, maxWidth: 320 }} />}>
         <input value={neuName} onChange={(e) => setNeuName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") personAnlegen(); }}
-          placeholder={t("personen.neuName")} style={{ ...toolbarInput, minWidth: 180 }} />
-        <button onClick={personAnlegen} disabled={!neuName.trim()}
-          style={{ ...btnSecondary, ...btnSmall, opacity: neuName.trim() ? 1 : 0.5 }}>{t("personen.neu")}</button>
-      </div>
+          placeholder={t("personen.neuName")} aria-label={t("personen.neuName")}
+          style={{ ...toolbarInput, flex: "1 1 160px", minWidth: 0, maxWidth: 240 }} />
+        <AddButton onClick={personAnlegen} disabled={!neuName.trim()} title={t("personen.neu")}
+          style={{ opacity: neuName.trim() ? 1 : 0.5 }} />
+      </Werkzeugleiste>
 
       {liste.length === 0 && <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("personen.leer")}</p>}
 
@@ -250,7 +254,7 @@ export default function Personen() {
             style={{ display: "flex", alignItems: "center", gap: 12, width: "100%",
               border: "none", background: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
             <Portrait key={`${p.id}-${fotoVer}`} student={{ id: p.id, name: p.name, has_photo: p.has_photo }} size={34} form="eckig" quelle="person" />
-            <span style={{ fontWeight: 600, flex: 1, color: "var(--text)" }}>{p.name}</span>
+            <span style={{ fontWeight: 600, flex: 1, minWidth: 0, color: "var(--text)" }}>{p.name}</span>
             <span style={{ color: "var(--text3)", display: "inline-flex",
               transform: offen === p.id ? "rotate(90deg)" : "none", transition: "transform .15s" }}>
               <Icon d={ICONS.open} size={14} />
@@ -268,27 +272,32 @@ export default function Personen() {
                     {/* Kein E/G-Abzeichen über den Kursnamen: das Niveau gilt je
                         Kurs, und über einer Liste aus vier Kursen behauptet ein
                         einzelnes „G" etwas, das so nicht stimmt. */}
-                    <span style={{ fontSize: 12, color: "var(--text3)", flex: 1 }}>{(p.kurse || []).join(" · ")}</span>
+                    <span style={{ fontSize: 12, color: "var(--text3)", flex: 1, minWidth: 0 }}>{(p.kurse || []).join(" · ")}</span>
                     {/* Bild und Name gehören der Person — hier sind sie
                         änderbar, statt dass man dafür in eine Liste geht, in
                         der dasselbe Kind noch einmal steht. */}
-                    <button onClick={() => fotoSetzen(p.id)} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.fotoSetzen")}</button>
-                    {p.has_photo && <button onClick={() => fotoZuschneiden(p.id)} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.fotoZuschnitt")}</button>}
-                    {p.has_photo && <button onClick={() => fotoWeg(p.id)} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.fotoWeg")}</button>}
-                    <button onClick={() => setNameEdit({ id: p.id, wert: p.name })} style={{ ...btnSecondary, ...btnSmall }}>{t("personen.nameAendern")}</button>
-                    {/* Loeschen steht am rechten Rand und traegt die Warnfarbe —
-                        wie ueberall das Gefaehrliche zuletzt. */}
-                    <button onClick={() => personLoeschen(p)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }}
-                      title={t("personen.loeschen")} aria-label={t("personen.loeschen")}>
-                      <Icon d={ICONS.trash} size={16} color={C.danger} />
+                    <button onClick={() => fotoSetzen(p.id)} className="icon-btn" style={toolbarIconBtn}
+                      title={t("personen.fotoSetzen")} aria-label={t("personen.fotoSetzen")}>
+                      <Icon d={ICONS.camera} size={16} />
                     </button>
+                    <button onClick={() => setNameEdit({ id: p.id, wert: p.name })} className="icon-btn" style={toolbarIconBtn}
+                      title={t("personen.nameAendern")} aria-label={t("personen.nameAendern")}>
+                      <Icon d={ICONS.edit} size={16} />
+                    </button>
+                    {/* Seltenes und Gefaehrliches im Menue — Loeschen sortiert
+                        sich dort selbst nach unten. */}
+                    <MehrMenu eintraege={[
+                      p.has_photo && { key: "zuschnitt", label: t("personen.fotoZuschnitt"), icon: ICONS.fit, onClick: () => fotoZuschneiden(p.id) },
+                      p.has_photo && { key: "fotoweg", label: t("personen.fotoWeg"), icon: ICONS.image, onClick: () => fotoWeg(p.id) },
+                      { key: "loeschen", label: t("personen.loeschen"), icon: ICONS.trash, gefahr: true, onClick: () => personLoeschen(p) },
+                    ].filter(Boolean)} />
                   </div>
                   {nameEdit && nameEdit.id === p.id && (
                     <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                       <input value={nameEdit.wert} autoFocus
                         onChange={(e) => setNameEdit({ ...nameEdit, wert: e.target.value })}
                         onKeyDown={(e) => { if (e.key === "Enter") nameSpeichern(); if (e.key === "Escape") setNameEdit(null); }}
-                        style={{ ...inputStyle, flex: 1 }} />
+                        style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
                       <button onClick={nameSpeichern} style={{ ...btnSecondary, ...btnSmall }}>{t("common.save")}</button>
                       {/* Abbrechen sichtbar, nicht nur auf Escape: eine Zeile,
                           aus der man nur mit einer Taste herauskommt, ist auf
@@ -321,12 +330,10 @@ export default function Personen() {
                   {kurse.length > 0 && (
                     <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("personen.inKurs")}</span>
-                      <select value="" onChange={(ev) => { if (ev.target.value) inKurs(p.id, Number(ev.target.value)); }}
-                        style={{ ...inputStyle, minWidth: 180 }}>
-                        <option value="">{t("personen.kursWaehlen")}</option>
-                        {kurse.filter((k) => !(stand.teile || []).some((teil) => teil.kurs === k.name))
-                          .map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-                      </select>
+                      <SuchSelect value="" onChange={(v) => { if (v) inKurs(p.id, Number(v)); }}
+                        leerLabel={t("personen.kursWaehlen")} style={{ minWidth: 0, maxWidth: 280 }}
+                        optionen={kurse.filter((k) => !(stand.teile || []).some((teil) => teil.kurs === k.name))
+                          .map((k) => ({ wert: String(k.id), label: k.name }))} />
                     </div>
                   )}
                   {(stand.teile || []).length === 0 && (
@@ -394,7 +401,7 @@ export default function Personen() {
                         <div style={{ display: "grid", gap: 4 }}>
                           {(teil.themen || []).slice(0, 8).map((th, i) => (
                             <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                              <span style={{ flex: 1 }}>{th.thema || th.name || "—"}</span>
+                              <span style={{ flex: 1, minWidth: 0 }}>{th.thema || th.name || "—"}</span>
                               {th.pct == null ? (
                                 <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("personen.zuWenig")}</span>
                               ) : (

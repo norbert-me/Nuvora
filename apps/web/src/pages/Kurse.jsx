@@ -8,7 +8,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { alsJson, hol, sende } from "../core/melden.js";
-import { AddButton, pageTitle, pageIntro, btnSecondary, btnSmall, selectStyle, chipStyle,
+import { AddButton, pageTitle, btnSecondary, btnSmall, selectStyle, chipStyle,
   Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, toolbarInput, sectionLabel, Toggle, Tabs, Empty, pageApp, LoadError } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
@@ -132,9 +132,8 @@ export default function Kurse() {
   return (
     <div style={{ ...pageApp }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>{t("kurse.title")}</h1>
+        <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1, minWidth: 0 }}>{t("kurse.title")}</h1>
       </div>
-      <p style={pageIntro}>{t("kurse.intro")}</p>
 
       {/* Eine Leiste statt zwei Zeilen: links die Auswahl (aktiv/Archiv),
           daneben der eine haeufige Handgriff (neuer Kurs). Das Feld hat
@@ -152,11 +151,9 @@ export default function Kurse() {
                 nebeneinander, weil es dieselbe Handlung ist. Erst ab einem
                 vorhandenen Kurs sichtbar: vorher gibt es nichts zu übernehmen. */}
             {kurse.length > 0 && (
-              <select value={ausKurs} onChange={(e) => setAusKurs(e.target.value)}
-                title={t("kurse.ausKursHinweis")} style={{ ...selectStyle, maxWidth: 220 }}>
-                <option value="">{t("kurse.ausKursLeer")}</option>
-                {kurse.map((k) => <option key={k.id} value={k.id}>{t("kurse.ausKurs", { name: k.name })}</option>)}
-              </select>
+              <SuchSelect value={ausKurs} onChange={setAusKurs} title={t("kurse.ausKursHinweis")}
+                leerLabel={t("kurse.ausKursLeer")} style={{ maxWidth: 220 }}
+                optionen={kurse.map((k) => ({ wert: String(k.id), label: t("kurse.ausKurs", { name: k.name }) }))} />
             )}
             <AddButton onClick={anlegen} title={t("kurse.add")} />
           </>
@@ -276,23 +273,20 @@ export default function Kurse() {
                         <option value={NEU}>{t("kurse.andere")}</option>
                       </select>
                     )}
-                    <select value={kurs.wert.vorgaenger} onChange={(e) => kurs.setz({ vorgaenger: e.target.value })} style={{ ...selectStyle, flex: 1, minWidth: 200 }}>
-                      <option value="">{t("kurse.noPrevious")}</option>
-                      {/* Nur FRUEHERE Jahrgaenge: ein Kurs aus demselben
-                          Schuljahr ist nie das Vorjahr. Kurse ohne
-                          Jahresangabe bleiben in der Liste — Bestandskurse
-                          tragen keins, und sie zu verstecken hiesse, sie gar
-                          nicht verknuepfen zu koennen. Neueste zuerst, damit
-                          das direkt vorangehende Jahr oben steht. */}
-                      {alleKurse
+                    {/* Nur FRUEHERE Jahrgaenge: ein Kurs aus demselben
+                        Schuljahr ist nie das Vorjahr. Kurse ohne
+                        Jahresangabe bleiben in der Liste — Bestandskurse
+                        tragen keins, und sie zu verstecken hiesse, sie gar
+                        nicht verknuepfen zu koennen. Neueste zuerst, damit
+                        das direkt vorangehende Jahr oben steht. */}
+                    <SuchSelect value={kurs.wert.vorgaenger} onChange={(v) => kurs.setz({ vorgaenger: v })}
+                      title={t("kurse.chainHint")} leerLabel={t("kurse.noPrevious")}
+                      style={{ flex: "1 1 200px", minWidth: 0 }}
+                      optionen={alleKurse
                         .filter((x) => x.id !== k.id && liegtDavor(x.schuljahr, kurs.wert.jahr))
                         .sort((a, b) => nachJahrAbsteigend(a.schuljahr, b.schuljahr))
-                        .map((x) => (
-                          <option key={x.id} value={x.id}>{x.name}{x.schuljahr ? ` (${x.schuljahr})` : ""}</option>
-                        ))}
-                    </select>
+                        .map((x) => ({ wert: String(x.id), label: `${x.name}${x.schuljahr ? ` (${x.schuljahr})` : ""}` }))} />
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("kurse.chainHint")}</div>
                 </div>
 
                 {/* Kein Klassen-Feld mehr. Der Kurs ist die Bedienebene
@@ -380,8 +374,9 @@ function StudentMembers({ kursId, allClasses, t }) {
           {e.wert.ids.map((sid) => { const m = nameVon(sid); return (
             <span key={sid} style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4 }}>
               {m.name} <span style={{ color: "var(--text3)", fontSize: 11 }}>· {m.class_name}</span>
-              <button onClick={() => remove(sid)} title={t("kurse.unlink")}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 0, display: "flex" }}>
+              <button onClick={() => remove(sid)} title={t("kurse.unlink")} aria-label={t("kurse.unlink")}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", display: "flex",
+                  alignItems: "center", justifyContent: "center", minWidth: 32, minHeight: 32, padding: 0, margin: "-8px -8px -8px -4px" }}>
                 <Icon d={ICONS.close} size={12} />
               </button>
             </span>

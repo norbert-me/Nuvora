@@ -99,7 +99,7 @@ export default function Papierkorb() {
                 <button onClick={() => restore(it)} disabled={busy} style={{ ...btnSecondary, ...btnSmall, opacity: busy ? 0.6 : 1 }}>
                   {t("trash.restore")}
                 </button>
-                <button onClick={() => purge(it)} disabled={busy} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("trash.purge")} aria-label={t("trash.purge")}>
+                <button onClick={() => purge(it)} disabled={busy} className="icon-btn" style={{ ...iconBtn, padding: 4, minWidth: 32, minHeight: 32 }} title={t("trash.purge")} aria-label={t("trash.purge")}>
                   <Icon d={ICONS.trash} size={15} color={C.danger} />
                 </button>
               </div>

@@ -15,6 +15,11 @@ const API = "/api";
 // Antwortfarben kommen aus dem Kern (ANTWORT_COLORS) — die Kopie hier war die
 // dritte im Modul, und eine Aenderung traf nur zwei davon.
 
+// Beschriftung eines Knopfes, der mit `flex: 1` in einer nicht umbrechenden
+// Leiste steht: mit `minWidth: 0` darf er schrumpfen, der Text endet dann mit
+// Ellipse statt ueber den Rand zu laufen (auf 320 px: „Test beenden").
+const kuerzen = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+
 export default function Scanner() {
   const { t } = useLanguage();
   const [searchParams] = useSearchParams();
@@ -552,18 +557,18 @@ export default function Scanner() {
         // Knoepfen (Radius 12) ueber einer Leiste mit 30 px hohen Pillen.
         <Werkzeugleiste style={{ marginBottom: 8, padding: "0 4px", flexWrap: "nowrap" }}>
           <button onClick={() => sendRemote(hostRevealed ? "hide" : "reveal")}
-            style={hostRevealed ? { ...toolbarBtn, flex: 1 } : { ...toolbarBtnPrimary, flex: 1 }}>
-            {hostRevealed ? t("scanner.hide") : t("scanner.reveal")}
+            style={hostRevealed ? { ...toolbarBtn, flex: 1, minWidth: 0 } : { ...toolbarBtnPrimary, flex: 1, minWidth: 0 }}>
+            <span style={kuerzen}>{hostRevealed ? t("scanner.hide") : t("scanner.reveal")}</span>
           </button>
           {hostRevealed && (
             hostIsLast ? (
               <button onClick={() => sendRemote("finish")}
-                style={{ ...toolbarBtnPrimary, flex: 1, background: C.danger, color: C.aufAkzent }}>
-                {t("scanner.finishTest")}
+                style={{ ...toolbarBtnPrimary, flex: 1, minWidth: 0, background: C.danger, color: C.aufAkzent }}>
+                <span style={kuerzen}>{t("scanner.finishTest")}</span>
               </button>
             ) : (
-              <button onClick={() => sendRemote("next")} style={{ ...toolbarBtnPrimary, flex: 1 }}>
-                {t("scanner.next")}
+              <button onClick={() => sendRemote("next")} style={{ ...toolbarBtnPrimary, flex: 1, minWidth: 0 }}>
+                <span style={kuerzen}>{t("scanner.next")}</span>
               </button>
             )
           )}

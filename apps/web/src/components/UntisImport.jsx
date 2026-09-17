@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  btnPrimary, btnSecondary, btnSmall, COLORS as C, CONTROL_R, inputStyle, Modal,
+  btnPrimary, btnSecondary, btnSmall, COLORS as C, inputStyle, Modal,
   panelStyle, sectionLabel, Segment, segmentBtn, selectStyle, td as tdCell, th,
 } from "./Icons.jsx";
 import { hol, alsJson } from "../core/melden.js";
@@ -204,7 +204,7 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
               )}
               {quelle === "api" && (
                 <button onClick={() => { setQuelle("ics"); setFehler(null); }}
-                  style={{ ...btnSecondary, ...btnSmall, marginTop: 8, borderRadius: CONTROL_R }}>
+                  style={{ ...btnSecondary, ...btnSmall, marginTop: 8 }}>
                   {t("untis.zuIcs")}
                 </button>
               )}
@@ -212,8 +212,8 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
           )}
 
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-            <button onClick={onClose} style={{ ...btnSecondary, borderRadius: CONTROL_R }}>{t("common.cancel")}</button>
-            <button onClick={abrufen} disabled={laeuft} style={{ ...btnPrimary, borderRadius: CONTROL_R, opacity: laeuft ? 0.6 : 1 }}>
+            <button onClick={onClose} style={btnSecondary}>{t("common.cancel")}</button>
+            <button onClick={abrufen} disabled={laeuft} style={{ ...btnPrimary, opacity: laeuft ? 0.6 : 1 }}>
               {laeuft ? t("untis.laeuft") : t("untis.abrufen")}
             </button>
           </div>
@@ -305,8 +305,8 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
           </div>
 
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-            <button onClick={() => setVorschau(null)} style={{ ...btnSecondary, borderRadius: CONTROL_R }}>{t("untis.zurueck")}</button>
-            <button onClick={uebernehmen} disabled={laeuft} style={{ ...btnPrimary, borderRadius: CONTROL_R, opacity: laeuft ? 0.6 : 1 }}>
+            <button onClick={() => setVorschau(null)} style={btnSecondary}>{t("untis.zurueck")}</button>
+            <button onClick={uebernehmen} disabled={laeuft} style={{ ...btnPrimary, opacity: laeuft ? 0.6 : 1 }}>
               {laeuft ? t("untis.laeuft") : t("untis.uebernehmen")}
             </button>
           </div>

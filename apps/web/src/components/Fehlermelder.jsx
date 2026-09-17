@@ -13,7 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
-  btnPrimary, btnSecondary, cardStyle, COLORS as C, CONTROL_R, dateiWaehlen, DialogKopf, Icon, iconBtn, ICONS,
+  btnPrimary, btnSecondary, btnSmall, cardStyle, COLORS as C, CONTROL_R, dateiWaehlen, DialogKopf, Icon, iconBtn, ICONS,
   inputStyle, Modal, SHADOW,
 } from "./Icons.jsx";
 import { alsText, anonym, beobachte, leeren, protokoll, umgebung } from "../core/protokoll.js";
@@ -161,7 +161,7 @@ export default function Fehlermelder() {
                   untereinander — auf dem Handy die halbe Maske. */}
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "8px 0" }}>
               <button onClick={() => setLogOffen((v) => !v)}
-                style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13 }}>
+                style={{ ...btnSecondary, ...btnSmall }}>
                 {logOffen ? t("melder.logZu") : t("melder.wasGeht")}
               </button>
               {/* Anhang: bewusst KEIN automatisches Einsammeln — die Datei
@@ -178,13 +178,13 @@ export default function Fehlermelder() {
                   if (!daten) { setFehler(t("melder.anhangFehler")); return; }
                   setFehler("");
                   setDatei({ name: f.name, typ: f.type || "application/octet-stream", groesse: f.size, daten });
-                }, "*/*")} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13 }}>
+                }, "*/*")} style={{ ...btnSecondary, ...btnSmall }}>
                   {t("melder.anhang")}
                 </button>
                 {datei && (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
                     {datei.name} ({Math.max(1, Math.round(datei.groesse / 1024))} KB)
-                    <button onClick={() => setDatei(null)} className="icon-btn" style={{ ...iconBtn, padding: 2 }}
+                    <button onClick={() => setDatei(null)} className="icon-btn" style={{ ...iconBtn, padding: 2, minWidth: 32, minHeight: 32, margin: "-8px 0" }}
                       title={t("common.delete")} aria-label={t("common.delete")}>
                       <Icon d={ICONS.close} size={14} />
                     </button>

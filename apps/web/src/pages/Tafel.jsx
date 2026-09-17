@@ -2,7 +2,7 @@
 // Jedes Feld ist verschiebbar, in der Größe änderbar und hat eine Schriftgröße.
 // Reiner Client; der Stand liegt lokal (localStorage), damit er den Reload übersteht.
 import { useState, useRef, useEffect } from "react";
-import { btnSecondary, cardStyle, CONTROL_R, Icon, ICONS, iconBtn, popoverPanel, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, COLORS as C, pageFull, SHADOW } from "../components/Icons.jsx";
+import { btnSecondary, cardStyle, CONTROL_R, Icon, ICONS, iconBtn, popoverPanel, toolbarBtn, toolbarIconBtn, COLORS as C, pageFull, SHADOW } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -15,7 +15,11 @@ import { stundenZeit } from "../core/stunden";
 const KEY = "nuvora_tafel_v1";
 // Stiftfarben der Tafel. Bewusst feste Werte wie ANTWORT_COLORS: die Farbe IST
 // die Wahl der Lehrkraft und darf nicht mit dem Design-Theme wandern.
-const COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed"];
+// Ausnahme ist die erste: „Schwarz" ist die Schriftfarbe des Designs — ein
+// festes #111827 verschwand im dunklen Design auf der dunklen Fläche.
+const COLORS = ["var(--text)", "#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed"];
+// Bestand: vor dem Wechsel gespeicherte Felder tragen noch das feste Schwarz.
+const farbe = (c) => (c === "#111827" ? "var(--text)" : c);
 // Feste Referenzfläche (16:9). Alle Element-Koordinaten liegen in diesem Raum;
 // die Anzeige skaliert per transform an die tatsächliche Breite.
 const REF_W = 1600, REF_H = 900;
@@ -215,11 +219,20 @@ export default function Tafel() {
           <Icon d={ICONS.check} size={15} /> {gespeichert && offene ? t("tafel.gespeichert") : t("tafel.speichern")}
         </button>
         <span style={{ flex: 1 }} />
-        <button onClick={add} style={toolbarBtnPrimary}><Icon d={ICONS.plus} size={15} color="var(--bg)" /> {t("tafel.add")}</button>
-        <button onClick={addTimer} style={toolbarBtn}><Icon d={ICONS.plus} size={15} /> {t("tafel.addTimer")}</button>
-        <button onClick={addLaerm} style={toolbarBtn}><Icon d={ICONS.plus} size={15} /> {t("tafel.addLaerm")}</button>
-        {kalenderAktiv && <button onClick={addVerlauf} style={toolbarBtn}><Icon d={ICONS.plus} size={15} /> {t("tafel.addVerlauf")}</button>}
-        <button onClick={() => setFs((v) => !v)} style={toolbarBtn} title={t("tafel.fullscreen")}><Icon d={fs ? ICONS.close : ICONS.fit} size={16} /> {fs ? t("common.close") : t("tafel.fullscreen")}</button>
+        {/* Je Elementart ein Symbol, der Name steht im title (Werkzeugleisten-
+            Regel). Vier Knöpfe mit „+ Wort" drückten die Leiste in die zweite
+            Zeile; das Textfeld bleibt der hervorgehobene Haupthandgriff. */}
+        <button onClick={add} style={{ ...toolbarIconBtn, background: "var(--text)", borderColor: "var(--text)" }}
+          title={t("tafel.add")} aria-label={t("tafel.add")}><Icon d={ICONS.note} size={17} color="var(--bg)" /></button>
+        <button onClick={addTimer} className="icon-btn" style={toolbarIconBtn} title={t("tafel.addTimer")} aria-label={t("tafel.addTimer")}>
+          <Icon d={ICONS.hourglass} size={17} /></button>
+        <button onClick={addLaerm} className="icon-btn" style={toolbarIconBtn} title={t("tafel.addLaerm")} aria-label={t("tafel.addLaerm")}>
+          <Icon d={ICONS.volume} size={17} /></button>
+        {kalenderAktiv && <button onClick={addVerlauf} className="icon-btn" style={toolbarIconBtn} title={t("tafel.addVerlauf")} aria-label={t("tafel.addVerlauf")}>
+          <Icon d={ICONS.clock} size={17} /></button>}
+        <button onClick={() => setFs((v) => !v)} className="icon-btn" style={toolbarIconBtn}
+          title={fs ? t("common.close") : t("tafel.fullscreen")} aria-label={fs ? t("common.close") : t("tafel.fullscreen")}>
+          <Icon d={fs ? ICONS.close : ICONS.fit} size={17} /></button>
       </Werkzeugleiste>
 
       {/* Tafel-Fläche: äußerer Rahmen misst die Breite, das innere Board hat feste
@@ -268,7 +281,7 @@ export default function Tafel() {
               ) : (
                 <textarea value={it.text} onChange={(e) => patch(it.id, { text: e.target.value })} placeholder={t("tafel.placeholder")} className="keep-fontsize"
                   style={{ width: "100%", height: "100%", boxSizing: "border-box", border: "none", outline: "none", resize: "none", background: "transparent",
-                    color: it.color, fontSize: it.fontSize, fontWeight: 700, lineHeight: 1.15, padding: "18px 16px 12px", overflow: "hidden", fontFamily: "inherit" }} />
+                    color: farbe(it.color), fontSize: it.fontSize, fontWeight: 700, lineHeight: 1.15, padding: "18px 16px 12px", overflow: "hidden", fontFamily: "inherit" }} />
               )}
               {/* Größen-Griff unten rechts (groß genug fürs Handy) */}
               <div onPointerDown={(e) => onDown(e, it.id, "resize")}
@@ -297,7 +310,7 @@ export default function Tafel() {
                 {fontPop && (<>
                   {COLORS.map((c) => (
                     <button key={c} onClick={() => patch(selItem.id, { color: c })} title={t("tafel.color")}
-                      style={{ width: 22, height: 22, borderRadius: CONTROL_R, background: c, border: selItem.color === c ? "2px solid var(--accent)" : "1px solid var(--border2)", cursor: "pointer" }} />
+                      style={{ width: 22, height: 22, borderRadius: CONTROL_R, background: c, border: farbe(selItem.color) === c ? "2px solid var(--accent)" : "1px solid var(--border2)", cursor: "pointer" }} />
                   ))}
                   <button onClick={() => bumpFont(-2)} style={leistenBtn} title={t("tafel.textSmaller")} aria-label={t("tafel.textSmaller")}>A<Icon d={ICONS.minus} size={13} color="var(--text2)" /></button>
                   <span style={{ fontSize: 13, minWidth: 40, textAlign: "center", fontWeight: 600 }}>{selItem.fontSize}</span>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { AddButton, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_H, CONTROL_R, dateiWaehlen, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, menuRow, Modal as UiModal, modalOverlay, modalPanel, NiveauToggle, overlayGuard, pageApp, panelStyle, Popover, REIFE_COLORS, selectStyle, Skeleton, td as tdBasis, th as thBasis, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { AddButton, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_H, CONTROL_R, dateiWaehlen, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, menuRow, Modal as UiModal, modalOverlay, modalPanel, NiveauToggle, overlayGuard, pageApp, pageForm, panelStyle, Popover, REIFE_COLORS, selectStyle, Skeleton, td as tdBasis, th as thBasis, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import { themenIndex } from "../core/topics.js";
@@ -19,6 +19,7 @@ import DateiMenu from "../components/DateiMenu.jsx";
 import VerknuepfungDialog, { themenNamen } from "../components/Verknuepfung.jsx";
 import Latex from "../components/Latex.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
+import { oeffentlicheBasis } from "../core/basis.js";
 import { formelEinfuegen, LATEX_TASTEN, spalteAnhaengen, TABELLE_GERUEST, zeileAnhaengen } from "../core/latextabelle.js";
 import { alsJson, hol, sende } from "../core/melden.js";
 import { mondayOf } from "../core/datum.js";
@@ -314,6 +315,11 @@ export default function Karten() {
     if (view === "qr") loadTokens();
   }, [view, classId, kursId]);
 
+  // Die Adresse im QR-Code ist die oeffentliche (SITE_URL), nicht die des
+  // Browsers — im Schulnetz waere das die LAN-Adresse, und die ist zu Hause tot.
+  const [qrBasis, setQrBasis] = useState(() => window.location.origin);
+  useEffect(() => { oeffentlicheBasis().then(setQrBasis); }, []);
+
   // Kurse: fuer die Zuweisung UND die Frage, ob mit E/G gearbeitet wird.
   useEffect(() => {
     hol("/api/kurse").then((d) => setAlleKurse(Array.isArray(d) ? d : []));
@@ -324,7 +330,7 @@ export default function Karten() {
 
   if (classes.length === 0) {
     return (
-      <div style={{ maxWidth: 700 }}>
+      <div style={pageForm}>
         <p style={{ color: "var(--text2)", fontSize: 14 }}>
           {t("karten.needClass").split("{{link}}")[0]}<Link to="/classes" style={{ color: "var(--accent)" }}>{t("nav.classes")}</Link>{t("karten.needClass").split("{{link}}")[1]}
         </p>
@@ -519,7 +525,7 @@ export default function Karten() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
             {(tokens || []).map((s) => (
               <div key={s.student_id} style={{ ...panelStyle, textAlign: "center", padding: 12, background: "#fff" }}>
-                <img src={`${API}/qr/${s.token}.png?base=${encodeURIComponent(window.location.origin)}`} alt="" width={120} height={120} style={{ display: "block", margin: "0 auto 6px" }} />
+                <img src={`${API}/qr/${s.token}.png?base=${encodeURIComponent(qrBasis)}`} alt="" width={120} height={120} style={{ display: "block", margin: "0 auto 6px" }} />
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{s.name}</div>
                 <div style={{ fontSize: 11, color: "#666" }}>#{s.card_id}</div>
               </div>

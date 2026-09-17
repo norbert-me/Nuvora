@@ -135,7 +135,7 @@ export function FruehwarnKarte({ schueler, t, offen = false }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {s.themen.map((th) => (
                   <div key={th.topic_id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                    <span style={{ flex: 1, color: "var(--text)" }}>{th.name || `#${th.topic_id}`}</span>
+                    <span style={{ flex: 1, minWidth: 0, color: "var(--text)" }}>{th.name || `#${th.topic_id}`}</span>
                     <span style={{ fontSize: 11, color: "var(--text3)" }}>
                       {th.altbestand ? t("fw.old") : t("fw.fresh")}
                     </span>
@@ -199,11 +199,11 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true }
     <div style={{ ...cardStyle, marginBottom: 16 }}>
       {titel && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, flex: 1, minWidth: 0 }}>
             {t("fw.title")}{nurKind == null && zeigen.length > 0 ? ` (${zeigen.length})` : ""}
           </div>
           <button onClick={() => setEmpfindlich(!empfindlich)}
-            style={{ ...chipStyle, cursor: "pointer", background: "var(--card)",
+            style={{ ...chipStyle, cursor: "pointer", background: "var(--card)", minHeight: 32, boxSizing: "border-box",
               border: `1px solid ${empfindlich ? "var(--accent)" : "var(--border2)"}`,
               color: empfindlich ? "var(--accent)" : "var(--text3)" }}
             title={t("fw.sensitiveHint")}>

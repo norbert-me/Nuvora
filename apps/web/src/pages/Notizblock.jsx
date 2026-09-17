@@ -158,7 +158,7 @@ export default function Notizblock({ embedded } = {}) {
                 <span className="drag-handle" title={t("notizblock.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
                 <input value={n.title} onChange={(e) => patch(n.idx, "titel", e.target.value)} placeholder={t("notizblock.titlePlaceholder")}
                   style={{ ...inputStyle, flex: 1, minWidth: 0, fontWeight: 700, padding: "6px 8px", border: "none", background: "transparent" }} />
-                <button onClick={() => del(n.id)} className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+                <button onClick={() => del(n.id)} className="icon-btn" style={{ ...iconBtn, padding: 4, minWidth: 32, minHeight: 32, flexShrink: 0 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
               </div>
               <textarea value={n.content} onChange={(e) => patch(n.idx, "texte", e.target.value)} placeholder={t("notizblock.placeholder")} rows={7}
                 style={{ ...inputStyle, width: "100%", flex: 1, boxSizing: "border-box", resize: "none", fontSize: 14, lineHeight: 1.5, border: "none", background: "transparent", padding: "4px 8px" }} />

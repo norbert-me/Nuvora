@@ -15,7 +15,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { COLORS as C, cardStyle, chipStyle, Icon, ICONS } from "./Icons.jsx";
+import { COLORS as C, cardStyle, chipStyle, Icon, ICONS, linkBtn } from "./Icons.jsx";
 import { hol } from "../core/melden.js";
 import { ymd } from "../core/datum.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -29,7 +29,7 @@ export function WidgetKarte({ titel, zu, zuLabel, children, leer }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
         <span style={{ fontSize: 16, fontWeight: 700, flex: 1, minWidth: 0 }}>{titel}</span>
         {zu && (
-          <Link to={zu} style={{ color: "var(--accent)", textDecoration: "none", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>
+          <Link to={zu} style={{ ...linkBtn, textDecoration: "none", fontSize: 13, whiteSpace: "nowrap" }}>
             {zuLabel} →
           </Link>
         )}

@@ -95,13 +95,13 @@ export default function Orga() {
   });
   useEffect(() => { if (frisch.current) { frisch.current = false; e.verwerfen(); } });
   // Kurs-/Klassenwechsel mit offenen Häkchen: nachfragen statt still verwerfen.
-  const wechseln = (fn) => {
+  const wechseln = async (fn) => {
     // Wer den Wechsel bestaetigt, hat die Aenderungen aufgegeben — die
     // Arbeitskopie muss dann WEG. Ohne das blieb sie „beruehrt": der neue
     // Stand vom Server wurde nie uebernommen, und beim Zurueckwechseln
     // fragte die Seite erneut, obwohl niemand etwas getan hatte.
     if (e.geaendert) {
-      if (!window.confirm(t("speichern.verlassen"))) return;
+      if (!(await askConfirm(t("speichern.verlassen"), { danger: true }))) return;
       e.verwerfen();
     }
     fn();
@@ -186,10 +186,16 @@ export default function Orga() {
                     const on = !!e.wert[`${it.id}:${s.id}`];
                     return (
                       <td key={it.id} style={td}>
+                        {/* Sichtbar 24 px, getroffen 32: Polster plus negativer
+                            Rand, damit die Zeile nicht hoeher wird. */}
                         <button onClick={() => toggle(it, s.id)} title={on ? t("orga.done") : t("orga.open")}
-                          style={{ width: 24, height: 24, borderRadius: CONTROL_R, cursor: "pointer", fontSize: 14, fontWeight: 700,
+                          aria-label={`${s.name}: ${on ? t("orga.done") : t("orga.open")}`} aria-pressed={on}
+                          style={{ padding: 4, margin: -4, border: "none", background: "transparent", cursor: "pointer", display: "inline-flex", verticalAlign: "middle" }}>
+                          <span style={{ width: 24, height: 24, borderRadius: CONTROL_R, fontSize: 14, fontWeight: 700, boxSizing: "border-box",
+                            display: "flex", alignItems: "center", justifyContent: "center",
                             border: on ? "none" : "1px solid var(--border2)", background: on ? C.success : "transparent", color: on ? C.aufAkzent : "transparent" }}>
-                          ✓
+                            ✓
+                          </span>
                         </button>
                       </td>
                     );

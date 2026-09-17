@@ -109,7 +109,7 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
                 {row.class_id == null && (kartenAktiv || lernpfadAktiv) && (
                   <select value={pickFor[row.topic_id] ?? ""} aria-label={t("home.weakPickClass")}
                     onChange={(e) => setPickFor((m) => ({ ...m, [row.topic_id]: e.target.value ? Number(e.target.value) : undefined }))}
-                    style={{ ...selectStyle, height: 28, padding: "0 26px 0 8px", fontSize: 13 }}>
+                    style={{ ...selectStyle, height: btnSmall.minHeight, padding: "0 26px 0 8px", fontSize: 13 }}>
                     <option value="">{t("home.weakPickClass")}</option>
                     {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>

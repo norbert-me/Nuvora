@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { COLORS as C, cardStyle, inputStyle as feld, btnPrimary as knopf, pageForm, SHADOW } from "../components/Icons.jsx";
+import { COLORS as C, cardStyle, inputStyle as feld, btnPrimary, pageForm, SHADOW } from "../components/Icons.jsx";
 
 import { useLanguage } from "../i18n/index.jsx";
 import { alsJson } from "../core/melden.js";
@@ -41,14 +41,14 @@ export default function ResetPassword() {
             <div style={{ color: C.success, fontSize: 14, marginBottom: 16 }}>
               {t("reset.done")}
             </div>
-            <a href="/login" style={{ ...btnPrimary, display: "inline-block", textDecoration: "none", textAlign: "center", boxSizing: "border-box" }}>{t("verify.toLogin")}</a>
+            <a href="/login" style={{ ...formBtn, display: "inline-block", textDecoration: "none", textAlign: "center", boxSizing: "border-box" }}>{t("verify.toLogin")}</a>
           </div>
         ) : (
           <form onSubmit={submit}>
             <input type="password" name="new-password" autoComplete="new-password" aria-label={t("reset.pw")} placeholder={t("reset.pw")} value={pw} onChange={(e) => setPw(e.target.value)} style={inputStyle} autoFocus required />
             <input type="password" name="new-password-repeat" autoComplete="new-password" aria-label={t("reset.pw2")} placeholder={t("reset.pw2")} value={pw2} onChange={(e) => setPw2(e.target.value)} style={inputStyle} required />
             {error && <div style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</div>}
-            <button type="submit" style={btnPrimary}>{t("reset.save")}</button>
+            <button type="submit" style={formBtn}>{t("reset.save")}</button>
             <div style={{ textAlign: "center", marginTop: 16 }}>
               <a href="/login" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>{t("login.backToLogin")}</a>
             </div>
@@ -62,4 +62,6 @@ export default function ResetPassword() {
 // Formularseite: volle Breite, sonst aus der Design-Quelle abgeleitet.
 const inputStyle = { ...feld, display: "block", width: "100%", marginBottom: 12 };
 
-const btnPrimary = { ...knopf, width: "100%", padding: 12, fontSize: 16 };
+// Anders benannt als der Baustein: die lokale Fassung hiess frueher
+// `btnPrimary` und ueberschattete ihn.
+const formBtn = { ...btnPrimary, width: "100%", padding: 12, fontSize: 16 };

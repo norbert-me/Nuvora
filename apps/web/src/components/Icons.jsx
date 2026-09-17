@@ -1,4 +1,4 @@
-import { Children, Fragment, useEffect, useId, useLayoutEffect, useRef } from "react";
+import { Children, Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { kommaRund } from "../core/zahl.js";
 import { quantil } from "../core/statistik.js";
@@ -716,6 +716,28 @@ export function Popover({ align = "left", style, children, ...rest }) {
     </div>
   );
 }
+// Info-Punkt: ein erklaerender Satz auf Klick UND Hover (ein reiner
+// title-Tooltip geht auf dem Handy nicht). Stand zweimal im Code (Profil,
+// Quiz-Auswertung), beide mit `padding: 0` — also ein 14-px-Tippziel. Die
+// Mindestgroesse hebt die Flaeche auf 32 px, der negative Rand nimmt sie
+// optisch zurueck: der Punkt steht, wo er stand.
+export function InfoDot({ text, size = 15 }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex", marginLeft: 4, flexShrink: 0 }}>
+      <button type="button" title={text} aria-label={text} aria-expanded={open}
+        onClick={() => setOpen((o) => !o)} onBlur={() => setTimeout(() => setOpen(false), 150)}
+        style={{ ...iconBtn, padding: 0, minWidth: 32, minHeight: 32, margin: -8 }}>
+        <Icon d={ICONS.info} size={size} color={open ? "var(--accent)" : "var(--text3)"} />
+      </button>
+      {open && (
+        <Popover style={{ width: 240, maxWidth: "70vw", padding: 8, fontSize: 12, lineHeight: 1.5, fontWeight: 400, zIndex: 30 }}>
+          {text}
+        </Popover>
+      )}
+    </span>
+  );
+}
 // Statistik-Kachel (Auswertungen): großer Wert + Label. EINE Quelle, damit die
 // Auswertungen (CardVote, Klassenarbeit) gleich aussehen.
 export function StatCard({ label, value, color, sub }) {
@@ -1035,12 +1057,12 @@ export function NiveauToggle({ wert, onChange, mitLeer = true, size = 26, title 
 // Reifegrad-Badge (alpha/beta) fuer Module. beta = blau, alpha = orange-Warnung.
 // Leerer Zustand: statt „keine Daten" ein Satz + optional ein erster-Schritt-
 // Knopf. Macht Listen selbsterklaerend.
-export function Empty({ title, hint, action, onAction }) {
+export function Empty({ title, hint, action, onAction, actionTour }) {
   return (
     <div style={{ textAlign: "center", padding: "36px 20px", border: "1px dashed var(--border2)", borderRadius: 14, background: "var(--bg2)" }}>
       <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: hint ? 6 : 0 }}>{title}</div>
       {hint && <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: action ? 16 : 0, maxWidth: 420, marginLeft: "auto", marginRight: "auto", lineHeight: 1.5 }}>{hint}</div>}
-      {action && onAction && <button onClick={onAction} style={btnPrimary}>{action}</button>}
+      {action && onAction && <button data-tour={actionTour} onClick={onAction} style={btnPrimary}>{action}</button>}
     </div>
   );
 }

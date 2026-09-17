@@ -4,7 +4,7 @@ import { useAktiv } from "../core/modules.js";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, quoteFarbe, quoteFlaeche, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
+import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, linkBtn, pageApp, panelStyle, quoteFarbe, quoteFlaeche, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
@@ -931,7 +931,7 @@ const gradeDistribution = (() => {
                     {!student.present && (
                       <button onClick={() => setStatus(student.card_id, "krank")}
                         title={t("eval.markSick")}
-                        style={{ marginLeft: 6, background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 11, fontWeight: 600, padding: 0 }}>
+                        style={{ ...linkBtn, marginLeft: 6, color: "var(--text3)", fontSize: 11 }}>
                         {t("eval.noSubmission")}
                       </button>
                     )}
@@ -943,7 +943,7 @@ const gradeDistribution = (() => {
                       const vor = (vorschlag[String(student.card_id)] || []).filter((x) => !eigene.includes(Number(x)));
                       if (!eigene.length && !vor.length) return (
                         <button onClick={() => setGefehltFuer(student)} title={t("eval.gefehltSet")} aria-label={t("eval.gefehltSet")}
-                          className="icon-btn" style={{ ...iconBtn, marginLeft: 6, width: 24, height: 24 }}>
+                          className="icon-btn" style={{ ...iconBtn, marginLeft: 2, marginBlock: -4, width: 32, height: 32 }}>
                           <Icon d={ICONS.calendar} size={13} color="var(--text3)" />
                         </button>
                       );
@@ -1013,7 +1013,7 @@ const gradeDistribution = (() => {
                   {student.name}
                   {/* Doch anwesend: dann zählt die fehlende Abgabe als 0 mit. */}
                   <button onClick={() => setStatus(student.card_id, "anwesend")}
-                    style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 11, fontWeight: 600, padding: 0, fontStyle: "normal" }}>
+                    style={{ ...linkBtn, marginLeft: 8, fontSize: 11, fontStyle: "normal" }}>
                     {t("eval.markPresent")}
                   </button>
                 </td>
@@ -1224,7 +1224,7 @@ function Stat({ label, value, onClick, clickable, info }) {
 function SchliessenBtn({ onClick, t }) {
   return (
     <button onClick={onClick} className="icon-btn" title={t("common.close")} aria-label={t("common.close")}
-      style={{ ...iconBtn, padding: 4, background: "var(--bg2)", color: "var(--text3)" }}>
+      style={{ ...iconBtn, padding: 4, minWidth: 32, minHeight: 32, background: "var(--bg2)", color: "var(--text3)" }}>
       <Icon d={ICONS.close} size={13} />
     </button>
   );

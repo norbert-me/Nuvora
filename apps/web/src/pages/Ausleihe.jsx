@@ -2,7 +2,8 @@
 // Ausleiher: ein Kern-Schüler (Klasse wählen) oder ein Freitextname.
 import { useState, useEffect, useCallback } from "react";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, badge, btnPrimary, btnSecondary, cardStyle, CONTROL_R, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C, inputStyle, Empty } from "../components/Icons.jsx";
+import { AddButton, badge, btnSecondary, btnSmall, cardStyle, CONTROL_R, selectStyle, Toggle, Icon, ICONS, toolbarBtnPrimary, toolbarIconBtn, toolbarInput, COLORS as C, inputStyle, Empty } from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr } from "../core/cache.js";
@@ -69,10 +70,10 @@ export default function Ausleihe() {
 
   return (
     <div style={{ maxWidth: "none" }}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()} placeholder={t("ausleihe.newPlaceholder")} style={{ ...fld, flex: 1, minWidth: 200 }} />
+      <Werkzeugleiste
+        links={<input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()} placeholder={t("ausleihe.newPlaceholder")} style={{ ...toolbarInput, flex: "1 1 200px" }} />}>
         <AddButton onClick={anlegen} title={t("ausleihe.add")} />
-      </div>
+      </Werkzeugleiste>
       {items.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <Toggle checked={nurOffene} onChange={setNurOffene} label={t("ausleihe.onlyOpen")} />
@@ -88,13 +89,13 @@ export default function Ausleihe() {
           {(nurOffene ? items.filter((it) => it.open > 0) : items).map((it) => (
             <div key={it.id} style={{ ...cardStyle, padding: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px" }}>
-                <button onClick={() => oeffnen(it.id)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", color: "var(--text)", fontSize: 16, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: "var(--text3)", fontSize: 12 }}>{offen === it.id ? "▾" : "▸"}</span>
-                  {it.name}
+                <button onClick={() => oeffnen(it.id)} aria-expanded={offen === it.id} style={{ flex: 1, minWidth: 0, minHeight: 32, textAlign: "left", background: "none", border: "none", cursor: "pointer", color: "var(--text)", fontSize: 16, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, padding: 0 }}>
+                  <Icon d={offen === it.id ? ICONS.chevronDown : ICONS.chevronRight} size={14} color="var(--text3)" />
+                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</span>
                 </button>
                 {it.open > 0 && <span style={badge(C.danger)}>{t("ausleihe.outCount", { n: it.open })}</span>}
                 {it.overdue > 0 && <span title={t("ausleihe.overdueHint", { d: UEBERFAELLIG_TAGE })} style={{ ...badge(C.danger), background: C.danger, color: C.aufAkzent }}>{t("ausleihe.overdueCount", { n: it.overdue })}</span>}
-                <button onClick={() => loeschen(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+                <button onClick={() => loeschen(it.id)} className="icon-btn" style={toolbarIconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
               </div>
 
               {offen === it.id && (
@@ -111,7 +112,7 @@ export default function Ausleihe() {
                     ) : (
                       <input value={borrower} onChange={(e) => setBorrower(e.target.value)} placeholder={t("ausleihe.borrowerPlaceholder")} style={{ ...fld, flex: 1, minWidth: 160 }} />
                     )}
-                    <button onClick={() => verleihen(it.id)} style={btnPrimary}>{t("ausleihe.lend")}</button>
+                    <button onClick={() => verleihen(it.id)} style={toolbarBtnPrimary}>{t("ausleihe.lend")}</button>
                   </div>
 
                   {offeneLoans.length === 0 ? (
@@ -122,10 +123,10 @@ export default function Ausleihe() {
                         const tage = tageDraussen(l.out_at);
                         const ueber = tage >= UEBERFAELLIG_TAGE;
                         return (
-                        <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", border: ueber ? `1px solid ${C.danger}` : "1px solid var(--border)", borderRadius: CONTROL_R, background: ueber ? "rgba(209,53,15,0.06)" : undefined }}>
-                          <span style={{ flex: 1, fontWeight: 500 }}>{l.borrower}</span>
+                        <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", border: ueber ? `1px solid ${C.danger}` : "1px solid var(--border)", borderRadius: CONTROL_R, background: ueber ? C.danger + "0f" : undefined }}>
+                          <span style={{ flex: 1, minWidth: 0, fontWeight: 500, overflowWrap: "anywhere" }}>{l.borrower}</span>
                           <span style={{ fontSize: 12, color: ueber ? C.danger : "var(--text3)", fontWeight: ueber ? 700 : 400 }}>{t("ausleihe.sinceDays", { n: tage })}</span>
-                          <button onClick={() => zurueck(l.id, it.id)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("ausleihe.return")}</button>
+                          <button onClick={() => zurueck(l.id, it.id)} style={{ ...btnSecondary, ...btnSmall }}>{t("ausleihe.return")}</button>
                         </div>
                         );
                       })}
@@ -137,7 +138,7 @@ export default function Ausleihe() {
                       <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
                         {zurueckLoans.map((l) => (
                           <div key={l.id} style={{ display: "flex", gap: 8, fontSize: 13, color: "var(--text3)" }}>
-                            <span style={{ flex: 1 }}>{l.borrower}</span>
+                            <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{l.borrower}</span>
                             <span>{fmt(l.out_at)} – {fmt(l.returned_at)} ✓</span>
                           </div>
                         ))}

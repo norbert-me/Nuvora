@@ -13,7 +13,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { useSearchParams } from "react-router-dom";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
-import { AddButton, COLORS as C, CONTROL_R, ICONS, Icon, Tabs, btnSecondary, btnSmall, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, pageApp, pageTitle, toolbarBtn } from "../components/Icons.jsx";
+import { AddButton, COLORS as C, CONTROL_R, ICONS, Icon, Tabs, btnSecondary, btnSmall, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, pageApp, pageForm, pageTitle, toolbarBtn } from "../components/Icons.jsx";
 import DateiMenu from "../components/DateiMenu.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import AuthImage from "../components/AuthImage.jsx";
@@ -346,9 +346,9 @@ export default function Classes() {
   if (editing) {
     const filled = students.filter((s) => s.name.trim() !== "").length;
     return (
-      // Schmaler als eine Modulseite (die Zeilen sind 620 breit) und trotzdem
-      // mittig: mit der vollen pageApp-Breite klebte das Formular am linken Rand.
-      <div style={{ ...pageApp, maxWidth: 620 }}>
+      // Formularbreite aus dem Kern (pageForm) — schmaler als eine
+      // Modulseite und mittig; keine eigene maxWidth je Seite.
+      <div style={pageForm}>
         {/* Die Ueberschrift IST der Weg zurueck — und der einzige. „Abbrechen"
             stand zusaetzlich unten in der Leiste: zwei Ausgaenge fuer dieselbe
             Bewegung, einer davon eine Handbreite neben „Speichern". Ein offener
@@ -400,14 +400,17 @@ export default function Classes() {
               </span>
               <input value={s.name} onChange={(e) => updateStudent(idx, e.target.value)} placeholder={t("common.name")}
                 autoComplete="off" name={`stud-${idx}`} data-lpignore="true"
-                style={{ ...inputStyle, flex: 1 }} />
+                style={{ ...inputStyle, flex: "1 1 0", minWidth: 0 }} />
               {/* E/G wird nicht mehr hier gepflegt, sondern im Kurs (betrifft die
                   Person, nicht die Fach-Klasse) — siehe Kurse.jsx. */}
               <button
                 type="button" onClick={() => setDetailsFor(detailsFor === idx ? null : idx)}
                 title={t("classes.detailsTitle")}
                 style={{
-                  ...btnSecondary, ...btnSmall, width: 92, flexShrink: 0, textAlign: "center",
+                  // Bei 390 px darf der Knopf schrumpfen statt die Zeile zu
+                  // sprengen; der Text kuerzt sich dann selbst.
+                  ...btnSecondary, ...btnSmall, flex: "0 1 92px", minWidth: 0, textAlign: "center",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block",
                   background: (s.foerder?.length || s.massnahmen?.length || s.notizen || s.klassenlehrer) ? "var(--accent-bg)" : "var(--card)",
                   color: "var(--text2)", cursor: "pointer",
                 }}

@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
 import { sparsamAn, setzeSparsam } from "../core/sparsam.js";
-import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel, Toggle,
+import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, Toggle, InfoDot, linkBtn,
   sectionLabel, Tabs, th as thBasis, td as tdBasis, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson } from "../core/melden.js";
@@ -25,24 +25,8 @@ const Spinner = ({ size = 14 }) => (
   </>
 );
 
-// Kleiner Info-Punkt: erklaerender Text. Auf Klick UND Hover, damit er auch
-// auf Touch/Mobile funktioniert (reiner title-Tooltip tut das nicht).
-const InfoDot = ({ text }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <span style={{ position: "relative", display: "inline-flex", marginLeft: 4, flexShrink: 0 }}>
-      {/* Das „i" war ein handgezeichneter Kreis mit Buchstabe — dasselbe Bild
-          gibt es als ICONS.info, und es faerbt sich mit. */}
-      <button type="button" title={text} aria-label={text} onClick={() => setOpen((o) => !o)} onBlur={() => setTimeout(() => setOpen(false), 150)}
-        style={{ ...iconBtn, padding: 0 }}>
-        <Icon d={ICONS.info} size={15} color={open ? "var(--accent)" : "var(--text3)"} />
-      </button>
-      {open && (
-        <span style={{ ...popoverPanel, position: "absolute", top: 22, left: 0, zIndex: 30, width: 240, maxWidth: "70vw", padding: 8, fontSize: 12, lineHeight: 1.5, fontWeight: 400 }}>{text}</span>
-      )}
-    </span>
-  );
-};
+// Der Info-Punkt kommt aus Icons.jsx (`InfoDot`) — er stand hier und in der
+// Quiz-Auswertung je einmal, beide mit einem 14-px-Tippziel.
 
 // Eine Einstellungszeile: links, wofuer sie steht, rechts der Wert. Vorher war
 // jede Zeile ein Aufklapper mit Pfeil und Info-Punkt — vier Ueberschriften
@@ -107,6 +91,29 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   // Alle abschaltbaren Teile der EINGESCHALTETEN Module — an einer Stelle.
   const { modules, setOption } = useModules();
   const modulTeile = modules.filter((m) => m.active && (m.optionen || []).length > 0);
+  // Die Schalter der Modul-Teile schreiben erst auf Knopfdruck (Speichern-
+  // Regel). Grundlage ist ein Objekt aus einem Schluessel — stabil ueber
+  // `useMemo`, sonst uebernimmt `useEntwurf` sich endlos selbst.
+  const teileSchluessel = JSON.stringify(modulTeile.map((m) => [m.key, m.optionen.map((o) => [o.key, (m.optionen_an || {})[o.key] !== false])]));
+  const teileBasis = useMemo(() => {
+    const aus = {};
+    for (const [mk, os] of JSON.parse(teileSchluessel)) for (const [ok, an] of os) aus[`${mk}|${ok}`] = an;
+    return aus;
+  }, [teileSchluessel]);
+  const [teileMsg, setTeileMsg] = useState("");
+  const teile = useEntwurf(teileBasis, async (w) => {
+    setTeileMsg("");
+    try {
+      for (const [k, an] of Object.entries(w)) {
+        if (teileBasis[k] === an) continue;
+        const [mk, ok] = k.split("|");
+        await setOption(mk, ok, an);
+      }
+    } catch {
+      setTeileMsg(t("profile.saveError"));
+      return false;
+    }
+  });
   const { t, lang, setLang } = useLanguage();
   const [sparsam, setSparsam] = useState(sparsamAn());
   const [oldPw, setOldPw] = useState("");
@@ -133,26 +140,27 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   });
   const profil = useEntwurf(profilBasis, (w) => saveProfile(w));
   const { gradeScale, gradeTendency, anwDefault } = profil.wert;
-  // Der Name, unter dem Beiträge im Marktplatz stehen. Er hängt an keinem
-  // zweiten Wert und wirkt sofort — deshalb steht er bei den Umschaltern und
-  // nicht im Entwurf; geschrieben wird beim Verlassen des Feldes und mit Enter.
-  const [marktName, setMarktName] = useState(user.marketplace_name || "");
-  const [marktStand, setMarktStand] = useState(user.marketplace_name || "");
-  const marktSpeichern = async () => {
-    const wert = marktName.trim();
-    if (wert === marktStand) return;
+  // Der Name, unter dem Beiträge im Marktplatz stehen. Ein eigener kleiner
+  // Entwurf mit eigener Leiste im Konto-Abschnitt: dort hat jede Angabe ihren
+  // eigenen Knopf. Vorher schrieb das Feld beim Verlassen still — genau das
+  // „hat es jetzt gespeichert?", das die Speichern-Regel abschafft.
+  const [marktStand, setMarktStand] = useState(() => ({ name: user.marketplace_name || "" }));
+  const [marktMsg, setMarktMsg] = useState("");
+  const markt = useEntwurf(marktStand, async (w) => {
+    setMarktMsg("");
+    const wert = (w.name || "").trim();
     const res = await fetch(`${API}/auth/profile`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ name, salutation, marketplace_name: wert }),
     }).catch(() => null);
-    if (!res || !res.ok) { setProfileMsg(t("profile.saveError")); return; }
+    if (!res || !res.ok) { setMarktMsg(t("profile.saveError")); return false; }
     const data = await res.json();
-    setMarktStand(wert); setMarktName(wert);
+    setMarktStand({ name: wert });
     const updated = { ...user, ...data };
     localStorage.setItem("user", JSON.stringify(updated));
     onUserUpdate?.(updated);
-  };
+  });
   const [showPw, setShowPw] = useState(false);
   // Die ladbaren Apps kommen vom Server (er holt sie beim Release-Anbieter) —
   // aus dem Browser waere der Aufruf durch die CSP geblockt.
@@ -169,7 +177,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   const appInstallieren = async (p) => {
     setAppLaeuft(0);
     const aus = await huelle.updateInstall(p.datei.url, setAppLaeuft);
-    if (!aus || !aus.ok) { setAppLaeuft(null); alert((aus && aus.error) || t("appupdate.fehler")); }
+    if (!aus || !aus.ok) { setAppLaeuft(null); showAlert((aus && aus.error) || t("appupdate.fehler")); }
     else if (aus.manuell) setAppLaeuft(null);
   };
   useEffect(() => {
@@ -316,8 +324,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         )}
         {!showEmailForm ? (
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => { setShowEmailForm(true); setEmailMsg(""); }} style={linkBtn}>{t("profile.changeEmail")}</button>
-            <button type="button" onClick={() => setShowPw((o) => !o)} style={linkBtn}>{t("profile.changePw")}</button>
+            <button type="button" onClick={() => { setShowEmailForm(true); setEmailMsg(""); }} style={linkBtnKlein}>{t("profile.changeEmail")}</button>
+            <button type="button" onClick={() => setShowPw((o) => !o)} style={linkBtnKlein}>{t("profile.changePw")}</button>
           </div>
         ) : (
           <form onSubmit={changeEmail}>
@@ -348,6 +356,16 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             </div>
           </form>
         )}
+
+        <Zeile label={t("profile.username")} hint={t("profile.usernameHint")}>
+          <input placeholder={t("profile.usernamePlaceholder")} value={markt.wert.name}
+            aria-label={t("profile.username")}
+            onChange={(e) => markt.setz({ name: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter" && markt.geaendert) markt.speichern(); }}
+            style={{ ...feldStyle, marginBottom: 0, width: 220 }} />
+        </Zeile>
+        {marktMsg && <div style={{ fontSize: 13, color: C.danger, marginTop: 8 }}>{marktMsg}</div>}
+        <Speicherleiste entwurf={markt} style={{ marginTop: 12 }} />
       </Abschnitt>
 
       {/* Bewusst kein <form>: die Knöpfe der Speicherleiste wären darin
@@ -427,12 +445,6 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             Nachlesen und der Neustart der eingeblendeten Führung. Der Weg zur
             Seite hing bisher in der Fußzeile — dort sucht ihn niemand, und
             neben dem Neustart steht er bei der Frage, zu der er gehört. */}
-        <Zeile label={t("profile.username")} hint={t("profile.usernameHint")}>
-          <input placeholder={t("profile.usernamePlaceholder")} value={marktName}
-            onChange={(e) => setMarktName(e.target.value)} onBlur={marktSpeichern}
-            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-            style={{ ...feldStyle, marginBottom: 0, width: 220 }} />
-        </Zeile>
         <Zeile label={t("profile.tutorialTitle")}>
           <Link to="/tutorial" style={{ ...btnSecondary, display: "inline-block", textDecoration: "none", marginRight: 8 }}>
             {t("profile.tutorialOpen")}
@@ -445,9 +457,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
       </Abschnitt>
 
       {/* Die abschaltbaren Teile ALLER eingeschalteten Module — an einer
-          Stelle. Im Zahnrad der jeweiligen Seite stehen sie weiterhin (dort
-          sieht man, was sie tun); hier findet man sie, ohne zu wissen, in
-          welchem Modul der Schalter steckt. Ein Modul erscheint erst, wenn es
+          Stelle, und nur hier (siehe CLAUDE.md, Modulregister). Gespeichert
+          wird mit der Leiste darunter. Ein Modul erscheint erst, wenn es
           eingeschaltet ist: Schalter fuer etwas, das es nicht gibt, sind
           Rauschen. */}
       {modulTeile.length > 0 && (
@@ -460,12 +471,14 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                   faengt an einer anderen Stelle an. */}
               <div style={{ flex: 1, display: "grid", gap: 8, justifyItems: "start" }}>
                 {m.optionen.map((o) => (
-                  <Toggle key={o.key} checked={(m.optionen_an || {})[o.key] !== false}
-                    onChange={(v) => setOption(m.key, o.key, v)} label={o.name} />
+                  <Toggle key={o.key} checked={teile.wert[`${m.key}|${o.key}`] !== false}
+                    onChange={(v) => teile.setz({ [`${m.key}|${o.key}`]: v })} label={o.name} />
                 ))}
               </div>
             </Zeile>
           ))}
+          {teileMsg && <div style={{ fontSize: 13, color: C.danger, marginTop: 8 }}>{teileMsg}</div>}
+          <Speicherleiste entwurf={teile} style={{ marginTop: 16 }} />
         </Abschnitt>
       )}
 
@@ -648,9 +661,18 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                               title={u.admin ? t("profile.roleRevoke") : t("profile.roleGrant")}
                               aria-label={u.admin ? t("profile.roleRevoke") : t("profile.roleGrant")}
                               onClick={async () => {
+                                // Wie beim Loeschen: die Administration bestaetigt
+                                // sich mit dem EIGENEN Passwort — eine offene
+                                // Sitzung allein ernennt niemanden.
+                                const pw = await askPrompt(t("profile.deleteUserPassword"), { typ: "password" });
+                                if (!pw) return;
                                 const res = await fetch(`${API}/auth/admin/users/${u.id}/admin`,
-                                  alsJson("PUT", { admin: !u.admin }));
+                                  alsJson("PUT", { admin: !u.admin, password: pw }));
                                 if (res.ok) setAdminUsers(adminUsers.map((x) => (x.id === u.id ? { ...x, admin: !u.admin } : x)));
+                                else {
+                                  const d = await res.json().catch(() => null);
+                                  setAdminMsg(d?.detail || t("common.error"));
+                                }
                               }}
                               style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R, marginRight: 8 }}
                             ><Icon d={u.admin ? ICONS.userMinus : ICONS.userPlus} size={15} /></button>
@@ -742,13 +764,10 @@ const feldStyle = {
 
 
 
-// Wie `linkBtn` in Icons.jsx, nur eine Stufe kleiner (13 statt 14) — das
-// Polster ist dasselbe und aus demselben Grund da: ohne es war „Passwort
-// ändern" 16 px hoch.
-const linkBtn = {
-  background: "none", border: "none", color: "var(--accent)", fontSize: 13, fontWeight: 500,
-  cursor: "pointer", padding: "8px 0", margin: "-8px 0", textAlign: "left",
-};
+// `linkBtn` aus Icons.jsx, eine Stufe kleiner (13 statt 14). Abgeleitet und
+// anders benannt: die lokale Fassung hiess frueher genauso und ueberschattete
+// den Baustein.
+const linkBtnKlein = { ...linkBtn, fontSize: 13, fontWeight: 500 };
 
 // Kopf und Zelle müssen dieselbe Ausrichtung haben: `th`/`td` aus Icons.jsx
 // stehen beide auf "center", der Kopf hier auf "left" — dadurch sah die

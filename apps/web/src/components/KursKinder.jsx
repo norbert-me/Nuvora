@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
-  AddButton, Icon, ICONS, COLORS as C, CONTROL_R, badge, btnSecondary, btnSmall,
-  dateiWaehlen, iconBtn, sectionLabel, toolbarInput,
+  AddButton, Icon, ICONS, COLORS as C, CONTROL_R, badge, btnPrimary, btnSecondary, btnSmall,
+  dateiWaehlen, iconBtn, inputStyle, sectionLabel, toolbarIconBtn, toolbarInput,
 } from "./Icons.jsx";
 import Portrait from "./Portrait.jsx";
 import SchuelerAngaben from "./SchuelerAngaben.jsx";
@@ -104,8 +104,10 @@ export default function KursKinder({ kursId, t: tProp }) {
         <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
           placeholder={text("kurse.kindNeu")} style={{ ...toolbarInput, flex: "1 1 200px", minWidth: 0 }} />
         <AddButton onClick={anlegen} title={text("kurse.kindNeu")} />
-        <button onClick={() => setImportOffen((v) => !v)} style={{ ...btnSecondary, ...btnSmall }}>
-          {text("kurse.kindListe")}
+        <button onClick={() => setImportOffen((v) => !v)} className="icon-btn" aria-pressed={importOffen}
+          title={text("kurse.kindListe")} aria-label={text("kurse.kindListe")}
+          style={{ ...toolbarIconBtn, color: importOffen ? "var(--accent)" : "var(--text2)" }}>
+          <Icon d={ICONS.import} size={16} />
         </button>
       </div>
 
@@ -115,10 +117,10 @@ export default function KursKinder({ kursId, t: tProp }) {
         <div style={{ marginBottom: 12 }}>
           <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={5}
             placeholder={text("kurse.kindListePlatzhalter")}
-            style={{ ...toolbarInput, width: "100%", boxSizing: "border-box", height: "auto", resize: "vertical", lineHeight: 1.5 }} />
+            style={{ ...inputStyle, width: "100%", resize: "vertical", lineHeight: 1.5 }} />
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 6 }}>
             <button onClick={() => { setImportOffen(false); setImportText(""); }} style={{ ...btnSecondary, ...btnSmall }}>{text("common.abort")}</button>
-            <button onClick={importieren} style={{ ...btnSecondary, ...btnSmall }}>{text("kurse.kindListeAn")}</button>
+            <button onClick={importieren} style={{ ...btnPrimary, ...btnSmall }}>{text("kurse.kindListeAn")}</button>
           </div>
         </div>
       )}
@@ -153,7 +155,10 @@ export default function KursKinder({ kursId, t: tProp }) {
                 Klick auf den Namen verdeckte er den haeufigen. */}
             <button onClick={() => setOffen(offen === k.student_id ? null : k.student_id)}
               title={text("kurse.kindAngaben")}
-              style={{ flex: 1, fontSize: 14, textAlign: "left", border: "none", background: "none", cursor: "pointer", color: "var(--text)", padding: 0 }}>
+              style={{ flex: 1, minWidth: 0, fontSize: 14, textAlign: "left", border: "none", background: "none", cursor: "pointer", color: "var(--text)",
+                // Wie linkBtn: Polster fuer die Trefferflaeche, negativer Rand
+                // nimmt es optisch zurueck.
+                padding: "7px 0", margin: "-7px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {k.name}
             </button>
             {k.niveau && <span style={badge(k.niveau === "E" ? C.info : C.success)}>{k.niveau}</span>}
@@ -164,11 +169,11 @@ export default function KursKinder({ kursId, t: tProp }) {
                 PERSON und wandert beim Aendern auf alle Kurse mit — im Kurs
                 sah er wie eine Angabe DIESES Kurses aus. Gepflegt wird er
                 unter „Personen" (Weg dorthin im Dialog des Kindes). */}
-            <button onClick={() => fotoWaehlen(k)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
+            <button onClick={() => fotoWaehlen(k)} className="icon-btn" style={{ ...iconBtn, padding: 4, minWidth: 32, minHeight: 32, flexShrink: 0 }}
               title={text("kurse.kindFoto")} aria-label={text("kurse.kindFoto")}>
               <Icon d={ICONS.camera} size={15} />
             </button>
-            <button onClick={() => entfernen(k)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
+            <button onClick={() => entfernen(k)} className="icon-btn" style={{ ...iconBtn, padding: 4, minWidth: 32, minHeight: 32, flexShrink: 0 }}
               title={text("common.delete")} aria-label={text("common.delete")}>
               <Icon d={ICONS.trash} size={15} color={C.danger} />
             </button>

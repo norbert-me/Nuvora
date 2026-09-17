@@ -3,7 +3,7 @@
 // Brücke, die Liste läuft eigenständig).
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { pageTitle, cardStyle, chipStyle, sectionLabel, toolbarBtn, toolbarBtnPrimary, toolbarInput, CONTROL_R, Icon, ICONS, iconBtn, toolbarIconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
+import { pageForm, pageTitle, cardStyle, chipStyle, sectionLabel, toolbarBtn, toolbarBtnPrimary, toolbarInput, CONTROL_R, Icon, ICONS, iconBtn, toolbarIconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
@@ -299,8 +299,8 @@ export default function Todo({ embedded } = {}) {
   return (
     // Auch eingebettet mittig: im Notizbrett sass die Liste in einer 960 px
     // breiten Seite und klebte am linken Rand — die Umgebung ist zentriert,
-    // die Liste war es nicht.
-    <div style={{ maxWidth: 640, margin: "0 auto" }}>
+    // die Liste war es nicht. Breite aus der Design-Quelle (`pageForm`).
+    <div style={pageForm}>
       {!embedded && <h1 style={pageTitle}>{t("todo.title")}</h1>}
 
       {/* Auch die Eingabezeile ist eine Werkzeugleiste — dieselbe Komponente,

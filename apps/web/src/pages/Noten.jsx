@@ -11,11 +11,13 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
-import { COLORS as C, CONTROL_R, DialogKopf, Empty, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { COLORS as C, CONTROL_R, DialogKopf, Empty, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
-import { MehrMenu } from "../components/Werkzeugleiste.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import ViewMenu from "../components/ViewMenu.jsx";
+import SuchSelect from "../components/SuchSelect.jsx";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useAktiv, useZielFilter } from "../core/modules.js";
@@ -493,7 +495,7 @@ export default function Noten() {
 
   if (classes.length === 0) {
     return (
-      <div style={{ maxWidth: 700 }}>
+      <div style={pageForm}>
         <p style={{ color: "var(--text2)", fontSize: 14 }}>
           {t("noten.needClass").split("{{link}}")[0]}
           <Link to="/classes" style={{ color: "var(--accent)" }}>{t("nav.classes")}</Link>
@@ -507,49 +509,52 @@ export default function Noten() {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        {/* `minWidth: 0`: ohne das ist die Beschriftung so breit wie die
-            laengste Klasse im Auswahlfeld und schrumpft als Flex-Kind nicht —
-            auf 320 px lief die ganze Seite dadurch waagerecht ueber. */}
-        <label data-tour="noten-class" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)", minWidth: 0 }}>
-          {t("nav.classes")}
-          <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />
-        </label>
-        {/* Kurze Beschriftungen („1. HJ"), damit die ganze Leiste in EINE Zeile
-            passt — sonst rutschen Plus und Mehr in eine zweite. Die lange Form
-            steht im title. Beide Umschalter kommen aus `Tabs` (Icons.jsx):
-            gleiche Hoehe, gleiche Form wie alles andere in der Leiste. */}
-        <span title={t("noten.term")}>
-          <Tabs value={term} onChange={(v) => wechseln(() => setTerm(v))}
-            options={[["1", t("noten.term1Short")], ["2", t("noten.term2Short")], ["year", t("noten.year")]]} />
-        </span>
-        <span title={t("noten.aggHint")}>
-          <Tabs value={agg} onChange={setAggPersist}
-            options={[["mean", t("noten.aggMean")], ["median", t("noten.aggMedian")]]} />
-        </span>
-        {/* Sichtbar bleibt der Handgriff, den man staendig braucht: ein neuer
-            Abschnitt. Export, Zeugnis, Import und die Code-Detektiv-Uebernahme
-            stehen im Mehr-Menue — dieselbe Stelle wie auf jeder anderen Seite
-            (components/Werkzeugleiste.jsx). Statt zweier eigener Klappmenues
-            nebeneinander gibt es jetzt eins. */}
+      {/* Werkzeugleiste (components/Werkzeugleiste.jsx): links Kurs und
+          Halbjahr, daneben der staendige Handgriff (neuer Abschnitt), rechts
+          Ansicht (Mittel/Median) und das Mehr-Menue mit Export, Zeugnis,
+          Import und der Code-Detektiv-Uebernahme. Die Beschriftung „Klassen"
+          steht nur noch im title — das Auswahlfeld sagt selbst, was es ist. */}
+      <Werkzeugleiste
+        links={<>
+          {/* `minWidth: 0`: sonst ist die Huelle so breit wie die laengste
+              Klasse und die Seite laeuft auf 320 px waagerecht ueber. */}
+          <span data-tour="noten-class" title={t("nav.classes")} style={{ display: "inline-flex", minWidth: 0, maxWidth: "100%" }}>
+            <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />
+          </span>
+          {/* Kurze Beschriftungen („1. HJ"), die lange Form im title. */}
+          <span title={t("noten.term")}>
+            <Tabs value={term} onChange={(v) => wechseln(() => setTerm(v))}
+              options={[["1", t("noten.term1Short")], ["2", t("noten.term2Short")], ["year", t("noten.year")]]} />
+          </span>
+        </>}
+        ansicht={
+          <ViewMenu title={t("noten.ansicht")} items={[{
+            key: "agg", art: "wahl",
+            label: t("noten.agg"),
+            hint: t("noten.aggHint"),
+            // Mittel ist die Vorgabe und steht als "" — sonst leuchtet das
+            // Zahnrad dauerhaft, als waere etwas umgestellt.
+            value: agg === "median" ? "median" : "",
+            onChange: (v) => setAggPersist(v || "mean"),
+            optionen: [{ wert: "", label: t("noten.aggMean") }, { wert: "median", label: t("noten.aggMedian") }],
+          }]} />
+        }
+        mehr={term !== "year" && classId ? [
+          { key: "bundle", label: t("noten.exportBundle"), icon: ICONS.export, onClick: doExport },
+          { key: "daten", label: t("noten.exportData"), icon: ICONS.export, onClick: doExportJson },
+          { key: "zeugnis", label: t("noten.zeugnis"), icon: ICONS.pdf || ICONS.export, onClick: doZeugnis },
+          { key: "import", label: t("noten.import"), icon: ICONS.import, onClick: () => dateiWaehlen(doImport) },
+          (cdAktiv && sections.length > 0)
+            && { key: "cd", label: t("noten.fromCd"), icon: ICONS.chart, onClick: () => setCdDialog(true) },
+        ] : []}
+      >
         {term !== "year" && classId && (
-          <div style={{ display: "flex", gap: 8, marginLeft: "auto", alignItems: "center" }}>
-            <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
-              className="icon-btn"
-              style={toolbarIconBtn}>
-              <Icon d={ICONS.plus} size={20} color="var(--accent)" />
-            </button>
-            <MehrMenu eintraege={[
-              { key: "bundle", label: t("noten.exportBundle"), icon: ICONS.export, onClick: doExport },
-              { key: "daten", label: t("noten.exportData"), icon: ICONS.export, onClick: doExportJson },
-              { key: "zeugnis", label: t("noten.zeugnis"), icon: ICONS.pdf || ICONS.export, onClick: doZeugnis },
-              { key: "import", label: t("noten.import"), icon: ICONS.import, onClick: () => dateiWaehlen(doImport) },
-              (cdAktiv && sections.length > 0)
-                && { key: "cd", label: t("noten.fromCd"), icon: ICONS.chart, onClick: () => setCdDialog(true) },
-            ]} />
-          </div>
+          <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
+            className="icon-btn" style={toolbarIconBtn}>
+            <Icon d={ICONS.plus} size={20} color="var(--accent)" />
+          </button>
         )}
-      </div>
+      </Werkzeugleiste>
 
       {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
@@ -643,11 +648,11 @@ export default function Noten() {
               {summary.map((s, i) => (
                 <div key={s.student_id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderTop: i === 0 ? "none" : "1px solid var(--border)" }}>
                   <button onClick={() => setInfoFuer(s.student_id)} title={t("noten.studentInfo")}
-                    style={{ flex: 1, textAlign: "left", padding: "2px 0", border: "none", background: "none", color: "var(--text)", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+                    style={{ flex: 1, minWidth: 0, minHeight: 32, textAlign: "left", padding: "2px 0", border: "none", background: "none", color: "var(--text)", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
                     <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 8 }}>{i + 1}.</span>{s.name}
                   </button>
                   <button onClick={() => setBeobFuer(s.student_id)} title={t("noten.obsHeading")}
-                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4, border: "none", background: "none", cursor: "pointer", color: s.observations ? "var(--accent)" : "var(--text3)", fontSize: 13, padding: 4 }}>
+                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4, border: "none", background: "none", cursor: "pointer", color: s.observations ? "var(--accent)" : "var(--text3)", fontSize: 13, padding: 4, minWidth: 32, minHeight: 32 }}>
                     {s.observations || <Icon d={ICONS.plus} size={14} />}
                   </button>
                 </div>
@@ -934,7 +939,7 @@ export default function Noten() {
                   </td>
                   <td style={td}>
                     <button onClick={() => setBeobFuer(s.student_id)} title={t("noten.obsHeading")}
-                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", cursor: "pointer", color: s.observations ? "var(--accent)" : "var(--text3)", fontSize: 13, padding: 4 }}>
+                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", cursor: "pointer", color: s.observations ? "var(--accent)" : "var(--text3)", fontSize: 13, padding: 4, minWidth: 32, minHeight: 32 }}>
                       {s.observations || <Icon d={ICONS.plus} size={14} />}
                     </button>
                   </td>
@@ -1179,11 +1184,11 @@ function CodeSessionImport({ t, classId, kursId, sections, onClose, onDone }) {
   return (
     <div>
       <div style={{ ...lbl, marginTop: 0 }}>{t("noten.fromCdSession")}</div>
-      <select value={sessionId} onChange={(e) => setSessionId(e.target.value)} style={inp}>
+      <select value={sessionId} onChange={(e) => setSessionId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
         {list.map((s) => <option key={s.id} value={s.id}>{s.code} · {t("noten.fromCdMeta", { players: s.players, puzzles: s.puzzles })}</option>)}
       </select>
       <div style={lbl}>{t("karten.masterySection")}</div>
-      <select value={sectionId} onChange={(e) => setSectionId(e.target.value)} style={inp}>
+      <select value={sectionId} onChange={(e) => setSectionId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
         {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
       </select>
       <div style={lbl}>{t("noten.columnName")}</div>
@@ -1303,16 +1308,15 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
               Datum steht. */}
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={{ ...toolbarInput, flex: 1, minWidth: 0 }} />
-            {datum && <button type="button" onClick={() => setDatum("")} className="icon-btn" style={{ ...iconBtn, padding: 6, flexShrink: 0 }} title={t("noten.colDateClear")} aria-label={t("noten.colDateClear")}><Icon d={ICONS.close} size={18} /></button>}
+            {datum && <button type="button" onClick={() => setDatum("")} className="icon-btn" style={{ ...iconBtn, padding: 6, minWidth: 32, minHeight: 32, flexShrink: 0 }} title={t("noten.colDateClear")} aria-label={t("noten.colDateClear")}><Icon d={ICONS.close} size={18} /></button>}
           </div>
         </div>
         {topics.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>{t("noten.colTopic")}</div>
-            <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
-              <option value="">{t("noten.colTopicNone")}</option>
-              {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
-            </select>
+            <SuchSelect value={topicId} onChange={setTopicId} leerLabel={t("noten.colTopicNone")}
+              style={{ width: "100%" }}
+              optionen={themen.geordnet.map((tp) => ({ wert: String(tp.id), label: themen.label(tp) }))} />
           </div>
         )}
         {cat.topic_id && kartenAktiv && (

@@ -420,6 +420,9 @@ export default function Session() {
   // Step 1: Choose class + question set + options
   if (!sessionId) {
     return (
+      // Eigene Breite mit Absicht: Session/Beamer ist eine der drei Gruppen,
+      // die von den Seiten-Shells abweichen (siehe Icons.jsx) — die Seite
+      // laeuft ohne Spaltenbreite (ContentWrapper), die Auswahl sitzt mittig.
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
           <button onClick={async () => {

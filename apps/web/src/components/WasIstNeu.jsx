@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLanguage } from "../i18n";
-import { modalOverlay, modalPanel, overlayGuard, btnPrimary, btnSecondary } from "./Icons.jsx";
+import { Modal, DialogKopf, btnPrimary, btnSecondary } from "./Icons.jsx";
 
 // „Was ist neu?" — die Änderungsliste nach einem Update, beim ersten Anmelden
 // danach. Der Stand hängt am Konto (users.changelog_seen), nicht am Browser:
@@ -91,9 +91,11 @@ export default function WasIstNeu() {
   };
 
   return (
-    <div {...overlayGuard(schliessen)} style={modalOverlay}>
-      <div style={{ ...modalPanel, maxWidth: 560 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("neu.titel")}</div>
+    // `Modal` statt eigener Flaeche: Fokus-Fang, Escape und Rueckgabe des
+    // Fokus kommen von dort; der Kopf traegt das Schliesskreuz.
+    <Modal onClose={schliessen} width={560} labelledby="was-ist-neu-titel">
+        <DialogKopf id="was-ist-neu-titel" titel={t("neu.titel")} onClose={schliessen}
+          schliessenLabel={t("common.close")} style={{ marginBottom: 4 }} />
         <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 16px" }}>
           {t("neu.fassung", { version: daten.version })}
         </p>
@@ -110,7 +112,6 @@ export default function WasIstNeu() {
             style={{ ...btnSecondary, textDecoration: "none" }}>{t("neu.alle")}</a>
           <button onClick={schliessen} style={btnPrimary}>{t("neu.ok")}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

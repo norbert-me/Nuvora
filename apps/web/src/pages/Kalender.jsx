@@ -213,6 +213,7 @@ export default function Kalender() {
   })();
   const [bearbeiten, setBearbeiten] = useState(false); // Stundenplan im Bearbeiten-Modus
   const ttEntwurf = useRef(null); // Entwurf des Editors — „Fertig" speichert ihn
+  const [ttOffen, setTtOffen] = useState(false); // hat der Entwurf offene Aenderungen?
   // WebUntis-Import: der Stundenplan der Schule steht schon in Untis — ihn
   // hier ein zweites Mal einzutragen ist die Arbeit, die dieses Modul
   // abnehmen soll. Der Dialog schreibt nichts, bevor jemand bestaetigt.
@@ -808,13 +809,25 @@ export default function Kalender() {
               ))}
           </Segment>
         ) : null}>
-          {bearbeiten ? (
+          {bearbeiten ? (<>
+            {/* Offene Aenderungen zeigen sich am Knopf: „Fertig" wird zur
+                Hauptaktion, daneben steht der Rueckweg. Ohne Aenderung ist
+                „Fertig" nur der Ausgang aus dem Modus. */}
+            {ttOffen && (
+              <button onClick={async () => {
+                if (!(await askConfirm(t("speichern.verlassen"), { danger: true }))) return;
+                ttEntwurf.current?.verwerfen();
+                setBearbeiten(false);
+              }} className="icon-btn" style={toolbarIconBtn} title={t("common.abort")} aria-label={t("common.abort")}>
+                <Icon d={ICONS.close} size={18} color="var(--text2)" />
+              </button>
+            )}
             <button onClick={async () => {
               const e = ttEntwurf.current;
               if (e && e.geaendert && !(await e.speichern())) return;
               setBearbeiten(false);
-            }} style={toolbarBtnPrimary}>{t("common.done")}</button>
-          ) : (
+            }} style={ttOffen ? toolbarBtnPrimary : toolbarBtn}>{t("common.done")}</button>
+          </>) : (
             <button onClick={() => setBearbeiten(true)} className="icon-btn" title={t("kalender.ttEdit")} aria-label={t("kalender.ttEdit")} style={toolbarIconBtn}>
               <Icon d={ICONS.edit} size={18} color="var(--text2)" />
             </button>
@@ -927,7 +940,7 @@ export default function Kalender() {
         <UntisImport onClose={() => setUntisOffen(false)} kurse={kurse} klassen={classes} periods={tt.periods}
           onFertig={() => { loadTt(); loadBreaks(); loadCancels(); }} />
       )}
-      {view === "timetable" && <TimetableView tt={tt} bearbeiten={bearbeiten} entwurfRef={ttEntwurf} stichtag={stichtag} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
+      {view === "timetable" && <TimetableView tt={tt} bearbeiten={bearbeiten} entwurfRef={ttEntwurf} onOffen={setTtOffen} stichtag={stichtag} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} zeiten={tt.times || []} zeroZeit={tt.zero || null} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
@@ -1602,9 +1615,12 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
                 <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.label}</div>
                 {it.sub && <div style={{ fontSize: 11, color: "var(--text2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.sub}</div>}
               </button>
-              {it.onCancel && <button onClick={(e) => { e.stopPropagation(); it.onCancel(); }} title={t("kalender.slotCancel")}
-                style={{ position: "absolute", top: 1, right: 1, width: 18, height: 18, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", background: "var(--card)", color: "var(--text3)", lineHeight: 1, boxShadow: SHADOW.ruhig }}>
-                <Icon d={ICONS.close} size={11} /></button>}
+              {/* Sichtbar bleibt der kleine Kreis; die Trefferflaeche ist 32 px
+                  gross (durchsichtiger Knopf, Kreis darin). */}
+              {it.onCancel && <button onClick={(e) => { e.stopPropagation(); it.onCancel(); }} title={t("kalender.slotCancel")} aria-label={t("kalender.slotCancel")}
+                style={{ position: "absolute", top: 0, right: 0, width: 32, height: 32, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", border: "none", padding: 1, cursor: "pointer", background: "transparent", color: "var(--text3)", lineHeight: 1 }}>
+                <span style={{ width: 18, height: 18, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--card)", boxShadow: SHADOW.ruhig }}>
+                  <Icon d={ICONS.close} size={11} /></span></button>}
             </div>
           ))}
         </div>
@@ -1613,7 +1629,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   );
 }
 
-function TimetableView({ tt, bearbeiten = false, entwurfRef = null, stichtag = null, className, slotName, slotColor, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
+function TimetableView({ tt, bearbeiten = false, entwurfRef = null, onOffen = null, stichtag = null, className, slotName, slotColor, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
   // Bearbeiten ist ein MODUS (Stift in der Werkzeugleiste): nur darin lassen
   // sich Stunden, Uhrzeiten, Pausen und die Belegung aendern. „Fertig" in der
   // Leiste ist der Speichern-Knopf — dieselbe Bauform wie die Startseite.
@@ -1641,6 +1657,10 @@ function TimetableView({ tt, bearbeiten = false, entwurfRef = null, stichtag = n
   });
   useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
   if (entwurfRef) entwurfRef.current = entwurf;
+  // Der Ref allein rendert die Leiste nicht neu — deshalb meldet der Editor
+  // den Zustand zusaetzlich nach oben.
+  const offen = bearbeiten && entwurf.geaendert;
+  useEffect(() => { onOffen?.(offen); }, [offen, onOffen]);
   const anzahl = entwurf.wert.periods;
   // Die 0. Stunde ist der Vorspann vor der ersten — angehaengt, nicht
   // eingeschoben: sonst hiesse die bisherige erste Stunde ploetzlich anders.
@@ -1660,9 +1680,8 @@ function TimetableView({ tt, bearbeiten = false, entwurfRef = null, stichtag = n
   // reicht nicht, weil ein <input type="time"> eine eigene Mindestbreite
   // mitbringt (Safari rund 110 px). Auf dem Handy schob es damit die ganze
   // Tabelle nach rechts, und die Stunden standen halb ausserhalb.
-  const timeInput = { width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box",
-    border: "1px solid var(--border2)", borderRadius: CONTROL_R, fontSize: 12, padding: "4px 2px",
-    background: "var(--bg)", color: "var(--text)", marginTop: 4 };
+  const timeInput = { ...inputStyle, width: "100%", fontSize: 12, padding: "4px 2px",
+    minHeight: 32, marginTop: 4 };
   // Zelle des Stundenplans: aus der gemeinsamen Tabellenzelle abgeleitet, nur
   // Rahmen ringsum statt nur unten (das Raster braucht alle vier Kanten).
   const tdBase = { ...tdCell, border: "1px solid var(--border)", padding: 0, textAlign: "left", verticalAlign: "top", background: "var(--card)" };
@@ -1995,11 +2014,12 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
               </div>
               {/* Symbole statt Worte: die Zeile ist ohnehin voll Felder.
                   Loeschen steht nur hier, im Bearbeiten — nicht mehr hinter ⋯. */}
-              <button onClick={() => saveEdit(e)} className="icon-btn" style={{ ...toolbarIconBtn, background: "var(--accent)", border: "1px solid var(--accent)" }}
-                title={t("common.save")} aria-label={t("common.save")}><Icon d={ICONS.check} size={18} color={C.aufAkzent} /></button>
+              <button onClick={() => saveEdit(e)} style={{ ...toolbarBtnPrimary, padding: 0, width: CONTROL_H, flexShrink: 0 }}
+                title={t("common.save")} aria-label={t("common.save")}><Icon d={ICONS.check} size={18} /></button>
               <button onClick={() => setEditId(null)} className="icon-btn" style={toolbarIconBtn}
                 title={t("common.abort")} aria-label={t("common.abort")}><Icon d={ICONS.close} size={18} color="var(--text2)" /></button>
-              <button onClick={() => loeschen(e)} className="icon-btn" style={toolbarIconBtn}
+              {/* Abstand zum Abbrechen: Loeschen soll man nicht im Vorbeigehen treffen. */}
+              <button onClick={() => loeschen(e)} className="icon-btn" style={{ ...toolbarIconBtn, marginLeft: 12 }}
                 title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
             </>
           ) : (
@@ -2030,11 +2050,11 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
                   nur bei aktivem Modul Auswertung (Regel 3); ohne es führte der
                   Knopf ans ModuleGate. */}
               {aktiv.auswertung && e.work_id && e.class_id && (
-                <Link to={`/auswertung?tab=klassenarbeit&class=${e.class_id}${e.kurs_id ? `&kurs=${e.kurs_id}` : ""}&work=${e.work_id}`} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("kalender.openExamWork")} aria-label={t("kalender.openExamWork")}>
+                <Link to={`/auswertung?tab=klassenarbeit&class=${e.class_id}${e.kurs_id ? `&kurs=${e.kurs_id}` : ""}&work=${e.work_id}`} className="icon-btn" style={toolbarIconBtn} title={t("kalender.openExamWork")} aria-label={t("kalender.openExamWork")}>
                   <Icon d={ICONS.chart} size={16} color="var(--accent)" />
                 </Link>
               )}
-              <button onClick={() => startEdit(e)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
+              <button onClick={() => startEdit(e)} className="icon-btn" style={toolbarIconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
             </>
           )}
          </div>

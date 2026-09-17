@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
-import { AddButton, badge, btnPrimary, DialogFuss, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_R, dateiWaehlen, DialogKopf, Icon, iconBtn, ICONS, inputStyle as inputBasis, menuRow, Modal, NiveauToggle, pageApp, pageTitle, panelStyle, Popover, quoteFarbe, sectionLabel, selectStyle, SHADOW, StatCard, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarInput } from "../components/Icons.jsx";
+import { AddButton, badge, btnPrimary, DialogFuss, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_R, dateiWaehlen, DialogKopf, Icon, iconBtn, ICONS, InfoDot, inputStyle as inputBasis, linkBtn, menuRow, Modal, NiveauToggle, pageApp, pageTitle, panelStyle, Popover, quoteFarbe, sectionLabel, selectStyle, SHADOW, StatCard, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarInput } from "../components/Icons.jsx";
 import { dublettenZahlen, findeDubletten, istInSammlung } from "../core/dubletten.js";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
@@ -1092,15 +1092,15 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
     <div>
       {/* „Zurueck" verlaesst die Maske, ohne dass sich die Adresse aendert —
           die Warnung des Routers greift hier nicht, also fragen wir selbst. */}
-      <button onClick={() => { if (e.geaendert && !window.confirm(t("speichern.verlassen"))) return; onBack(); }}
-        style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 16 }}>
+      <button onClick={async () => { if (e.geaendert && !await askConfirm(t("speichern.verlassen"))) return; onBack(); }}
+        style={{ ...linkBtn, display: "inline-flex", alignItems: "center", gap: 4, color: "var(--text3)", fontSize: 13, fontWeight: 500, marginBottom: 9 }}>
         <Icon d={ICONS.arrowLeft} size={14} /> {t("common.back")}
       </button>
 
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
         {/* Der Quizname IST die Seitenueberschrift — deshalb 22 wie pageTitle. */}
-        <input value={name} onChange={(ev) => e.setz({ name: ev.target.value })}
-          style={{ ...inputBasis, fontSize: 22, fontWeight: 700, flex: 1, maxWidth: 500 }} />
+        <input value={name} onChange={(ev) => e.setz({ name: ev.target.value })} aria-label={t("common.name")}
+          style={{ ...inputBasis, fontSize: 22, fontWeight: 700, flex: "1 1 200px", minWidth: 0, maxWidth: 500 }} />
         {/* EINE Leiste fuer die ganze Maske: Name, Reihenfolge, Schalter, E/G. */}
         <Speicherleiste entwurf={e} klein />
         {onDelete && <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
@@ -1393,29 +1393,6 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
   );
 }
 
-function InfoTip({ text }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span style={{ position: "relative", display: "inline-flex", marginLeft: 4 }}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        onBlur={() => setOpen(false)}
-        aria-label={text}
-        style={{ ...iconBtn, padding: 0 }}
-      ><Icon d={ICONS.info} size={14} /></button>
-      {open && (
-        <div style={{
-          position: "absolute", bottom: "140%", left: "50%", transform: "translateX(-50%)",
-          width: 220, padding: 8, background: "var(--text)", color: "var(--bg)",
-          borderRadius: CONTROL_R, fontSize: 11, lineHeight: 1.4, zIndex: 20, fontWeight: 400,
-          boxShadow: SHADOW.schwebend,
-        }}>{text}</div>
-      )}
-    </span>
-  );
-}
-
 function QuestionStats({ questionId }) {
   const { t } = useLanguage();
   const [stats, setStats] = useState(null);
@@ -1441,7 +1418,7 @@ function QuestionStats({ questionId }) {
         <StatCard
           value={`${stats.pct_correct}%`}
           color={quoteFarbe(stats.pct_correct)}
-          label={<>{t("dash.correct")}<InfoTip text={t("dash.ciTip")} /></>}
+          label={<>{t("dash.correct")}<InfoDot text={t("dash.ciTip")} size={14} /></>}
           sub={stats.ci_low != null ? `${stats.ci_low}–${stats.ci_high}%` : undefined}
         />
         {stats.item_sd != null && <StatCard value={stats.item_sd.toFixed(2)} label={t("dash.sd")} />}

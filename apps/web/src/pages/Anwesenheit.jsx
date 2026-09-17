@@ -3,6 +3,7 @@
 // und wird nicht gespeichert. Übersicht zeigt Fehlzeiten und lässt nachtragen.
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { askConfirm } from "../core/dialog.jsx";
 import { badge, btnSecondary, btnSmall, cardStyle, panelStyle, selectStyle, Segment, segmentBtn, Tabs, DatumNavigator, segmentInput, toolbarBtn, toolbarIconBtn, Icon, ICONS, COLORS as C } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
@@ -220,13 +221,13 @@ export default function Anwesenheit() {
     eTag.setz((v) => { const o = { ...basis, ...vorschlaege }; eigene.forEach((k) => { if (k in v) o[k] = v[k]; }); return o; });
   });
   // Klassen-/Tageswechsel mit offenen Änderungen: nachfragen statt still verwerfen.
-  const wechseln = (fn) => {
+  const wechseln = async (fn) => {
     // Wer den Wechsel bestaetigt, hat die Aenderungen aufgegeben — die
     // Arbeitskopie muss dann WEG. Ohne das blieb sie „beruehrt": der neue
     // Stand vom Server wurde nie uebernommen, und beim Zurueckwechseln
     // fragte die Seite erneut, obwohl niemand etwas getan hatte.
     if (eTag.geaendert) {
-      if (!window.confirm(t("speichern.verlassen"))) return;
+      if (!(await askConfirm(t("speichern.verlassen"), { danger: true }))) return;
       angefasst.current.clear();
       eTag.verwerfen();
     }
@@ -321,7 +322,8 @@ export default function Anwesenheit() {
         )}
         ansicht={<>
           <button onClick={() => setShowLegend((v) => !v)} className="icon-btn" title={t("anwesenheit.legend")} aria-label={t("anwesenheit.legend")}
-            style={{ ...toolbarIconBtn, border: showLegend ? "1px solid var(--accent)" : toolbarIconBtn.border }}>
+            aria-pressed={showLegend}
+            style={{ ...toolbarIconBtn, ...(showLegend ? { border: "1px solid var(--accent)", background: "var(--accent-bg)" } : {}) }}>
             <Icon d={ICONS.info} size={16} color={showLegend ? "var(--accent)" : "var(--text2)"} />
           </button>
           <Tabs value={view} onChange={setView}
@@ -375,7 +377,7 @@ export default function Anwesenheit() {
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 8px", flexWrap: "wrap" }}>
-            <span style={{ flex: 1 }} />
+            <span style={{ flex: 1, minWidth: 0 }} />
             <button onClick={() => ladePdf(`${API}/${classId}/report.pdf`, `Fehlzeiten_${cls?.name || ""}.pdf`)} style={toolbarBtn}>{t("anwesenheit.classPdf")}</button>
           </div>
           {legende}

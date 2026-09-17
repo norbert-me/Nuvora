@@ -13,10 +13,11 @@
 import { useEffect, useState } from "react";
 
 import {
-  btnPrimary, btnSecondary, btnSmall, COLORS as C, CONTROL_R, Icon, ICONS,
-  inputStyle, panelStyle, toolbarIconBtn,
+  btnPrimary, btnSecondary, btnSmall, COLORS as C, Icon, ICONS,
+  inputStyle, linkBtn, panelStyle, toolbarIconBtn,
 } from "./Icons.jsx";
-import { hol, alsJson } from "../core/melden.js";
+import { hol, alsJson, pruefeAntwort, sende } from "../core/melden.js";
+import { askConfirm } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 export default function CaldavZugaenge() {
@@ -33,7 +34,7 @@ export default function CaldavZugaenge() {
     setLaeuft(true);
     const res = await fetch("/api/caldav-zugaenge", alsJson("POST", { name })).catch(() => null);
     setLaeuft(false);
-    if (!res || !res.ok) return;
+    if (!(await pruefeAntwort(res, t("caldav.anlegen")))) return;
     setFrisch(await res.json().catch(() => null));
     setName("");
     laden();
@@ -57,8 +58,11 @@ export default function CaldavZugaenge() {
   const protokollLaden = () => hol("/api/caldav-zugaenge/protokoll")
     .then((d) => setProtokoll((d && d.eintraege) || []));
 
-  const zuruecknehmen = async (id) => {
-    await fetch(`/api/caldav-zugaenge/${id}`, { method: "DELETE" }).catch(() => null);
+  // Zuruecknehmen sperrt das Geraet sofort aus — erst fragen, dann melden,
+  // wenn der Server nicht mitspielt.
+  const zuruecknehmen = async (z) => {
+    if (!(await askConfirm(t("caldav.zuruecknehmenFrage", { name: z.name }), { danger: true, ok: t("caldav.zuruecknehmen") }))) return;
+    await sende(`/api/caldav-zugaenge/${z.id}`, { method: "DELETE" }, t("caldav.zuruecknehmen"));
     laden();
   };
 
@@ -82,9 +86,8 @@ export default function CaldavZugaenge() {
             /.well-known/caldav — und den Pfad fangen viele vorgeschaltete
             Proxys für Let's Encrypt selbst ab. Mit ausdrücklichem Serverpfad
             sucht Apple nicht. */}
-        <button onClick={() => setErweitert((v) => !v)}
-          style={{ background: "none", border: "none", padding: 0, marginTop: 8, cursor: "pointer",
-            color: "var(--accent)", fontSize: 12, fontWeight: 600 }}>
+        <button onClick={() => setErweitert((v) => !v)} aria-expanded={erweitert}
+          style={{ ...linkBtn, fontSize: 12, display: "block", marginTop: 1 }}>
           {t("caldav.erweitert")}
         </button>
         {erweitert && (
@@ -107,7 +110,7 @@ export default function CaldavZugaenge() {
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{t("caldav.neuTitel", { name: frisch.name })}</div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <code style={{ ...inputStyle, flex: 1, minWidth: 0, overflowX: "auto", fontFamily: "monospace", fontSize: 14, letterSpacing: 0.5 }}>{frisch.passwort}</code>
-            <button onClick={() => navigator.clipboard?.writeText(frisch.passwort)} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R }}>
+            <button onClick={() => navigator.clipboard?.writeText(frisch.passwort)} style={{ ...btnSecondary, ...btnSmall }}>
               {t("common.copy")}
             </button>
           </div>
@@ -122,13 +125,13 @@ export default function CaldavZugaenge() {
               bricht an der Stelle jeder ab. */}
           {frisch.profil && (
             <div style={{ marginTop: 8 }}>
-              <a href={frisch.profil} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R, display: "inline-block", textDecoration: "none" }}>
+              <a href={frisch.profil} style={{ ...btnSecondary, ...btnSmall, display: "inline-block", textDecoration: "none" }}>
                 {t("caldav.profil")}
               </a>
               <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6, lineHeight: 1.4 }}>{t("caldav.profilHinweis")}</div>
             </div>
           )}
-          <button onClick={() => setFrisch(null)} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R, marginTop: 8 }}>
+          <button onClick={() => setFrisch(null)} style={{ ...btnSecondary, ...btnSmall, marginTop: 8 }}>
             {t("caldav.notiert")}
           </button>
         </div>
@@ -146,7 +149,7 @@ export default function CaldavZugaenge() {
                 {z.zuletzt ? t("caldav.zuletzt", { wann: new Date(z.zuletzt).toLocaleDateString() })
                   : t("caldav.nieBenutzt")}
               </span>
-              <button onClick={() => zuruecknehmen(z.id)} className="icon-btn"
+              <button onClick={() => zuruecknehmen(z)} className="icon-btn"
                 style={{ ...toolbarIconBtn, color: C.danger }}
                 title={t("caldav.zuruecknehmen")} aria-label={t("caldav.zuruecknehmen")}>
                 <Icon d={ICONS.trash} size={15} />
@@ -160,22 +163,21 @@ export default function CaldavZugaenge() {
         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80}
           placeholder={t("caldav.namePlatzhalter")} name="caldav-name" autoComplete="off" size={1}
           style={{ ...inputStyle, flex: "1 1 160px", minWidth: 0 }} />
-        <button onClick={anlegen} disabled={laeuft} style={{ ...btnPrimary, borderRadius: CONTROL_R, opacity: laeuft ? 0.6 : 1 }}>
+        <button onClick={anlegen} disabled={laeuft} style={{ ...btnPrimary, opacity: laeuft ? 0.6 : 1 }}>
           {t("caldav.anlegen")}
         </button>
       </div>
 
       {/* Wenn das Handy nicht will, sagt hier der Server, woran es liegt. */}
       <div style={{ borderTop: "1px solid var(--border)", marginTop: 10, paddingTop: 10 }}>
-        <button onClick={() => { setOffen((v) => !v); if (!offen) protokollLaden(); }}
-          style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
-            color: "var(--accent)", fontSize: 12, fontWeight: 600 }}>
+        <button onClick={() => { setOffen((v) => !v); if (!offen) protokollLaden(); }} aria-expanded={offen}
+          style={{ ...linkBtn, fontSize: 12 }}>
           {t("caldav.protokoll")}
         </button>
         {offen && (
           <div style={{ marginTop: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <button onClick={protokollLaden} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R }}>
+              <button onClick={protokollLaden} style={{ ...btnSecondary, ...btnSmall }}>
                 {t("caldav.protokollNeu")}
               </button>
             </div>
@@ -185,11 +187,11 @@ export default function CaldavZugaenge() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {protokoll.map((e, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, fontSize: 12, alignItems: "baseline" }}>
+                  <div key={i} style={{ display: "flex", flexWrap: "wrap", columnGap: 8, rowGap: 2, fontSize: 12, alignItems: "baseline" }}>
                     <span style={{ color: "var(--text3)", flexShrink: 0 }}>{new Date(e.zeit).toLocaleTimeString()}</span>
                     <span style={{ fontFamily: "monospace", flexShrink: 0 }}>{e.methode}</span>
                     <span style={{ flex: 1, minWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text3)" }} title={e.geraet}>{e.pfad}</span>
-                    <span style={{ flexShrink: 0, color: e.status >= 400 ? C.danger : "var(--text2)" }}>{e.grund}</span>
+                    <span style={{ minWidth: 0, overflowWrap: "anywhere", color: e.status >= 400 ? C.danger : "var(--text2)" }}>{e.grund}</span>
                   </div>
                 ))}
               </div>

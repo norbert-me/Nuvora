@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Icon, ICONS, COLORS as C, CONTROL_R, toolbarBtn, toolbarBtnPrimary, toolbarInput, Toggle, Modal, DialogKopf } from "./Icons.jsx";
 import { useLanguage } from "../i18n";
+import { DialogFuss } from "./Speichern.jsx";
 
 // Editor für Programmablaufpläne (DIN 66001).
 //
@@ -20,11 +21,17 @@ const B = 150;   // Grundbreite eines Symbols
 const H = 60;    // Grundhöhe
 const RASTER = 10;
 
-const FARBE = {
+// Die Grundtöne sind feste Farben — im dunklen Design standen sie zu dunkel
+// auf dem dunklen Blatt. Gemischt mit `--text` rücken sie im hellen Design
+// Richtung Schwarz und im dunklen Richtung Weiß: eine Formel für beide Designs,
+// ohne zweite Farbtabelle.
+const GRUNDTON = {
   start: "#16a34a", ende: "#dc2626", anweisung: "#2563eb",
   verzweigung: "#d97706", eingabe: "#7c3aed", ausgabe: "#7c3aed",
   unterprogramm: "#0891b2", kommentar: "#6b7280",
 };
+const FARBE = Object.fromEntries(Object.entries(GRUNDTON)
+  .map(([k, v]) => [k, `color-mix(in srgb, ${v} 72%, var(--text))`]));
 
 function uid() {
   return "n" + Math.random().toString(36).slice(2, 9);
@@ -71,8 +78,10 @@ export function masse(knoten) {
 // rechnet auch das Ziehen, und der Verbindungspunkt ist immer die Mitte einer
 // Kante.
 function Form({ art, x, y, w, h, aktiv }) {
-  const f = FARBE[art] || "#2563eb";
-  const gem = { fill: "var(--card)", stroke: f, strokeWidth: aktiv ? 3 : 2 };
+  const f = FARBE[art] || FARBE.anweisung;
+  // Farbe über `style`: CSS-Funktionen gelten dort sicher, als SVG-Attribut
+  // nicht in jedem Browser.
+  const gem = { fill: "var(--card)", style: { stroke: f }, strokeWidth: aktiv ? 3 : 2 };
   if (art === "start" || art === "ende") {
     return <rect x={x} y={y} width={w} height={h} rx={h / 2} ry={h / 2} {...gem} />;
   }
@@ -87,8 +96,8 @@ function Form({ art, x, y, w, h, aktiv }) {
     return (
       <>
         <rect x={x} y={y} width={w} height={h} {...gem} />
-        <line x1={x + 10} y1={y} x2={x + 10} y2={y + h} stroke={f} strokeWidth={2} />
-        <line x1={x + w - 10} y1={y} x2={x + w - 10} y2={y + h} stroke={f} strokeWidth={2} />
+        <line x1={x + 10} y1={y} x2={x + 10} y2={y + h} style={{ stroke: f }} strokeWidth={2} />
+        <line x1={x + w - 10} y1={y} x2={x + w - 10} y2={y + h} style={{ stroke: f }} strokeWidth={2} />
       </>
     );
   }
@@ -96,9 +105,9 @@ function Form({ art, x, y, w, h, aktiv }) {
     // Eckige Klammer links, offener Kasten rechts — die Normform der Anmerkung.
     return (
       <>
-        <rect x={x} y={y} width={w} height={h} fill="var(--card)" stroke={f} strokeWidth={aktiv ? 2 : 1}
+        <rect x={x} y={y} width={w} height={h} fill="var(--card)" style={{ stroke: f }} strokeWidth={aktiv ? 2 : 1}
           strokeDasharray="4 3" />
-        <path d={`M${x + 8},${y + 6} h-6 v${h - 12} h6`} fill="none" stroke={f} strokeWidth={2} />
+        <path d={`M${x + 8},${y + 6} h-6 v${h - 12} h6`} fill="none" style={{ stroke: f }} strokeWidth={2} />
       </>
     );
   }
@@ -336,7 +345,7 @@ export default function PapEditor({ wert, onChange, lesen = false, hoehe = 520, 
       {!lesen && verbinden && (
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, padding: "8px 12px",
           border: `1px solid ${C.accent || "var(--accent)"}`, borderRadius: CONTROL_R, background: "var(--bg2)" }}>
-          <span style={{ fontSize: 13, color: "var(--text2)", flex: 1 }}>
+          <span style={{ fontSize: 13, color: "var(--text2)", flex: 1, minWidth: 0 }}>
             {von ? t("pap.verbindeZiel") : t("pap.verbindeStart")}
           </span>
           <button onClick={() => { setVerbinden(false); setVon(null); }} style={toolbarBtn}>{t("pap.verbindeFertig")}</button>
@@ -378,11 +387,8 @@ export default function PapEditor({ wert, onChange, lesen = false, hoehe = 520, 
               if (ev.key === "Escape") setTextEdit(null);
             }}
             style={{ ...toolbarInput, width: "100%", boxSizing: "border-box", height: "auto", resize: "vertical", lineHeight: 1.5 }} />
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
-            <button onClick={() => setTextEdit(null)} style={toolbarBtn}>{t("common.abort")}</button>
-            <button onClick={() => { aendere(textEdit.id, { text: textEdit.wert }); setTextEdit(null); }}
-              style={toolbarBtnPrimary}>{t("common.save")}</button>
-          </div>
+          <DialogFuss onSpeichern={() => { aendere(textEdit.id, { text: textEdit.wert }); setTextEdit(null); }}
+            onAbbrechen={() => setTextEdit(null)} style={{ marginTop: 12 }} />
         </Modal>
       )}
     </div>
