@@ -509,7 +509,8 @@ async def student_history(class_id: int, student_id: int, user: User = Depends(r
         key = schul_datum(r.date)
         cur = proTag.get(key)
         if cur is None or _RANK.get(r.status, 0) > _RANK.get(cur["status"], 0):
-            proTag[key] = {"date": r.date.isoformat(), "status": r.status, "note": r.note, "period": r.period}
+            proTag[key] = {"date": r.date.isoformat(), "status": r.status, "note": r.note,
+                           "period": r.period, "kurs_id": r.kurs_id}
     return sorted(proTag.values(), key=lambda x: x["date"], reverse=True)
 
 

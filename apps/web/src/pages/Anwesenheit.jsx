@@ -53,7 +53,7 @@ export default function Anwesenheit() {
   const nurHeute = !params.get("class");
   const [offen, setOffen] = useState(null); // aufgeklappter Schüler in der Übersicht
   const [verlauf, setVerlauf] = useState([]);
-  const [stunde, setStunde] = useState(0); // 0 = ganzer Tag, sonst Stundenplan-Period
+  const [stunde, setStunde] = useState(null); // null = ganzer Tag, sonst Stundenplan-Period (auch die 0. Stunde)
   const [zeiten, setZeiten] = useState({ times: [], zero: null }); // Uhrzeiten des Stundenrasters
 
   useEffect(() => {
@@ -128,7 +128,7 @@ export default function Anwesenheit() {
         if (ziel) { setStunde(ziel.period); setClassId(ziel.class_id); }
       }
     } else if (tagStunden.length && !tagStunden.includes(stunde)) setStunde(tagStunden[0]);
-    else if (!tagStunden.length && stunde !== 0) setStunde(0);
+    else if (!tagStunden.length && stunde !== null) setStunde(null);
   }, [tagSlots, tagStunden, stundenWahl, zeiten, jetztMin]); // eslint-disable-line
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
@@ -153,7 +153,7 @@ export default function Anwesenheit() {
     // Status aus einer früheren Stunde vor); Stunde 0 = ganzer Tag (stärkster
     // Status). `kurs_id` sagt, welcher Kurs gemeint ist — ein Eintrag aus einem
     // anderen Kurs gehört nicht in diese Liste.
-    const p = stunde ? `&period=${stunde}` : "";
+    const p = stunde != null ? `&period=${stunde}` : "";
     const k = kursId ? `&kurs_id=${kursId}` : "";
     hol(`${API}/${classId}?date=${isoOf(datum)}${p}${k}`, {}).then((d) => { frisch.current = true; setTag(d || {}); });
   }, [classId, datum, stunde, kursId]);
@@ -198,7 +198,7 @@ export default function Anwesenheit() {
       // sieht nur zufaellig aus wie „nichts geaendert". Ungesendet kam
       // derselbe Vorschlag beim naechsten Aufschlagen wieder.
       if (wert[k] === basis[k] && !(k in vorschlaege)) continue;
-      await mark(s.id, wert[k], isoOf(datum), stunde || null, kursId).catch(() => {});
+      await mark(s.id, wert[k], isoOf(datum), stunde ?? null, kursId).catch(() => {});
     }
     angefasst.current.clear();
     loadTag();
@@ -264,10 +264,13 @@ export default function Anwesenheit() {
   // „Speichern" geschrieben.
   const frischV = useRef(false);
   const basisV = useMemo(() => Object.fromEntries(verlauf.map((v) => [v.date, v.status])), [verlauf]);
+  // Die Zeile gehoert einer Stunde und einem Kurs — genau die wird geaendert.
+  // Ohne beides entstand eine neue Abwesenheit fuer den GANZEN Tag, die in
+  // jedem Kurs mitzaehlt.
   const eV = useEntwurf(basisV, async (wert) => {
     for (const v of verlauf) {
       if (wert[v.date] === basisV[v.date]) continue;
-      await mark(offen, wert[v.date], v.date).catch(() => {});
+      await mark(offen, wert[v.date], v.date, v.period ?? null, v.kurs_id ?? null).catch(() => {});
     }
     if (offen) await ladeVerlauf(offen);
     loadSumme();
@@ -408,7 +411,7 @@ export default function Anwesenheit() {
                         <p style={{ fontSize: 13, color: "var(--text3)", margin: "4px 0" }}>{t("anwesenheit.noEntries")}</p>
                       ) : verlauf.map((e) => (
                         <div key={e.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
-                          <span style={{ flex: 1, fontSize: 13 }}>{new Date(e.date).toLocaleDateString()}{e.period ? ` · ${stundeLabel(e.period, t)}` : ""}</span>
+                          <span style={{ flex: 1, fontSize: 13 }}>{new Date(e.date).toLocaleDateString()}{e.period != null ? ` · ${stundeLabel(e.period, t)}` : ""}</span>
                           <StatusWahl wert={eV.wert[e.date] || e.status} onWahl={(st) => eV.setz({ [e.date]: st })} />
                         </div>
                       ))}
