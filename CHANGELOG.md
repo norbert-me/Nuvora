@@ -16,6 +16,17 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+## 4.4.1 — 17.09.2026
+
+- **Klassenarbeit mit E und G in einem Griff.** Das Plus öffnet ein kleines
+  Fenster: eine Arbeit — oder gleich zwei, eine für E und eine für G. Die
+  Liste zeigt nur die Kinder des jeweiligen Niveaus.
+- **Person: ein Klick auf die Kursnote zeigt, woraus sie entsteht.** Je
+  Halbjahr die Oberkategorien mit Gewicht und Bereichsnote, darunter der
+  Notenverlauf aus Klassenarbeiten und Quizzen.
+- **Klassenarbeit: statt des Themenstands ein Hinweis auf den Lernstand.**
+  Die Auswahl einzelner Kinder war die falsche Stelle, um auf Lücken
+  hinzuweisen; der Weg in die Klassenauswertung steht jetzt daneben.
 - Kalender: die Stundenzahl wird jetzt wirklich ausgeblendet, wenn die
   Jetzt-Beschriftung darüberliegt — verglichen wurden die Linien statt der
   Beschriftungen, und die sitzen unterschiedlich hoch.
