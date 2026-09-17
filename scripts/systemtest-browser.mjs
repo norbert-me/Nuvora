@@ -495,6 +495,12 @@ const bedienung = (td) => [
       // auch geprueft, ob es das Neuladen uebersteht.
       // „Zurueck" traegt seit dem Icon-Aufraeumen ein SVG statt des Zeichens
       // „←" — der zugaengliche Name ist damit nur noch das Wort.
+      // Die neue Frage haengt erst mit dem Speichern im Quiz (siehe
+      // Dashboard.jsx, addNewQuestion) — also speichern, wie eine Lehrkraft.
+      // Ohne das fragt „Zurueck" nach dem Verwerfen, und das war bisher nur
+      // unsichtbar, weil der Browser-Dialog automatisch bestaetigt wurde.
+      await seite.getByRole("button", { name: "Speichern", exact: true }).first().click({ timeout: 8000 });
+      await seite.getByText("nicht gespeichert").first().waitFor({ state: "hidden", timeout: 15000 });
       await seite.getByRole("button", { name: /Zurück/ }).first().click({ timeout: 8000 });
       await seite.getByText(MARKE_UI, { exact: true }).first().waitFor({ timeout: 15000 });
     },
