@@ -23,6 +23,67 @@ import { askConfirm, showAlert } from "../core/dialog.jsx";
 // Gerechnet wird nichts eigenes: der Themenstand kommt vom Server, der ihn aus
 // derselben Quelle holt wie die Schülerseite. Zwei Rechnungen wären zwei
 // Wahrheiten.
+// Note 1..6 in eine Farbe — dieselbe Dreiteilung wie ueberall (gut/mittel/schwach).
+const noteFarbe = (n) => (n <= 2.5 ? C.success : n <= 4.4 ? C.warning : C.danger);
+
+// Woraus eine Kursnote entsteht — und wie sie dorthin gekommen ist.
+//
+// Beides ist GEHOLT, nicht gerechnet: die Oberkategorien kommen aus derselben
+// Zusammenfassung wie das Notenbuch (`_summarize`), der Verlauf aus
+// `app/notenverlauf.py`. Zwei Rechnungen waeren zwei Wahrheiten.
+//
+// Der Verlauf haengt am Kurs, nicht am Halbjahr — die Erhebungen tragen ihr
+// Datum, und eine zweite Grenze daneben waere eine Aussage, die die Quelle
+// gar nicht macht.
+function NotenDetail({ teil, hj, t }) {
+  const zus = (teil.zusammensetzung || {})[hj] || [];
+  const verlauf = teil.verlauf || [];
+  return (
+    <div style={{ ...panelStyle, padding: 12, marginBottom: 8 }}>
+      <div style={{ ...sectionLabel, margin: "0 0 6px" }}>{t("personen.zusammensetzung")}</div>
+      {zus.length === 0 ? (
+        <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("personen.keineTeilnoten")}</p>
+      ) : (
+        <div style={{ display: "grid", gap: 4 }}>
+          {zus.map((s, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+              <span style={{ flex: 1, minWidth: 0 }}>{s.name}</span>
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>{Math.round(s.gewicht)} %</span>
+              {s.note == null ? (
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>—</span>
+              ) : (
+                <span style={badge(noteFarbe(s.note))}>{String(Math.round(s.note * 10) / 10).replace(".", ",")}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ ...sectionLabel, margin: "12px 0 6px" }}>{t("personen.verlauf")}</div>
+      {verlauf.length === 0 ? (
+        <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("personen.keinVerlauf")}</p>
+      ) : (
+        <div style={{ display: "grid", gap: 4 }}>
+          {verlauf.map((v, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {v.name}
+              </span>
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                {v.date ? new Date(v.date).toLocaleDateString() : ""}
+              </span>
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>{Math.round(v.pct)} %</span>
+              {v.note != null && (
+                <span style={badge(noteFarbe(v.note))}>{String(v.note).replace(".", ",")}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Personen() {
   const { t } = useLanguage();
   const [liste, setListe] = useState([]);
@@ -32,6 +93,9 @@ export default function Personen() {
   const [params] = useSearchParams();
   const [offen, setOffen] = useState(null);
   const [stand, setStand] = useState(null);
+  // Welche Kursnote ist aufgeklappt? Eine zur Zeit — zwei offene Kaesten
+  // untereinander beantworten dieselbe Frage zweimal.
+  const [noteOffen, setNoteOffen] = useState(null);
 
   useEffect(() => {
     fetch("/api/personen").then((r) => (r.ok ? r.json() : [])).then((d) => {
@@ -279,11 +343,19 @@ export default function Personen() {
                             aus derselben Rechnung wie das Notenbuch. Ein
                             früheres Halbjahr steht damit neben dem laufenden:
                             das ist der Verlauf, nach dem man ein Kind ansieht. */}
-                        {["1", "2"].map((hj) => ((teil.noten || {})[hj] != null ? (
-                          <span key={hj} style={{ ...badge(C.info) }} title={t(`noten.term${hj}`)}>
-                            {hj}. HJ: {String((teil.noten || {})[hj]).replace(".", ",")}
-                          </span>
-                        ) : null))}
+                        {["1", "2"].map((hj) => {
+                          const wert = (teil.noten || {})[hj];
+                          if (wert == null) return null;
+                          const schluessel = `${teil.student_id}-${teil.kurs_id || teil.class_id}-${hj}`;
+                          const auf = noteOffen === schluessel;
+                          return (
+                            <button key={hj} onClick={() => setNoteOffen(auf ? null : schluessel)}
+                              style={{ ...badge(C.info), border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                              title={`${t(`noten.term${hj}`)} — ${t("personen.notenDetail")}`} aria-expanded={auf}>
+                              {hj}. HJ: {String(wert).replace(".", ",")}
+                            </button>
+                          );
+                        })}
                         {/* Fehlzeiten und Verspätungen dieses Kurses. Sie
                             gehören neben die Noten: „drei Verspätungen" erklärt
                             oft mehr als die Zahl daneben. */}
@@ -309,6 +381,13 @@ export default function Personen() {
                             style={{ ...btnSecondary, ...btnSmall }}>{t("personen.qr")}</button>
                         )}
                       </div>
+                      {/* Aufgeklappte Kursnote: woraus sie entsteht und wie
+                          sie sich entwickelt hat. */}
+                      {["1", "2"].map((hj) => (
+                        noteOffen === `${teil.student_id}-${teil.kurs_id || teil.class_id}-${hj}`
+                          ? <NotenDetail key={hj} teil={teil} hj={hj} t={t} />
+                          : null
+                      ))}
                       {(teil.themen || []).length === 0 ? (
                         <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("personen.keineThemen")}</p>
                       ) : (

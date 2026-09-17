@@ -450,8 +450,27 @@ async def auswertung(person_id: int, user: User = Depends(get_current_user),
                     note = treffer.weighted
                 if note is not None:
                     teil.setdefault("noten", {})[hj] = round(float(note), 2)
+                # Woraus die Note entstand: je Oberkategorie (Abschnitt) ihr
+                # Gewicht und die wirksame Bereichsnote. „2,3" allein sagt
+                # nicht, ob die Arbeiten oder die Mitarbeit sie tragen — und
+                # genau das ist die Frage beim Blick auf ein Kind.
+                zus = [{"name": sec.name, "gewicht": sec.weight or 0,
+                        "note": treffer.section_effective.get(str(sec.id))}
+                       for sec in (_sec or [])]
+                if any(x["note"] is not None for x in zus):
+                    teil.setdefault("zusammensetzung", {})[hj] = zus
                 if treffer.observations:
                     teil["beobachtungen"] = treffer.observations
+            # Der Notenverlauf wird geholt, nicht nachgebaut: dieselbe Rechnung
+            # wie in der Klassensicht (app/notenverlauf.py), die Klassenarbeiten
+            # und CardVote-Quizze auf EINER Achse fuehrt.
+            try:
+                from .. import notenverlauf as _nv
+                v = await _nv.klasse(db, user, z.class_id, cardvote=cardvote,
+                                     auswertung=auswertung, student_id=z.id)
+                teil["verlauf"] = ((v or {}).get("schueler") or [{}])[0].get("werte") or []
+            except Exception:
+                teil["verlauf"] = []
         # Fehlzeiten und Verspaetungen dieses Kurses — geholt, nicht gezaehlt:
         # `anwesenheit.summary` kennt die Regeln, die man beim Nachbauen
         # verliert (Ferien zaehlen nicht, mehrere Stunden am selben Tag sind
