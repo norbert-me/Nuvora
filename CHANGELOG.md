@@ -20,9 +20,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   ausgeteilten Wegen heißt 401 „dieser Zugang gilt nicht mehr", nicht
   „Sitzung abgelaufen".
 - **Karteikarten sagen, welche Karte schwerfällt.** Im Stapelkopf steht die
-  Kartenzahl, das ⋯-Menü öffnet eine Auswertung: je Karte Trefferquote,
-  Versuche, beteiligte Kinder und Reifegrad — schwerste zuerst. Karten mit zu
-  wenigen Versuchen bekommen „zu wenig Daten" und stehen am Ende.
+  Kartenzahl; das ⋯-Menü blendet die Auswertung ein — Trefferquote und
+  Versuche stehen dann hinter jeder Karte der vorhandenen Liste, oben die
+  Summe des Stapels, und ein Klick auf „n schwer" zeigt nur diese Karten.
+  Karten mit zu wenigen Versuchen bekommen keine Quote, sondern einen Strich.
 - **Karten lernen:** kein leerer Bereich mehr über der Karte und keine
   Scrollleiste ohne Inhalt.
 - **Karten lernen:** Am Ende steht je Reifegrad, wie viele Karten dort liegen

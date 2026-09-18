@@ -601,7 +601,23 @@ function Deck({ kurse = [], deck, kursId = null, t, call, topics = [], showTopic
   // Karten und Eingabe dazu. Offen IST der Name das Eingabefeld.
   const [collapsed, setCollapsed] = useState(true);
   const [einstellungen, setEinstellungen] = useState(false); // Thema/Niveau (selten, deshalb im ⋯)
-  const [auswertung, setAuswertung] = useState(false);       // „Welche Karte faellt schwer?"
+  // „Welche Karte faellt schwer?" — KEINE zweite Liste: die Zahlen stehen an
+  // den Karten der vorhandenen Liste, sonst stuende jede Karte zweimal da
+  // (gemeldet am 18.09.2026). `nurSchwer` blendet die uebrigen aus, statt die
+  // Liste umzusortieren: sie ist die Reihenfolge des Stapels und wird gezogen.
+  const [auswertung, setAuswertung] = useState(false);
+  const [nurSchwer, setNurSchwer] = useState(false);
+  const [ausw, setAusw] = useState(null);   // null = laedt, false = Fehler
+  useEffect(() => {
+    if (!auswertung) return undefined;
+    let weg = false;
+    setAusw(null);
+    hol(`${API}/decks/${deck.id}/auswertung${kursId ? `?kurs_id=${kursId}` : ""}`, null)
+      .then((d) => { if (!weg) setAusw(d || false); });
+    return () => { weg = true; };
+  }, [auswertung, deck.id, kursId]);
+  // Zahlen je Karte, nachgeschlagen an der Kartenzeile.
+  const auswKarte = useMemo(() => Object.fromEntries(((ausw && ausw.cards) || []).map((z) => [z.card_id, z])), [ausw]);
   const rootRef = useRef(null);
   // Deep-Link (?deck=<id> aus dem Kalender): einmalig aufklappen + hinscrollen.
   useEffect(() => {
@@ -938,7 +954,7 @@ function Deck({ kurse = [], deck, kursId = null, t, call, topics = [], showTopic
         onClose={() => setEinstellungen(false)}
         onSave={async (werte) => { const ok = await saveDeck(werte); if (ok) setEinstellungen(false); return ok; }} />}
       {auswertung && !collapsed && (
-        <DeckAuswertung deck={deck} kursId={kursId} t={t} onClose={() => setAuswertung(false)} />
+        <AuswertungKopf daten={ausw} nurSchwer={nurSchwer} onNurSchwer={setNurSchwer} onClose={() => setAuswertung(false)} t={t} />
       )}
       {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
         onPublish={(description) => fetch(`/api/marketplace/publish/deck`, alsJson("POST", { deck_id: deck.id, description })).catch(() => null)} />}
@@ -946,6 +962,8 @@ function Deck({ kurse = [], deck, kursId = null, t, call, topics = [], showTopic
       {!collapsed && (<>
       {cards.map((c) => {
         const kartenSeite = ziehKarte.seite(c.id);
+        const z = auswertung ? auswKarte[c.id] : null;
+        if (auswertung && nurSchwer && !(z && z.genug && z.quote < (ausw?.schwer_quote ?? 60))) return null;
         return (
         <div key={c.id} onDragOver={(e) => ziehKarte.ueber(e, c.id)} onDrop={() => dropCard(c.id)}
           onMouseEnter={() => setHoverCard(c.id)} onMouseLeave={() => setHoverCard(null)}
@@ -984,6 +1002,24 @@ function Deck({ kurse = [], deck, kursId = null, t, call, topics = [], showTopic
             <strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span>
             {(c.has_front_image || c.has_back_image) && <Icon d={ICONS.image} size={18} color="var(--accent)" style={{ marginLeft: 4 }} />}
           </span>
+          {/* Die Auswertung haengt HINTER der Karte: Quote, Versuche, Kinder.
+              Ohne genug Versuche steht ein Strich — eine 0 % saehe aus wie die
+              schwerste Karte im Stapel. */}
+          {auswertung && (
+            z && z.genug ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0, fontSize: 12 }}
+                title={t("karten.analysisRow", { versuche: z.versuche, kinder: z.kinder })}>
+                <span style={{ width: 54, height: QUOTE_H, borderRadius: QUOTE_H / 2, background: "var(--bg2)", overflow: "hidden" }}>
+                  <span style={{ display: "block", width: `${z.quote}%`, height: "100%", background: quoteFarbe(z.quote) }} />
+                </span>
+                <span style={{ width: 38, textAlign: "right", color: quoteFarbe(z.quote), fontWeight: 700 }}>{z.quote} %</span>
+                <span style={{ width: 30, textAlign: "right", color: "var(--text3)" }}>{z.versuche}×</span>
+              </span>
+            ) : (
+              <span style={{ flexShrink: 0, fontSize: 12, color: "var(--text3)", width: 128, textAlign: "right" }}
+                title={t("karten.tooFewHint", { n: (ausw && ausw.mindest) || 3 })}>—</span>
+            )
+          )}
         </div>
         );
       })}
@@ -1362,86 +1398,34 @@ const quoteFarbe = (q) => (q < 50 ? C.danger : q < 75 ? C.warning : C.success);
 // Radius-Stufe (siehe die Leiter in Icons.jsx).
 const QUOTE_H = 8;
 
-function DeckAuswertung({ deck, kursId, t, onClose }) {
-  const [daten, setDaten] = useState(null);
-  const [sort, setSort] = useState("schwer"); // schwer | stapel
-  useEffect(() => {
-    let weg = false;
-    setDaten(null);
-    // Scheitert das Lesen, muss das zu SEHEN sein: ein Skelett, das nie
-    // aufhoert, sieht aus wie ein haengender Server.
-    hol(`${API}/decks/${deck.id}/auswertung${kursId ? `?kurs_id=${kursId}` : ""}`, null)
-      .then((d) => { if (!weg) setDaten(d || false); });
-    return () => { weg = true; };
-  }, [deck.id, kursId]);
-
-  // Der Server liefert schon „schwerste zuerst"; die zweite Reihenfolge ist die
-  // des Stapels — so findet man die Karte wieder, die man gleich umschreiben will.
-  const zeilen = useMemo(() => {
-    const cs = daten?.cards || [];
-    return sort === "stapel" ? [...cs].sort((a, b) => a.position - b.position) : cs;
-  }, [daten, sort]);
-
+// Kopfzeile der Auswertung: die Summe ueber den Stapel, ein Filter auf die
+// schweren Karten und ein Weg hinaus. Die Karten selbst stehen darunter in der
+// gewohnten Liste — mit ihren Zahlen an der Zeile.
+function AuswertungKopf({ daten, nurSchwer, onNurSchwer, onClose, t }) {
   return (
-    <div style={{ ...panelStyle, marginBottom: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-        <strong style={{ fontSize: 14, flex: 1, minWidth: 0 }}>{t("karten.analysis")}</strong>
-        <Segment>
-          {[["schwer", t("karten.sortHard")], ["stapel", t("karten.sortDeck")]].map(([k, label]) => (
-            <button key={k} onClick={() => setSort(k)}
-              style={{ ...segmentBtn, fontWeight: sort === k ? 700 : 500,
-                color: sort === k ? "var(--accent)" : "var(--text2)" }}>{label}</button>
-          ))}
-        </Segment>
-        <button onClick={onClose} className="icon-btn" style={toolbarIconBtn} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={16} /></button>
-      </div>
-      {daten === false ? <div style={{ fontSize: 13, color: C.danger }}>{t("common.error")}</div>
-        : !daten ? <Skeleton rows={3} height={28} />
-        : !daten.versuche ? <Empty title={t("karten.analysisEmpty")} hint={t("karten.analysisEmptyHint")} />
+    <div style={{ ...panelStyle, marginBottom: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <strong style={{ fontSize: 14 }}>{t("karten.analysis")}</strong>
+      {daten === false ? <span style={{ fontSize: 13, color: C.danger }}>{t("common.error")}</span>
+        : !daten ? <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("common.loading")}</span>
+        : !daten.versuche ? <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("karten.analysisEmptyHint")}</span>
         : (<>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-            <span style={chipStyle}>{daten.karten} {t("karten.cards")}</span>
-            <span style={chipStyle}>{daten.kinder} {t("karten.students")}</span>
-            <span style={chipStyle}>{daten.versuche} {t("karten.tries")}</span>
-            {daten.quote != null && (
-              <span style={{ ...chipStyle, background: quoteFarbe(daten.quote) + "1f", color: quoteFarbe(daten.quote) }}>
-                {t("karten.hitRate")}: {daten.quote} %
-              </span>
-            )}
-            {daten.schwer > 0 && (
-              <span style={{ ...chipStyle, background: C.danger + "1f", color: C.danger }}>
-                {t("karten.hardCount", { n: daten.schwer })}
-              </span>
-            )}
-          </div>
-          {zeilen.map((z) => (
-            <div key={z.card_id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13 }}>
-              {/* Eine Zeile, dann Auslassungspunkte — dieselbe Form wie in der
-                  Kartenliste darueber; der volle Text steht im title. */}
-              <span title={z.front} style={{ flex: 1, minWidth: 0, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                <Latex>{z.front}</Latex>
-              </span>
-              {z.genug ? (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, width: 120, flexShrink: 0 }}>
-                  <span style={{ flex: 1, minWidth: 0, height: QUOTE_H, borderRadius: QUOTE_H / 2, background: "var(--bg2)", overflow: "hidden" }}>
-                    <span style={{ display: "block", width: `${z.quote}%`, height: "100%", background: quoteFarbe(z.quote) }} />
-                  </span>
-                  <span style={{ width: 38, textAlign: "right", color: quoteFarbe(z.quote), fontWeight: 700 }}>{z.quote} %</span>
-                </span>
-              ) : (
-                // Nicht als 0 % zeichnen: zwei Zuege sagen nichts, und eine
-                // Karte ohne Aussage darf nicht wie die schwerste aussehen.
-                <span style={{ width: 120, flexShrink: 0, textAlign: "right", color: "var(--text3)", fontSize: 12 }}
-                  title={t("karten.tooFewHint", { n: daten.mindest })}>{t("karten.tooFew")}</span>
-              )}
-              <span style={{ width: 54, flexShrink: 0, textAlign: "right", color: "var(--text3)" }}
-                title={t("karten.tries")}>{z.versuche}</span>
-              <span style={{ width: 40, flexShrink: 0, textAlign: "right", color: "var(--text3)" }}
-                title={t("karten.students")}>{z.kinder}</span>
-              <span style={{ width: 90, flexShrink: 0 }}><ReifeBar hist={z.hist} /></span>
-            </div>
-          ))}
+          <span style={chipStyle}>{daten.kinder} {t("karten.students")}</span>
+          <span style={chipStyle}>{daten.versuche} {t("karten.tries")}</span>
+          {daten.quote != null && (
+            <span style={{ ...chipStyle, background: quoteFarbe(daten.quote) + "1f", color: quoteFarbe(daten.quote) }}>
+              {t("karten.hitRate")}: {daten.quote} %
+            </span>
+          )}
+          {daten.schwer > 0 && (
+            <button onClick={() => onNurSchwer(!nurSchwer)} aria-pressed={nurSchwer}
+              style={{ ...chipStyle, cursor: "pointer", minHeight: 32, border: nurSchwer ? "1px solid " + C.danger : "1px solid transparent",
+                background: C.danger + "1f", color: C.danger }}>
+              {t("karten.hardCount", { n: daten.schwer })}
+            </button>
+          )}
         </>)}
+      <span style={{ flex: 1, minWidth: 0 }} />
+      <button onClick={onClose} className="icon-btn" style={toolbarIconBtn} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={16} /></button>
     </div>
   );
 }

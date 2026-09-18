@@ -1505,6 +1505,7 @@ class DeckAuswertung(BaseModel):
     fehler: int
     quote: Optional[int]
     schwer: int            # wie viele Karten unter SCHWER_QUOTE liegen
+    schwer_quote: int      # ab wo „schwer" gilt — die Oberflaeche filtert danach
     cards: List[AuswertungKarte]
 
 
@@ -1578,6 +1579,7 @@ async def deck_auswertung(deck_id: int, kurs_id: Optional[int] = None,
         karten=len(cards), kinder=len(kinder), versuche=versuche, fehler=fehler,
         quote=round((versuche - fehler) / versuche * 100) if versuche else None,
         schwer=sum(1 for z in zeilen if z.genug and (z.quote or 0) < SCHWER_QUOTE),
+        schwer_quote=SCHWER_QUOTE,
         cards=zeilen,
     )
 
