@@ -7,6 +7,7 @@ import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import "@fontsource/inter/800.css";
 import { LanguageProvider, useLanguage, uebersetze } from "./i18n/index.jsx";
+import { istOeffentlich } from "./core/oeffentlich.js";
 import { enqueue, classify, newTmp, flush as flushOutbox, setKonfliktFrage, leeren as outboxLeeren, count as outboxCount } from "./core/outbox.js";
 import { raeumeBrowser } from "./core/abmelden.js";
 // Optimistisches Sperren: gelesene Staende merken, beim Schreiben mitschicken
@@ -114,8 +115,14 @@ window.fetch = function(input, init) {
     if (res.status === 409 && isApi && basisVersion != null) {
       return konfliktKlaeren(res, input, init, url);
     }
+    // Oeffentliche Wege: dort heisst 401 „dieser ausgeteilte Zugang gilt nicht
+    // mehr" (Modul aus, Klasse archiviert, Token rotiert) — nie „deine Sitzung
+    // ist abgelaufen". Die Ausnahme stand als Absicht im Kommentar darueber,
+    // im Code fehlte sie: eine Lehrkraft, die den QR-Link ihres Kindes oeffnet,
+    // flog aus ihrem eigenen Konto.
+    const oeffentlicherWeg = istOeffentlich(url, location.pathname);
     if (res.status === 401 && isApi && !url.includes("/auth/")
-        && !url.includes("/api/caldav/") && tokenBeimStart) {
+        && !url.includes("/api/caldav/") && !oeffentlicherWeg && tokenBeimStart) {
       const tokenJetzt = lies("token") || "";
       if (tokenJetzt === tokenBeimStart) {
         // Abgelaufene Sitzung ist ein Abmelden wie jedes andere — und der

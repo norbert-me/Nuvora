@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Der QR-Link eines Kindes meldet die Lehrkraft nicht mehr ab.** Auf den
+  ausgeteilten Wegen heißt 401 „dieser Zugang gilt nicht mehr", nicht
+  „Sitzung abgelaufen".
 - **Karteikarten sagen, welche Karte schwerfällt.** Im Stapelkopf steht die
   Kartenzahl, das ⋯-Menü öffnet eine Auswertung: je Karte Trefferquote,
   Versuche, beteiligte Kinder und Reifegrad — schwerste zuerst. Karten mit zu
