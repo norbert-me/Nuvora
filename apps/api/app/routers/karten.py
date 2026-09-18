@@ -309,6 +309,7 @@ class DeckIn(BaseModel):
     # E/G je Karte ueberhaupt benutzen? Aus = alle sehen alle Karten (wie ein
     # CardVote-Quiz ohne Niveau). Voreinstellung aus.
     niveau_aktiv: bool = False
+    mischen: bool = False            # Reihenfolge beim Lernen zufaellig
     folder_id: Optional[int] = None  # Ordner (wie CardVote); NULL = Wurzel
     # Nur beim Anlegen in der Sammlung: Kurse, fuer die der Stapel gelten soll.
     # None = keine Angabe (nichts zuweisen), [] = ausdruecklich niemandem.
@@ -335,6 +336,7 @@ class DeckOut(VersionOut):
     topic_id: Optional[int] = None
     niveau: str = ""
     niveau_aktiv: bool = False
+    mischen: bool = False
     folder_id: Optional[int] = None
     released_at: Optional[datetime] = None
     cards: List[CardOut] = []
@@ -348,6 +350,7 @@ def _deck_out(deck, kurs_ids=()) -> "DeckOut":
         id=deck.id, class_id=deck.class_id, kurs_id=deck.kurs_id,
         kurs_ids=sorted(kurs_ids or []), name=deck.name,
         topic_id=deck.topic_id, niveau=deck.niveau, niveau_aktiv=bool(deck.niveau_aktiv),
+        mischen=bool(getattr(deck, "mischen", False)),
         folder_id=deck.folder_id,
         released_at=deck.released_at,
         cards=[CardOut.model_validate(c) for c in deck.cards if c.deleted_at is None],
@@ -582,7 +585,8 @@ async def create_deck(class_id: int, body: DeckIn, kurs_id: Optional[int] = None
     last = (await db.execute(select(CardDeck.position).where(CardDeck.class_id == class_id).order_by(CardDeck.position.desc()))).scalars().first()
     deck = CardDeck(class_id=class_id, kurs_id=kurs_id, owner_id=user.id, name=body.name.strip(),
                     topic_id=body.topic_id, niveau=body.niveau if body.niveau in ("E", "G") else "",
-                    niveau_aktiv=bool(body.niveau_aktiv), folder_id=body.folder_id, position=(last if last is not None else -1) + 1)
+                    niveau_aktiv=bool(body.niveau_aktiv), mischen=bool(body.mischen),
+                    folder_id=body.folder_id, position=(last if last is not None else -1) + 1)
     db.add(deck)
     await db.commit()
     await db.refresh(deck, ["cards"])
@@ -772,6 +776,7 @@ async def update_deck(deck_id: int, body: DeckIn, request: Request = None, user:
     deck.topic_id = body.topic_id
     deck.niveau = body.niveau if body.niveau in ("E", "G") else ""
     deck.niveau_aktiv = bool(body.niveau_aktiv)
+    deck.mischen = bool(body.mischen)
     deck.folder_id = body.folder_id
     await db.commit()
     await db.refresh(deck, ["cards"])
@@ -1756,10 +1761,28 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
         if is_due:
             due_count += 1
         if all or is_due:
-            faellig.append({"card_id": c.id, "front": c.front, "back": c.back,
+            faellig.append({"card_id": c.id, "deck_id": c.deck_id, "front": c.front, "back": c.back,
                             "has_front_image": c.has_front_image, "has_back_image": c.has_back_image})
         if rev is not None and _utc(rev.due) > now and (next_due is None or _utc(rev.due) < next_due):
             next_due = _utc(rev.due)
+    # Stapel mit „zufaelliger Reihenfolge": ihre Karten werden untereinander
+    # gemischt — und nur sie. Die Reihenfolge eines Stapels ohne den Schalter
+    # ist eine Entscheidung der Lehrkraft (Aufbau, Schwierigkeit) und bleibt.
+    # Gemischt wird JE SITZUNG, nichts wird gespeichert: `position` traegt die
+    # gedruckte Ordnung, und die darf sich nicht heimlich aendern.
+    gemischte = set((await db.execute(select(CardDeck.id).where(
+        CardDeck.id.in_({e["deck_id"] for e in faellig}) if faellig else False,
+        CardDeck.mischen.is_(True)))).scalars().all()) if faellig else set()
+    if gemischte:
+        import random as _random
+        plaetze = [i for i, e in enumerate(faellig) if e["deck_id"] in gemischte]
+        werte = [faellig[i] for i in plaetze]
+        _random.shuffle(werte)
+        for i, w in zip(plaetze, werte):
+            faellig[i] = w
+    for e in faellig:
+        e.pop("deck_id", None)
+
     # Auch geplante Stapel zaehlen: rollt einer frueher aus als die naechste
     # Karte faellig ist, zieht das "naechste Lernen" nach vorne.
     future_release = (await db.execute(select(sa_func.min(CardDeck.released_at)).where(

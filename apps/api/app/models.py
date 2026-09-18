@@ -1383,6 +1383,11 @@ class CardDeck(Versioniert, Base):
     # Zuweisung steht jetzt in card_deck_kurse (mehrere moeglich).
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    # Reihenfolge beim Lernen: aus = die Reihenfolge des Stapels (so gedacht,
+    # so gebaut), an = je Sitzung gemischt. Gemischt gehoert dem STAPEL, nicht
+    # dem Kind: „Vokabeln in beliebiger Folge" ist eine Entscheidung ueber den
+    # Stoff, und ein Kind soll sie nicht umgehen koennen.
+    mischen: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Niveau-Stapel: "E"/"G" nur fuer Schueler des jeweiligen Niveaus, "" fuer
     # alle. So teilt eine Stunde automatisch getrennte Kartensaetze aus.
     niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")

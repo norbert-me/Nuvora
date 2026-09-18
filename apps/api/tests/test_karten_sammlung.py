@@ -346,3 +346,37 @@ async def test_stunde_nimmt_bestehende_zuweisung_nicht_weg(s):
     assert (await K._kurse_je_deck(s, [deck.id])).get(deck.id) == sorted([k1.id, k2.id])
     assert len((await K.student_session("tok-1", db=s))["cards"]) == 1
     assert len((await K.student_session("tok-2", db=s))["cards"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_mischen_gilt_nur_dem_eigenen_stapel(s):
+    """„Zufällige Reihenfolge" mischt die Karten DIESES Stapels — die eines
+    Stapels ohne den Schalter bleiben an ihrem Platz, und gespeichert wird
+    nichts (position bleibt die gedruckte Ordnung)."""
+    from app.models import Card, CardDeck, SchoolClass, Student, User, UserModule
+    from app.routers import karten as K
+
+    u = User(email="mix@b.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="karten"))
+    c = SchoolClass(name="7a", owner_id=u.id); s.add(c); await s.flush()
+    kind = Student(card_id=1, name="Kim", class_id=c.id, karten_token="tok-mischen")
+    fest = CardDeck(owner_id=u.id, class_id=c.id, name="Fest", released_at=K._now())
+    misch = CardDeck(owner_id=u.id, class_id=c.id, name="Misch", mischen=True, released_at=K._now())
+    s.add_all([kind, fest, misch]); await s.flush()
+    for i in range(6):
+        s.add(Card(deck_id=fest.id, front=f"F{i}", back="x", position=i))
+        s.add(Card(deck_id=misch.id, front=f"M{i}", back="x", position=i))
+    await s.commit()
+
+    reihen = set()
+    for _ in range(12):
+        d = await K.student_session("tok-mischen", db=s)
+        namen = [k["front"] for k in d["cards"]]
+        # Die Karten des festen Stapels stehen weiter in ihrer Reihenfolge …
+        assert [n for n in namen if n.startswith("F")] == [f"F{i}" for i in range(6)]
+        reihen.add(tuple(n for n in namen if n.startswith("M")))
+    # … die des gemischten kommen mal so, mal so.
+    assert len(reihen) > 1
+    # Gespeichert wurde nichts: die Position der Karten ist unveraendert.
+    karten = (await s.execute(select(Card).where(Card.deck_id == misch.id).order_by(Card.position))).scalars().all()
+    assert [k.front for k in karten] == [f"M{i}" for i in range(6)]
