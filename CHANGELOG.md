@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Karten lernen:** kein leerer Bereich mehr über der Karte und keine
+  Scrollleiste ohne Inhalt.
 - **Karten lernen:** Am Ende steht je Reifegrad, wie viele Karten dort liegen
   und wann sie wieder drankommen.
 - **Karten ausrollen:** „Zuweisen" aktualisiert die Anzeige wieder — der Stapel

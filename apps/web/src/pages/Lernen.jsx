@@ -264,9 +264,14 @@ function Ergebnisse({ results, t }) {
   );
 }
 
+// `100dvh` statt `100vh`: auf dem Handy rechnet `vh` mit der EINGEKLAPPTEN
+// Adressleiste — zusammen mit der Fusszeile ergab das eine Seite, die immer ein
+// Stueck laenger war als das Fenster, also eine Scrollleiste ohne Inhalt.
+// Und der Inhalt steht OBEN statt senkrecht mittig: zentriert klaffte ueber den
+// Reitern eine leere Flaeche, waehrend die Karte nach unten rutschte.
 const Center = ({ children, hinweis }) => (
-  <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
-    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+  <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
+    <div style={{ flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px" }}>
       {children}
     </div>
     {/* Pflichtangaben auch hier: diese Seite sehen Lernende ohne Konto. */}
