@@ -1061,11 +1061,16 @@ function StapelEinstellungenModal({ deck, t, themen, showTopic, onClose, onSave 
       <div style={{ marginTop: 16 }}>
         <Toggle checked={e.wert.mischen} onChange={(v) => e.setz({ mischen: v })} label={t("karten.mischen")} />
       </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
+      {/* Umbrechend und rechtsbuendig: „nicht gespeichert" plus drei Knoepfe
+          passten nicht in die Dialogbreite und schoben „Schliessen" hinaus.
+          „Schliessen" faellt weg, sobald etwas offen ist — dann sind Speichern
+          und Abbrechen die Antwort, und ein dritter Knopf daneben waere die
+          Frage, was er anders macht als Abbrechen. */}
+      <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
         {/* `immer`: im Dialog steht der Knopf an seinem festen Platz, auch
             solange nichts geaendert wurde — sonst waere der Dialog leer unten. */}
         <Speicherleiste entwurf={e} immer />
-        <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
+        {!e.geaendert && <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>}
       </div>
     </UiModal>
   );
