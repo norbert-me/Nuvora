@@ -25,7 +25,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import eigene_klasse, eigenes, gehoert_optional
-from ..kursmitglieder import class_kurs_ids, eigener_kurs, student_kurs_ids
+from ..kursmitglieder import class_kurs_ids, eigener_kurs, member_student_ids, student_kurs_ids
 from ..nebenlauf import mit_wiederholung
 from ..oeffentlich import basis as oeffentliche_basis
 from ..zeit import als_utc, jetzt, tagesbeginn
@@ -1414,6 +1414,174 @@ async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] =
     return out
 
 
+# ─── Auswertung eines Stapels: welche Karte faellt schwer? ───
+#
+# Die Fortschrittsuebersicht beantwortet „wie weit ist WER?"; das hier die
+# andere Haelfte derselben Frage: „an WELCHER Karte haengt es?". Vorbild ist die
+# Auswertung der Klassenarbeit (routers/klassenarbeit.py `analysis`) — gezaehlt
+# wird je Aufgabe, nicht je Kind, und die Namen bleiben draussen: wer wo steht,
+# zeigt die vorhandene Fortschritt-/Detailsicht.
+
+# Unter so vielen Versuchen sagt eine Quote nichts. Bei zwei Zuegen gibt es nur
+# 0/50/100 %, und eine Karte, die ein einziges Kind einmal verpatzt hat, stuende
+# als schwerste im Stapel — dieselbe Begruendung wie MINDEST_KARTEN im
+# Themenstand (app/themenprofil.py). Solche Karten bekommen KEINE Quote,
+# sondern „zu wenig Daten", und stehen nicht in der Rangliste.
+MINDEST_VERSUCHE = 3
+# „Schwer" ist keine Note, sondern eine Auswahl fuer den naechsten Blick: unter
+# dieser Quote lohnt es, die Karte noch einmal anzusehen.
+SCHWER_QUOTE = 60
+
+
+async def _deck_kinder(db, user, deck, kurs_id=None) -> list:
+    """Die Kinder, die diesen Stapel sehen.
+
+    Entschieden wird mit DERSELBEN Abfrage, die beim Lernen entscheidet
+    (`_student_deck_where` + `_niveau_where`) — nachgebaut wuerde sie beim
+    naechsten Umbau der Sichtbarkeit auseinanderlaufen. Die Kurs-/Klassen-Menge
+    davor ist nur eine Vorauswahl, damit nicht jedes Kind des Kontos einzeln
+    gefragt werden muss; sie darf zu breit sein, die Pruefung faengt es ab.
+
+    Gefragt wird je (Kurse, Klasse, Niveau) genau einmal: alle Kinder einer
+    Klasse teilen sich die Antwort, sonst waere es eine Abfrage je Kind.
+    """
+    zugewiesen = (await _kurse_je_deck(db, [deck.id])).get(deck.id, [])
+    ids: set = set()
+    if kurs_id is not None:
+        ids |= await member_student_ids(db, kurs_id)
+    elif zugewiesen:
+        for k in zugewiesen:
+            ids |= await member_student_ids(db, k)
+    else:   # Bestandsstapel ohne Zuweisung: die Herkunft gilt (siehe _student_deck_where)
+        if deck.kurs_id:
+            ids |= await member_student_ids(db, deck.kurs_id)
+        if deck.class_id:
+            ids |= set((await db.execute(select(Student.id).where(
+                Student.class_id == deck.class_id))).scalars().all())
+    if not ids:
+        return []
+    # Nur eigene Kinder — die Kurs-/Klassen-IDs kamen aus dem Stapel, die Pruefung
+    # steht trotzdem hier: eine Liste fremder Namen entstuende sonst still.
+    kandidaten = await sortiert(db, Student.id.in_(list(ids)),
+                                Student.class_id.in_(select(SchoolClass.id).where(
+                                    SchoolClass.owner_id == user.id,
+                                    SchoolClass.deleted_at.is_(None))))
+    out, gesehen = [], {}
+    for st in kandidaten:
+        kurse = frozenset(await _student_kurs_ids(db, st))
+        schluessel = (kurse, st.class_id, st.niveau or "")
+        if schluessel not in gesehen:
+            gesehen[schluessel] = (await db.execute(select(CardDeck.id).where(
+                CardDeck.id == deck.id, await _student_deck_where(db, st), _niveau_where(st),
+            ))).scalar_one_or_none() is not None
+        if gesehen[schluessel]:
+            out.append(st)
+    return out
+
+
+class AuswertungKarte(BaseModel):
+    card_id: int
+    front: str
+    niveau: str = ""
+    position: int
+    sichtbar: int          # wie vielen Kindern gehoert die Karte ueberhaupt
+    kinder: int            # wie viele haben sie mindestens einmal gehabt
+    versuche: int          # reps + lapses ueber alle Kinder
+    fehler: int            # lapses
+    quote: Optional[int]   # Prozent — None heisst „zu wenig Daten"
+    genug: bool
+    faellig: int
+    hist: dict
+    ease: Optional[int]
+
+
+class DeckAuswertung(BaseModel):
+    deck_id: int
+    name: str
+    mindest: int
+    karten: int
+    kinder: int
+    versuche: int
+    fehler: int
+    quote: Optional[int]
+    schwer: int            # wie viele Karten unter SCHWER_QUOTE liegen
+    cards: List[AuswertungKarte]
+
+
+@router.get("/decks/{deck_id}/auswertung", response_model=DeckAuswertung)
+async def deck_auswertung(deck_id: int, kurs_id: Optional[int] = None,
+                          user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Je Karte: wie oft geuebt, wie oft daneben, bei wie vielen faellig.
+
+    `Treffer = reps`, `Versuche = reps + lapses` — dieselbe Rechnung wie im
+    Themenstand. NICHT nach `reps > 0` filtern: SM-2 setzt `reps` beim Fehler auf
+    0 zurueck, `reps=0, lapses=3` ist also die schwaechste Karte im Stapel und
+    genau die, um die es geht.
+
+    E/G zaehlt mit: eine Karte zaehlt nur bei Kindern, die sie ueberhaupt sehen
+    (`_sichtbar_karte`) — sonst stuende eine E-Karte als „von niemandem geuebt"
+    da, obwohl die halbe Klasse sie nie bekommen hat.
+    """
+    deck = await _owned_deck(db, user, deck_id)
+    if kurs_id is not None:
+        await eigener_kurs(db, user, kurs_id)   # kurs_id kommt aus der URL: erst pruefen, wem er gehoert
+    now = _now()
+    kinder = await _deck_kinder(db, user, deck, kurs_id)
+    cards = (await db.execute(select(Card).where(
+        Card.deck_id == deck.id, Card.deleted_at.is_(None)
+    ).order_by(Card.position, Card.id))).scalars().all()
+    reviews: dict = {}
+    if kinder and cards:
+        for r in (await db.execute(select(CardReview).where(
+                CardReview.student_id.in_([s.id for s in kinder]),
+                CardReview.card_id.in_([c.id for c in cards])))).scalars().all():
+            reviews[(r.student_id, r.card_id)] = r
+
+    zeilen = []
+    for c in cards:
+        sichtbar = [s for s in kinder
+                    if _sichtbar_karte(s.niveau or "", c.niveau, deck.niveau or "",
+                                       bool(deck.niveau_aktiv))]
+        hist, eases = _empty_hist(), []
+        treffer = patzer = geuebt = faellig = 0
+        for s in sichtbar:
+            rev = reviews.get((s.id, c.id))
+            hist[_bucket(rev)] += 1
+            if rev is None:
+                faellig += 1
+                continue
+            r, l = rev.reps or 0, rev.lapses or 0
+            if r or l:
+                geuebt += 1
+                treffer += r
+                patzer += l
+                eases.append(rev.ease or 250)
+            if _utc(rev.due) <= now:
+                faellig += 1
+        versuche = treffer + patzer
+        genug = versuche >= MINDEST_VERSUCHE
+        zeilen.append(AuswertungKarte(
+            card_id=c.id, front=c.front, niveau=c.niveau or "", position=c.position,
+            sichtbar=len(sichtbar), kinder=geuebt, versuche=versuche, fehler=patzer,
+            quote=round(treffer / versuche * 100) if genug else None, genug=genug,
+            faellig=faellig, hist=hist,
+            ease=round(sum(eases) / len(eases)) if eases else None,
+        ))
+    # Schwerste zuerst; „zu wenig Daten" ans Ende — eine Karte ohne Aussage
+    # gehoert nicht an die Spitze einer Rangliste.
+    zeilen.sort(key=lambda z: (z.genug is False, z.quote if z.quote is not None else 0,
+                               -z.versuche, z.position))
+    versuche = sum(z.versuche for z in zeilen)
+    fehler = sum(z.fehler for z in zeilen)
+    return DeckAuswertung(
+        deck_id=deck.id, name=deck.name or "", mindest=MINDEST_VERSUCHE,
+        karten=len(cards), kinder=len(kinder), versuche=versuche, fehler=fehler,
+        quote=round((versuche - fehler) / versuche * 100) if versuche else None,
+        schwer=sum(1 for z in zeilen if z.genug and (z.quote or 0) < SCHWER_QUOTE),
+        cards=zeilen,
+    )
+
+
 # ─── Schueler: Token-Zugang (KEIN Login) ───
 
 async def _student_by_token(db: AsyncSession, token: str, modul="karten") -> Student:
@@ -1640,6 +1808,13 @@ async def submit_review(token: str, body: ReviewIn, db: AsyncSession = Depends(g
         CardDeck.id == deck.id, dw, _niveau_where(st)))).scalar_one_or_none()
     if not sichtbar:
         raise HTTPException(403, "Karte gehört nicht zu dieser Klasse")
+    # Und die KARTE selbst: bei eingeschalteter Differenzierung bekommt ein
+    # G-Kind nie eine E-Karte ausgeteilt — es durfte aber mit bekannter
+    # card_id eine Bewertung darauf schreiben. Derselbe Massstab wie beim
+    # Austeilen (`_sichtbar_karte`), sonst entstuende Fortschritt an einer
+    # Karte, die das Kind nie gesehen hat.
+    if not _sichtbar_karte(st.niveau or "", card.niveau or "", deck.niveau or "", bool(deck.niveau_aktiv)):
+        raise HTTPException(403, "Karte gehört nicht zu diesem Niveau")
     # Raeumt die Lehrkraft auf, waehrend ein Kind lernt (Karte/Stapel geloescht,
     # Freigabe zurueckgezogen), wird der Zug still verworfen: kein Fehler auf dem
     # Kindergeraet und kein Fortschritt auf etwas, das es nicht mehr gibt.

@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Karteikarten sagen, welche Karte schwerfällt.** Im Stapelkopf steht die
+  Kartenzahl, das ⋯-Menü öffnet eine Auswertung: je Karte Trefferquote,
+  Versuche, beteiligte Kinder und Reifegrad — schwerste zuerst. Karten mit zu
+  wenigen Versuchen bekommen „zu wenig Daten" und stehen am Ende.
 - **Karten lernen:** kein leerer Bereich mehr über der Karte und keine
   Scrollleiste ohne Inhalt.
 - **Karten lernen:** Am Ende steht je Reifegrad, wie viele Karten dort liegen

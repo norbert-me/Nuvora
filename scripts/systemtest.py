@@ -694,6 +694,48 @@ def inhalt_karten(api, u, spuren):
     api.call("PUT", f"/api/karten/decks/{stapel['id']}",
              {"name": f"{PRAEFIX} Stapel", "topic_id": u.topic_id, "niveau_aktiv": True}, erwartet=(200,))
 
+    # ─── Auswertung: welche Karte faellt schwer? ───
+    #
+    # Die Quote wird hier NACHGERECHNET, nicht abgelesen: „Treffer = reps,
+    # Versuche = reps + lapses" ist genau die Stelle, an der ein Filter auf
+    # reps > 0 die schwaechsten Karten verschlucken wuerde (grade 0 setzt reps
+    # auf 0 zurueck). Dazu die Mindestzahl — unter ihr darf KEINE Quote stehen.
+    #
+    # Stand bis hier: das G-Kind hat kg1 einmal richtig (reps=1) und kg2 einmal
+    # daneben (lapses=1). Zwei weitere Zuege je Karte bringen beide ueber die
+    # Mindestzahl, in entgegengesetzte Richtung.
+    for _ in range(2):
+        anonym.call("POST", f"/api/karten/lernen/{token_g}/review",
+                    {"card_id": kg1["id"], "grade": 3}, erwartet=(200,))
+        anonym.call("POST", f"/api/karten/lernen/{token_g}/review",
+                    {"card_id": kg2["id"], "grade": 0}, erwartet=(200,))
+    aus = api.call("GET", f"/api/karten/decks/{stapel['id']}/auswertung", erwartet=(200,))
+    if aus.get("mindest") != 3:
+        raise AssertionError(f"Mindestzahl steht auf {aus.get('mindest')} statt 3")
+    a_kg1 = _finde(aus.get("cards"), card_id=kg1["id"])
+    a_kg2 = _finde(aus.get("cards"), card_id=kg2["id"])
+    a_ke = _finde(aus.get("cards"), card_id=ke["id"])
+    if not (a_kg1 and a_kg2 and a_ke):
+        raise AssertionError(f"Auswertung nennt nicht alle drei Karten: {aus}")
+    if (a_kg1["versuche"], a_kg1["fehler"], a_kg1["quote"]) != (3, 0, 100):
+        raise AssertionError(f"dreimal richtig ergibt {a_kg1} statt 3 Versuche / 100 %")
+    if (a_kg2["versuche"], a_kg2["fehler"], a_kg2["quote"]) != (3, 3, 0):
+        raise AssertionError(f"dreimal daneben ergibt {a_kg2} statt 3 Versuche / 0 % "
+                             "(grade 0 setzt reps zurueck — die Karte darf nicht verschwinden)")
+    if a_ke["quote"] is not None or a_ke["genug"]:
+        raise AssertionError(f"ungeuebte E-Karte hat eine Quote: {a_ke}")
+    if a_ke["sichtbar"] != 1:
+        raise AssertionError(f"E-Karte gilt fuer {a_ke['sichtbar']} Kinder statt nur fuer das E-Kind")
+    # Schwerste zuerst, „zu wenig Daten" ans Ende.
+    reihenfolge = [c["card_id"] for c in aus["cards"]]
+    if reihenfolge != [kg2["id"], kg1["id"], ke["id"]]:
+        raise AssertionError(f"Rangliste steht als {reihenfolge}, erwartet schwerste zuerst")
+    if (aus["versuche"], aus["fehler"], aus["quote"]) != (6, 3, 50):
+        raise AssertionError(f"Deck-Summe {aus['versuche']}/{aus['fehler']}/{aus['quote']} "
+                             "statt 6 Versuche, 3 Fehler, 50 %")
+    if aus["schwer"] != 1:
+        raise AssertionError(f"{aus['schwer']} schwere Karten statt 1")
+
     # Fremder Token darf nichts oeffnen.
     status, _ = anonym.call("GET", "/api/karten/lernen/ZZ-kein-token", roh=True)
     if status < 400:
@@ -743,7 +785,9 @@ def inhalt_karten(api, u, spuren):
     return (f"{zuweisung}; Stapel freigegeben, Karte ohne Angabe kommt als G an, E-Kind sieht "
             "E- und G-Karten, G-Kind genau die beiden G-Karten, "
             "ohne Anmeldung gelernt, Fortschritt 0 -> 1 von 2 "
-            f"(Detailsicht bestaetigt reps=1), falsche Karte in {frist:.0f} Minuten "
+            f"(Detailsicht bestaetigt reps=1), Auswertung rechnet 100 %/0 % nach und "
+            "haelt die ungeuebte Karte unter der Mindestzahl, falsche Karte in "
+            f"{frist:.0f} Minuten "
             "wieder faellig, falscher Token abgewiesen; Niveau-Schalter aus = alle "
             "sehen alles; Sammlungsstapel erst nach Kurs-Zuweisung sichtbar und "
             "nach Ruecknahme wieder still")

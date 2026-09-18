@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { AddButton, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_H, CONTROL_R, dateiWaehlen, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, menuRow, Modal as UiModal, modalOverlay, modalPanel, NiveauToggle, overlayGuard, pageApp, pageForm, panelStyle, Popover, REIFE_COLORS, selectStyle, Skeleton, td as tdBasis, th as thBasis, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { AddButton, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_H, CONTROL_R, dateiWaehlen, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, menuRow, Modal as UiModal, modalOverlay, modalPanel, NiveauToggle, overlayGuard, pageApp, pageForm, panelStyle, Popover, REIFE_COLORS, Segment, segmentBtn, selectStyle, Skeleton, td as tdBasis, th as thBasis, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import { themenIndex } from "../core/topics.js";
@@ -444,7 +444,7 @@ export default function Karten() {
               <Speicherleiste entwurf={ordnung} />
             </div>
           )}
-          {sichtbareDecks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} kurse={alleKurse} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => { setDragDeckId(d.id); ziehDeck.start(d.id, d.folder_id ?? null); }} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => ziehDeck.ueber(e, d.id, d.folder_id ?? null)} onReorderDrop={() => dropDeck(d.id)} dropSide={ziehDeck.seite(d.id)} />)}
+          {sichtbareDecks.map((d) => <Deck key={d.id} deck={d} kursId={kursId} t={t} call={call} topics={topics} kurse={alleKurse} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => { setDragDeckId(d.id); ziehDeck.start(d.id, d.folder_id ?? null); }} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => ziehDeck.ueber(e, d.id, d.folder_id ?? null)} onReorderDrop={() => dropDeck(d.id)} dropSide={ziehDeck.seite(d.id)} />)}
         </>
       )}
 
@@ -593,7 +593,7 @@ function StudentDetail({ detail, t, onClose }) {
   );
 }
 
-function Deck({ kurse = [], deck, t, call, topics = [], showTopic = false, folders = [], onMove, onDragStartDeck, onDragEndDeck, dragging = false, autoOpen = false, onAutoOpened, onReorderOver, onReorderDrop, dropSide = null }) {
+function Deck({ kurse = [], deck, kursId = null, t, call, topics = [], showTopic = false, folders = [], onMove, onDragStartDeck, onDragEndDeck, dragging = false, autoOpen = false, onAutoOpened, onReorderOver, onReorderDrop, dropSide = null }) {
   const [planDate, setPlanDate] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -601,6 +601,7 @@ function Deck({ kurse = [], deck, t, call, topics = [], showTopic = false, folde
   // Karten und Eingabe dazu. Offen IST der Name das Eingabefeld.
   const [collapsed, setCollapsed] = useState(true);
   const [einstellungen, setEinstellungen] = useState(false); // Thema/Niveau (selten, deshalb im ⋯)
+  const [auswertung, setAuswertung] = useState(false);       // „Welche Karte faellt schwer?"
   const rootRef = useRef(null);
   // Deep-Link (?deck=<id> aus dem Kalender): einmalig aufklappen + hinscrollen.
   useEffect(() => {
@@ -799,12 +800,15 @@ function Deck({ kurse = [], deck, t, call, topics = [], showTopic = false, folde
               background: nameHover || nameFocus ? "var(--bg)" : "transparent",
             }} />
         )}
-        {/* Im Kopf steht nur noch, WELCHER Stapel das ist, und ob er draussen
-            ist. Thema, Niveau und Kartenzahl standen hier als graue Chips: das
-            Thema war abgeschnitten und damit unlesbar, das geplante Datum
-            nannte eine Uhrzeit auf die Sekunde, die niemand gesetzt hat, und
-            die Kartenzahl wollte niemand sehen. Thema und Niveau stehen in den
-            Stapel-Einstellungen, der geplante Tag im Ausrollen-Menue. */}
+        {/* Im Kopf steht, WELCHER Stapel das ist, wie viele Karten er hat und ob
+            er draussen ist. Thema, Niveau und das geplante Datum standen hier
+            einmal als weitere Chips: das Thema war abgeschnitten und damit
+            unlesbar, das Datum nannte eine Uhrzeit auf die Sekunde, die niemand
+            gesetzt hat. Sie stehen jetzt in den Stapel-Einstellungen und im
+            Ausrollen-Menue. Die KARTENZAHL war mit ihnen verschwunden und ist
+            auf Wunsch zurueck (18.09.2026): zugeklappt sagt sonst nichts, ob in
+            dem Stapel drei Karten liegen oder achtzig. */}
+        <span style={chipStyle}>{cards.length} {t("karten.cards")}</span>
         {status === "aus" && (
           <span style={{ ...chipStyle, background: C.success + "1f", color: C.success }}>{t("karten.rolledOut")}</span>
         )}
@@ -814,6 +818,11 @@ function Deck({ kurse = [], deck, t, call, topics = [], showTopic = false, folde
           // zweiten Menue — zwei Flaechen fuer anderthalb Funktionen. Der
           // Lernmodus steht jetzt als erster Eintrag im ⋯.
           cards.length > 0 && { key: "study", label: t("karten.study"), icon: ICONS.eye, onClick: () => setStudying(true) },
+          // Die Auswertung steht im ⋯ und nicht als eigener Knopf in der Leiste:
+          // links liegen schon Griff, Aufklappen, Name und die zwei Chips, rechts
+          // der Haupthandgriff (Ausrollen) — ein sechstes Bedienelement waere
+          // genau die Reihe, die diese Leiste einmal aufgeloest hat.
+          cards.length > 0 && { key: "auswertung", label: t("karten.analysis"), icon: ICONS.chart, onClick: () => setAuswertung(true) },
           { key: "einstellungen", label: t("karten.deckSettings"), icon: ICONS.settings, onClick: () => setEinstellungen(true) },
           deck.cards.length > 0 && { key: "export", label: t("karten.export"), icon: ICONS.export, onClick: exportDeck },
           { key: "import", label: t("karten.import"), icon: ICONS.import, onClick: () => setImporting(true) },
@@ -928,6 +937,9 @@ function Deck({ kurse = [], deck, t, call, topics = [], showTopic = false, folde
       {einstellungen && <StapelEinstellungenModal deck={deck} t={t} themen={themen} showTopic={showTopic}
         onClose={() => setEinstellungen(false)}
         onSave={async (werte) => { const ok = await saveDeck(werte); if (ok) setEinstellungen(false); return ok; }} />}
+      {auswertung && !collapsed && (
+        <DeckAuswertung deck={deck} kursId={kursId} t={t} onClose={() => setAuswertung(false)} />
+      )}
       {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
         onPublish={(description) => fetch(`/api/marketplace/publish/deck`, alsJson("POST", { deck_id: deck.id, description })).catch(() => null)} />}
 
@@ -1338,6 +1350,102 @@ const REIFE = [
 ];
 
 // Gestapelter Reifegrad-Balken aus einem hist-Objekt {neu,lernen,...}.
+// ─── Auswertung eines Stapels ───
+//
+// Die Fortschrittsseite beantwortet „wie weit ist WER?"; das hier die andere
+// Haelfte derselben Frage: „an WELCHER Karte haengt es?". Gerechnet wird nichts:
+// Quote, Mindestzahl und Reihenfolge kommen fertig vom Server (eine Rechnung,
+// nicht zwei — dieselbe Regel wie beim Themenstand). Namen stehen bewusst nicht
+// drin: wer wo steht, zeigt die Detailsicht im Reiter „Fortschritt".
+const quoteFarbe = (q) => (q < 50 ? C.danger : q < 75 ? C.warning : C.success);
+// Wie beim Reifegrad-Balken: die Rundung ist die halbe Kante, keine eigene
+// Radius-Stufe (siehe die Leiter in Icons.jsx).
+const QUOTE_H = 8;
+
+function DeckAuswertung({ deck, kursId, t, onClose }) {
+  const [daten, setDaten] = useState(null);
+  const [sort, setSort] = useState("schwer"); // schwer | stapel
+  useEffect(() => {
+    let weg = false;
+    setDaten(null);
+    // Scheitert das Lesen, muss das zu SEHEN sein: ein Skelett, das nie
+    // aufhoert, sieht aus wie ein haengender Server.
+    hol(`${API}/decks/${deck.id}/auswertung${kursId ? `?kurs_id=${kursId}` : ""}`, null)
+      .then((d) => { if (!weg) setDaten(d || false); });
+    return () => { weg = true; };
+  }, [deck.id, kursId]);
+
+  // Der Server liefert schon „schwerste zuerst"; die zweite Reihenfolge ist die
+  // des Stapels — so findet man die Karte wieder, die man gleich umschreiben will.
+  const zeilen = useMemo(() => {
+    const cs = daten?.cards || [];
+    return sort === "stapel" ? [...cs].sort((a, b) => a.position - b.position) : cs;
+  }, [daten, sort]);
+
+  return (
+    <div style={{ ...panelStyle, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+        <strong style={{ fontSize: 14, flex: 1, minWidth: 0 }}>{t("karten.analysis")}</strong>
+        <Segment>
+          {[["schwer", t("karten.sortHard")], ["stapel", t("karten.sortDeck")]].map(([k, label]) => (
+            <button key={k} onClick={() => setSort(k)}
+              style={{ ...segmentBtn, fontWeight: sort === k ? 700 : 500,
+                color: sort === k ? "var(--accent)" : "var(--text2)" }}>{label}</button>
+          ))}
+        </Segment>
+        <button onClick={onClose} className="icon-btn" style={toolbarIconBtn} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={16} /></button>
+      </div>
+      {daten === false ? <div style={{ fontSize: 13, color: C.danger }}>{t("common.error")}</div>
+        : !daten ? <Skeleton rows={3} height={28} />
+        : !daten.versuche ? <Empty title={t("karten.analysisEmpty")} hint={t("karten.analysisEmptyHint")} />
+        : (<>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            <span style={chipStyle}>{daten.karten} {t("karten.cards")}</span>
+            <span style={chipStyle}>{daten.kinder} {t("karten.students")}</span>
+            <span style={chipStyle}>{daten.versuche} {t("karten.tries")}</span>
+            {daten.quote != null && (
+              <span style={{ ...chipStyle, background: quoteFarbe(daten.quote) + "1f", color: quoteFarbe(daten.quote) }}>
+                {t("karten.hitRate")}: {daten.quote} %
+              </span>
+            )}
+            {daten.schwer > 0 && (
+              <span style={{ ...chipStyle, background: C.danger + "1f", color: C.danger }}>
+                {t("karten.hardCount", { n: daten.schwer })}
+              </span>
+            )}
+          </div>
+          {zeilen.map((z) => (
+            <div key={z.card_id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13 }}>
+              {/* Eine Zeile, dann Auslassungspunkte — dieselbe Form wie in der
+                  Kartenliste darueber; der volle Text steht im title. */}
+              <span title={z.front} style={{ flex: 1, minWidth: 0, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <Latex>{z.front}</Latex>
+              </span>
+              {z.genug ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, width: 120, flexShrink: 0 }}>
+                  <span style={{ flex: 1, minWidth: 0, height: QUOTE_H, borderRadius: QUOTE_H / 2, background: "var(--bg2)", overflow: "hidden" }}>
+                    <span style={{ display: "block", width: `${z.quote}%`, height: "100%", background: quoteFarbe(z.quote) }} />
+                  </span>
+                  <span style={{ width: 38, textAlign: "right", color: quoteFarbe(z.quote), fontWeight: 700 }}>{z.quote} %</span>
+                </span>
+              ) : (
+                // Nicht als 0 % zeichnen: zwei Zuege sagen nichts, und eine
+                // Karte ohne Aussage darf nicht wie die schwerste aussehen.
+                <span style={{ width: 120, flexShrink: 0, textAlign: "right", color: "var(--text3)", fontSize: 12 }}
+                  title={t("karten.tooFewHint", { n: daten.mindest })}>{t("karten.tooFew")}</span>
+              )}
+              <span style={{ width: 54, flexShrink: 0, textAlign: "right", color: "var(--text3)" }}
+                title={t("karten.tries")}>{z.versuche}</span>
+              <span style={{ width: 40, flexShrink: 0, textAlign: "right", color: "var(--text3)" }}
+                title={t("karten.students")}>{z.kinder}</span>
+              <span style={{ width: 90, flexShrink: 0 }}><ReifeBar hist={z.hist} /></span>
+            </div>
+          ))}
+        </>)}
+    </div>
+  );
+}
+
 function ReifeBar({ hist, height = 10 }) {
   const total = REIFE.reduce((s, [k]) => s + (hist?.[k] || 0), 0);
   if (!total) return <span style={{ fontSize: 12, color: "var(--text3)" }}>—</span>;
