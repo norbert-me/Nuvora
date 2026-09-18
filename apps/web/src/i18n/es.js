@@ -2286,6 +2286,7 @@ export default {
   "lernen.reifeKurz": "Corto plazo",
   "lernen.reifeMittel": "Medio plazo",
   "lernen.reifeLang": "Largo plazo",
+  "lernen.wiederAm": "de nuevo el {{datum}}",
   "lernen.noResultTitle": "Todavía sin resultados",
   "lernen.noResultHint": "Tus resultados aparecerán aquí en cuanto se evalúe la primera prueba.",
   "lernen.resultsTitle": "Tus resultados",

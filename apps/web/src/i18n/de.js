@@ -2275,6 +2275,7 @@ export default {
   "lernen.reifeKurz": "Kurzfristig",
   "lernen.reifeMittel": "Mittelfristig",
   "lernen.reifeLang": "Langfristig",
+  "lernen.wiederAm": "wieder am {{datum}}",
   "lernen.noResultTitle": "Noch kein Ergebnis",
   "lernen.noResultHint": "Deine Testergebnisse erscheinen hier, sobald der erste Test ausgewertet wurde.",
   "lernen.resultsTitle": "Deine Ergebnisse",

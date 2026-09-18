@@ -192,13 +192,26 @@ function MeinFortschritt({ data, t }) {
           return n > 0 ? <div key={k} style={{ width: `${(n / total) * 100}%`, background: REIFE_COLORS[k] }} title={`${n}`} /> : null;
         })}
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px" }}>
-        {REIFE.map(([k, label]) => (
-          <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text3)" }}>
-            <span style={{ width: 8, height: 8, borderRadius: 4, background: REIFE_COLORS[k] }} />
-            {t(label)} {hist[k] || 0}
-          </span>
-        ))}
+      {/* Je Reifegrad eine Zeile: wie viele Karten dort liegen und wann sie
+          wiederkommen. Die blosse Zahl beantwortet „wie weit bin ich?", nicht
+          „wann ist das wieder dran?" — und danach fragt man am Schluss. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {REIFE.map(([k, label]) => {
+          const n = hist[k] || 0;
+          const wann = (data?.hist_due || {})[k];
+          return (
+            <div key={k} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: n ? "var(--text2)" : "var(--text3)" }}>
+              <span style={{ width: 8, height: 8, borderRadius: 4, background: REIFE_COLORS[k], flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: 0 }}>{t(label)}</span>
+              <span style={{ fontWeight: n ? 700 : 400 }}>{n}</span>
+              {n > 0 && wann && (
+                <span style={{ color: "var(--text3)", minWidth: 0 }}>
+                  · {t("lernen.wiederAm", { datum: new Date(wann).toLocaleDateString(undefined, { day: "numeric", month: "short" }) })}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

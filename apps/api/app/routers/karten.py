@@ -1555,7 +1555,8 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
             dw, _niveau_where(st), CardDeck.deleted_at.is_(None), CardDeck.released_at > now,
         ))).scalar()
         return {"name": st.name, "cards": [], "total": 0, "due": 0, "learned": 0,
-                "hist": _empty_hist(), "next_due": naechste.isoformat() if naechste else None}
+                "hist": _empty_hist(), "hist_due": {b: None for b in BUCKETS},
+                "next_due": naechste.isoformat() if naechste else None}
     # Auch auf Kartenebene filtern: der Stapel darf gemischt sein, das Kind
     # bekommt daraus nur die neutralen und die eigenen Niveau-Karten. Ohne
     # diesen Filter zaehlten "total"/"faellig" Karten mit, die es nie zu sehen
@@ -1569,9 +1570,16 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
     learned = 0
     due_count = 0
     next_due = None  # frueheste kuenftige Faelligkeit → wann wieder lernen
+    # Je Reifegrad die naechste Faelligkeit: „Kurzfristig 12 · wieder am 21.9."
+    # beantwortet auf dem Schlussbildschirm die Frage, die die blosse Zahl
+    # offen laesst — wann diese Karten wiederkommen.
+    hist_due: dict = {b: None for b in BUCKETS}
     for c in cards:
         rev = reviews.get(c.id)
-        hist[_bucket(rev)] += 1
+        b = _bucket(rev)
+        hist[b] += 1
+        if rev is not None and _utc(rev.due) > now and (hist_due[b] is None or _utc(rev.due) < hist_due[b]):
+            hist_due[b] = _utc(rev.due)
         if rev is not None and (rev.reps or 0) > 0:
             learned += 1
         is_due = rev is None or _utc(rev.due) <= now
@@ -1591,6 +1599,7 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
         next_due = _utc(future_release)
     return {"name": st.name, "cards": faellig, "total": len(cards),
             "due": due_count, "learned": learned, "hist": hist,
+            "hist_due": {b: (d.isoformat() if d else None) for b, d in hist_due.items()},
             "next_due": next_due.isoformat() if next_due else None}
 
 
