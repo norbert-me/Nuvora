@@ -60,7 +60,7 @@ export const ZIELE = [
 
   // ── Karteikarten ──
   { pfad: "/karten?tab=cards", key: "karten.tabCards", modul: "karten", worte: ["karteikarten", "stapel", "deck", "üben"] },
-  { pfad: "/karten?tab=progress", key: "karten.tabProgress", modul: "karten", option: "fortschritt", worte: ["fortschritt", "lernstand"] },
+  { pfad: "/karten?tab=progress", key: "karten.tabProgress", modul: "karten", option: "fortschritt", worte: ["auswertung", "fortschritt", "lernstand", "schwere karten"] },
   { pfad: "/karten?tab=qr", key: "karten.tabQr", modul: "karten", worte: ["qr", "zugang", "code", "zettel drucken"] },
   { pfad: "/marktplatz?area=karten&kind=karten_deck", key: "market.kindDeck", modul: "karten", worte: ["marktplatz", "stapel teilen", "deck übernehmen", "fremde karten"] },
 

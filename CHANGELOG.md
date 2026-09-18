@@ -16,6 +16,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Karteikarten: Reiter „Fortschritt" heißt jetzt „Auswertung"** — dort steht
+  neben dem Stand je Kind auch, welche Karte schwerfällt.
+- **„Als Note übernehmen" bei den Karteikarten ist entfernt.** Aus einem
+  Reifegrad lässt sich keine Note rechnen; die Klassenarbeit rechnet mit
+  echten Punkten und übernimmt weiter.
 - **Der QR-Link eines Kindes meldet die Lehrkraft nicht mehr ab.** Auf den
   ausgeteilten Wegen heißt 401 „dieser Zugang gilt nicht mehr", nicht
   „Sitzung abgelaufen".

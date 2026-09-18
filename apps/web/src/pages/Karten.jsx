@@ -19,25 +19,21 @@ import PublishModal from "../components/PublishModal.jsx";
 import DateiMenu from "../components/DateiMenu.jsx";
 import VerknuepfungDialog, { themenNamen } from "../components/Verknuepfung.jsx";
 import Latex from "../components/Latex.jsx";
-import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 import { oeffentlicheBasis } from "../core/basis.js";
 import { formelEinfuegen, LATEX_TASTEN, spalteAnhaengen, TABELLE_GERUEST, zeileAnhaengen } from "../core/latextabelle.js";
 import { alsJson, hol, sende } from "../core/melden.js";
 import { mondayOf } from "../core/datum.js";
 import { istVorfahre, ordnerMitId, pfadZu } from "../core/ordnerbaum.js";
 import { useAblegeZiel, useEinfuegen } from "../core/ziehsortieren.js";
-import NotenUebernahme from "../components/NotenUebernahme.jsx";
 
 
-// Meisterung aus dem Reifegrad: gewichteter Anteil reifer Karten. Neu zählt
-// nicht, langfristig voll. Ergibt 0–100 %, das die Notenskala in eine Note übersetzt.
-const MASTERY_W = { neu: 0, lernen: 0.25, kurz: 0.5, mittel: 0.8, lang: 1 };
-function masteryPct(hist) {
-  const total = Object.values(hist || {}).reduce((a, b) => a + b, 0);
-  if (!total) return null;
-  const w = Object.entries(MASTERY_W).reduce((s, [k, v]) => s + ((hist[k] || 0) * v), 0);
-  return (w / total) * 100;
-}
+// „Als Note übernehmen" gab es hier einmal: aus dem Reifegrad wurde über die
+// Notenskala eine Note. Entfernt am 18.09.2026 auf Wunsch des Nutzers — „dafür
+// gibt es keinen Umrechnungsfaktor". Stimmt: der Reifegrad sagt, wie oft und
+// wie sicher jemand geübt hat, nicht, was er kann; eine Skala dazwischen wäre
+// eine erfundene Umrechnung. Wer eine Note braucht, schreibt eine Arbeit.
+// Der gemeinsame Baustein `components/NotenUebernahme.jsx` bleibt — die
+// Klassenarbeit rechnet mit echten Punkten und benutzt ihn weiter.
 
 const API = "/api/karten";
 
@@ -67,24 +63,11 @@ export default function Karten() {
   // Themen-Bindung ist nur mit Kalender sinnvoll (Auto-Freischaltung). Ohne das
   // Modul bleibt die Option aus (Regel 3: Zusatz, nie Voraussetzung).
   const kalenderAktiv = aktiv("kalender");
-  // Brücke zum Notenbuch (Regel 3: Zusatz). Nur wenn das Modul Noten aktiv ist.
-  const notenAktiv = aktiv("auswertung");
-  const [gradeScale, setGradeScale] = useState(DEFAULT_SCALE);
-  const [notenDialog, setNotenDialog] = useState(false);
 
   useEffect(() => {
     if (kalenderAktiv) return swr("topics", "/api/topics", (d) => setTopics(Array.isArray(d) ? d : []));
   }, [kalenderAktiv]);
 
-  useEffect(() => {
-    if (!notenAktiv) return;
-    // Notenskala der Lehrkraft vom Server (autoritativ) — der localStorage-Cache
-    // kann veraltet sein, wenn die Skala in dieser Sitzung geaendert wurde.
-    fetch("/api/auth/me").then((r) => (r.ok ? r.json() : null)).then((u) => {
-      if (u?.grade_scale) setGradeScale(u.grade_scale);
-      else { try { const c = JSON.parse(localStorage.getItem("user")); if (c?.grade_scale) setGradeScale(c.grade_scale); } catch {} }
-    }).catch(() => { try { const c = JSON.parse(localStorage.getItem("user")); if (c?.grade_scale) setGradeScale(c.grade_scale); } catch {} });
-  }, [notenAktiv]);
 
   // Klassenliste, Vorwahl und „zuletzt gewaehlt" aus core/klassenwahl.js.
   // `vorzug` ist die Klasse aus der Adresse (?class=, z.B. Link aus dem
@@ -477,7 +460,6 @@ export default function Karten() {
                 <span style={{ fontSize: 14, fontWeight: 700 }}>{t("karten.progress")}</span>
                 <span style={{ ...chipStyle, background: C.success + "1f", color: C.success }}>{t("karten.thisWeek")}: {dieseWoche}/{nStud}</span>
                 {nieGelernt > 0 && <span style={chipStyle}>{t("karten.neverLearned")}: {nieGelernt}</span>}
-                {notenAktiv && <button onClick={() => setNotenDialog(true)} style={{ ...toolbarBtn, marginLeft: "auto" }}>{t("karten.toNoten")}</button>}
               </div>
             )}
             <div style={{ ...cardStyle, padding: 0, overflowX: "auto" }}>
@@ -548,16 +530,6 @@ export default function Karten() {
       )}
 
       {detail && <StudentDetail detail={detail} t={t} onClose={() => setDetail(null)} />}
-      {notenDialog && (() => {
-        // Nur wer schon gelernt hat — nie-Gelernten wird keine 6 untergeschoben.
-        const noten = progress.filter((p) => p.reviewed > 0)
-          .map((p) => ({ student_id: p.student_id, value: gradeFromPct(masteryPct(p.hist), gradeScale) }))
-          .filter((g) => g.value >= 1 && g.value <= 6);
-        return <NotenUebernahme titel={t("karten.toNoten")} hinweis={t("karten.masteryHint", { n: noten.length })}
-          classId={classId} kursId={kursId} grades={noten} quelle="karten" notiz={t("karten.masteryNote")}
-          spalte={`${t("karten.masteryColumn")} ${new Date().toLocaleDateString()}`}
-          onClose={() => setNotenDialog(false)} />;
-      })()}
     </div>
   );
 }
@@ -1394,7 +1366,7 @@ function KartenAuswertung({ decks, kursId, t }) {
   return (
     <div style={{ marginTop: 24 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-        <span style={{ fontSize: 14, fontWeight: 700 }}>{t("karten.analysis")}</span>
+        <span style={{ fontSize: 14, fontWeight: 700 }}>{t("karten.analysisCards")}</span>
         {decks.length > 1 && (
           <SuchSelect value={String(gewaehlt)} onChange={(v) => setDeckId(Number(v))} style={{ minWidth: 0, maxWidth: 320 }}
             optionen={decks.map((d) => ({ wert: String(d.id), label: d.name || t("karten.deck") }))} />

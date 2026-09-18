@@ -116,18 +116,6 @@ const klassenParam = (td, trenner = "?") => {
 
 const verbindungen = (td) => [
   {
-    name: "Karten → „Als Note übernehmen\" (braucht Auswertung)",
-    // Klasse UND Kurs in der Adresse: die Seiten merken sich sonst die
-    // zuletzt gewaehlte Klasse. Auf einer Instanz mit echten Klassen zeigten
-    // sie deshalb eine fremde — und die Bruecke sah tot aus, obwohl nur die
-    // falsche Klasse offen war. Lokal fiel das nie auf: dort gab es nur die
-    // Testklasse.
-    pfad: `/karten?tab=progress${klassenParam(td, "&")}`,
-    marker: "Als Note übernehmen",
-    allein: ["karten"],
-    zusammen: ["karten", "auswertung"],
-  },
-  {
     name: "CardVote-Auswertung → „Ins Notenmodul\" (braucht Auswertung)",
     pfad: `/cardvote/evaluation/${td.session?.id}`,
     marker: "Ins Notenmodul",

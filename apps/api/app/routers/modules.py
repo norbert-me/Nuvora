@@ -163,9 +163,13 @@ REGISTRY: List[ModuleDef] = [
         optionen=[
             ModulOption(
                 key="fortschritt",
-                name="Fortschritt",
+                # Schluessel bleibt „fortschritt": er steht in den Konten
+                # (user_modules.optionen) — umbenennen hiesse, jede Abwahl zu
+                # vergessen. Der NAME heisst, was der Reiter heisst.
+                name="Auswertung",
                 description=(
-                    "Der Reifegrad je Kind und Stapel. Aus, wenn du die Karten nur erstellst und druckst."
+                    "Der Reifegrad je Kind und Stapel und die Frage, welche Karte schwerfällt. "
+                    "Aus, wenn du die Karten nur erstellst und druckst."
                 ),
             ),
         ],
