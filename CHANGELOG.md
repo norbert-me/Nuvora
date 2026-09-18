@@ -16,6 +16,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Karten ausrollen:** „Zuweisen" aktualisiert die Anzeige wieder — der Stapel
+  stand als „keinem Kurs zugewiesen" da, obwohl die Zuweisung gespeichert war;
+  ein Fehler des Servers bleibt jetzt nicht mehr unsichtbar.
+- **Konflikt-Dialog zeigt die Unterschiede:** eigene Änderung und anderer Stand
+  nebeneinander, Abweichungen hervorgehoben, mit Zeitpunkt.
 - **Bestehende Klassenarbeit in E und G teilen:** Knopf „E/G“ in der Leiste;
   die Aufgaben gehen in beide Blätter, die Punkte der G-Kinder ins G-Blatt.
 

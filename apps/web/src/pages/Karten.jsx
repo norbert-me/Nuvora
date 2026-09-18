@@ -883,10 +883,14 @@ function Deck({ kurse = [], deck, t, call, topics = [], showTopic = false, folde
                         </label>
                       ))}
                     </div>
+                    {/* Ueber `call`: es zeigt einen Fehler des Servers an UND
+                        laedt die Stapel neu. Vorher ging der Aufruf ins Leere
+                        (`Promise.resolve()` hat kein `.ok`) — die Zuweisung war
+                        gespeichert, die Liste zeigte weiter „keinem Kurs
+                        zugewiesen", und ein 404 blieb unsichtbar. */}
                     <button onClick={async () => {
-                      await fetch(`${API}/decks/${deck.id}/kurse`, alsJson("PUT", { kurs_ids: kursWahl })).catch(() => {});
-                      setRollOpen(false);
-                      call(() => Promise.resolve());
+                      const ok = await call(() => fetch(`${API}/decks/${deck.id}/kurse`, alsJson("PUT", { kurs_ids: kursWahl })));
+                      if (ok) setRollOpen(false);
                     }} style={{ ...toolbarBtnPrimary, marginTop: 6, width: "100%" }}>{t("karten.kurseSpeichern")}</button>
                   </div>
                 )}

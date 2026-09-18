@@ -181,16 +181,25 @@ function _konfliktWert(v) {
   return String(v);
 }
 function KonfliktVergleich({ lokal, server }) {
-  const felder = Object.keys(lokal || {}).filter((k) => {
-    if (["id", "version"].includes(k)) return false;
-    if (!server || !(k in server)) return true;
-    return _konfliktWert(lokal[k]) !== _konfliktWert(server[k]);
-  });
+  // Gezeigt wird ALLES, was die eigene Aenderung anfasst — nicht nur das
+  // Abweichende: eine leere Tabelle („es unterscheidet sich nichts, was ich
+  // sehe") liess die Frage unbeantwortbar, und genau daran stand die
+  // Entscheidung. Was sich unterscheidet, ist hervorgehoben; ist alles gleich,
+  // sagt eine Zeile das ausdruecklich.
+  const alle = Object.keys(lokal || {}).filter((k) => !["id", "version"].includes(k));
+  const andersAls = (k) => !server || !(k in server) || _konfliktWert(lokal[k]) !== _konfliktWert(server[k]);
+  const abweichend = alle.filter(andersAls);
+  const felder = abweichend.length ? [...abweichend, ...alle.filter((k) => !abweichend.includes(k))] : alle;
   const z = { padding: "4px 8px", verticalAlign: "top", fontSize: 13, borderTop: "1px solid var(--border)", wordBreak: "break-word" };
+  const wann = server && server.geaendert_at ? new Date(server.geaendert_at) : null;
   return (
     <div>
       <div style={{ fontSize: 16, marginBottom: 10 }}>{uebersetze("konflikt.frage")}</div>
+      {!abweichend.length && felder.length > 0 && (
+        <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 8 }}>{uebersetze("konflikt.gleich")}</div>
+      )}
       {felder.length > 0 && (
+        <div style={{ maxHeight: "40vh", overflowY: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <thead><tr>
             <th style={{ ...z, borderTop: "none", textAlign: "left", width: "30%", color: "var(--text3)", fontWeight: 600 }}></th>
@@ -198,15 +207,24 @@ function KonfliktVergleich({ lokal, server }) {
             <th style={{ ...z, borderTop: "none", textAlign: "left", color: "var(--text2)", fontWeight: 700 }}>{uebersetze("konflikt.spalteServer")}</th>
           </tr></thead>
           <tbody>
-            {felder.map((k) => (
-              <tr key={k}>
-                <td style={{ ...z, color: "var(--text3)" }}>{k}</td>
-                <td style={z}>{_konfliktWert(lokal[k])}</td>
-                <td style={{ ...z, color: "var(--text2)" }}>{server ? _konfliktWert(server[k]) : "—"}</td>
-              </tr>
-            ))}
+            {felder.map((k) => {
+              const anders = andersAls(k);
+              return (
+                <tr key={k}>
+                  <td style={{ ...z, color: "var(--text3)" }}>{k}</td>
+                  <td style={{ ...z, fontWeight: anders ? 700 : 400, opacity: anders ? 1 : 0.6 }}>{_konfliktWert(lokal[k])}</td>
+                  <td style={{ ...z, color: "var(--text2)", fontWeight: anders ? 700 : 400, opacity: anders ? 1 : 0.6 }}>{server ? _konfliktWert(server[k]) : "—"}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+        </div>
+      )}
+      {wann && (
+        <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
+          {uebersetze("konflikt.standVom", { zeit: wann.toLocaleString() })}
+        </div>
       )}
     </div>
   );
@@ -221,7 +239,7 @@ async function konfliktKlaeren(res, input, init, url) {
   let lokal = {};
   try { lokal = init && typeof init.body === "string" ? JSON.parse(init.body) : (init && init.body) || {}; } catch { /* egal */ }
   const wahl = await askChoice(
-    <KonfliktVergleich lokal={lokal} server={stand.daten} />,
+    <KonfliktVergleich lokal={lokal} server={{ ...(stand.daten || {}), geaendert_at: stand.geaendert_at }} />,
     [{ key: "meine", label: uebersetze("konflikt.meine") },
      { key: "server", label: uebersetze("konflikt.server") }],
   );
@@ -239,7 +257,7 @@ async function konfliktKlaeren(res, input, init, url) {
 setKonfliktFrage(async (eintrag, stand) => {
   const { askChoice } = await import("./core/dialog.jsx");
   const wahl = await askChoice(
-    <KonfliktVergleich lokal={eintrag && eintrag.body} server={stand.daten} />,
+    <KonfliktVergleich lokal={eintrag && eintrag.body} server={{ ...(stand.daten || {}), geaendert_at: stand.geaendert_at }} />,
     [{ key: "server", label: uebersetze("konflikt.neuer") },
      { key: "meine", label: uebersetze("konflikt.meine"), danger: true }],
   );

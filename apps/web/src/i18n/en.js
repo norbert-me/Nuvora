@@ -2790,6 +2790,8 @@ export default {
   "offline.db": "Database unreachable — retrying…",
   "offline.weg": "No connection — retrying…",
   "konflikt.frage": "This data has changed elsewhere in the meantime (another device or a second window). Which version counts?",
+  "konflikt.gleich": "Same content — only the version differs.",
+  "konflikt.standVom": "Other version from {{zeit}}",
   "konflikt.meine": "Keep my change",
   "konflikt.spalteMeine": "Your change",
   "konflikt.spalteServer": "Server version",

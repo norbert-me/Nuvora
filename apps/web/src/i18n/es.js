@@ -2790,6 +2790,8 @@ export default {
   "offline.db": "Base de datos no accesible: reintentando…",
   "offline.weg": "Sin conexión: reintentando…",
   "konflikt.frage": "Estos datos han cambiado mientras tanto en otro sitio (otro dispositivo o una segunda ventana). ¿Cuál vale?",
+  "konflikt.gleich": "Mismo contenido: solo cambia la versión.",
+  "konflikt.standVom": "Otra versión del {{zeit}}",
   "konflikt.meine": "Conservar mi cambio",
   "konflikt.spalteMeine": "Tu cambio",
   "konflikt.spalteServer": "Versión del servidor",

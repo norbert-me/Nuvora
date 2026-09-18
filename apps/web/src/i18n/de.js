@@ -2791,6 +2791,8 @@ export default {
   "offline.db": "Datenbank nicht erreichbar — Neuversuch läuft…",
   "offline.weg": "Keine Verbindung — Neuversuch läuft…",
   "konflikt.frage": "Diese Daten wurden inzwischen an anderer Stelle geändert (anderes Gerät oder zweites Fenster). Was gilt?",
+  "konflikt.gleich": "Inhaltlich gleich — es unterscheidet sich nur der Stand.",
+  "konflikt.standVom": "Anderer Stand vom {{zeit}}",
   "konflikt.meine": "Meine Änderung übernehmen",
   "konflikt.spalteMeine": "Deine Änderung",
   "konflikt.spalteServer": "Serverstand",
