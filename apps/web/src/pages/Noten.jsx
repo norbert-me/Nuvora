@@ -1647,7 +1647,12 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
     : (modus === "einzeln" ? einzeln(bereich) : schnittLauf(bereich));
   const secName = sections.find((x) => x.id === bereich)?.name || "";
   return (
-    <UiModal onClose={onClose} width={460} label={student.name}>
+    // Hintergrund weichgezeichnet: die Uebersicht eines Kindes soll sich dem
+    // Kind selbst zeigen lassen, ohne dass dahinter die Notentabelle der
+    // anderen lesbar bleibt. Stark genug fuer Ziffern, schwach genug, dass die
+    // Seite als Ort erkennbar bleibt.
+    <UiModal onClose={onClose} width={460} label={student.name}
+      overlayStyle={{ backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
         {/* Zu ist das Kreuz oben rechts (DialogKopf) — ein zweiter
             „Schliessen"-Knopf unter einer langen Maske ist derselbe Weg,
             nur weiter unten. */}
