@@ -987,6 +987,41 @@ export default function Noten() {
   );
 }
 
+// Zeilen, die unter dem aktiven Notenfeld sichtbar bleiben sollen, plus Platz
+// fuer die schwebende Speicherleiste, die ueber der Tastatur liegt.
+const FREIE_ZEILEN = 3;
+const LEISTE_PX = 64;
+
+function scrollBehaelter(el) {
+  for (let p = el?.parentElement; p && p !== document.body; p = p.parentElement) {
+    const oy = getComputedStyle(p).overflowY;
+    if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
+  }
+  return null;
+}
+
+function platzDarunter(feld) {
+  if (!feld || typeof window === "undefined") return undefined;
+  const vv = window.visualViewport;
+  const pruefen = () => {
+    const zeile = feld.closest("tr") || feld;
+    const r = zeile.getBoundingClientRect();
+    // visualViewport liefert Koordinaten im Layout-Viewport; getBoundingClientRect
+    // ebenfalls — die sichtbare Unterkante ist also offsetTop + height.
+    const unten = vv ? vv.offsetTop + vv.height : window.innerHeight;
+    const soll = r.bottom + FREIE_ZEILEN * r.height + LEISTE_PX;
+    const fehlt = soll - unten;
+    if (fehlt <= 1) return;
+    const box = scrollBehaelter(zeile);
+    if (box) box.scrollBy({ top: fehlt, behavior: "smooth" });
+    else window.scrollBy({ top: fehlt, behavior: "smooth" });
+  };
+  const t1 = setTimeout(pruefen, 50);
+  const t2 = setTimeout(pruefen, 400);   // Tastatur ist dann meist ganz oben
+  vv?.addEventListener("resize", pruefen);
+  return () => { clearTimeout(t1); clearTimeout(t2); vv?.removeEventListener("resize", pruefen); };
+}
+
 // Eingabefeld einer Notenzelle. Nur 1–6 mit einer Nachkommastelle ist tippbar:
 // vorher liess sich „42" eintragen, und das Speichern schlug still fehl.
 //
@@ -998,6 +1033,13 @@ function Zelle({ onSave, onCancel, onTab, onEnter, onPfeil, initial = "" }) {
   const ref = useRef(null);
   const weiter = useRef(false);   // Tab hat schon gespeichert — onBlur nicht doppelt
   useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
+  // Unter dem Feld bleiben immer drei Zeilen frei: wer auf dem Handy eine Spalte
+  // abarbeitet, stand sonst nach ein paar Kindern mit dem Feld direkt ueber der
+  // Tastatur und musste zwischendurch selbst scrollen. Gemessen wird am
+  // SICHTBAREN Ausschnitt (visualViewport) — die Tastatur verkleinert ihn, das
+  // Fenster nicht. Die Tastatur kommt erst nach dem Fokus, deshalb auch beim
+  // Groessenwechsel des Ausschnitts.
+  useEffect(() => { return platzDarunter(ref.current); }, []);
   return (
     <input ref={ref} defaultValue={initial} size={1} inputMode="decimal" maxLength={4}
       onInput={(e) => {
