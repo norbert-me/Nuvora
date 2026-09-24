@@ -14,13 +14,27 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.4.4 — 24.09.2026
 
+- **Klassenarbeit und Notenbuch sind verknüpft:** „Mit Notenbuch verknüpfen"
+  legt die Spalte einmal an, danach folgt sie jedem Speichern der Arbeit.
+- Klassenarbeit: Punktsummen mit höchstens zwei Nachkommastellen (keine
+  100,00999… mehr).
+- **Notenbuch-Statistik** wahlweise in ganzen oder halben Noten (Zahnrad).
+- **Themen:** Anlegen im Dialog mit allen Feldern; eigenes Feld Nummer;
+  sortiert nach Fach, Stufe und Nummer; Unterthemen per Ziehen ordnen; die
+  Themen-Auswahl zeigt Stufe und Nummer.
+- **Anwesenheit:** mit „mit abwesend beginnen" sprang ein gespeichertes „da"
+  nicht mehr auf „fehlt" zurück.
+- **Startseite:** laufende Stunden und Termine bleiben stehen, bis sie vorbei
+  sind.
+- Der Knopf „Fehler melden" lässt sich je Gerät ausblenden (z. B. am Beamer),
+  wieder einschalten im Profil.
 - **Karteikarten: Reiter „Fortschritt" heißt jetzt „Auswertung"** — dort steht
   neben dem Stand je Kind auch, welche Karte schwerfällt.
 - **„Als Note übernehmen" bei den Karteikarten ist entfernt.** Aus einem
   Reifegrad lässt sich keine Note rechnen; die Klassenarbeit rechnet mit
-  echten Punkten und übernimmt weiter.
+  echten Punkten und bleibt mit dem Notenbuch verknüpft.
 - **Der QR-Link eines Kindes meldet die Lehrkraft nicht mehr ab.** Auf den
   ausgeteilten Wegen heißt 401 „dieser Zugang gilt nicht mehr", nicht
   „Sitzung abgelaufen".
