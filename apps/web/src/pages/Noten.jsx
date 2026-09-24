@@ -28,6 +28,7 @@ import { useEinfuegen } from "../core/ziehsortieren.js";
 import { alsJson, hol } from "../core/melden.js";
 import { parseYmd, ymd } from "../core/datum.js";
 import { median as medianVon, mittel, streuung } from "../core/statistik.js";
+import { verteilung } from "../core/notenstufen.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
 
 const API = "/api/noten";
@@ -231,6 +232,10 @@ export default function Noten() {
   };
   useEffect(() => { if (classId) load(classId); }, [classId, kursId, classes, term, agg]);
   const setAggPersist = (m) => { setAgg(m); try { localStorage.setItem("noten_agg", m); } catch { /* egal */ } };
+  // Statistik auf ganze oder halbe Noten — eine Ansicht wie Mittel/Median,
+  // deshalb derselbe Ort (localStorage je Gerät) und sofort wirksam.
+  const [halb, setHalb] = useState(() => { try { return localStorage.getItem("noten_stufen") === "halb"; } catch { return false; } });
+  const setHalbPersist = (h) => { setHalb(h); try { localStorage.setItem("noten_stufen", h ? "halb" : "ganz"); } catch { /* egal */ } };
 
   const doExport = async () => {
     if (!classId) return;
@@ -465,8 +470,8 @@ export default function Noten() {
     if (!vals.length) return null;
     const n = vals.length;
     const median = n % 2 ? vals[(n - 1) / 2] : (vals[n / 2 - 1] + vals[n / 2]) / 2;
-    // Verteilung auf ganze Notenstufen 1–6 (2,3 zählt zu 2).
-    const dist = [1, 2, 3, 4, 5, 6].map((g) => ({ g, n: vals.filter((v) => Math.floor(v) === g).length }));
+    // Verteilung auf ganze oder halbe Stufen (Ansicht, core/notenstufen.js).
+    const dist = verteilung(vals, halb);
     return { n, avg: rund(mittel(vals), 2), median: rund(median, 2), min: vals[0], max: vals[n - 1], dist };
   };
   const sumOf = (studentId) => summary.find((s) => s.student_id === studentId);
@@ -537,6 +542,12 @@ export default function Noten() {
             value: agg === "median" ? "median" : "",
             onChange: (v) => setAggPersist(v || "mean"),
             optionen: [{ wert: "", label: t("noten.aggMean") }, { wert: "median", label: t("noten.aggMedian") }],
+          }, {
+            key: "stufen", art: "wahl",
+            label: t("noten.stufen"),
+            value: halb ? "halb" : "",
+            onChange: (v) => setHalbPersist(v === "halb"),
+            optionen: [{ wert: "", label: t("noten.stufenGanz") }, { wert: "halb", label: t("noten.stufenHalb") }],
           }]} />
         }
         mehr={term !== "year" && classId ? [
@@ -600,7 +611,7 @@ export default function Noten() {
                       <div style={{ fontSize: 11, color: "var(--text3)" }}>{d.n || ""}</div>
                       {/* Saeule: Radius rundet nur die Kappe der Grafik. */}
                       <div style={{ width: "100%", height: `${(d.n / maxN) * 70}px`, minHeight: d.n ? 3 : 0, background: "var(--accent)", borderRadius: 4 }} />
-                      <div style={{ fontSize: 12, fontWeight: 700 }}>{d.g}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>{komma(d.g)}</div>
                     </div>
                   ))}
                 </div>
@@ -625,8 +636,8 @@ export default function Noten() {
       })()}
 
       {term === "year"
-        ? (yearData.rows || []).length > 0 && <NotenStatistik noten={(yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))} t={t} />
-        : sections.length > 0 && <NotenStatistik noten={(summary || []).map((s) => endNoteVon(s))} t={t} />}
+        ? (yearData.rows || []).length > 0 && <NotenStatistik noten={(yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))} halb={halb} t={t} />
+        : sections.length > 0 && <NotenStatistik noten={(summary || []).map((s) => endNoteVon(s))} halb={halb} t={t} />}
 
       {loading && !loadedOnce.current && term !== "year" ? (
         <Skeleton rows={6} height={38} />
@@ -1107,7 +1118,7 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
 // Statistische Auswertung der Halbjahresnoten — analog CardVote: Kennzahlen und
 // Notenverteilung ueber die effektiven Endnoten (manuell gesetzt schlaegt
 // Schnitt). Rein deskriptiv, keine Zeugnisnote.
-function NotenStatistik({ noten, t }) {
+function NotenStatistik({ noten, halb, t }) {
   const [open, setOpen] = useState(false);
   noten = (noten || []).filter((v) => v != null);
   if (noten.length < 2) return null;
@@ -1118,8 +1129,8 @@ function NotenStatistik({ noten, t }) {
   // schied). Eine Klasse ist eine Stichprobe des Koennens, nicht die ganze Welt.
   const median = medianVon(noten);
   const sd = streuung(noten);
-  const dist = [1, 2, 3, 4, 5, 6].map((g) => noten.filter((v) => Math.round(v) === g).length);
-  const maxD = Math.max(...dist, 1);
+  const dist = verteilung(noten, halb);
+  const maxD = Math.max(...dist.map((d) => d.n), 1);
   // Kachel kommt aus Icons.jsx (StatCard) — hier stand eine vierte Fassung
   // derselben Sache (Wert gross, Beschriftung klein, getoente Flaeche). Der
   // Umschlag traegt nur die Breitenverteilung der Zeile.
@@ -1140,11 +1151,11 @@ function NotenStatistik({ noten, t }) {
             {tile(t("noten.statSd"), `±${kommaRund(sd, 2)}`)}
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 90 }}>
-            {dist.map((c, i) => (
-              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            {dist.map(({ g, n: c }) => (
+              <div key={g} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                 <div style={{ fontSize: 11, color: "var(--text3)" }}>{c || ""}</div>
                 <div style={{ width: "100%", maxWidth: 44, height: `${(c / maxD) * 60}px`, minHeight: c ? 3 : 0, background: "var(--accent)", borderRadius: "5px 5px 0 0", opacity: c ? 0.85 : 0.15 }} />
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>{i + 1}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>{komma(g)}</div>
               </div>
             ))}
           </div>
