@@ -343,7 +343,10 @@ export default function Klassenarbeit() {
   // das alte Format (Aufgabe ohne Teile) unverändert gültig.
   const units = (task) => (task.parts && task.parts.length) ? task.parts : [{ id: task.id, label: "", max: Number(task.max) > 0 ? Number(task.max) : 1 }];
   const unitMax = (u) => (Number(u.max) > 0 ? Number(u.max) : 1);
-  const taskMax = (task) => units(task).reduce((n, u) => n + unitMax(u), 0);
+  // Punkte kommen mit bis zu zwei Nachkommastellen; eine Summe aus
+  // Gleitkommazahlen wird sonst zu 100.00999999999999. Gerundet wird an der
+  // Quelle, damit Anzeige, Note und Auswertung dieselbe Zahl sehen.
+  const taskMax = (task) => rund(units(task).reduce((n, u) => n + unitMax(u), 0), 2);
   const partLabel = (i) => String.fromCharCode(97 + i); // a, b, c …
   const cleanResults = (results, removeIds) => Object.fromEntries(
     Object.entries(results || {})
@@ -409,7 +412,7 @@ export default function Klassenarbeit() {
     if (Object.keys(row).length) results[String(sid)] = row; else delete results[String(sid)];
     persist({ ...work, results });
   };
-  const totalMax = () => (work.tasks || []).reduce((n, tk) => n + taskMax(tk), 0);
+  const totalMax = () => rund((work.tasks || []).reduce((n, tk) => n + taskMax(tk), 0), 2);
   // Ist zu diesem Kind ueberhaupt etwas erfasst? Eine eingetragene 0 zaehlt,
   // ein leeres Feld nicht — genau darin unterscheiden sich „hat nichts
   // geloest" und „ist noch nicht korrigiert".
@@ -421,7 +424,7 @@ export default function Klassenarbeit() {
     return Object.values(r).some((v) => v != null && v !== "");
   };
 
-  const sumOf = (sid) => { const r = (work.results || {})[String(sid)]; if (!r || r === "abwesend") return 0; return (work.tasks || []).reduce((n, tk) => n + units(tk).reduce((m, u) => { const v = r[u.id]; return m + (v == null ? 0 : Number(v)); }, 0), 0); };
+  const sumOf = (sid) => { const r = (work.results || {})[String(sid)]; if (!r || r === "abwesend") return 0; return rund((work.tasks || []).reduce((n, tk) => n + units(tk).reduce((m, u) => { const v = r[u.id]; return m + (v == null ? 0 : Number(v)); }, 0), 0), 2); };
   // Abwesend ist ein eigenes Feld (work.absent) — die Punkte in results bleiben
   // erhalten, „abwesend" heisst nur „aus der Klassenstatistik raus". Alt-Marker
   // (results[sid] === "abwesend", ohne Punkte) wird weiter als abwesend erkannt.
@@ -738,7 +741,7 @@ export default function Klassenarbeit() {
                     leerLabel={t("klassenarbeit.topicNone")} style={{ flex: "1 1 180px", minWidth: 0, maxWidth: 340 }}
                     optionen={themenOptionen} />
                   {hasParts ? (
-                    <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap", flexShrink: 0 }}>{t("klassenarbeit.maxPoints")}: <b>{taskMax(task)}</b></span>
+                    <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap", flexShrink: 0 }}>{t("klassenarbeit.maxPoints")}: <b>{komma(taskMax(task))}</b></span>
                   ) : (
                     <label style={{ fontSize: 12, color: "var(--text3)", display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0 }}>
                       {t("klassenarbeit.maxPoints")}
@@ -829,7 +832,7 @@ export default function Klassenarbeit() {
                   <tr>
                     <th rowSpan={2} style={{ ...th, ...klebtLinks, textAlign: "left", minWidth: 130, zIndex: 2 }}>{t("common.name")}</th>
                     {(work.tasks || []).map((tk, i) => <th key={tk.id} colSpan={units(tk).length + (units(tk).length > 1 ? 1 : 0)} style={{ ...th, minWidth: 46, borderLeft: "1px solid var(--border)" }} title={tk.label}>{tk.label || (i + 1)}</th>)}
-                    <th rowSpan={2} style={{ ...th, minWidth: 58, borderLeft: "1px solid var(--border)" }}>Σ / {totalMax()}</th>
+                    <th rowSpan={2} style={{ ...th, minWidth: 58, borderLeft: "1px solid var(--border)" }}>Σ / {komma(totalMax())}</th>
                     {/* Note: in der SuS-/Präsentationsansicht unsichtbar, weil das
                         ganze Raster oben schon hinter !hideIndividual haengt. */}
                     <th rowSpan={2} style={{ ...th, minWidth: 44 }}>{t("klassenarbeit.grade")}</th>
@@ -838,10 +841,10 @@ export default function Klassenarbeit() {
                     {(work.tasks || []).flatMap((tk) => {
                       const sub = units(tk).length > 1;   // echte Teilaufgaben
                       const cols = units(tk).map((u, j) => (
-                        <th key={u.id} style={{ ...th, minWidth: 44, fontWeight: 500, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>{u.label || ""}<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{unitMax(u)}</div></th>
+                        <th key={u.id} style={{ ...th, minWidth: 44, fontWeight: 500, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>{u.label || ""}<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{komma(unitMax(u))}</div></th>
                       ));
                       // Summe der Teilaufgaben je Aufgabe (nur wenn es Teile gibt).
-                      if (sub) cols.push(<th key={tk.id + "-sum"} style={{ ...th, minWidth: 46, fontWeight: 700, background: "var(--bg2)" }}>Σ<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{taskMax(tk)}</div></th>);
+                      if (sub) cols.push(<th key={tk.id + "-sum"} style={{ ...th, minWidth: 46, fontWeight: 700, background: "var(--bg2)" }}>Σ<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{komma(taskMax(tk))}</div></th>);
                       return cols;
                     })}
                   </tr>
@@ -907,7 +910,7 @@ export default function Klassenarbeit() {
                           if (sub) { const ts = units(tk).reduce((n, u) => n + (Number(pointsOf(s.id, u.id)) || 0), 0); cells.push(<td key={tk.id + "-sum"} style={{ ...td, fontWeight: 700, background: "var(--bg2)", color: "var(--text2)" }}>{kommaRund(ts, 2)}</td>); }
                           return cells;
                         })}
-                        <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: !erfasst ? "var(--text3)" : abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{erfasst ? `${kommaRund(sum, 2)}/${tm}` : `–/${tm}`}{abw ? ` (${t("klassenarbeit.absentShort")})` : ""}</td>
+                        <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: !erfasst ? "var(--text3)" : abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{erfasst ? `${kommaRund(sum, 2)}/${komma(tm)}` : `–/${komma(tm)}`}{abw ? ` (${t("klassenarbeit.absentShort")})` : ""}</td>
                         <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{note}</td>
                       </tr>
                     );
@@ -1233,7 +1236,7 @@ export default function Klassenarbeit() {
 function notenAusArbeit(students, work, scale) {
   const uIds = (tk) => (tk.parts && tk.parts.length) ? tk.parts.map((u) => u.id) : [tk.id];
   const uMaxT = (tk) => (tk.parts && tk.parts.length) ? tk.parts.reduce((n, u) => n + (Number(u.max) > 0 ? Number(u.max) : 1), 0) : (Number(tk.max) > 0 ? Number(tk.max) : 1);
-  const totalMax = (work.tasks || []).reduce((n, tk) => n + uMaxT(tk), 0);
+  const totalMax = rund((work.tasks || []).reduce((n, tk) => n + uMaxT(tk), 0), 2);
   const absentU = new Set((work.absent || []).map(String));
   return students
     .filter((s) => {
@@ -1258,7 +1261,7 @@ function pctList(work) {
   const tasks = work.tasks || [];
   const uIds = (tk) => (tk.parts && tk.parts.length) ? tk.parts.map((u) => u.id) : [tk.id];
   const uMaxT = (tk) => (tk.parts && tk.parts.length) ? tk.parts.reduce((n, u) => n + (Number(u.max) > 0 ? Number(u.max) : 1), 0) : (Number(tk.max) > 0 ? Number(tk.max) : 1);
-  const tm = tasks.reduce((n, tk) => n + uMaxT(tk), 0);
+  const tm = rund(tasks.reduce((n, tk) => n + uMaxT(tk), 0), 2);
   if (!tm) return [];
   const absent = new Set((work.absent || []).map(String));
   const out = [];
