@@ -64,3 +64,37 @@ describe("Stunde in der Pause", () => {
     expect(stundeLabel(PAUSE_BASIS + 2, (k, o) => `${k}:${o ? o.n : ""}`)).toBe("kalender.pauseNach:2");
   });
 });
+
+// Startseite „Heute": eine angefangene Stunde verschwindet erst nach ihrem Ende.
+import { tagesStand, eintragFenster } from "./stunden.js";
+
+describe("tagesStand", () => {
+  const hm = (h, m) => h * 60 + m;
+  it("laufende Stunde bleibt stehen", () => {
+    expect(tagesStand(hm(8, 0), hm(8, 45), hm(8, 10))).toBe("laeuft");
+    expect(tagesStand(hm(8, 0), hm(8, 45), hm(8, 0))).toBe("laeuft");
+  });
+  it("erst nach dem Ende vorbei", () => {
+    expect(tagesStand(hm(8, 0), hm(8, 45), hm(8, 45))).toBe("vorbei");
+    expect(tagesStand(hm(8, 0), hm(8, 45), hm(7, 59))).toBe("kommt");
+  });
+  it("Termin ohne Ende verschwindet nicht mit seinem Anfang", () => {
+    expect(tagesStand(hm(10, 0), null, hm(10, 0))).toBe("laeuft");
+    expect(tagesStand(hm(10, 0), null, hm(15, 0))).toBe("laeuft");
+  });
+  it("ohne Uhrzeit wird nichts geraten", () => {
+    expect(tagesStand(null, null, hm(12, 0))).toBe("kommt");
+  });
+});
+
+describe("eintragFenster", () => {
+  it("Eintrag ohne eigene Zeit erbt die seiner Stunde", () => {
+    expect(eintragFenster({ period: 2 }, ZEITEN, null)).toEqual({ start: 530, ende: 575 });
+  });
+  it("eigene Uhrzeit schlaegt die der Stunde", () => {
+    expect(eintragFenster({ period: 2, start_time: "09:00", end_time: "09:20" }, ZEITEN, null)).toEqual({ start: 540, ende: 560 });
+  });
+  it("nur Anfang: Ende aus der Stunde", () => {
+    expect(eintragFenster({ period: 1, start_time: "08:10" }, ZEITEN, null)).toEqual({ start: 490, ende: 525 });
+  });
+});

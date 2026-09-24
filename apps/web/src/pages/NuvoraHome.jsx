@@ -12,7 +12,7 @@ import { alsJson, hol } from "../core/melden.js";
 import { WIDGETS } from "../components/Widgets.jsx";
 import { ZIELE } from "../core/ziele.js";
 import { hmToMin, ymd } from "../core/datum.js";
-import { stundenZeit, slotGiltAm, stundenRang, stundeKurz } from "../core/stunden";
+import { stundenZeit, slotGiltAm, stundenRang, stundeKurz, tagesStand, eintragFenster } from "../core/stunden";
 import { kursLabel } from "../core/kurslabel.js";
 
 // Modul-Kachel: dieselbe Karte wie überall, nur als Link (kein eigener Kasten).
@@ -179,14 +179,14 @@ function HeutePanel({ t }) {
   // Nur heute gültige Stundenplan-Versionen (valid_from/valid_to grenzen ein).
   // heuteYmd ist oben schon definiert (YYYY-MM-DD).
   const activeToday = (s) => slotGiltAm(s, heuteYmd);
-  // Vorbei heisst: das ENDE liegt hinter uns. Ohne Endzeit (Stunde ohne
-  // gepflegte Uhrzeit, ganztägiger Termin) bleibt der Eintrag stehen — geraten
-  // wird nichts, und ein Termin ohne Zeit gilt den ganzen Tag.
-  const vorbei = (ende) => ende != null && ende <= jetztMin;
-  const slotEnde = (p) => { const w = stundenZeit(data.times, data.zero, p); return w ? hmToMin(w.end) : null; };
+  // Vorbei heisst: das ENDE liegt hinter uns — eine angefangene Stunde bleibt
+  // stehen und ist als laufend markiert (core/stunden.js: tagesStand). Ohne
+  // Endzeit bleibt der Eintrag stehen, geraten wird nichts.
+  const slotStand = (p) => { const w = stundenZeit(data.times, data.zero, p); return tagesStand(hmToMin(w?.start), hmToMin(w?.end), jetztMin); };
+  const terminStand = (e) => { const f = eintragFenster(e, data.times, data.zero); return tagesStand(f.start, f.ende, jetztMin); };
   const slots = data.slots
     .filter((s) => s.weekday === wochentag() && activeToday(s) && !(data.entfallen || []).includes(s.period))
-    .filter((s) => !vorbei(slotEnde(s.period)))
+    .filter((s) => slotStand(s.period) !== "vorbei")
     .sort((a, b) => stundenRang(a.period) - stundenRang(b.period));
   const alleSlots = data.slots.filter((s) => s.weekday === wochentag() && activeToday(s));
   // Liegt der Eintrag WIRKLICH heute? Das Fenster der Abfrage reicht dafuer
@@ -202,7 +202,7 @@ function HeutePanel({ t }) {
   const extras = data.entries
     .filter(amTag)
     .filter((e) => e.period == null || !alleSlots.some((s) => s.period === e.period))
-    .filter((e) => !vorbei(hmToMin(e.end_time) ?? hmToMin(e.start_time)));
+    .filter((e) => terminStand(e) !== "vorbei");
   if (slots.length === 0 && extras.length === 0 && !data.frei) return null;
   const cname = (id) => data.classes.find((c) => c.id === id)?.name || "";
   // Dieselbe Regel wie im Kalender (`slotName` dort): erst der Kurs, dann die
@@ -250,8 +250,9 @@ function HeutePanel({ t }) {
               const von = e.start_time || "";
               const bis = e.end_time || "";
               const zeitTxt = von ? (bis ? `${von}–${bis}` : von) : "";
+              const laeuft = terminStand(e) === "laeuft";
               return (
-                <Link key={`e${e.id}`} to={`/kalender?view=day&date=${heuteYmd}&entry=${e.id}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
+                <Link key={`e${e.id}`} to={`/kalender?view=day&date=${heuteYmd}&entry=${e.id}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: `1px dashed ${laeuft ? "var(--accent)" : "var(--border2)"}`, background: laeuft ? "var(--accent-bg, transparent)" : undefined, borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
                   <div style={{ minWidth: 42, textAlign: "center", color: "var(--text3)", fontSize: 12, whiteSpace: "nowrap" }}>{zeitTxt || "—"}</div>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{e.title || (e.kurs_id && kname(e.kurs_id)) || (e.class_id && cname(e.class_id)) || t("kalender.planned")}</div>
                 </Link>
@@ -267,8 +268,11 @@ function HeutePanel({ t }) {
             // Tag das Ziel.
             const to = e ? `/kalender?view=day&date=${heuteYmd}&entry=${e.id}`
               : `/kalender?view=day&date=${heuteYmd}`;
+            // Die laufende Stunde traegt Rahmen und Toenung — um 8:10 ist sie
+            // die, um die es geht.
+            const laeuft = slotStand(s.period) === "laeuft";
             return (
-              <Link key={s.id} to={to} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px solid var(--border)", borderLeft: `4px solid ${s.class_id ? ccolor(s.class_id) : "var(--border2)"}`, borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
+              <Link key={s.id} to={to} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", background: laeuft ? "var(--accent-bg, transparent)" : undefined, border: `1px solid ${laeuft ? "var(--accent)" : "var(--border)"}`, borderLeft: `4px solid ${s.class_id ? ccolor(s.class_id) : "var(--border2)"}`, borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
                 <div style={{ minWidth: 42, textAlign: "center" }}>
                   <div style={{ fontSize: 14, fontWeight: 800 }}>{stundeKurz(s.period)}</div>
                   <div style={{ fontSize: 11, color: "var(--text3)" }}>{zeit(s.period)}</div>

@@ -80,3 +80,32 @@ export function laufendeStunde(kandidaten, times, zero, jetztMin) {
   }
   return letzteMitZeit || kandidaten[0];
 }
+
+/**
+ * Wo steht eine Zeile der Startseite gerade: "kommt", "laeuft" oder "vorbei"?
+ *
+ * Eine angefangene Stunde bleibt stehen, bis sie AUS ist — um 8:10 ist die
+ * erste Stunde genau die, um die es geht. Ein Termin ohne eigenes Ende nimmt
+ * das Ende seiner Stunde; hat er keine Stunde und kein Ende, gilt er als
+ * laufend, sobald er begonnen hat, und verschwindet nicht (vorher war sein
+ * Anfang zugleich sein Ende: um 10:00 war der Termin um 10:00 weg). Ohne
+ * Uhrzeit wird nichts geraten: "kommt".
+ *
+ * @param start/ende  Minuten seit Mitternacht oder null
+ */
+export function tagesStand(start, ende, jetztMin) {
+  if (ende != null && ende <= jetztMin) return "vorbei";
+  if (start != null && start <= jetztMin) return "laeuft";
+  return "kommt";
+}
+
+// Anfang und Ende eines Kalendereintrags in Minuten: die eigene Uhrzeit
+// schlaegt die seiner Stunde (dieselbe Rangfolge wie ueberall im Kalender).
+export function eintragFenster(e, times, zero) {
+  const alsMin = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || "")); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const w = e && e.period != null ? stundenZeit(times, zero, e.period) : null;
+  return {
+    start: alsMin(e?.start_time) ?? alsMin(w?.start),
+    ende: alsMin(e?.end_time) ?? alsMin(w?.end),
+  };
+}
