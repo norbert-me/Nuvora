@@ -15,6 +15,9 @@ import pkg from "./package.json" with { type: "json" };
 function precacheListe() {
   return {
     name: "nuvora-precache-liste",
+    // Nach Vites eigenem Aufraeumen: reine CSS-Chunks (katex.min-*.js) entfernt
+    // Vite erst in seinem generateBundle — vorher stuenden sie hier als 404.
+    enforce: "post",
     apply: "build",
     generateBundle(_optionen, bundle) {
       // Nur was Rollup gebaut hat. Alles aus `public/` wird von Vite daneben
