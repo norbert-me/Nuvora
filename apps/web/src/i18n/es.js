@@ -1590,7 +1590,6 @@ export default {
   "klassenarbeit.grade": "Nota",
   "klassenarbeit.boxplotLegend": "Caja = 50 % central (Q1–Q3), línea = mediana, bigotes = mín–máx.",
   "klassenarbeit.toNoten": "Pasar a notas",
-  "klassenarbeit.toNotenHint": "El porcentaje de aciertos se convierte en nota (según tu escala) en una columna nueva ({{n}} alumnos). Editable — quita ausentes después.",
   "klassenarbeit.hint": "Crea tareas con tema y anota los puntos por alumno. La evaluación muestra luego quién necesita repasar cada tema.",
   "klassenarbeit.none": "— sin examen —",
   "klassenarbeit.new": "Nuevo examen",

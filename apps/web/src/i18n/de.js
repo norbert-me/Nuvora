@@ -1572,7 +1572,6 @@ export default {
   "klassenarbeit.grade": "Note",
   "klassenarbeit.boxplotLegend": "Box = mittlere 50 % (Q1–Q3), Strich = Median, Whisker = min–max.",
   "klassenarbeit.toNoten": "In Noten übernehmen",
-  "klassenarbeit.toNotenHint": "Aus der Trefferquote wird je Schüler eine Note (über deine Notenskala) und als neue Spalte angelegt ({{n}} SuS). Frei editierbar — Abwesende danach entfernen.",
   "klassenarbeit.hint": "Aufgaben mit Thema anlegen und je Kind die Punkte eintragen. Die Auswertung zeigt dann, wer bei welchem Thema Nachholbedarf hat.",
   "klassenarbeit.none": "— keine Arbeit —",
   "klassenarbeit.new": "Neue Arbeit",

@@ -1589,7 +1589,6 @@ export default {
   "klassenarbeit.grade": "Grade",
   "klassenarbeit.boxplotLegend": "Box = middle 50 % (Q1–Q3), line = median, whiskers = min–max.",
   "klassenarbeit.toNoten": "Add to gradebook",
-  "klassenarbeit.toNotenHint": "Each student's hit rate becomes a grade (via your scale) in a new column ({{n}} students). Editable — remove absentees afterwards.",
   "klassenarbeit.hint": "Create tasks with a topic and enter the points per student. The evaluation then shows who needs to catch up on which topic.",
   "klassenarbeit.none": "— no test —",
   "klassenarbeit.new": "New test",

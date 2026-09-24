@@ -958,7 +958,7 @@ export default function Klassenarbeit() {
           )}
           {notenModal && (() => {
             const noten = notenAusArbeit(students, work, effScale);
-            return <NotenUebernahme titel={t("klassenarbeit.toNoten")} hinweis={t("klassenarbeit.toNotenHint", { n: noten.length })}
+            return <NotenUebernahme titel={t("klassenarbeit.toNoten")}
               classId={classId} kursId={kursId} grades={noten}
               quelle="klassenarbeit" notiz={t("klassenarbeit.title")} spalte={work.name || t("klassenarbeit.newName")}
               onClose={() => setNotenModal(false)} />;
