@@ -22,7 +22,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   100,00999… mehr).
 - **Notenbuch-Statistik** wahlweise in ganzen oder halben Noten (Zahnrad).
 - **Themen:** Anlegen im Dialog mit allen Feldern; eigenes Feld Nummer;
-  sortiert nach Fach, Stufe und Nummer; Unterthemen per Ziehen ordnen; die
+  automatische Ordner nach Fach und Stufe, darin nach Nummer sortiert; Unterthemen per Ziehen ordnen; die
   Themen-Auswahl zeigt Stufe und Nummer.
 - **Anwesenheit:** mit „mit abwesend beginnen" sprang ein gespeichertes „da"
   nicht mehr auf „fehlt" zurück.
