@@ -30,6 +30,9 @@ export default function Topics() {
   // Ziehen zum Umsortieren kommt aus core/ziehsortieren.js — dieselbe Marke
   // („vor"/„nach") wie bei Kartenstapeln, Karten und Notenbuch-Spalten.
   const zieh = useEinfuegen();
+  // Unterthemen sortieren sich nur unter ihrem eigenen Thema — die Gruppe ist
+  // der Elternknoten; zwischen Themen umhängen geht über das Detail-Popup.
+  const ziehKind = useEinfuegen({ nurGleicheGruppe: true });
 
   const toggleExpand = (id) => setExpanded((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -39,6 +42,11 @@ export default function Topics() {
   const dropRoot = (targetId) => {
     const ids = zieh.ablegen(targetId, ordnung.wert.ids);
     if (ids) ordnung.setz({ ids });
+  };
+  const dropKind = (parentId, targetId) => {
+    const aktuell = kinderIds(parentId);
+    const ids = ziehKind.ablegen(targetId, aktuell);
+    if (ids) ordnung.setz({ kinder: { ...ordnung.wert.kinder, [parentId]: ids } });
   };
 
   const load = () =>
@@ -74,10 +82,23 @@ export default function Topics() {
   // hinweg DIESELBE bleiben (sonst ersetzt useEntwurf die Arbeitskopie bei
   // jedem Rendern) — deshalb der Schlüssel aus den IDs.
   const wurzelIds = topics.filter((x) => x.parent_id === null).map((x) => x.id);
+  // Unterthemen je Thema im selben Schlüssel: „7:3,1,2;9:4" — eine Änderung
+  // an ihrer Reihenfolge gehört in denselben Entwurf wie die der Themen.
+  const kinderSchluessel = wurzelIds.map((id) => `${id}:${topics.filter((x) => x.parent_id === id).map((x) => x.id).join(",")}`).join(";");
   const idSchluessel = wurzelIds.join(",");
-  const basisOrdnung = useMemo(() => ({ ids: idSchluessel ? idSchluessel.split(",").map(Number) : [] }), [idSchluessel]);
+  const basisOrdnung = useMemo(() => {
+    const kinder = {};
+    for (const teil of kinderSchluessel ? kinderSchluessel.split(";") : []) {
+      const [pid, rest] = teil.split(":");
+      kinder[pid] = rest ? rest.split(",").map(Number) : [];
+    }
+    return { ids: idSchluessel ? idSchluessel.split(",").map(Number) : [], kinder };
+  }, [idSchluessel, kinderSchluessel]);
+  // Eine Liste für alle: Themen zuerst, dann die Unterthemen je Thema. Die
+  // Positionen sind damit überall eindeutig, und innerhalb eines Themas stimmt
+  // die Reihenfolge — mehr fragt die Sortierung (position, name) nicht.
   const ordnung = useEntwurf(basisOrdnung, (w) =>
-    call(() => fetch(`${API}/topics/reorder`, alsJson("PUT", { ids: w.ids }))));
+    call(() => fetch(`${API}/topics/reorder`, alsJson("PUT", { ids: [...w.ids, ...Object.values(w.kinder || {}).flat()] }))));
 
   const add = (name, parent_id) =>
     call(() => fetch(`${API}/topics`, alsJson("POST", { name, parent_id })));
@@ -109,7 +130,15 @@ export default function Topics() {
     const bekannt = new Set(sortiert.map((x) => x.id));
     return [...sortiert, ...wurzeln.filter((x) => !bekannt.has(x.id))];
   })();
-  const childrenOf = (id) => topics.filter((t) => t.parent_id === id);
+  // Wie bei den Themen: Reihenfolge aus dem Entwurf, Unbekanntes hinten an.
+  const childrenOf = (id) => {
+    const kinder = topics.filter((x) => x.parent_id === id);
+    const nach = new Map(kinder.map((x) => [x.id, x]));
+    const sortiert = ((ordnung.wert.kinder || {})[id] || []).map((k) => nach.get(k)).filter(Boolean);
+    const bekannt = new Set(sortiert.map((x) => x.id));
+    return [...sortiert, ...kinder.filter((x) => !bekannt.has(x.id))];
+  };
+  const kinderIds = (id) => childrenOf(id).map((x) => x.id);
   const openPopup = (tp) => setPopup({ ...tp, parent_name: tp.parent_id ? (topics.find((x) => x.id === tp.parent_id)?.name || "") : "" });
 
   const submitRoot = async (e) => {
@@ -126,22 +155,24 @@ export default function Topics() {
 
   // Zwei Ebenen: Thema (0) > Unterthema (1). Neue Unterpunkte nur unter Themen
   // (Ebene 0). Bestehende tiefere Einträge werden weiter angezeigt, nur nicht mehr
-  // erweitert. Drag (Reihenfolge) nur auf der obersten Ebene.
+  // erweitert. Gezogen wird auf beiden Ebenen, Unterthemen nur unter ihrem Thema.
   const MAX_DEPTH = 1;
   const row = (tp, depth) => {
     const isChild = depth > 0;
     const isRoot = depth === 0;
     const canHaveKids = depth < MAX_DEPTH;                 // neues Unterthema erlauben?
     const subCount = childrenOf(tp.id).length;             // vorhandene Kinder immer zeigen
-    const seite = isRoot ? zieh.seite(tp.id) : null;
+    const ziehbar = isRoot || depth === 1;
+    const z = isRoot ? zieh : ziehKind;
+    const seite = ziehbar ? z.seite(tp.id) : null;
     return (
     <div
       key={tp.id}
-      draggable={isRoot}
-      onDragStart={isRoot ? () => zieh.start(tp.id) : undefined}
-      onDragOver={isRoot ? (e) => zieh.ueber(e, tp.id) : undefined}
-      onDragEnd={isRoot ? zieh.beenden : undefined}
-      onDrop={isRoot ? () => dropRoot(tp.id) : undefined}
+      draggable={ziehbar}
+      onDragStart={ziehbar ? (e) => { e.stopPropagation(); z.start(tp.id, tp.parent_id); } : undefined}
+      onDragOver={ziehbar ? (e) => z.ueber(e, tp.id, tp.parent_id) : undefined}
+      onDragEnd={ziehbar ? z.beenden : undefined}
+      onDrop={ziehbar ? () => (isRoot ? dropRoot(tp.id) : dropKind(tp.parent_id, tp.id)) : undefined}
       style={{
         // Thema = Karte (cardStyle), Unterthema = flachere Zeile mit
         // Bedien-Radius — der Unterschied traegt die Schachtelung.
@@ -151,8 +182,8 @@ export default function Topics() {
         marginLeft: depth * 28, marginBottom: 4,
         borderRadius: isChild ? CONTROL_R : cardStyle.borderRadius,
         background: isChild ? "var(--bg)" : "var(--card)",
-        cursor: isRoot ? "grab" : "default",
-        opacity: zieh.zieht === tp.id ? 0.4 : 1,
+        cursor: ziehbar ? "grab" : "default",
+        opacity: z.zieht === tp.id ? 0.4 : 1,
         borderTop: seite === "vor" ? "3px solid var(--accent)" : undefined,
         borderBottom: seite === "nach" ? "3px solid var(--accent)" : undefined,
       }}
