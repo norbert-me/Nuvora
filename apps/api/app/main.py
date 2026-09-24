@@ -345,6 +345,7 @@ def _ensure_columns(sync_conn):
         ("methods", "dauer", "INTEGER"),
         ("grade_categories", "source_session_id", "INTEGER"),
         ("grade_categories", "source_kind", "VARCHAR(20) DEFAULT '' NOT NULL"),
+        ("grade_categories", "source_work_id", "INTEGER"),
         ("grade_categories", "topic_id", "INTEGER"),
         # Tag der Leistung — Eigenschaft der Spalte, nicht Teil ihres Namens.
         ("grade_categories", "date", "DATE"),

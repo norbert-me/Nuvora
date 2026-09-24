@@ -34,7 +34,7 @@ from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
 from ..importe import geprueft
 from ..models import (
     GradeCategory, GradeEntry, GradeSection, GradeOverride, QuartalDivider,
-    Session as TestSession, Student, User, CodeSession,
+    Session as TestSession, Student, User, CodeSession, WorkAnalysis,
 )
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
@@ -156,6 +156,8 @@ class CategoryOut(BaseModel):
     # Aus welcher CardVote-Session übernommen (für den Link zur Auswertung).
     source_session_id: Optional[int] = None
     source_kind: Optional[str] = None  # "cardvote" | "karten" | "codedetektiv" | ""
+    # Mit einer Klassenarbeit verknuepft (Noten folgen der Arbeit).
+    source_work_id: Optional[int] = None
     topic_id: Optional[int] = None
     # Tag der Leistung — Eigenschaft, kein Namensbestandteil (siehe models.py).
     date: Optional[str] = None
@@ -1022,6 +1024,8 @@ class ImportGradesBody(BaseModel):
     column_name: str
     note: str = ""
     source_kind: str = ""   # Herkunft, z.B. "karten" (fuer die Kennzeichnung im Notenbuch)
+    # Klassenarbeit, mit der die Spalte VERKNUEPFT wird (siehe verknuepft_sync).
+    source_work_id: Optional[int] = None
     grades: List[GradeCell]
 
     name_ok = field_validator("column_name")(_pflicht_spaltenname)
@@ -1041,11 +1045,16 @@ async def import_grades(body: ImportGradesBody, user: User = Depends(require_mod
     if sec.class_id != body.class_id:
         raise HTTPException(400, "Abschnitt und Klasse passen nicht zusammen")
 
+    work_id = None
+    if body.source_work_id is not None:
+        await eigenes(db, WorkAnalysis, body.source_work_id, user, "Arbeit nicht gefunden")
+        work_id = body.source_work_id
+
     pos = len((await db.execute(
         select(GradeCategory).where(GradeCategory.section_id == sec.id)
     )).scalars().all())
     cat = GradeCategory(name=body.column_name, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, position=pos,
-                        source_kind=(body.source_kind or "")[:20])
+                        source_kind=(body.source_kind or "")[:20], source_work_id=work_id)
     db.add(cat)
     await db.flush()
 
@@ -1056,12 +1065,78 @@ async def import_grades(body: ImportGradesBody, user: User = Depends(require_mod
             continue
         db.add(GradeEntry(category_id=cat.id, student_id=g.student_id, kind="grade", value=g.value, note=body.note or ""))
         angelegt += 1
-    if angelegt == 0:
-        # Keine einzige Zuordnung -> leere Spalte waere nur Ballast.
+    if angelegt == 0 and work_id is None:
+        # Keine einzige Zuordnung -> leere Spalte waere nur Ballast. Eine
+        # verknuepfte Spalte darf leer anfangen: sie fuellt sich beim Korrigieren.
         await db.rollback()
         raise HTTPException(400, "Kein Schüler der Übernahme gehört zu diesem Kurs")
     await db.commit()
     return {"imported": angelegt}
+
+
+# ─── Verknuepfung Klassenarbeit -> Notenspalte ───
+# Eine Uebernahme war ein Abzug: wer danach in der Arbeit weiter korrigierte,
+# musste die Spalte loeschen und neu uebernehmen. Die verknuepfte Spalte folgt
+# der Arbeit — die Klassenarbeit schickt nach jedem Speichern ihre Noten, und
+# hier werden sie eingetragen. Gerechnet wird weiter in der Klassenarbeit
+# (Punkte -> Note mit Tendenz), wie bei der einmaligen Uebernahme.
+# Eine E/G-Arbeit hat zwei Blaetter; die Spalte haengt an einem von beiden und
+# gilt fuer beide, deshalb die Suche ueber id UND partner_id.
+
+async def _verknuepfte_spalten(db, user, work_id: int) -> list:
+    w = await eigenes(db, WorkAnalysis, work_id, user, "Arbeit nicht gefunden")
+    ids = [w.id] + ([w.partner_id] if w.partner_id else [])
+    return list((await db.execute(select(GradeCategory).where(
+        GradeCategory.owner_id == user.id, GradeCategory.source_work_id.in_(ids),
+    ).order_by(GradeCategory.id))).scalars().all())
+
+
+@router.get("/verknuepft/{work_id}")
+async def verknuepft(work_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    spalten = await _verknuepfte_spalten(db, user, work_id)
+    sek = {}
+    if spalten:
+        sek = {x.id: x.name for x in (await db.execute(select(GradeSection).where(
+            GradeSection.id.in_({c.section_id for c in spalten if c.section_id})))).scalars().all()}
+    return [{"id": c.id, "name": c.name, "section_id": c.section_id, "section": sek.get(c.section_id, "")} for c in spalten]
+
+
+class VerknuepftSyncBody(BaseModel):
+    # Wer auf diesem Blatt steht: nur deren Noten werden angefasst. Ohne das
+    # loeschte das G-Blatt beim Speichern die Noten der E-Kinder.
+    student_ids: List[int]
+    grades: List[GradeCell]
+    note: str = ""
+
+
+@router.put("/verknuepft/{work_id}")
+async def verknuepft_sync(work_id: int, body: VerknuepftSyncBody, user: User = Depends(require_module),
+                          db: AsyncSession = Depends(get_db)):
+    spalten = await _verknuepfte_spalten(db, user, work_id)
+    if not spalten:
+        return {"spalten": 0}
+    werte = {g.student_id: g.value for g in body.grades}
+    bereich = set(body.student_ids) | set(werte)
+    for cat in spalten:
+        # Nur Kinder dieser Klassenfamilie — eine fremde student_id faellt still heraus.
+        geschwister = await sibling_class_ids(db, cat.class_id)
+        erlaubt = {sid for (sid,) in (await db.execute(select(Student.id).where(
+            Student.id.in_(bereich), Student.class_id.in_(geschwister)))).all()} if bereich else set()
+        vorhanden = {e.student_id: e for e in (await db.execute(select(GradeEntry).where(
+            GradeEntry.category_id == cat.id, GradeEntry.kind == "grade",
+            GradeEntry.student_id.in_(erlaubt)))).scalars().all()} if erlaubt else {}
+        for sid in erlaubt:
+            e = vorhanden.get(sid)
+            if sid in werte:
+                if e is None:
+                    db.add(GradeEntry(category_id=cat.id, student_id=sid, kind="grade", value=werte[sid], note=body.note or ""))
+                elif e.value != werte[sid]:
+                    e.value = werte[sid]
+            elif e is not None:
+                # Keine Note mehr (abwesend, Punkte geleert): die Zelle folgt.
+                await db.delete(e)
+    await db.commit()
+    return {"spalten": len(spalten)}
 
 
 # ─── Code-Detektiv-Session als Notenspalte ───

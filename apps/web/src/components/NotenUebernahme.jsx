@@ -21,8 +21,10 @@ import { useLanguage } from "../i18n/index.jsx";
  * @param spalte    Vorschlag für den Spaltennamen
  * @param notiz     was als Herkunft an der Spalte steht
  * @param quelle    `source_kind` für den Server ("karten", "klassenarbeit", …)
+ * @param workId    Klassenarbeit, mit der die Spalte VERKNÜPFT wird (Noten
+ *                  folgen danach jedem Speichern der Arbeit); ohne = einmalig
  */
-export default function NotenUebernahme({ titel, classId, kursId, grades, spalte, notiz, quelle, onClose }) {
+export default function NotenUebernahme({ titel, classId, kursId, grades, spalte, notiz, quelle, workId, onClose }) {
   const { t } = useLanguage();
   const [sectionId, setSectionId] = useState(null);
   const [name, setName] = useState(spalte);
@@ -36,13 +38,14 @@ export default function NotenUebernahme({ titel, classId, kursId, grades, spalte
     const res = await fetch("/api/noten/import-grades", alsJson("POST", {
       class_id: classId, kurs_id: kursId, section_id: Number(sectionId),
       column_name: name.trim(), note: notiz, source_kind: quelle, grades,
+      ...(workId ? { source_work_id: workId } : {}),
     })).catch(() => null);
     setBusy(false);
     if (res && res.ok) onClose();
     else { const b = res ? await res.json().catch(() => ({})) : {}; setErr(typeof b.detail === "string" ? b.detail : t("common.notWork")); }
   };
 
-  const aus = busy || grades.length === 0 || !sectionId;
+  const aus = busy || (!workId && grades.length === 0) || !sectionId;
   return (
     <Modal onClose={onClose} width={440} label={titel}>
       <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{titel}</h3>

@@ -819,6 +819,11 @@ class GradeCategory(Base):
     # Herkunft der Spalte, damit das Notenbuch die Quelle kennzeichnet:
     # "cardvote" | "karten" | "codedetektiv" (leer = von Hand angelegt).
     source_kind: Mapped[str] = mapped_column(String(20), default="", server_default="")
+    # Mit einer Klassenarbeit VERKNUEPFT statt einmal uebernommen: jedes
+    # Speichern der Arbeit schreibt die Noten dieser Spalte neu (Notenbuch und
+    # Klassenarbeit sind beide Teil des Moduls Auswertung). SET NULL: wird die
+    # Arbeit geloescht, bleibt die Spalte als gewoehnliche stehen.
+    source_work_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
     # Thema der Spalte (z.B. eine Klassenarbeit deckt ein Thema ab). Optional,
     # SET NULL. Grundlage fuer den Nachholbedarf: schwache SuS -> Karten des
     # Themas wieder faellig setzen / Aufgaben vorschlagen.

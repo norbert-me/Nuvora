@@ -112,6 +112,10 @@ export default function Klassenarbeit() {
   const notenAktiv = aktiv("auswertung");
   const cardvoteAktiv = aktiv("cardvote");
   const [notenModal, setNotenModal] = useState(false);
+  // Notenspalten, die mit dieser Arbeit VERKNUEPFT sind (kein Abzug): jedes
+  // Speichern schickt die Noten neu, die Spalte folgt. Eine E/G-Arbeit teilt
+  // sich die Spalte ueber beide Blaetter — der Server sucht ueber partner_id.
+  const [verknuepft, setVerknuepft] = useState([]);
   const [scale, setScale] = useState(DEFAULT_SCALE);
   useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ } }, []);
   const [hideIndividual, setHideIndividual] = useState(false); // #55: SuS-Ansicht — einzelne Leistungen + Noten aus
@@ -201,6 +205,12 @@ export default function Klassenarbeit() {
     const r = await fetch(`${API}/works/${next.id}`, alsJson("PUT", { name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [], fehler: next.fehler || {} })).catch(() => null);
     if (!r || !r.ok) { showAlert(t("common.notWork")); return false; }
     setSavedWork(next);
+    if (verknuepft.length) {
+      const sc = (next.scale && Object.keys(next.scale).length) ? next.scale : scale;
+      await fetch(`/api/noten/verknuepft/${next.id}`, alsJson("PUT", {
+        student_ids: students.map((s) => s.id), grades: notenAusArbeit(students, next, sc), note: t("klassenarbeit.title"),
+      })).catch(() => null);
+    }
     // Der Name gilt beiden Blaettern (der Server zieht das andere mit).
     setWorks((ws) => ws.map((x) => (x.id === next.id || (next.partner_id && x.id === next.partner_id) ? { ...x, name: next.name } : x)));
     return true;
@@ -218,6 +228,13 @@ export default function Klassenarbeit() {
   // Der Name bleibt: jede Geste geht weiter denselben einen Weg — nur endet er
   // jetzt im Entwurf statt beim Server.
   const persist = (next) => entwurf.setz(next);
+  const workId = work && work.id;
+  useEffect(() => {
+    if (!notenAktiv || !workId) { setVerknuepft([]); return; }
+    let weg = false;
+    hol(`/api/noten/verknuepft/${workId}`).then((d) => { if (!weg) setVerknuepft(Array.isArray(d) ? d : []); });
+    return () => { weg = true; };
+  }, [notenAktiv, workId, notenModal]);
   // Andere Arbeit / andere Klasse gewählt: nachfragen, sonst wäre die
   // Arbeitskopie still weg.
   const wechseln = (fn) => {
@@ -921,7 +938,12 @@ export default function Klassenarbeit() {
           )}
 
           <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap", alignItems: "center" }}>
-            {notenAktiv && (work.tasks || []).length > 0 && <button onClick={() => setNotenModal(true)} style={btnPrimary}>{t("klassenarbeit.toNoten")}</button>}
+            {notenAktiv && (work.tasks || []).length > 0 && (verknuepft.length ? (
+              <Link to={`/auswertung?tab=noten&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`} title={t("klassenarbeit.verknuepftHint")}
+                style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "var(--text2)" }}>
+                <Icon d={ICONS.link} size={14} /> {verknuepft.map((v) => v.section ? `${v.section} · ${v.name}` : v.name).join(", ")}
+              </Link>
+            ) : <button onClick={() => setNotenModal(true)} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.link} size={15} /> {t("klassenarbeit.toNoten")}</button>)}
             {(kartenAktiv || lernpfadAktiv) && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.restore} size={15} /> {t("klassenarbeit.remediate")}</button>}
             {/* Ein Blatt je Kind. Der Ausdruck laesst den Rahmen weg (Druck-CSS
                 in index.html: `.nur-drucken` gewinnt), deshalb reicht hier
@@ -963,7 +985,7 @@ export default function Klassenarbeit() {
             const noten = notenAusArbeit(students, work, effScale);
             return <NotenUebernahme titel={t("klassenarbeit.toNoten")}
               classId={classId} kursId={kursId} grades={noten}
-              quelle="klassenarbeit" notiz={t("klassenarbeit.title")} spalte={work.name || t("klassenarbeit.newName")}
+              quelle="klassenarbeit" notiz={t("klassenarbeit.title")} spalte={work.name || t("klassenarbeit.newName")} workId={work.id}
               onClose={() => setNotenModal(false)} />;
           })()}
           </>)}
