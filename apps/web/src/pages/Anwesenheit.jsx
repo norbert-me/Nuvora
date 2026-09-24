@@ -175,16 +175,29 @@ export default function Anwesenheit() {
   // Was WIRKLICH gespeichert ist. Ein Vorschlag des Servers gehört nicht dazu —
   // sonst stünde er als bereits eingetragen da, ohne dass ihn jemand bestätigt
   // hat (genau das tat der Server bis 10.09.2026 selbst).
+  //
+  // Ohne Eintrag heisst das fuer den Server „da" — also auch hier. Die
+  // Vorauswahl „fehlt" aus dem Profil stand frueher direkt in dieser Basis:
+  // dann galt ein Kind ohne Eintrag als gespeichert-fehlend, ein gespeichertes
+  // „da" (= kein Eintrag) sprang nach dem Speichern optisch auf „fehlt" zurueck,
+  // und wer auf „fehlt" stehen blieb, wurde nie gesendet (sah ja unveraendert
+  // aus) und stand beim Server als anwesend.
   const basis = useMemo(() => {
     const o = {};
-    students.forEach((s) => { const e = tag[String(s.id)]; o[String(s.id)] = e && !e.vorschlag ? e.status : vorauswahl; });
+    students.forEach((s) => { const e = tag[String(s.id)]; o[String(s.id)] = e && !e.vorschlag ? e.status : "da"; });
     return o;
-  }, [students, tag, vorauswahl]);
+  }, [students, tag]);
   // Die Vorschläge — vorbelegt als offene Änderung, damit die Speicherleiste
   // „nicht gespeichert" zeigt, bis die Lehrkraft sie bestätigt.
   const vorschlaege = useMemo(() => {
     const o = {};
-    students.forEach((s) => { const e = tag[String(s.id)]; if (e?.vorschlag && e.status !== vorauswahl) o[String(s.id)] = e.status; });
+    students.forEach((s) => {
+      const k = String(s.id); const e = tag[k];
+      if (e?.vorschlag && e.status !== vorauswahl) o[k] = e.status;
+      // Noch nicht erfasst und die Lehrkraft beginnt mit „abwesend": das ist
+      // eine Vorbelegung, kein gespeicherter Stand — offen bis zum Speichern.
+      else if (!e && vorauswahl !== "da") o[k] = vorauswahl;
+    });
     return o;
   }, [students, tag, vorauswahl]);
   // Wen hat die Lehrkraft in DIESER Runde selbst angefasst? Nur diese Kinder

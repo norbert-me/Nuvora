@@ -105,6 +105,23 @@ async def test_da_ohne_vorschlag_legt_keine_zeile_an(s):
 
 
 @pytest.mark.asyncio
+async def test_abhaken_haelt_da_als_eintrag_fest(s):
+    """Wer mit „abwesend" beginnt, liest „kein Eintrag" als „noch nicht erfasst".
+    Ein gespeichertes „da" darf deshalb nicht zu „kein Eintrag" werden — sonst
+    sprang das Kind nach dem Speichern optisch zurueck auf „fehlt"."""
+    u, c, st = await _seed(s)
+    u.anwesenheit_default = "fehlt"; await s.commit()
+    d = datetime(2026, 7, 27)
+    for period in (2, None):
+        await an.mark(c.id, an.MarkIn(student_id=st.id, date=d, status="da", period=period), user=u, db=s)
+        tag = await an.get_day(c.id, date=d, period=period, user=u, db=s)
+        assert tag[str(st.id)]["status"] == "da"
+        assert tag[str(st.id)].get("vorschlag") is not True
+    zus = await an.summary(c.id, user=u, db=s)
+    assert not zus.get(str(st.id), {}).get("fehlt"), "ein da zaehlt nie als Fehlzeit"
+
+
+@pytest.mark.asyncio
 async def test_abgelehnter_vorschlag_zaehlt_nicht_als_fehltag(s):
     """Die „da"-Zeile darf in keiner Zaehlung auftauchen."""
     u, c, st = await _seed(s)

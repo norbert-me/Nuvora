@@ -436,8 +436,15 @@ async def mark(class_id: int, body: MarkIn, user: User = Depends(require_module)
     # Abwesenheit), also entstehen nicht dreissig Zeilen je Stunde; gezaehlt
     # wird sie nirgends (`status != "da"` in Summe, Verlauf und Druck), und im
     # Tagesstatus steht sie ganz unten im Rang.
+    #
+    # Dasselbe gilt, wenn die Lehrkraft mit „abwesend" beginnt (Profil,
+    # `anwesenheit_default = "fehlt"`): dort heisst „kein Eintrag" in der
+    # Oberflaeche „noch nicht erfasst" und steht als „fehlt" vorbelegt. Ein
+    # geloeschtes „da" kam beim naechsten Laden also als FEHLT zurueck, obwohl
+    # es gespeichert war — die Anwesenden sprangen optisch wieder auf fehlend.
+    abhaken = (getattr(user, "anwesenheit_default", "da") or "da") == "fehlt"
     if body.status == "da" and not body.note.strip():
-        if await _hat_frueheren_vorschlag(db, canon_id, lo, hi, body.period):
+        if abhaken or await _hat_frueheren_vorschlag(db, canon_id, lo, hi, body.period):
             if row:
                 row.status = "da"
                 row.note = ""
