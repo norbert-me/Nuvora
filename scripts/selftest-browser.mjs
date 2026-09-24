@@ -901,7 +901,10 @@ const BEDIENUNG = [
       // Der Knopf traegt nur ein Icon; erkennbar ist er am title-Attribut.
       await seite.locator("[title='Neues Thema'], [title='New topic'], [title='Nuevo tema']")
         .first().click({ timeout: 8000 });
-      const feld = seite.locator("input:visible").last();
+      // Anlegen ist ein Dialog mit mehreren Feldern; der Name hat den Fokus,
+      // Enter legt an.
+      await seite.waitForTimeout(300);
+      const feld = seite.locator("input:focus");
       await feld.fill(MARKE, { timeout: 8000 });
       await feld.press("Enter");
       await seite.waitForTimeout(1200);

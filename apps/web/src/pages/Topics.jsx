@@ -536,7 +536,13 @@ function ThemaNeu({ parent, t, onAnlegen, onClose }) {
   return (
     <Modal onClose={schliessen} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={titel}>
       <DialogKopf titel={titel} onClose={schliessen} schliessenLabel={t("common.close")} style={{ marginBottom: 8 }} />
-      <ThemaFelder ent={ent} istOberthema={!parent} t={t} />
+      {/* Enter in einem Feld legt an — wie vorher in der Zeile; wer nur einen
+          Namen tippt, soll nicht zur Leiste greifen muessen. */}
+      <div onKeyDown={(ev) => {
+        if (ev.key === "Enter" && ev.target.tagName === "INPUT" && (ent.wert.name || "").trim()) { ev.preventDefault(); ent.speichern(); }
+      }}>
+        <ThemaFelder ent={ent} istOberthema={!parent} t={t} />
+      </div>
       <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center", flexWrap: "wrap" }}>
         <Speicherleiste entwurf={ent} immer />
       </div>
