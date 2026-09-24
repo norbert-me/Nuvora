@@ -637,6 +637,11 @@ class Topic(Versioniert, Base):
     # Sortiert wird ohnehin nach Namen, gefiltert per Vergleich — beides
     # funktioniert mit Text.
     jahrgang: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # Nummer im Lehrplan („1", „9.1") — Text aus demselben Grund wie der
+    # Jahrgang. Stand vorher im Namen („2 IP-Adressen") und sortierte dort nur
+    # zufaellig richtig; als eigenes Feld ordnet sie die Liste (Fach, Stufe,
+    # Nummer) und erscheint in jeder Themen-Auswahl.
+    nummer: Mapped[str] = mapped_column(String(20), default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     children: Mapped[list["Topic"]] = relationship(

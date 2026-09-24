@@ -34,7 +34,7 @@ export default function TopicPicker({ value, onChange, style }) {
 
   // Beschriftung („Thema / Unterthema") und Reihenfolge kommen aus
   // core/topics.js — dieselbe Quelle wie der Themenfilter im Quiz.
-  const { label, geordnet: ordered } = themenIndex(topics);
+  const { auswahlLabel: label, geordnet: ordered } = themenIndex(topics);
 
   return (
     <select

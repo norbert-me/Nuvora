@@ -2818,7 +2818,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
             Auswahl mehr — wer sein Thema kennt, tippt es. */}
         <SuchSelect value={topicId} onChange={setTopicId} style={{ width: "100%" }}
           leerLabel={`– ${t("kalender.noTopic")} –`}
-          optionen={themen.geordnet.map((tp) => ({ wert: tp.id, label: topicLabel(tp) }))} />
+          optionen={themen.geordnet.map((tp) => ({ wert: tp.id, label: themen.auswahlLabel(tp) }))} />
         {aktiv.unterrichtsplanung && (
           <>
             <div style={lbl}>{t("kalender.method")}</div>

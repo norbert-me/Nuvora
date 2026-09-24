@@ -5,13 +5,14 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { askConfirm } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { AddButton, btnSecondary, cardStyle, chipStyle, COLORS as C, CONTROL_R, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, Modal, pageApp, pageIntro, pageTitle, panelStyle, sectionLabel, Skeleton, toolbarBtn, toolbarBtnPrimary, toolbarInput } from "../components/Icons.jsx";
+import { AddButton, btnSecondary, cardStyle, chipStyle, COLORS as C, CONTROL_R, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, Modal, pageApp, pageIntro, pageTitle, panelStyle, sectionLabel, Skeleton } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { peek, put } from "../core/cache.js";
 import AutoTextarea from "../components/AutoTextarea.jsx";
 import { Link } from "react-router-dom";
 import { themaZiel } from "../core/themaLinks.js";
 import { useEinfuegen } from "../core/ziehsortieren.js";
+import { mitNummer, themenVergleich } from "../core/topics.js";
 import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api";
@@ -21,18 +22,21 @@ export default function Topics() {
   const [topics, setTopics] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
-  const [newRoot, setNewRoot] = useState("");
-  const [showRootForm, setShowRootForm] = useState(false);
-  const [addingUnder, setAddingUnder] = useState(null);
-  const [childName, setChildName] = useState("");
+  // Anlegen läuft über denselben Dialog wie das Bearbeiten, mit allen Feldern
+  // (Nummer, Fach, Stufe …) — vorher nur ein Namensfeld, und alles Übrige
+  // musste man danach im zweiten Schritt nachtragen. `{ parent_id }` = offen.
+  const [neu, setNeu] = useState(null);
   const [popup, setPopup] = useState(null); // Thema/Unterthema im Detail-Popup
   const [expanded, setExpanded] = useState(() => new Set());
   // Ziehen zum Umsortieren kommt aus core/ziehsortieren.js — dieselbe Marke
   // („vor"/„nach") wie bei Kartenstapeln, Karten und Notenbuch-Spalten.
-  const zieh = useEinfuegen();
   // Unterthemen sortieren sich nur unter ihrem eigenen Thema — die Gruppe ist
   // der Elternknoten; zwischen Themen umhängen geht über das Detail-Popup.
   const ziehKind = useEinfuegen({ nurGleicheGruppe: true });
+  // Sortiert wird nach Fach, Stufe und Nummer (core/topics.js); gezogen wird
+  // deshalb nur zwischen Einträgen, die dort gleichauf liegen — sonst sprängen
+  // sie nach dem Ablegen an ihren Platz zurück.
+  const zieh0 = useEinfuegen({ nurGleicheGruppe: true });
 
   const toggleExpand = (id) => setExpanded((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -40,7 +44,7 @@ export default function Topics() {
   // und geht erst mit „Speichern" zum Server. Vorher lag jede losgelassene
   // Karte sofort in der Datenbank — ein Verrutschen war nicht zurückzunehmen.
   const dropRoot = (targetId) => {
-    const ids = zieh.ablegen(targetId, ordnung.wert.ids);
+    const ids = zieh0.ablegen(targetId, ordnung.wert.ids);
     if (ids) ordnung.setz({ ids });
   };
   const dropKind = (parentId, targetId) => {
@@ -100,16 +104,26 @@ export default function Topics() {
   const ordnung = useEntwurf(basisOrdnung, (w) =>
     call(() => fetch(`${API}/topics/reorder`, alsJson("PUT", { ids: [...w.ids, ...Object.values(w.kinder || {}).flat()] }))));
 
-  const add = (name, parent_id) =>
-    call(() => fetch(`${API}/topics`, alsJson("POST", { name, parent_id })));
+  // Ein Satz Felder für Anlegen und Ändern (`w` aus dem Dialog-Entwurf).
+  const felder = (w) => ({
+    name: (w.name || "").trim(), notes: w.notes || "", ziel_g: w.zielG || "", ziel_e: w.zielE || "",
+    voraussetzungen: w.voraus || "", fach: w.fach || "", jahrgang: (w.jahrgang || "").trim() || null,
+    nummer: (w.nummer || "").trim(),
+  });
+  const add = async (w, parent_id) => {
+    if (!(w.name || "").trim()) { setError(t("topics.newPlaceholder")); return false; }
+    const ok = await call(() => fetch(`${API}/topics`, alsJson("POST", { ...felder(w), parent_id })));
+    if (ok && parent_id) setExpanded((p) => new Set(p).add(parent_id));
+    return ok;
+  };
 
   // Umbenennen laeuft ueber saveTopic (Detail-Popup) — eine Funktion, ein Weg.
   // Wichtig dabei: alle Felder mitschicken, PUT setzt fehlende auf leer. Genau
   // daran ist die frueher getrennte rename()-Fassung fast gescheitert (Notiz,
   // Ziele und Voraussetzungen weg nach einem Umbenennen).
   // Titel + Notiz speichern (aus dem Detail-Popup). Leerer Titel behält den alten.
-  const saveTopic = (tp, name, notes, zielG, zielE, voraussetzungen, fach, jahrgang) =>
-    call(() => fetch(`${API}/topics/${tp.id}`, alsJson("PUT", { name: (name || "").trim() || tp.name, parent_id: tp.parent_id, notes, ziel_g: zielG || "", ziel_e: zielE || "", voraussetzungen: voraussetzungen || "", fach: fach || "", jahrgang: jahrgang || null })));
+  const saveTopic = (tp, w) =>
+    call(() => fetch(`${API}/topics/${tp.id}`, alsJson("PUT", { ...felder(w), name: (w.name || "").trim() || tp.name, parent_id: tp.parent_id })));
 
   const remove = async (tp) => {
     const kids = topics.filter((x) => x.parent_id === tp.id);
@@ -123,35 +137,22 @@ export default function Topics() {
 
   // Angezeigt wird die Reihenfolge des Entwurfs; was der Server inzwischen neu
   // kennt (frisch angelegtes Thema), hängt hinten an, statt zu verschwinden.
-  const roots = (() => {
-    const wurzeln = topics.filter((x) => x.parent_id === null);
-    const nach = new Map(wurzeln.map((x) => [x.id, x]));
-    const sortiert = ordnung.wert.ids.map((id) => nach.get(id)).filter(Boolean);
-    const bekannt = new Set(sortiert.map((x) => x.id));
-    return [...sortiert, ...wurzeln.filter((x) => !bekannt.has(x.id))];
-  })();
-  // Wie bei den Themen: Reihenfolge aus dem Entwurf, Unbekanntes hinten an.
-  const childrenOf = (id) => {
-    const kinder = topics.filter((x) => x.parent_id === id);
-    const nach = new Map(kinder.map((x) => [x.id, x]));
-    const sortiert = ((ordnung.wert.kinder || {})[id] || []).map((k) => nach.get(k)).filter(Boolean);
-    const bekannt = new Set(sortiert.map((x) => x.id));
-    return [...sortiert, ...kinder.filter((x) => !bekannt.has(x.id))];
+  // Die gezogene Reihenfolge des Entwurfs tritt an die Stelle von `position`
+  // — sie entscheidet nur bei Gleichstand in Fach, Stufe und Nummer.
+  const nachEntwurf = (liste, ids) => {
+    const rang = new Map((ids || []).map((id, i) => [id, i]));
+    return liste
+      .map((x) => ({ x, v: { ...x, position: rang.has(x.id) ? rang.get(x.id) : 1e6 + (x.position || 0) } }))
+      .sort((a, b) => themenVergleich(a.v, b.v))
+      .map(({ x }) => x);
   };
+  const roots = nachEntwurf(topics.filter((x) => x.parent_id === null), ordnung.wert.ids);
+  const gruppe = (tp) => (tp.parent_id ? `${tp.parent_id}|${tp.nummer || ""}` : `${tp.fach || ""}|${tp.jahrgang || ""}|${tp.nummer || ""}`);
+  // Wie bei den Themen: Reihenfolge aus dem Entwurf, Unbekanntes hinten an.
+  const childrenOf = (id) => nachEntwurf(topics.filter((x) => x.parent_id === id), (ordnung.wert.kinder || {})[id]);
   const kinderIds = (id) => childrenOf(id).map((x) => x.id);
   const openPopup = (tp) => setPopup({ ...tp, parent_name: tp.parent_id ? (topics.find((x) => x.id === tp.parent_id)?.name || "") : "" });
 
-  const submitRoot = async (e) => {
-    e.preventDefault();
-    if (!newRoot.trim()) return;
-    if (await add(newRoot.trim(), null)) { setNewRoot(""); setShowRootForm(false); }
-  };
-
-  const submitChild = async (e, parentId) => {
-    e.preventDefault();
-    if (!childName.trim()) return;
-    if (await add(childName.trim(), parentId)) { setChildName(""); setAddingUnder(null); }
-  };
 
   // Zwei Ebenen: Thema (0) > Unterthema (1). Neue Unterpunkte nur unter Themen
   // (Ebene 0). Bestehende tiefere Einträge werden weiter angezeigt, nur nicht mehr
@@ -162,15 +163,16 @@ export default function Topics() {
     const isRoot = depth === 0;
     const canHaveKids = depth < MAX_DEPTH;                 // neues Unterthema erlauben?
     const subCount = childrenOf(tp.id).length;             // vorhandene Kinder immer zeigen
-    const ziehbar = isRoot || depth === 1;
-    const z = isRoot ? zieh : ziehKind;
+    const z = isRoot ? zieh0 : ziehKind;
+    const nachbarn = isRoot ? roots : childrenOf(tp.parent_id);
+    const ziehbar = (isRoot || depth === 1) && nachbarn.filter((x) => gruppe(x) === gruppe(tp)).length > 1;
     const seite = ziehbar ? z.seite(tp.id) : null;
     return (
     <div
       key={tp.id}
       draggable={ziehbar}
-      onDragStart={ziehbar ? (e) => { e.stopPropagation(); z.start(tp.id, tp.parent_id); } : undefined}
-      onDragOver={ziehbar ? (e) => z.ueber(e, tp.id, tp.parent_id) : undefined}
+      onDragStart={ziehbar ? (e) => { e.stopPropagation(); z.start(tp.id, gruppe(tp)); } : undefined}
+      onDragOver={ziehbar ? (e) => z.ueber(e, tp.id, gruppe(tp)) : undefined}
       onDragEnd={ziehbar ? z.beenden : undefined}
       onDrop={ziehbar ? () => (isRoot ? dropRoot(tp.id) : dropKind(tp.parent_id, tp.id)) : undefined}
       style={{
@@ -208,11 +210,16 @@ export default function Topics() {
           <span onClick={() => (subCount > 0 ? toggleExpand(tp.id) : openPopup(tp))}
             title={subCount > 0 ? (expanded.has(tp.id) ? t("topics.collapse") : t("topics.expand")) : t("topics.openDetails")}
             style={{ flex: 1, fontWeight: isChild ? 400 : 600, fontSize: isChild ? 14 : 16, color: "var(--text)", cursor: "pointer" }}>
-            {tp.name}
+            {mitNummer(tp)}
+            {isRoot && (tp.fach || tp.jahrgang) && (
+              <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)", marginLeft: 8 }}>
+                {[tp.fach, tp.jahrgang && t("topics.stufeN", { n: tp.jahrgang })].filter(Boolean).join(" · ")}
+              </span>
+            )}
             {subCount > 0 && <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)", marginLeft: 8 }}>{t("topics.subCount", { n: subCount })}</span>}
           </span>
           {canHaveKids && (
-            <button onClick={() => { setAddingUnder(tp.id); setChildName(""); setExpanded((p) => new Set(p).add(tp.id)); }} className="icon-btn" style={iconBtn} title={t("topics.addSub")} aria-label={t("topics.addSub")}>
+            <button onClick={() => setNeu({ parent_id: tp.id })} className="icon-btn" style={iconBtn} title={t("topics.addSub")} aria-label={t("topics.addSub")}>
               <Icon d={ICONS.plus} size={16} color="var(--accent)" />
             </button>
           )}
@@ -239,17 +246,6 @@ export default function Topics() {
     <div key={tp.id} style={depth === 0 ? { marginBottom: 12 } : undefined}>
       {row(tp, depth)}
       {expanded.has(tp.id) && depth < MAX_DEPTH && childrenOf(tp.id).map((c) => renderNode(c, depth + 1))}
-      {addingUnder === tp.id && depth < MAX_DEPTH && (
-        <form onSubmit={(e) => submitChild(e, tp.id)} style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: (depth + 1) * 28, marginBottom: 4 }}>
-          <input
-            value={childName} onChange={(e) => setChildName(e.target.value)} autoFocus
-            placeholder={t("topics.subPlaceholder")}
-            style={{ ...toolbarInput, flex: 1 }}
-          />
-          <button type="submit" style={toolbarBtnPrimary}>{t("common.add")}</button>
-          <button type="button" onClick={() => setAddingUnder(null)} style={toolbarBtn}>{t("common.abort")}</button>
-        </form>
-      )}
     </div>
   );
 
@@ -260,25 +256,7 @@ export default function Topics() {
 
       {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
-      {!showRootForm ? (
-        <AddButton onClick={() => setShowRootForm(true)} title={t("topics.addTopic")} style={{ marginBottom: 24 }} />
-      ) : (
-        // Leisten-Masse (CONTROL_H), damit die Zeile beim Umschalten vom
-        // AddButton aufs Formular nicht in der Hoehe springt.
-        <form onSubmit={submitRoot} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
-          <input
-            value={newRoot} onChange={(e) => setNewRoot(e.target.value)} placeholder={t("topics.newPlaceholder")} autoFocus
-            onKeyDown={(e) => { if (e.key === "Escape") { setShowRootForm(false); setNewRoot(""); } }}
-            style={{ ...toolbarInput, flex: 1, maxWidth: 340 }}
-          />
-          <button type="submit" disabled={!newRoot.trim()} style={{ ...toolbarBtnPrimary, opacity: newRoot.trim() ? 1 : 0.4 }}>
-            {t("common.add")}
-          </button>
-          <button type="button" onClick={() => { setShowRootForm(false); setNewRoot(""); }} style={toolbarBtn}>
-            {t("common.abort")}
-          </button>
-        </form>
-      )}
+      <AddButton onClick={() => setNeu({ parent_id: null })} title={t("topics.addTopic")} style={{ marginBottom: 24 }} />
 
       {!loaded && <Skeleton rows={5} />}
       {loaded && roots.length === 0 && <Empty title={t("topics.empty")} hint={t("topics.emptyHint")} />}
@@ -289,6 +267,8 @@ export default function Topics() {
       {roots.map((tp) => renderNode(tp, 0))}
 
       {popup && <TopicPopup tp={popup} t={t} onSaveTopic={saveTopic} onClose={() => setPopup(null)} />}
+      {neu && <ThemaNeu parent={topics.find((x) => x.id === neu.parent_id) || null} t={t}
+        onAnlegen={(w) => add(w, neu.parent_id)} onClose={() => setNeu(null)} />}
     </div>
   );
 }
@@ -309,7 +289,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   // Felder mit fünf eigenen Zuständen, die einzeln verloren gehen können.
   const [gespeichert, setGespeichert] = useState({
     name: tp.name, notes: tp.notes || "", zielG: tp.ziel_g || "", zielE: tp.ziel_e || "", voraus: tp.voraussetzungen || "",
-    fach: tp.fach || "", jahrgang: tp.jahrgang || "",
+    fach: tp.fach || "", jahrgang: tp.jahrgang || "", nummer: tp.nummer || "",
   });
   // Der Entwurf muss sich nach dem Speichern selbst nachziehen (leerer Titel
   // behält den alten). `e` steht in seiner eigenen Rückrufkette noch nicht —
@@ -317,13 +297,13 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   const entwurfRef = useRef(null);
   const ent = useEntwurf(gespeichert, async (w) => {
     const name = (w.name || "").trim() || gespeichert.name;
-    if (await onSaveTopic(tp, name, w.notes, w.zielG, w.zielE, w.voraus, w.fach, (w.jahrgang || "").trim() || null) === false) return false;
+    if (await onSaveTopic(tp, { ...w, name }) === false) return false;
     entwurfRef.current?.setz({ name });
     setGespeichert({ ...w, name });
     setEditNote(false);
   });
   entwurfRef.current = ent;
-  const { notes, zielG, zielE, voraus, fach } = gespeichert;
+  const { notes, zielG, zielE, voraus, fach, jahrgang, nummer } = gespeichert;
   const name = gespeichert.name;                  // Anzeige-Titel (nach Umbenennen)
   const [open, setOpen] = useState(false); // Inhalte-Bereich ausgeklappt?
   const [usage, setUsage] = useState(null);
@@ -361,9 +341,10 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
     </Link>
   ) : <div style={line}>{children}</div>);
 
+  const titel = [tp.parent_name, nummer ? `${nummer} ${name}` : name].filter(Boolean).join(" / ");
   return (
-    <Modal onClose={schliessen} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={tp.parent_name ? `${tp.parent_name} / ${name}` : name}>
-        <DialogKopf titel={tp.parent_name ? `${tp.parent_name} / ${name}` : name} onClose={schliessen}
+    <Modal onClose={schliessen} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={titel}>
+        <DialogKopf titel={titel} onClose={schliessen}
           schliessenLabel={t("common.close")} style={{ marginBottom: 8 }}>
           {/* Ein Edit-Icon für Titel UND Notiz. */}
           {!editNote && <button onClick={() => setEditNote(true)} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={16} /></button>}
@@ -371,45 +352,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
 
         {editNote ? (
           <div>
-            <div style={secTitle}>{t("common.rename")}</div>
-            <input value={ent.wert.name} onChange={(ev) => ent.setz({ name: ev.target.value })} autoFocus maxLength={120}
-              style={{ ...inputStyle, width: "100%", fontSize: 16, fontWeight: 600 }} />
-            {/* Das Fach steht am OBERTHEMA — Unterthemen erben es (der Server
-                pflegt die Regel, siehe _erbt in topics.py). Ein zweites
-                Eingabefeld am Unterthema hiesse: dasselbe Fach an fuenfzig
-                Stellen, und beim ersten Tippfehler weichen sie ab.
-                Der Jahrgang stand hier daneben und ist entfernt (08.09.2026):
-                das Schuljahr sagt bereits, um welchen Jahrgang es geht. Spalte
-                und API bleiben, damit Bestandswerte nicht verschwinden. */}
-            {!tp.parent_id && (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <div style={{ flex: "2 1 180px" }}>
-                  <div style={secTitle}>{t("topics.fach")}</div>
-                  <input list="nuvora-faecher" value={ent.wert.fach} maxLength={60}
-                    onChange={(ev) => ent.setz({ fach: ev.target.value })}
-                    placeholder={t("topics.fachPlaceholder")} style={{ ...inputStyle, width: "100%" }} />
-                  {/* Vorschlagsliste statt Katalog: Schulformen und Bundeslaender
-                      nennen Faecher verschieden, eine feste Liste waere nach
-                      einem Jahr falsch. Eigenes bleibt trotzdem moeglich. */}
-                  <datalist id="nuvora-faecher">
-                    {FACH_VORSCHLAEGE.map((f) => <option key={f} value={f} />)}
-                  </datalist>
-                </div>
-              </div>
-            )}
-            <div style={secTitle}>{t("topics.notes")}</div>
-            <AutoTextarea value={ent.wert.notes} onChange={(ev) => ent.setz({ notes: ev.target.value.slice(0, 500) })} rows={2} maxLength={500}
-              placeholder={t("topics.notesPlaceholder")}
-              style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical" }} />
-            {[["v", t("topics.voraus"), t("topics.vorausPlaceholder"), "voraus"],
-              ["g", t("topics.zielG"), t("topics.zielGPlaceholder"), "zielG"],
-              ["e", t("topics.zielE"), t("topics.zielEPlaceholder"), "zielE"]].map(([k, label, ph, feld]) => (
-              <div key={k}>
-                <div style={secTitle}>{label}</div>
-                <AutoTextarea value={ent.wert[feld]} onChange={(ev) => ent.setz({ [feld]: ev.target.value.slice(0, 500) })} rows={2} maxLength={500} placeholder={ph}
-                  style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical" }} />
-              </div>
-            ))}
+            <ThemaFelder ent={ent} istOberthema={!tp.parent_id} t={t} />
             <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
               <Speicherleiste entwurf={ent} immer />
               <button onClick={() => { if (!ent.geaendert || window.confirm(t("speichern.verlassen"))) { ent.verwerfen(); setEditNote(false); } }}
@@ -418,9 +361,10 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
             </div>
           </div>
         ) : (<>
-          {fach && (
+          {!tp.parent_id && (fach || jahrgang) && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
-              <span style={chipStyle}>{fach}</span>
+              {fach && <span style={chipStyle}>{fach}</span>}
+              {jahrgang && <span style={chipStyle}>{t("topics.stufeN", { n: jahrgang })}</span>}
             </div>
           )}
           <div style={secTitle}>{t("topics.notes")}</div>
@@ -472,3 +416,88 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   );
 }
 
+// Die Felder eines Themas — EINMAL, für Anlegen und Bearbeiten. Zwei Fassungen
+// liefen beim ersten neuen Feld auseinander.
+function ThemaFelder({ ent, istOberthema, t, autoFocus = true }) {
+  const secTitle = { ...sectionLabel, margin: "12px 0 4px" };
+  return (<>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ flex: "0 1 96px", minWidth: 0 }}>
+        <div style={secTitle}>{t("topics.nummer")}</div>
+        <input value={ent.wert.nummer} onChange={(ev) => ent.setz({ nummer: ev.target.value })} maxLength={20}
+          placeholder={t("topics.nummerPlaceholder")} style={{ ...inputStyle, width: "100%" }} />
+      </div>
+      <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+        <div style={secTitle}>{t("topics.name")}</div>
+        <input value={ent.wert.name} onChange={(ev) => ent.setz({ name: ev.target.value })} autoFocus={autoFocus} maxLength={120}
+          placeholder={istOberthema ? t("topics.newPlaceholder") : t("topics.subPlaceholder")}
+          style={{ ...inputStyle, width: "100%", fontWeight: 600 }} />
+      </div>
+    </div>
+    {/* Fach und Stufe stehen am OBERTHEMA — Unterthemen erben sie (der
+        Server pflegt die Regel, siehe _erbt in topics.py). Ein zweites Feld
+        am Unterthema hiesse: dasselbe Fach an fuenfzig Stellen. Die Stufe war
+        einmal entfernt (08.09.2026) und ist zurück: nach Fach, Stufe und
+        Nummer wird die Liste geordnet, und die Auswahl zeigt sie an. */}
+    {istOberthema && (
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ flex: "2 1 180px", minWidth: 0 }}>
+          <div style={secTitle}>{t("topics.fach")}</div>
+          <input list="nuvora-faecher" value={ent.wert.fach} maxLength={60}
+            onChange={(ev) => ent.setz({ fach: ev.target.value })}
+            placeholder={t("topics.fachPlaceholder")} style={{ ...inputStyle, width: "100%" }} />
+          {/* Vorschlagsliste statt Katalog: Schulformen und Bundeslaender
+              nennen Faecher verschieden, eine feste Liste waere nach einem
+              Jahr falsch. Eigenes bleibt trotzdem moeglich. */}
+          <datalist id="nuvora-faecher">
+            {FACH_VORSCHLAEGE.map((f) => <option key={f} value={f} />)}
+          </datalist>
+        </div>
+        <div style={{ flex: "1 1 96px", minWidth: 0 }}>
+          <div style={secTitle}>{t("topics.stufe")}</div>
+          <input value={ent.wert.jahrgang} maxLength={20} onChange={(ev) => ent.setz({ jahrgang: ev.target.value })}
+            placeholder={t("topics.stufePlaceholder")} style={{ ...inputStyle, width: "100%" }} />
+        </div>
+      </div>
+    )}
+    <div style={secTitle}>{t("topics.notes")}</div>
+    <AutoTextarea value={ent.wert.notes} onChange={(ev) => ent.setz({ notes: ev.target.value.slice(0, 500) })} rows={2} maxLength={500}
+      placeholder={t("topics.notesPlaceholder")}
+      style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical" }} />
+    {[["v", t("topics.voraus"), t("topics.vorausPlaceholder"), "voraus"],
+      ["g", t("topics.zielG"), t("topics.zielGPlaceholder"), "zielG"],
+      ["e", t("topics.zielE"), t("topics.zielEPlaceholder"), "zielE"]].map(([k, label, ph, feld]) => (
+      <div key={k}>
+        <div style={secTitle}>{label}</div>
+        <AutoTextarea value={ent.wert[feld]} onChange={(ev) => ent.setz({ [feld]: ev.target.value.slice(0, 500) })} rows={2} maxLength={500} placeholder={ph}
+          style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical" }} />
+      </div>
+    ))}
+  </>);
+}
+
+const LEER = { name: "", notes: "", zielG: "", zielE: "", voraus: "", fach: "", jahrgang: "", nummer: "" };
+
+// Neues Thema/Unterthema: derselbe Dialog wie das Bearbeiten, gleich mit allen
+// Feldern. Ein Unterthema bekommt als Nummer die nächste freie vorgeschlagen.
+function ThemaNeu({ parent, t, onAnlegen, onClose }) {
+  const basis = useMemo(() => LEER, []);
+  const ent = useEntwurf(basis, async (w) => {
+    if (await onAnlegen(w) === false) return false;
+    onClose();
+  });
+  const schliessen = () => {
+    if (ent.geaendert && !window.confirm(t("speichern.verlassen"))) return;
+    onClose();
+  };
+  const titel = parent ? `${mitNummer(parent)} / ${t("topics.neuSub")}` : t("topics.addTopic");
+  return (
+    <Modal onClose={schliessen} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={titel}>
+      <DialogKopf titel={titel} onClose={schliessen} schliessenLabel={t("common.close")} style={{ marginBottom: 8 }} />
+      <ThemaFelder ent={ent} istOberthema={!parent} t={t} />
+      <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center", flexWrap: "wrap" }}>
+        <Speicherleiste entwurf={ent} immer />
+      </div>
+    </Modal>
+  );
+}

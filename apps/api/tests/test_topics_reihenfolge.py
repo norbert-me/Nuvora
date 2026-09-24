@@ -33,3 +33,20 @@ async def test_unterthemen_folgen_der_liste(s):
     )).scalars().all()
     assert [r.name[0] for r in rows] == list("1234")
     assert (await s.get(Topic, andere.id)).position == alt
+
+
+@pytest.mark.asyncio
+async def test_nummer_wird_gespeichert_und_bleibt_ohne_angabe(s):
+    u = User(email="nr@d.de", password_hash="x", name="L")
+    s.add(u)
+    await s.flush()
+
+    t = await TOP.create_topic(TOP.TopicIn(name="Netzwerk", nummer="9.1", jahrgang="9", fach="Informatik"), user=u, db=s)
+    assert t.nummer == "9.1" and t.jahrgang == "9"
+
+    # Ein alter Client schickt keine Nummer — sie darf nicht verschwinden.
+    aus = await TOP.update_topic(t.id, TOP.TopicIn(name="Netzwerke", fach="Informatik", jahrgang="9"), user=u, db=s)
+    assert aus.nummer == "9.1"
+
+    aus = await TOP.update_topic(t.id, TOP.TopicIn(name="Netzwerke", nummer=""), user=u, db=s)
+    assert aus.nummer == ""

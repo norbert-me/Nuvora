@@ -294,6 +294,7 @@ def _ensure_columns(sync_conn):
         ("exam_dates", "topic_ids", "JSON"),   # Themen der geplanten Klassenarbeit
         ("topics", "fach", "VARCHAR(60) DEFAULT '' NOT NULL"),   # Fach und Jahrgang am Thema …
         ("topics", "jahrgang", "VARCHAR(20)"),
+        ("topics", "nummer", "VARCHAR(20) DEFAULT '' NOT NULL"),  # Nummer im Lehrplan
         ("kurse", "fach", "VARCHAR(60) DEFAULT '' NOT NULL"),    # … und ihr Gegenstueck am Kurs
         ("users", "is_admin", "BOOLEAN DEFAULT FALSE NOT NULL"),
         ("users", "hj1_start", "DATE"),        # Schuljahr: Halbjahre + Jahresende

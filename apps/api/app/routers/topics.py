@@ -49,6 +49,10 @@ class TopicIn(BaseModel):
     # Text — sonst ist ein Feld, das jahrelang eine Zahl war, ueber Nacht ein
     # 422 (genau so ist der Selbsttest rot geworden).
     jahrgang: Optional[Union[int, str]] = None
+    # Nummer im Lehrplan, an JEDER Ebene die eigene (nicht geerbt). None heisst
+    # „nicht mitgeschickt, bleibt" — aeltere Clients und die Lernpfad-App
+    # schicken das Feld nicht und duerfen es beim Umbenennen nicht leeren.
+    nummer: Optional[Union[int, str]] = None
 
     @field_validator("name")
     @classmethod
@@ -92,10 +96,16 @@ class TopicOut(VersionOut):
     # Text — sonst ist ein Feld, das jahrelang eine Zahl war, ueber Nacht ein
     # 422 (genau so ist der Selbsttest rot geworden).
     jahrgang: Optional[Union[int, str]] = None
+    nummer: str = ""
     # Wie viele CardVote-Fragen haengen an diesem Thema? Macht sichtbar, was
     # ein Loeschen kostet.
     question_count: int = 0
     model_config = {"from_attributes": True}
+
+
+def _nummer(v) -> Optional[str]:
+    """Nummer als Text, gekuerzt; None bleibt None (= nicht geschickt)."""
+    return None if v is None else str(v).strip()[:20]
 
 
 def _erbt(t: Topic, by_id: dict) -> tuple:
@@ -207,7 +217,7 @@ async def list_topics(
             id=t.id, name=t.name, parent_id=t.parent_id, position=t.position,
             notes=t.notes or "", ziel_g=t.ziel_g or "", ziel_e=t.ziel_e or "",
             voraussetzungen=t.voraussetzungen or "",
-            fach=fach, jahrgang=jahrgang,
+            fach=fach, jahrgang=jahrgang, nummer=t.nummer or "",
             question_count=counts.get(t.id, 0), **stand(t),
         ))
     return out
@@ -247,6 +257,7 @@ async def create_topic(
         # Nur am Oberthema: ein Unterthema erbt (siehe `_erbt`).
         fach=("" if data.parent_id else (data.fach or "").strip()[:60]),
         jahrgang=(None if data.parent_id else ((str(data.jahrgang).strip()[:20] or None) if data.jahrgang else None)),
+        nummer=_nummer(data.nummer) or "",
     )
     db.add(topic)
     await db.commit()
@@ -254,7 +265,8 @@ async def create_topic(
     fach, jahrgang = await _erbt_geladen(db, user, topic)
     return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position,
                     notes=topic.notes or "", ziel_g=topic.ziel_g or "", ziel_e=topic.ziel_e or "",
-                    voraussetzungen=topic.voraussetzungen or "", fach=fach, jahrgang=jahrgang, **stand(topic))
+                    voraussetzungen=topic.voraussetzungen or "", fach=fach, jahrgang=jahrgang,
+                    nummer=topic.nummer or "", **stand(topic))
 
 
 class ReorderIn(BaseModel):
@@ -372,6 +384,8 @@ async def update_topic(
     topic.ziel_g = data.ziel_g or ""
     topic.voraussetzungen = data.voraussetzungen or ""
     topic.ziel_e = data.ziel_e or ""
+    if data.nummer is not None:
+        topic.nummer = _nummer(data.nummer)
     if data.parent_id is None:
         topic.fach = (data.fach or "").strip()[:60]
         topic.jahrgang = (str(data.jahrgang).strip()[:20] or None) if data.jahrgang else None
@@ -385,7 +399,8 @@ async def update_topic(
     fach, jahrgang = await _erbt_geladen(db, user, topic)
     return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position,
                     notes=topic.notes or "", ziel_g=topic.ziel_g or "", ziel_e=topic.ziel_e or "",
-                    voraussetzungen=topic.voraussetzungen or "", fach=fach, jahrgang=jahrgang, **stand(topic))
+                    voraussetzungen=topic.voraussetzungen or "", fach=fach, jahrgang=jahrgang,
+                    nummer=topic.nummer or "", **stand(topic))
 
 
 @router.delete("/{topic_id}", status_code=204)
