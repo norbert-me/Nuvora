@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { themenIndex, themenVergleich } from "./topics.js";
+import { themenGruppen, themenIndex, themenVergleich } from "./topics.js";
 
 const T = [
   { id: 1, name: "Netzwerk", parent_id: null, fach: "Informatik", jahrgang: "9", nummer: "9.1", position: 5 },
@@ -30,5 +30,21 @@ describe("themenIndex", () => {
     const a = { id: 1, name: "B", parent_id: 9, nummer: "", position: 1 };
     const b = { id: 2, name: "A", parent_id: 9, nummer: "", position: 2 };
     expect([b, a].sort(themenVergleich).map((t) => t.id)).toEqual([1, 2]);
+  });
+});
+
+describe("themenGruppen", () => {
+  it("gruppiert nach Fach, dann Stufe, in der gegebenen Reihenfolge", () => {
+    const roots = [
+      { id: 1, fach: "Informatik", jahrgang: "8" },
+      { id: 2, fach: "informatik ", jahrgang: "9" },
+      { id: 3, fach: "Informatik", jahrgang: "9" },
+      { id: 4, fach: "Mathematik", jahrgang: "" },
+      { id: 5, fach: "", jahrgang: "7" },
+    ];
+    const g = themenGruppen(roots);
+    expect(g.map((f) => f.fach)).toEqual(["Informatik", "Mathematik", ""]);
+    expect(g[0].stufen.map((s) => [s.jahrgang, s.themen.map((t) => t.id)])).toEqual([["8", [1]], ["9", [2, 3]]]);
+    expect(g[1].stufen[0].jahrgang).toBe("");
   });
 });

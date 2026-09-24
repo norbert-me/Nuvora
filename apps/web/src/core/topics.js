@@ -31,6 +31,30 @@ export function themenVergleich(a, b) {
     || (a.name || "").localeCompare(b.name || "", "de", { numeric: true });
 }
 
+/**
+ * Oberthemen in Fach > Stufe gruppiert — die Ordner der Themenseite.
+ *
+ * Keine Daten, sondern eine Sicht auf `fach` und `jahrgang` der Oberthemen:
+ * ein Ordner, den man anlegen und pflegen müsste, wäre eine zweite Wahrheit
+ * neben dem Feld. Die Eingabe muss schon sortiert sein (`themenVergleich`),
+ * die Gruppen behalten die Reihenfolge. Groß-/Kleinschreibung und Leerraum
+ * trennen keine Gruppen („informatik " landet bei „Informatik").
+ */
+export function themenGruppen(roots) {
+  const schluessel = (x) => String(x || "").trim().toLocaleLowerCase("de");
+  const faecher = [];
+  for (const tp of roots || []) {
+    const fk = schluessel(tp.fach);
+    let f = faecher.find((g) => g.key === fk);
+    if (!f) { f = { key: fk, fach: String(tp.fach || "").trim(), stufen: [] }; faecher.push(f); }
+    const sk = schluessel(tp.jahrgang);
+    let st = f.stufen.find((g) => g.key === sk);
+    if (!st) { st = { key: sk, jahrgang: String(tp.jahrgang || "").trim(), themen: [] }; f.stufen.push(st); }
+    st.themen.push(tp);
+  }
+  return faecher;
+}
+
 /** „2 IP-Adressen" — die Nummer steht vor dem Namen, wenn es eine gibt. */
 export const mitNummer = (t) => (t ? (t.nummer ? `${t.nummer} ${t.name}` : t.name) : "");
 

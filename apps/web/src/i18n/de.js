@@ -741,6 +741,8 @@ export default {
   "topics.stufe": "Stufe",
   "topics.stufePlaceholder": "z. B. 9 oder 7/8",
   "topics.stufeN": "Stufe {{n}}",
+  "topics.ohneFach": "Ohne Fach",
+  "topics.ohneStufe": "Ohne Stufe",
   "topics.neuSub": "Neues Unterthema",
   "noten.title": "Noten",
   "noten.agg": "Zusammenfassen mit",

@@ -740,6 +740,8 @@ export default {
   "topics.stufe": "Curso",
   "topics.stufePlaceholder": "p. ej. 9 o 7/8",
   "topics.stufeN": "Curso {{n}}",
+  "topics.ohneFach": "Sin asignatura",
+  "topics.ohneStufe": "Sin curso",
   "topics.neuSub": "Nuevo subtema",
   "noten.title": "Notas",
   "noten.agg": "Resumir con",

@@ -12,7 +12,7 @@ import AutoTextarea from "../components/AutoTextarea.jsx";
 import { Link } from "react-router-dom";
 import { themaZiel } from "../core/themaLinks.js";
 import { useEinfuegen } from "../core/ziehsortieren.js";
-import { mitNummer, themenVergleich } from "../core/topics.js";
+import { mitNummer, themenGruppen, themenVergleich } from "../core/topics.js";
 import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api";
@@ -211,11 +211,6 @@ export default function Topics() {
             title={subCount > 0 ? (expanded.has(tp.id) ? t("topics.collapse") : t("topics.expand")) : t("topics.openDetails")}
             style={{ flex: 1, fontWeight: isChild ? 400 : 600, fontSize: isChild ? 14 : 16, color: "var(--text)", cursor: "pointer" }}>
             {mitNummer(tp)}
-            {isRoot && (tp.fach || tp.jahrgang) && (
-              <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)", marginLeft: 8 }}>
-                {[tp.fach, tp.jahrgang && t("topics.stufeN", { n: tp.jahrgang })].filter(Boolean).join(" · ")}
-              </span>
-            )}
             {subCount > 0 && <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)", marginLeft: 8 }}>{t("topics.subCount", { n: subCount })}</span>}
           </span>
           {canHaveKids && (
@@ -242,6 +237,17 @@ export default function Topics() {
 
   // Ein Knoten samt Kindern, rekursiv bis MAX_DEPTH. Das „Hinzufügen"-Formular
   // hängt unter dem jeweiligen Elternknoten (auf jeder Ebene außer der letzten).
+  // Zugeklappte Fach-/Stufen-Ordner: eine Ansicht dieses Geraets, kein Inhalt.
+  const [zu, setZu] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("themen_zu") || "[]")); } catch { return new Set(); }
+  });
+  const umschalten = (key) => setZu((alt) => {
+    const neu = new Set(alt);
+    if (neu.has(key)) neu.delete(key); else neu.add(key);
+    try { localStorage.setItem("themen_zu", JSON.stringify([...neu])); } catch { /* nur Ansicht */ }
+    return neu;
+  });
+
   const renderNode = (tp, depth) => (
     <div key={tp.id} style={depth === 0 ? { marginBottom: 12 } : undefined}>
       {row(tp, depth)}
@@ -264,12 +270,48 @@ export default function Topics() {
       {/* Erscheint erst, wenn wirklich etwas umsortiert wurde. */}
       <Speicherleiste entwurf={ordnung} style={{ marginBottom: 12 }} />
 
-      {roots.map((tp) => renderNode(tp, 0))}
+      {/* Fach > Stufe sind keine angelegten Ordner, sondern die Felder der
+          Oberthemen — sie entstehen und verschwinden mit ihnen. */}
+      {themenGruppen(roots).map((f) => {
+        const fKey = "f:" + f.key;
+        const fZu = zu.has(fKey);
+        const n = f.stufen.reduce((m, st) => m + st.themen.length, 0);
+        return (
+          <div key={fKey} style={{ marginBottom: 16 }}>
+            <GruppenKopf ebene={0} zu={fZu} onClick={() => umschalten(fKey)}
+              titel={f.fach || t("topics.ohneFach")} anzahl={n} t={t} />
+            {!fZu && f.stufen.map((st) => {
+              const sKey = fKey + "|s:" + st.key;
+              const sZu = zu.has(sKey);
+              return (
+                <div key={sKey} style={{ marginLeft: 12, marginBottom: 8 }}>
+                  <GruppenKopf ebene={1} zu={sZu} onClick={() => umschalten(sKey)}
+                    titel={st.jahrgang ? t("topics.stufeN", { n: st.jahrgang }) : t("topics.ohneStufe")} anzahl={st.themen.length} t={t} />
+                  {!sZu && <div style={{ marginLeft: 12 }}>{st.themen.map((tp) => renderNode(tp, 0))}</div>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
 
       {popup && <TopicPopup tp={popup} t={t} onSaveTopic={saveTopic} onClose={() => setPopup(null)} />}
       {neu && <ThemaNeu parent={topics.find((x) => x.id === neu.parent_id) || null} t={t}
         onAnlegen={(w) => add(w, neu.parent_id)} onClose={() => setNeu(null)} />}
     </div>
+  );
+}
+
+// Kopf eines Fach- oder Stufen-Ordners (aufklappbar).
+function GruppenKopf({ ebene, zu, onClick, titel, anzahl, t }) {
+  return (
+    <button onClick={onClick} aria-expanded={!zu} title={zu ? t("topics.expand") : t("topics.collapse")}
+      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer",
+        padding: "8px 4px", color: ebene === 0 ? "var(--text)" : "var(--text2)", fontSize: ebene === 0 ? 16 : 14, fontWeight: ebene === 0 ? 700 : 600, textAlign: "left" }}>
+      <Icon d={zu ? ICONS.chevronRight : ICONS.chevronDown} size={15} />
+      <span>{titel}</span>
+      <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)" }}>{anzahl}</span>
+    </button>
   );
 }
 

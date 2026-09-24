@@ -739,6 +739,8 @@ export default {
   "topics.stufe": "Grade",
   "topics.stufePlaceholder": "e.g. 9 or 7/8",
   "topics.stufeN": "Grade {{n}}",
+  "topics.ohneFach": "No subject",
+  "topics.ohneStufe": "No grade level",
   "topics.neuSub": "New subtopic",
   "noten.title": "Grades",
   "noten.agg": "Summarise by",
