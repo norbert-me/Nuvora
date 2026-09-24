@@ -50,7 +50,7 @@ const PRAEFIXE = ["nuvora_cache_", "sitzplan_mark_", "sitzplan_view_",
 // Bewusst NICHT geraeumt, weil es dem GERAET gehoert und niemandem etwas
 // verraet: `cardvote_lang`, `nuvora_sparsam`, `nuvora_bundesland`,
 // `nuvora_session_muted`/`_volume`, `lp_pdf_format`, `lp_gen_prefs`,
-// `nuvora_app_update_weg`, `nuvora_sw_reparatur`.
+// `nuvora_app_update_weg`, `nuvora_sw_reparatur`, `nuvora_melder_aus`.
 
 /**
  * Den API-Zwischenspeicher des Service-Workers wegwerfen.

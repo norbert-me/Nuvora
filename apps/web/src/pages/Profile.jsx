@@ -4,6 +4,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
 import { sparsamAn, setzeSparsam } from "../core/sparsam.js";
+import { beobachteMelderKnopf, melderKnopfAus, setzeMelderKnopf } from "../core/melderKnopf.js";
 import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, Toggle, InfoDot, linkBtn,
   sectionLabel, Tabs, th as thBasis, td as tdBasis, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
@@ -116,6 +117,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   });
   const { t, lang, setLang } = useLanguage();
   const [sparsam, setSparsam] = useState(sparsamAn());
+  const [melderKnopf, setMelderKnopf] = useState(() => !melderKnopfAus());
+  useEffect(() => beobachteMelderKnopf(() => setMelderKnopf(!melderKnopfAus())), []);
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [msg, setMsg] = useState("");
@@ -433,6 +436,11 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             weniger da ist, sieht man dem Schalter nicht an. */}
         <Zeile label={t("profile.sparsam")} hint={t("profile.sparsamHint")} erste>
           <Toggle checked={sparsam} onChange={(v) => { setSparsam(v); setzeSparsam(v); }} label="" />
+        </Zeile>
+        {/* Derselbe Fall: ein Umschalter ohne zweiten Wert, Einstellung des
+            Geräts (am Beamer aus, am eigenen Rechner an). */}
+        <Zeile label={t("profile.melderKnopf")}>
+          <Toggle checked={melderKnopf} onChange={(v) => { setMelderKnopf(v); setzeMelderKnopf(v); }} label="" />
         </Zeile>
         <Zeile label={t("nav.language")}>
           <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ ...selectStyle, minWidth: 160 }}>
