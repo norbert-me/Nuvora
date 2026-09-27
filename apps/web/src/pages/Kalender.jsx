@@ -2696,7 +2696,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
                     // Die laufende Phase traegt Toenung UND Balken — dieselbe
                     // Bauform wie die Abwesenheit im Notenbuch: eine Toenung
                     // allein verschwindet am Beamer und bei Sonne.
-                    <div key={i} style={{ display: "flex", gap: 8, padding: an ? "8px 8px 8px 5px" : "8px 0",
+                    <div key={i} style={{ padding: an ? "8px 8px 8px 5px" : "8px 0",
                       borderTop: i ? "1px solid var(--border)" : "none",
                       borderRadius: an ? CONTROL_R : undefined,
                       background: an ? "var(--accent-bg)" : undefined,
@@ -2704,13 +2704,15 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
                       opacity: aktiv >= 0 && i < aktiv ? 0.55 : 1 }}>
                       {/* Uhrzeit, Phase, Dauer. Die Zeit sagt, WANN die Phase
                           dran ist — die Markierung nur, dass sie gerade laeuft;
-                          wer um 10:52 auf den Plan sieht, will beides. */}
-                      <div style={{ minWidth: 120, flexShrink: 0, display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                          wer um 10:52 auf den Plan sieht, will beides. Die
+                          Zeile steht UEBER dem Text: daneben blieb dem Text
+                          nur die halbe Breite. */}
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", marginBottom: p.text ? 4 : 0 }}>
                         {zt[i] && <span style={{ fontSize: 12, color: an ? "var(--accent)" : "var(--text3)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{minToHm(zt[i].von)}{zt[i].bis != null ? `–${minToHm(zt[i].bis)}` : ""}</span>}
                         <span style={{ fontSize: 14, fontWeight: an ? 800 : 600 }}>{p.phase || "—"}</span>
                         {p.dauer && <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>{p.dauer} min</span>}
                       </div>
-                      <TextMitTabellen text={p.text} style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }} />
+                      <TextMitTabellen text={p.text} style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }} />
                     </div>
                     );
                   });
