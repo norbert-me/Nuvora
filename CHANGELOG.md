@@ -14,6 +14,12 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- **Verlaufsplan: Tabellen im Phasentext** — Knöpfe „Tabelle", „Zeile",
+  „Spalte" unter dem Textfeld, Vorschau darunter; der Termin-Dialog ist
+  breiter.
+
 ## 4.4.4 — 24.09.2026
 
 - **Klassenarbeit und Notenbuch sind verknüpft:** „Mit Notenbuch verknüpfen"

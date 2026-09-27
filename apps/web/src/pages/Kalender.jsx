@@ -29,6 +29,7 @@ import { feiertage } from "../data/feiertage.js";
 import { addDays, hmToMin, minToHm, isoDay, isoWeek, mondayOf, parseYmd, startOfDay, wochentagMo0, ymd } from "../core/datum.js";
 import { stundenZeit, stundenListe, slotGiltAm, PAUSE_BASIS, stundenRang, stundeLabel } from "../core/stunden";
 import { useZielFilter } from "../core/modules.js";
+import { TextMitTabellen, TextMitTabellenFeld } from "../components/TextMitTabellen.jsx";
 
 // Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
 const BUNDESLAENDER = [
@@ -2592,7 +2593,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
   ].filter(Boolean);
   const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: 14 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
   return (
-    <Modal onClose={onClose} width={460} style={{ padding: 0 }} label={!edit ? (title || clsName || t("kalender.entry")) : (entry.id ? t("kalender.editEntry") : t("kalender.newEntry"))}>
+    <Modal onClose={onClose} width={620} style={{ padding: 0 }} label={!edit ? (title || clsName || t("kalender.entry")) : (entry.id ? t("kalender.editEntry") : t("kalender.newEntry"))}>
         <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <div style={{ flex: 1 }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 5 }}>{!edit ? (title || clsName || t("kalender.entry")) : (entry.id ? t("kalender.editEntry") : t("kalender.newEntry"))}</h3>
@@ -2709,7 +2710,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
                         <span style={{ fontSize: 14, fontWeight: an ? 800 : 600 }}>{p.phase || "—"}</span>
                         {p.dauer && <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>{p.dauer} min</span>}
                       </div>
-                      <div style={{ flex: 1, fontSize: 14, color: "var(--text2)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{p.text}</div>
+                      <TextMitTabellen text={p.text} style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }} />
                     </div>
                     );
                   });
@@ -2918,7 +2919,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
               <button onClick={() => movePhase(i, 1)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title="↓" disabled={i === verlauf.length - 1}><Icon d={ICONS.arrowDown} size={14} color={i === verlauf.length - 1 ? "var(--text3)" : "var(--text2)"} /></button>
               <button onClick={() => delPhase(i)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
             </div>
-            <textarea value={p.text} onChange={(e) => setPhase(i, "text", e.target.value)} rows={2} placeholder={t("kalender.verlaufText")} style={{ ...fld, resize: "vertical", padding: 8 }} />
+            <TextMitTabellenFeld value={p.text} onChange={(v) => setPhase(i, "text", v)} placeholder={t("kalender.verlaufText")} style={{ ...fld, padding: 8 }} t={t} />
           </div>
         )); })()}
         {/* Das Plus steht UNTER der Liste: eine Phase wird hinten angehängt, und
