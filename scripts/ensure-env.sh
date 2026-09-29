@@ -42,7 +42,7 @@ if [ ! -f .env ]; then
   # ADMIN_EMAIL=admin@example.com sieht ausgefuellt aus, verschickt
   # Kontaktanfragen aber ins Nichts. Lieber leer — dann meldet der
   # Setup-Check im Profil ehrlich, dass etwas fehlt.
-  sed -E 's|^(ADMIN_EMAIL|ADMIN_PASSWORD|SMTP_HOST|SMTP_USER|SMTP_PASSWORD|SMTP_FROM)=.*|\1=|' \
+  sed -E 's#^(ADMIN_EMAIL|ADMIN_PASSWORD|SMTP_HOST|SMTP_USER|SMTP_PASSWORD|SMTP_FROM)=.*#\1=#' \
     .env.example > .env
   changed=' (neu angelegt)'
 fi
