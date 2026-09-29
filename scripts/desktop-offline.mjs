@@ -320,12 +320,16 @@ async function offlineProbe(exe, user, lauf, profil, zweiterAnlauf = false) {
     // Anmeldung wie die Shell, dann neu laden, damit React sie sieht.
     // Zweimal versuchen: navigiert die Seite genau dazwischen, ist der Kontext
     // weg und der Aufruf scheitert — beim zweiten Mal steht sie still.
+    // Mit Frist: haengt die Service-Worker-Ablage, antwortet der Renderer nie,
+    // und ohne Frist stand der Lauf hier still, bis die 9-Minuten-Frist des
+    // ganzen Durchgangs griff — ohne ein Wort. Die Abfrage weiter unten
+    // erkennt den Fall und setzt die Ablage zurueck.
     for (let versuch = 0; versuch < 2; versuch++) {
-      const ok = await seite.evaluate(([tok, usr]) => {
+      const ok = await mitFrist(seite.evaluate(([tok, usr]) => {
         localStorage.setItem("token", tok);
         localStorage.setItem("user", usr);
         return true;
-      }, [token, JSON.stringify(user)]).catch(() => false);
+      }, [token, JSON.stringify(user)]), 15000, G("Anmeldung hinterlegen")).catch(() => false);
       if (ok) break;
       await seite.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
     }
