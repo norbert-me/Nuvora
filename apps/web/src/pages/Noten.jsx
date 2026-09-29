@@ -476,28 +476,6 @@ export default function Noten() {
   };
   const sumOf = (studentId) => summary.find((s) => s.student_id === studentId);
 
-  // Spalten des Halbjahres in chronologischer Reihenfolge (Abschnitt, dann
-  // Spalte). Grundlage fuer den Trend je SuS.
-  const orderedCatIds = sections
-    .flatMap((sec) => (sec.categories || []).map((c) => ({ id: c.id, sp: sec.position ?? 0, cp: c.position ?? 0 })))
-    .sort((a, b) => a.sp - b.sp || a.cp - b.cp)
-    .map((c) => c.id);
-  // Trend je SuS: Ausgleichsgerade ueber die Notenfolge. Note niedriger = besser,
-  // also Steigung < 0 = Leistung steigt. Erst ab 3 Noten aussagekraeftig.
-  const trendFor = (sid) => {
-    const seq = orderedCatIds
-      .map((cid) => { const es = notenVon(sid, cid).filter((e) => e.value != null); return es.length ? es[es.length - 1].value : null; })
-      .filter((v) => v != null);
-    if (seq.length < 3) return null;
-    const n = seq.length, mx = (n - 1) / 2, my = seq.reduce((a, b) => a + b, 0) / n;
-    let num = 0, den = 0;
-    seq.forEach((v, i) => { num += (i - mx) * (v - my); den += (i - mx) ** 2; });
-    const slope = den ? num / den : 0;
-    if (slope <= -0.15) return "up";     // Leistung verbessert sich
-    if (slope >= 0.15) return "down";    // Leistung verschlechtert sich
-    return "flat";
-  };
-
   if (classes.length === 0) {
     return (
       <div style={pageForm}>
@@ -578,7 +556,6 @@ export default function Noten() {
             )) setNeuAbschnitt(false); }} />
         </Modal>
       )}
-
 
       {cdDialog && (
         <Modal title={t("noten.fromCd")} onClose={() => setCdDialog(false)}>
@@ -816,18 +793,6 @@ export default function Noten() {
                           „10. Jamiro" weiter rechts an als „7. Selina" und die
                           Namensspalte franst aus. */}
                       <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span>{s.name}
-                      {/* Zeile mit Kommentaren: ein Punkt genuegt — die Zelle
-                          selbst zeigt, wo er sitzt. */}
-                      {allCats.some((c) => kommentarVon(s.student_id, c.id).trim()) && (
-                        /* Punkt: Radius = halbe Kante, reine Grafik. */
-                        <span title={t("noten.commentRow")} style={{ display: "inline-block", width: 6, height: 6, borderRadius: 3, background: C.warning, marginLeft: 8, verticalAlign: "middle" }} />
-                      )}
-                      {(() => { const tr = trendFor(s.student_id); return tr && tr !== "flat" ? (
-                        <span title={t(tr === "up" ? "noten.trendUp" : "noten.trendDown")}
-                          style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, color: tr === "up" ? C.success : C.danger }}>
-                          <Icon d={ICONS.open} size={11} style={{ transform: tr === "up" ? "rotate(-90deg)" : "rotate(90deg)" }} />
-                        </span>
-                      ) : null; })()}
                     </button>
                   </td>
                   {secListe.map((sec) => {
@@ -860,7 +825,7 @@ export default function Noten() {
                         const statFarbe = (stat === "fehlt" || stat === "entsch") ? C.danger : null;
                         return (
                           <td key={c.id} title={statFarbe ? t(`anwesenheit.${stat}`) : undefined}
-                            style={{ ...td, padding: 0, width: 56, minWidth: 56, maxWidth: 56, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
+                            style={{ ...td, padding: 0, position: "relative", width: 56, minWidth: 56, maxWidth: 56, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
                                      ...(statFarbe ? { background: `${statFarbe}1f`, boxShadow: `inset 3px 0 0 ${statFarbe}` } : null) }}>
                             {zelle === id
                               ? <Zelle initial={wert != null ? de(wert) : ""}
@@ -886,7 +851,10 @@ export default function Noten() {
                                     noteSetzen(s.student_id, c.id, txt);
                                     setZelle(ziel);
                                   }} />
-                              : (<div style={{ position: "relative" }}>
+                              // Die Ecke haengt an der ZELLE, nicht am inneren
+                              // Block: ist die Zeile hoeher (langer Name), sitzt
+                              // der Block mittig und die Ecke rutschte mit.
+                              : (<div>
                                   {/* Der Kommentar hängt nicht mehr allein an der
                                       kleinen Ecke: die Zelle ist 56 px breit, die
                                       Ecke 20 — wer den Kommentar wollte, traf die
