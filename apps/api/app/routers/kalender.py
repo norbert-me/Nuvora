@@ -2154,7 +2154,9 @@ def _ext_calendars(user: User) -> list:
 @router.get("/external")
 async def get_external(user: User = Depends(require_module)):
     return {"calendars": _ext_calendars(user), "hidden": user.external_hidden or [],
-            "mitschicken": bool(user.feed_external)}
+            "mitschicken": bool(user.feed_external),
+            # Mit gespeichertem Untis-Abo kommen Vertretungen, auch ohne Abo.
+            "untis": _untis_kalender(user) is not None}
 
 
 @router.put("/external")
@@ -2367,21 +2369,27 @@ async def externe_ereignisse(user: User, refresh: bool = False,
     if not isinstance(db, AsyncSession):
         db = None          # direkter Aufruf ohne Sitzung (Depends-Platzhalter)
     cals = _ext_calendars(user)
+    # Die Vertretungen aus dem Untis-Abo stehen als eigener Kalender daneben —
+    # nicht in der Liste der Abos (die zeigte sonst den ganzen Stundenplan
+    # doppelt), sondern hier angehaengt, damit Ausblenden, Archiv, Suche und
+    # die Weitergabe ans Handy fuer sie genauso gelten.
+    untis_cal = _untis_kalender(user)
+    alle_cals = cals + ([untis_cal] if untis_cal else [])
     hidden = set(user.external_hidden or [])
 
     async def _fertig(rows):
         if archiv and db is not None:
-            rows = rows + await _aus_archiv(db, user, cals, {r["key"] for r in rows})
+            rows = rows + await _aus_archiv(db, user, alle_cals, {r["key"] for r in rows})
             rows.sort(key=lambda x: (x["date"], x.get("time") or ""))
         return [{**r, "hidden": r["key"] in hidden} for r in rows]
 
-    if not cals:
+    if not alle_cals:
         _EXT_CACHE.pop(user.id, None)
         return await _fertig([])
     # Cache-Signatur: URLs + Farben. Die ausgeblendeten Schluessel stehen
     # bewusst NICHT drin — sie werden erst beim Lesen angeheftet, sonst wuerde
     # jedes Ausblenden alle Feeds neu holen.
-    sig = "|".join(f"{c['url']}~{c.get('color','')}" for c in cals)
+    sig = "|".join(f"{c['url']}~{c.get('color','')}" for c in alle_cals)
 
     hit = _EXT_CACHE.get(user.id)
     if not refresh and hit and hit[0] == sig and hit[1] > time.time():
@@ -2399,9 +2407,12 @@ async def externe_ereignisse(user: User, refresh: bool = False,
             return await asyncio.get_event_loop().run_in_executor(None, _fetch_ics, url)
         except Exception:
             return ""
-    texts = await asyncio.gather(*[_load(c["url"]) for c in cals])
+    texts = await asyncio.gather(*[_load(c["url"]) for c in alle_cals])
 
     out = []
+    if untis_cal:
+        out.extend(await _untis_vertretungen(user, db, texts[-1], untis_cal, win_start, win_end))
+        texts = texts[:-1]
     for cal, text in zip(cals, texts):
         color = cal.get("color") or ""
         for e in _parse_ics(text):
@@ -2447,6 +2458,53 @@ async def externe_ereignisse(user: User, refresh: bool = False,
     if db is not None:
         await archivieren(db, user, result)
     return await _fertig(result)
+
+
+UNTIS_FARBE = "#d97706"
+
+
+def _untis_kalender(user: User):
+    """Der Untis-Abo-Link als Kalender der Vertretungen — oder None."""
+    url = (user.untis_ics_url or "").strip()
+    if not url:
+        return None
+    return {"url": url, "color": UNTIS_FARBE, "name": "Untis-Vertretungen", "untis": True}
+
+
+async def _untis_vertretungen(user: User, db, text: str, cal: dict, von, bis) -> list:
+    """Aus dem Untis-Abo nur das, was vom regulaeren Plan abweicht.
+
+    Der ganze Plan steht schon im Stundenplan; ihn hier noch einmal zu zeigen,
+    hiesse jede Stunde doppelt. Was abweicht, entscheidet `untis.abweichungen`
+    (Muster im Feed, dazu Nuvoras eigener Plan). Angezeigt, nicht geschrieben:
+    faellt die Vertretung in Untis weg, ist sie beim naechsten Abruf auch hier
+    weg — ein angelegter Eintrag bliebe stehen.
+    """
+    import hashlib
+    from .. import untis as U
+    if not text:
+        return []
+    stunden = U.stunden_aus_ics_text(text, von, bis)
+    regulaer = None
+    zeiten = _untis_zeiten(user)
+    if db is not None and zeiten:
+        slots = (await db.execute(select(TimetableSlot).where(
+            TimetableSlot.owner_id == user.id))).scalars().all()
+
+        def regulaer(d, start):
+            nr = U._stunde_nr(start, zeiten)
+            return [s.title for s in slots if nr and s.period == nr
+                    and s.weekday == d.weekday() and _slot_active_on(s, d)]
+    out = []
+    for s in U.abweichungen(stunden, regulaer):
+        d = s["datum"]
+        uid = "untis-" + hashlib.md5(f"{d}|{s.get('start')}|{s.get('titel')}".encode()).hexdigest()[:16]
+        out.append({"title": f"Vertretung: {s.get('titel', '')}"[:200],
+                    "time": s.get("start") or None, "endtime": s.get("ende") or None,
+                    "cal": cal["url"], "cal_name": cal["name"], "location": s.get("raum", ""),
+                    "color": cal["color"], "uid": uid, "description": "",
+                    "start": d, "end": d, "date": d, "key": f"{uid}|{d}", "untis": True})
+    return out
 
 
 # ─── Archiv vergangener fremder Termine ───

@@ -2730,7 +2730,7 @@ export default {
   "untis.passwort": "Password",
   "untis.passwortHinweis": "The password is not stored. A WebUntis login is your entire school account — far more than Nuvora itself holds. It is sent to Untis for this one request and discarded afterwards.",
   "untis.icsUrl": "ICS subscription link",
-  "untis.icsHinweis": "In WebUntis: “My timetable” → ⋯ → “Copy public link”.",
+  "untis.icsHinweis": "In WebUntis: “My timetable” → ⋯ → “Copy public link”. Once saved, the calendar also shows substitutions from it — checked again every 10 minutes.",
   "untis.icsGrenze": "This route only provides subject line and time — no cancellations, no substitutions and no holidays.",
   "untis.abrufen": "Fetch",
   "untis.laeuft": "Working …",
@@ -2769,7 +2769,7 @@ export default {
   "untis.grund.unbekannt": "Fetch not possible",
   "untis.rat.unbekannt": "If it keeps happening, use the subscription link — it works without enabled access.",
   "help.kal.untisT": "Timetable from WebUntis",
-  "help.kal.untis": "If your timetable already lives in WebUntis, Nuvora can fetch it: in the ⋯ menu of the calendar view → “Import from WebUntis”. Cancellations and holidays come along. What repeats over several weeks is imported — a single substitution does not colour the plan. You assign every period to a course yourself before anything is written; missing courses can be created by the import. Your Untis plan is never changed. Two routes: with your credentials (more detail, but many schools have not enabled access for other programs at all) or with the personal subscription link from WebUntis (less detail, always works). The password is not stored.",
+  "help.kal.untis": "If your timetable already lives in WebUntis, Nuvora can fetch it: in the ⋯ menu of the calendar view → “Import from WebUntis”. Cancellations and holidays come along. What repeats over several weeks is imported — a single substitution does not colour the plan. You assign every period to a course yourself before anything is written; missing courses can be created by the import. Your Untis plan is never changed. Two routes: with your credentials (more detail, but many schools have not enabled access for other programs at all) or with the personal subscription link from WebUntis (less detail, always works). The password is not stored. Once the subscription link is saved, the calendar shows substitutions and extra lessons by itself (orange, refreshed every 10 minutes) — displayed, not created.",
 
   // ── CalDAV (components/CaldavZugaenge.jsx) ──
   "caldav.titel": "Calendar both ways (CalDAV)",

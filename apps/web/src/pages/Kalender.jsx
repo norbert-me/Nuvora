@@ -198,7 +198,8 @@ export default function Kalender() {
     loadHidden();
     loadExt(true);
   };
-  useEffect(() => { hol(`${API}/external`, {}).then((d) => { setExtCals(d.calendars || []); }); }, []);
+  const [untisAn, setUntisAn] = useState(false);
+  useEffect(() => { hol(`${API}/external`, {}).then((d) => { setExtCals(d.calendars || []); setUntisAn(!!d.untis); }); }, []);
   const extByDay = (d) => extEvents.filter((e) => e.date === ymd(d));
   const [entries, setEntries] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -361,9 +362,18 @@ export default function Kalender() {
   // Fenster fuer die fremden Termine nachziehen, sobald geblaettert wird.
   const extKey = `${ymd(addDays(range[0], -7))}|${ymd(addDays(range[1], 7))}`;
   extFenster.current = extKey;   // vor den Effekten: jeder Abruf kennt das Fenster
+  const extAn = extCals.length > 0 || untisAn;
   useEffect(() => {
-    if (extCals.length) loadExt();
-  }, [extKey, extCals.length]);
+    if (extAn) loadExt();
+  }, [extKey, extAn]);
+  // Vertretungen aendern sich waehrend des Tages. Bleibt die Seite offen,
+  // wird nachgefragt; der Server holt den Feed hoechstens alle 10 Minuten
+  // neu (_EXT_TTL), jede Anfrage dazwischen ist ein Treffer im Zwischenspeicher.
+  useEffect(() => {
+    if (!extAn) return undefined;
+    const uhr = setInterval(() => loadExt(), 10 * 60 * 1000);
+    return () => clearInterval(uhr);
+  }, [extAn]);
 
 
   const load = useCallback(() => {
@@ -791,7 +801,7 @@ export default function Kalender() {
                     <option value="day">{t("kalender.day")}</option>
                   </select>
                 </div>
-                {extCals.length > 0 && (
+                {extAn && (
                   <button onClick={() => loadExt(true)} disabled={extBusy}
                     style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500, cursor: extBusy ? "default" : "pointer", opacity: extBusy ? 0.6 : 1 }}
                     title={t("kalender.extRefreshHint")}>

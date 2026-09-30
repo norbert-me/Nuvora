@@ -2731,7 +2731,7 @@ export default {
   "untis.passwort": "Contraseña",
   "untis.passwortHinweis": "La contraseña no se guarda. Un acceso a WebUntis es toda tu cuenta escolar — mucho más de lo que Nuvora almacena. Solo se envía a Untis para esta consulta y luego se descarta.",
   "untis.icsUrl": "Enlace de suscripción ICS",
-  "untis.icsHinweis": "En WebUntis: «Mi horario» → ⋯ → «Copiar enlace público».",
+  "untis.icsHinweis": "En WebUntis: «Mi horario» → ⋯ → «Copiar enlace público». Guardado, el calendario muestra también las sustituciones — consultadas de nuevo cada 10 minutos.",
   "untis.icsGrenze": "Esta vía solo aporta asunto y hora — sin cancelaciones, sustituciones ni vacaciones.",
   "untis.abrufen": "Consultar",
   "untis.laeuft": "En curso …",
@@ -2770,7 +2770,7 @@ export default {
   "untis.grund.unbekannt": "No se pudo consultar",
   "untis.rat.unbekannt": "Si se repite, usa el enlace de suscripción — funciona sin acceso habilitado.",
   "help.kal.untisT": "Horario desde WebUntis",
-  "help.kal.untis": "Si tu horario ya está en WebUntis, Nuvora lo consulta: en el menú ⋯ de la vista de calendario → «Importar de WebUntis». Vienen también las cancelaciones y las vacaciones. Se importa lo que se repite durante varias semanas — una sustitución aislada no tiñe el plan. Asignas tú cada hora a un curso antes de que se escriba nada; los cursos que falten puede crearlos la importación. Tu plan de Untis nunca se modifica. Dos vías: con tus credenciales (más detalle, pero muchos centros no han habilitado el acceso para otros programas) o con el enlace de suscripción personal de WebUntis (menos detalle, funciona siempre). La contraseña no se guarda.",
+  "help.kal.untis": "Si tu horario ya está en WebUntis, Nuvora lo consulta: en el menú ⋯ de la vista de calendario → «Importar de WebUntis». Vienen también las cancelaciones y las vacaciones. Se importa lo que se repite durante varias semanas — una sustitución aislada no tiñe el plan. Asignas tú cada hora a un curso antes de que se escriba nada; los cursos que falten puede crearlos la importación. Tu plan de Untis nunca se modifica. Dos vías: con tus credenciales (más detalle, pero muchos centros no han habilitado el acceso para otros programas) o con el enlace de suscripción personal de WebUntis (menos detalle, funciona siempre). La contraseña no se guarda. Con el enlace de suscripción guardado, el calendario muestra por sí mismo sustituciones y horas extra (naranja, cada 10 minutos) — solo se muestran, no se crean.",
 
   // ── CalDAV (components/CaldavZugaenge.jsx) ──
   "caldav.titel": "Calendario en ambos sentidos (CalDAV)",

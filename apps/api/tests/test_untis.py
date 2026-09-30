@@ -6,6 +6,8 @@ Netzabruf selbst wird nicht nachgebaut — er gehoert in den Systemtest.
 """
 import pytest
 
+from app import untis as U
+
 from app.untis import (GRUENDE, UntisFehler, _CODES, _datum, _server_url, _stunde_nr,
                        _stunde_aus_api, _zeit, ausfaelle, zu_wochenraster)
 
@@ -227,3 +229,44 @@ async def test_zweiter_import_legt_nichts_doppelt_an(s):
     assert d["kurse"] == 0
     kurse = (await s.execute(select(Kurs).where(Kurs.owner_id == u.id))).scalars().all()
     assert len(kurse) == 1
+
+
+# ─── Vertretungen aus dem Abo ───
+
+def _woche(n, titel, start="08:00"):
+    from datetime import date, timedelta
+    return {"datum": (date(2026, 9, 7) + timedelta(weeks=n)).isoformat(), "start": start, "titel": titel}
+
+
+def test_abweichungen_findet_vertretung_und_zusatzstunde():
+    stunden = [_woche(0, "M 7.5"), _woche(1, "M 7.5"), _woche(2, "E 9.2"), _woche(3, "M 7.5"),
+               _woche(2, "D 8.1", start="09:45")]
+    treffer = {(s["datum"], s["titel"]) for s in U.abweichungen(stunden)}
+    assert treffer == {("2026-09-21", "E 9.2"), ("2026-09-21", "D 8.1")}
+
+
+def test_abweichungen_regulaeres_bleibt_draussen():
+    stunden = [_woche(n, "M 7.5") for n in range(4)]
+    assert U.abweichungen(stunden) == []
+
+
+def test_abweichungen_fragt_den_eigenen_plan_bei_duennem_feed():
+    # Nur eine Woche im Feed: kein Muster. Der eigene Plan sagt, was regulaer ist.
+    stunden = [_woche(0, "M 7.5"), _woche(0, "D 8.1", start="09:45")]
+    plan = lambda d, start: ["M 7.5"] if start == "08:00" else []
+    assert [s["titel"] for s in U.abweichungen(stunden, plan)] == ["D 8.1"]
+
+
+def test_abweichungen_gleichstand_ist_kein_muster():
+    # Zwei Wochen, zwei Titel: keiner ist „der regulaere“ — ohne eigenen Plan
+    # werden beide gezeigt statt einer geraten.
+    stunden = [_woche(0, "M 7.5"), _woche(1, "E 9.2")]
+    assert len(U.abweichungen(stunden)) == 2
+
+
+def test_ics_text_rechnet_utc_um():
+    from datetime import date
+    text = ("BEGIN:VCALENDAR\nBEGIN:VEVENT\nDTSTART:20260921T060000Z\nDTEND:20260921T064500Z\n"
+            "SUMMARY:M 7.5\nEND:VEVENT\nEND:VCALENDAR\n")
+    s = U.stunden_aus_ics_text(text, date(2026, 9, 1), date(2026, 9, 30))
+    assert s[0]["start"] == "08:00" and s[0]["datum"] == "2026-09-21"

@@ -315,7 +315,13 @@ def stunden_aus_ics(url: str, von: date, bis: date) -> list:
         raise UntisFehler("server", str(e))
     except Exception as e:
         raise UntisFehler("server", str(e))
+    return stunden_aus_ics_text(text, von, bis)
 
+
+def stunden_aus_ics_text(text: str, von: date, bis: date) -> list:
+    """Der Parser zu `stunden_aus_ics`, ohne den Abruf — den Text holt auch
+    der Kalender (Vertretungen, siehe `abweichungen`), und zwei Parser fuer
+    dieselbe Datei wuerden die UTC-Umrechnung nur einmal richtig machen."""
     text = re.sub(r"\r?\n[ \t]", "", text)
     out, cur = [], None
     for zeile in text.split("\n"):
@@ -352,6 +358,58 @@ def stunden_aus_ics(url: str, von: date, bis: date) -> list:
                 cur["raum"] = roh.replace("\\,", ",").replace(r"\;", ";")
             elif k == "STATUS":
                 cur["status"] = roh.upper()
+    return out
+
+
+# ─── Vertretungen: was vom regulaeren Plan abweicht ───
+
+def abweichungen(stunden: list, regulaer=None) -> list:
+    """Die Stunden eines Untis-Abos, die NICHT der regulaere Unterricht sind.
+
+    Der ICS-Weg kennt kein Kennzeichen fuer Vertretungen (siehe
+    `stunden_aus_ics`). Er kennt aber den Plan selbst: was an einem Wochentag
+    zur selben Uhrzeit Woche fuer Woche wiederkehrt, ist regulaer. Abweichend
+    ist eine Stunde, deren Titel dort nicht der wiederkehrende ist — oder die
+    es an dieser Stelle nur einmal gibt (eine Zusatzstunde).
+
+    Zwei Wochen Feed reichen fuer das Muster nicht immer (eine Vertretung
+    steht dann eins zu eins neben dem Regulaeren). Deshalb fragt `regulaer`
+    zusaetzlich Nuvoras eigenen Stundenplan: `regulaer(datum, start)` gibt die
+    Titel zurueck, die dort an diesem Tag zu dieser Uhrzeit stehen — der Plan
+    wurde aus Untis uebernommen und traegt dieselben Titel.
+    """
+    from collections import Counter
+
+    def norm(t):
+        return " ".join((t or "").lower().split())
+
+    muster = {}
+    for s in stunden:
+        try:
+            wt = date.fromisoformat(s["datum"]).weekday()
+        except (KeyError, ValueError):
+            continue
+        muster.setdefault((wt, s.get("start", "")), Counter())[norm(s.get("titel"))] += 1
+
+    out = []
+    for s in stunden:
+        titel = norm(s.get("titel"))
+        if not titel:
+            continue
+        try:
+            d = date.fromisoformat(s["datum"])
+        except (KeyError, ValueError):
+            continue
+        haeufig = (muster.get((d.weekday(), s.get("start", ""))) or Counter()).most_common(2)
+        erster = haeufig[0] if haeufig else ("", 0)
+        zweiter = haeufig[1][1] if len(haeufig) > 1 else 0
+        # Regulaer nur bei einem klaren Muster: mindestens zweimal und
+        # haeufiger als alles andere an dieser Stelle.
+        if erster[0] == titel and erster[1] >= 2 and erster[1] > zweiter:
+            continue
+        if regulaer and titel in {norm(t) for t in (regulaer(d, s.get("start", "")) or ())}:
+            continue
+        out.append(s)
     return out
 
 

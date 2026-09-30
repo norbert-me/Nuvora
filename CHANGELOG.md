@@ -16,6 +16,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Vertretungen aus WebUntis im Kalender** — mit gespeichertem Abo-Link
+  erscheinen Vertretungen und Zusatzstunden von selbst (orange, alle
+  10 Minuten neu abgefragt); die Anleitung zum Abo-Link stimmt jetzt.
+- **Notenbuch:** kein Punkt und kein Trendpfeil mehr hinter dem Namen; die
+  Kommentar-Ecke sitzt oben rechts in der Zelle.
 - **Verlaufsplan: Tabellen im Phasentext** — Knöpfe „Tabelle", „Zeile",
   „Spalte" unter dem Textfeld, Vorschau darunter; der Termin-Dialog ist
   breiter.

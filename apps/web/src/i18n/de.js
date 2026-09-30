@@ -2722,7 +2722,7 @@ export default {
   "untis.passwort": "Passwort",
   "untis.passwortHinweis": "Das Passwort wird nicht gespeichert. Ein WebUntis-Zugang ist dein ganzes Schulkonto — deutlich mehr, als Nuvora selbst hält. Es geht nur für diesen einen Abruf zu Untis und wird danach verworfen.",
   "untis.icsUrl": "ICS-Abo-Link",
-  "untis.icsHinweis": "In WebUntis: „Mein Stundenplan“ → ⋯ → „Öffentlichen Link kopieren“.",
+  "untis.icsHinweis": "In WebUntis: „Mein Stundenplan“ → ⋯ → „Öffentlichen Link kopieren“. Gespeichert zeigt der Kalender damit auch Vertretungen — alle 10 Minuten neu abgefragt.",
   "untis.icsGrenze": "Dieser Weg liefert nur Betreff und Uhrzeit — keine Ausfälle, keine Vertretungen und keine Ferien.",
   "untis.abrufen": "Abrufen",
   "untis.laeuft": "Läuft …",
@@ -2764,7 +2764,7 @@ export default {
   "untis.grund.unbekannt": "Abruf nicht möglich",
   "untis.rat.unbekannt": "Wenn es sich wiederholt, nimm den Abo-Link — der geht auch ohne freigeschalteten Zugang.",
   "help.kal.untisT": "Stundenplan aus WebUntis",
-  "help.kal.untis": "Steht dein Stundenplan schon in WebUntis, holt Nuvora ihn: im ⋯-Menü der Kalenderansicht → „Aus WebUntis übernehmen“. Mit dabei sind Ausfälle und Ferien. Übernommen wird, was sich über mehrere Wochen wiederholt — eine einzelne Vertretung färbt den Plan nicht ein. Du ordnest jede Stunde selbst einem Kurs zu, bevor etwas geschrieben wird; fehlende Kurse legt der Import auf Wunsch an. Dein Untis-Plan wird nie verändert. Zwei Wege: mit deinen Zugangsdaten (mehr Angaben, aber viele Schulen haben den Zugang für andere Programme gar nicht freigeschaltet) oder mit dem persönlichen Abo-Link aus WebUntis (weniger Angaben, geht immer). Das Passwort wird nicht gespeichert.",
+  "help.kal.untis": "Steht dein Stundenplan schon in WebUntis, holt Nuvora ihn: im ⋯-Menü der Kalenderansicht → „Aus WebUntis übernehmen“. Mit dabei sind Ausfälle und Ferien. Übernommen wird, was sich über mehrere Wochen wiederholt — eine einzelne Vertretung färbt den Plan nicht ein. Du ordnest jede Stunde selbst einem Kurs zu, bevor etwas geschrieben wird; fehlende Kurse legt der Import auf Wunsch an. Dein Untis-Plan wird nie verändert. Zwei Wege: mit deinen Zugangsdaten (mehr Angaben, aber viele Schulen haben den Zugang für andere Programme gar nicht freigeschaltet) oder mit dem persönlichen Abo-Link aus WebUntis (weniger Angaben, geht immer). Das Passwort wird nicht gespeichert. Ist der Abo-Link gespeichert, zeigt der Kalender Vertretungen und Zusatzstunden von selbst (orange, alle 10 Minuten neu) — nur angezeigt, nicht angelegt.",
 
   // ── CalDAV (components/CaldavZugaenge.jsx) ──
   // Das Abo darueber ist einseitig: der Kalender HOLT eine Datei und bietet gar
