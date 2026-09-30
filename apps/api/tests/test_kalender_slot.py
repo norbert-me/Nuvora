@@ -474,3 +474,30 @@ async def test_klassenarbeit_ersetzt_die_stunde(s):
     assert len((await s.execute(select(SlotCancellation))).scalars().all()) == 1
     await kal.delete_exam(e.id, user=u, db=s)
     assert (await s.execute(select(SlotCancellation))).scalars().all() == []
+
+
+@pytest.mark.asyncio
+async def test_spaetere_version_im_halbjahr_wird_ueberschrieben(s):
+    """Liegt im Halbjahr schon eine Fassung, die erst NACH seinem Anfang
+    beginnt (angelegt, bevor das Schuljahr gepflegt war: „ab heute"), muss
+    ein neuer Stand sie treffen. Vorher suchte die Abfrage nur eine Fassung,
+    die schon am Halbjahresanfang galt, fand keine und legte eine zweite
+    daneben — die alte ohne Kurs blieb sichtbar (Untis-Import: „Kurs
+    angegeben, Stunde hat keinen")."""
+    from datetime import date as _date
+    from app.models import TimetableSlot
+    u = User(email="spaet@b.de", password_hash="x", name="L",
+             hj1_start=_date(2026, 8, 10), hj2_start=_date(2027, 2, 1),
+             jahr_ende=_date(2027, 7, 10))
+    s.add(u); await s.flush()
+    k = Kurs(name="Mathe 7.5", owner_id=u.id); s.add(k); await s.flush()
+    alt = TimetableSlot(owner_id=u.id, weekday=0, period=2, title="M 7.5",
+                        valid_from=_date(2026, 9, 20), valid_to=None)
+    s.add(alt); await s.commit()
+
+    neu = await KAL.upsert_slot(KAL.SlotIn(weekday=0, period=2, kurs_id=k.id, title="M 7.5", term="1"), user=u, db=s)
+    tt = await KAL.get_timetable(user=u, db=s)
+    for tag in (_date(2026, 8, 17), _date(2026, 9, 28)):
+        an = [x for x in tt["slots"] if x.weekday == 0 and x.period == 2 and KAL._slot_active_on(x, tag)]
+        assert [x.kurs_id for x in an] == [k.id], tag
+    assert str(neu.valid_from) == "2026-08-10"

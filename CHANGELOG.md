@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Stundenplan:** ein neuer Stand (auch aus dem Untis-Import) ersetzt eine
+  Fassung, die erst später im Halbjahr begann — vorher blieb sie ohne Kurs
+  daneben stehen.
 - **Vertretungen aus WebUntis im Kalender** — mit gespeichertem Abo-Link
   erscheinen Vertretungen und Zusatzstunden von selbst (orange, alle
   10 Minuten neu abgefragt); die Anleitung zum Abo-Link stimmt jetzt.

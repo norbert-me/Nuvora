@@ -1600,14 +1600,31 @@ async def upsert_slot(body: SlotIn, user: User = Depends(require_module), db: As
     # morgen". Der Plan des VORIGEN Halbjahrs bleibt davon unberührt.
     ab, bis = _stundenplan_fenster(user, body.term)
     felder = body.model_dump(exclude={"term"})
-    # Die an `ab` gültige Version an (weekday, period).
-    active = (await db.execute(select(TimetableSlot).where(
+    # Alle Fassungen an (weekday, period), die den Zeitraum beruehren. Nur die
+    # am Anfang gueltige zu suchen reichte nicht: eine Fassung, die erst
+    # SPAETER im Zeitraum beginnt (angelegt „ab heute", bevor das Schuljahr
+    # gepflegt war), wurde nicht gefunden — neben ihr entstand eine zweite,
+    # und im Plan stand weiter die alte (Untis-Import: Kurs gewaehlt, Stunde
+    # ohne Kurs). Was im Zeitraum beginnt, ersetzt der neue Stand; es gibt
+    # keinen Fremdschluessel auf Stunden, also darf es weg.
+    beruehrt = (await db.execute(select(TimetableSlot).where(
         TimetableSlot.owner_id == user.id,
         TimetableSlot.weekday == body.weekday,
         TimetableSlot.period == body.period,
         or_(TimetableSlot.valid_to.is_(None), TimetableSlot.valid_to >= ab),
-        or_(TimetableSlot.valid_from.is_(None), TimetableSlot.valid_from <= ab),
-    ).order_by(TimetableSlot.id.desc()))).scalars().first()
+        *([or_(TimetableSlot.valid_from.is_(None), TimetableSlot.valid_from <= bis)] if bis else []),
+    ).order_by(TimetableSlot.id.desc()))).scalars().all()
+    davor = [x for x in beruehrt if _tag(x.valid_from) is None or _tag(x.valid_from) <= ab]
+    active = davor[0] if davor else None
+    for spaeter in beruehrt:
+        if spaeter is not active and not (_tag(spaeter.valid_from) is None or _tag(spaeter.valid_from) <= ab):
+            await db.delete(spaeter)
+    for aelter in davor[1:]:
+        # Doppelte Fassung am Anfang (Altbestand): nur die neueste bleibt.
+        if _tag(aelter.valid_from) == ab:
+            await db.delete(aelter)
+        else:
+            aelter.valid_to = ab - timedelta(days=1)
     same = active is not None and (
         active.class_id == body.class_id and active.kurs_id == body.kurs_id
         and (active.title or "") == (body.title or "") and active.topic_id == body.topic_id
