@@ -38,6 +38,13 @@ updates:
     groups:
       alle:
         patterns: ["*"]
+    ignore:
+      # eslint 10 bricht die Installation (ERESOLVE): eslint-plugin-react 7.x
+      # erlaubt als Peer nur bis eslint 9. Ein Gruppen-PR mit diesem Sprung
+      # haelt alle anderen Updates darin mit fest. Freigeben, sobald das Plugin
+      # eslint 10 nennt.
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /apps/desktop
