@@ -290,6 +290,7 @@ def _ensure_columns(sync_conn):
         ("work_analyses", "scale", "JSON"),
         ("work_analyses", "absent", "JSON"),
         ("work_analyses", "fehler", "JSON"),   # Fehlerart je Einheit und Kind
+        ("work_analyses", "e_wahl", "JSON"),   # Wahlaufgaben: E-Fassung je Kind
         ("user_modules", "optionen", "JSON"),  # Anzeige-Optionen je Modul und Lehrkraft
         ("exam_dates", "topic_ids", "JSON"),   # Themen der geplanten Klassenarbeit
         ("topics", "fach", "VARCHAR(60) DEFAULT '' NOT NULL"),   # Fach und Jahrgang am Thema …

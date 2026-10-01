@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..besitz import eigenes, klasse_oder_403, kurs_oder_klasse
 from ..kursmitglieder import eigener_kurs
 from ..database import get_db
+from .. import arbeitswertung as aw
 # `roster_kurs` heisst hier unten schon ein Endpunkt — deshalb umbenannt
 # importiert, sonst ueberdeckt der Endpunkt den Helfer.
 from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
@@ -84,6 +85,7 @@ class WorkPut(BaseModel):
     scale: Optional[dict] = None        # Notenschlüssel {"1":87,…} oder null = Profil
     absent: Optional[list] = None       # abwesende student_ids (Punkte bleiben)
     fehler: Optional[dict] = None       # {student_id: {unit_id: Fehlerart}}
+    e_wahl: Optional[dict] = None       # {student_id: [task_id]} — E-Fassung geschrieben
 
 
 class WorkOut(BaseModel):
@@ -97,6 +99,7 @@ class WorkOut(BaseModel):
     scale: Optional[dict] = None
     absent: list = []
     fehler: dict = {}
+    e_wahl: dict = {}
     niveau: str = ""
     partner_id: Optional[int] = None
     model_config = {"from_attributes": True}
@@ -132,7 +135,7 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
 async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     rows = (await db.execute(select(WorkAnalysis).where(*_keyw(user, class_id, kurs_id)).order_by(WorkAnalysis.created_at.desc()))).scalars().all()
-    return [WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, niveau=w.niveau or "") for w in rows]
+    return [WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, e_wahl=w.e_wahl or {}, niveau=w.niveau or "") for w in rows]
 
 
 @router.post("/works", response_model=WorkOut, status_code=201)
@@ -273,6 +276,13 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
         own = {t for (t,) in (await db.execute(select(Topic.id).where(Topic.owner_id == user.id))).all()}
         def _num(x, default):
             return float(x) if isinstance(x, (int, float)) and 0 < x <= 1000 else default
+
+        def _teile(parts):
+            if not isinstance(parts, list):
+                return []
+            return [{"id": str(p["id"])[:40], "label": str(p.get("label") or "")[:40], "max": _num(p.get("max"), 1),
+                     "topic_id": p.get("topic_id") if (isinstance(p.get("topic_id"), int) and p.get("topic_id") in own) else None}
+                    for p in parts[:50] if isinstance(p, dict) and p.get("id")]
         clean = []
         for t in body.tasks[:100]:
             if not isinstance(t, dict) or not t.get("id"):
@@ -288,19 +298,28 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
                   # obwohl beide nichts miteinander zu tun haben.
                   "form": bool(t.get("form"))}
             # Teilaufgaben (a, b, c …) mit eigenem Maximum — optional.
-            parts = t.get("parts")
-            if isinstance(parts, list) and parts:
-                # Thema JE TEILAUFGABE: eine „Aufgabe 1: Wiederholung" enthaelt
-                # in a) Kopfrechnen, in b) Bruch/Dezimal/Prozent, in c) Runden.
-                # Haengt das Thema nur an der Aufgabe, wird all das zu einem
-                # Topf, und die Auswertung sagt „Wiederholung schwach" statt
-                # „Runden schwach". Ohne eigenes Thema erbt die Teilaufgabe das
-                # der Aufgabe (der haeufige Fall bleibt einfach).
-                cp = [{"id": str(p["id"])[:40], "label": str(p.get("label") or "")[:40], "max": _num(p.get("max"), 1),
-                       "topic_id": p.get("topic_id") if (isinstance(p.get("topic_id"), int) and p.get("topic_id") in own) else None}
-                      for p in parts[:50] if isinstance(p, dict) and p.get("id")]
-                if cp:
-                    ct["parts"] = cp
+            # Thema JE TEILAUFGABE: eine „Aufgabe 1: Wiederholung" enthaelt
+            # in a) Kopfrechnen, in b) Bruch/Dezimal/Prozent, in c) Runden.
+            # Haengt das Thema nur an der Aufgabe, wird all das zu einem
+            # Topf, und die Auswertung sagt „Wiederholung schwach" statt
+            # „Runden schwach". Ohne eigenes Thema erbt die Teilaufgabe das
+            # der Aufgabe (der haeufige Fall bleibt einfach).
+            cp = _teile(t.get("parts"))
+            if cp:
+                ct["parts"] = cp
+            # E-Fassung (Wahlaufgabe): eigene Teilaufgaben, Punkte und Themen.
+            # Welches Kind sie geschrieben hat, steht in e_wahl; gewertet wird in
+            # app/arbeitswertung.py.
+            e = t.get("e")
+            if isinstance(e, dict):
+                etid = e.get("topic_id")
+                ce = {"id": str(e.get("id") or f"{ct['id']}e")[:40],
+                      "topic_id": etid if (isinstance(etid, int) and etid in own) else None,
+                      "max": _num(e.get("max"), 1)}
+                cep = _teile(e.get("parts"))
+                if cep:
+                    ce["parts"] = cep
+                ct["e"] = ce
             clean.append(ct)
         w.tasks = clean
     if body.results is not None:
@@ -309,7 +328,7 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
         # Punkte bleiben in 0..Maximum der Wertungseinheit: ein Vertipper (77
         # statt 7) ergäbe sonst über 100 % und damit einen Notenwert unter 1,0 —
         # den die Übernahme ins Notenbuch stillschweigend wegwirft.
-        umax = {uid: mx for t in (w.tasks or []) for uid, mx in _units(t)}
+        umax = {uid: mx for t in (w.tasks or []) for uid, mx, _ in aw.alle_einheiten(t)}
         def _punkte(uid, p):
             if isinstance(p, bool) or not isinstance(p, (int, float)):
                 return 0
@@ -346,7 +365,7 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
         # eine Nebenangabe, und eine verlorene Korrektur waere der teurere
         # Fehler. Unbekannte Einheiten ebenso — sie entstehen, wenn eine
         # Teilaufgabe geloescht wird, waehrend jemand anders noch korrigiert.
-        gueltige = {uid for t in (w.tasks or []) for uid, _ in _units(t)}
+        gueltige = {uid for t in (w.tasks or []) for uid, _, _ in aw.alle_einheiten(t)}
         fout = {}
         for k, v in list(body.fehler.items())[:400]:
             if not isinstance(v, dict):
@@ -356,12 +375,29 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
             if zeile:
                 fout[str(k)] = zeile
         w.fehler = fout or None
+    if body.e_wahl is not None:
+        # {student_id: [task_id]} — nur eigene Kinder und nur Aufgaben, die
+        # wirklich eine E-Fassung haben. Eine Aufgabe ohne E-Fassung ist fuer
+        # jedes Kind G; ein Eintrag dafuer waere ein Geist.
+        mit_e = {str(t.get("id")) for t in (w.tasks or []) if aw.e_fassung(t)}
+        roh_ids = {int(k) for k in list(body.e_wahl.keys())[:400] if str(k).isdigit()}
+        eigene = set((await db.execute(
+            select(Student.id).join(SchoolClass, Student.class_id == SchoolClass.id)
+            .where(Student.id.in_(roh_ids), SchoolClass.owner_id == user.id))).scalars().all()) if roh_ids else set()
+        wahl = {}
+        for k, v in list(body.e_wahl.items())[:400]:
+            if not str(k).isdigit() or int(k) not in eigene or not isinstance(v, list):
+                continue
+            ids = sorted({str(x)[:40] for x in v[:100]} & mit_e)
+            if ids:
+                wahl[str(k)] = ids
+        w.e_wahl = wahl or None
     if body.absent is not None:
         # Abwesende als eindeutige String-IDs; Punkte in results bleiben unberuehrt.
         w.absent = list({str(x)[:40] for x in body.absent[:400]}) or None
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, niveau=w.niveau or "")
+    return WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, e_wahl=w.e_wahl or {}, niveau=w.niveau or "")
 
 
 @router.post("/works/{work_id}/teilen", response_model=List[WorkOut])
@@ -388,17 +424,19 @@ async def split_work(work_id: int, user: User = Depends(require_module), db: Asy
 
     res_e, res_g = teile(w.results)
     feh_e, feh_g = teile(w.fehler)
+    wahl_e, wahl_g = teile(w.e_wahl)
     abw = [str(x) for x in (w.absent or [])]
     g = WorkAnalysis(owner_id=user.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name,
                      niveau="G", tasks=_copy.deepcopy(w.tasks or []),
                      scale=_copy.deepcopy(w.scale) if w.scale else None,
-                     results=res_g, fehler=feh_g or None,
+                     results=res_g, fehler=feh_g or None, e_wahl=wahl_g or None,
                      absent=[x for x in abw if x in g_ids] or None)
     db.add(g)
     await db.flush()
     w.niveau = "E"
     w.results = res_e
     w.fehler = feh_e or None
+    w.e_wahl = wahl_e or None
     w.absent = [x for x in abw if x not in g_ids] or None
     w.partner_id, g.partner_id = g.id, w.id
     await db.commit()
@@ -406,7 +444,7 @@ async def split_work(work_id: int, user: User = Depends(require_module), db: Asy
     await db.refresh(g)
     return [WorkOut(id=x.id, partner_id=x.partner_id, source_id=x.source_id, class_id=x.class_id, kurs_id=x.kurs_id,
                     name=x.name, tasks=x.tasks or [], results=x.results or {}, scale=x.scale,
-                    absent=x.absent or [], fehler=x.fehler or {}, niveau=x.niveau or "") for x in (w, g)]
+                    absent=x.absent or [], fehler=x.fehler or {}, e_wahl=x.e_wahl or {}, niveau=x.niveau or "") for x in (w, g)]
 
 
 @router.delete("/works/{work_id}", status_code=204)
@@ -434,52 +472,35 @@ class RemediateIn(BaseModel):
 
 
 def _units(t):
-    """Wertungseinheiten einer Aufgabe: ihre Teilaufgaben (a, b, c …) oder — ohne
-    Teile — die Aufgabe selbst. Liefert [(unit_id, max), …]."""
-    return [(uid, mx) for uid, mx, _ in _units_mit_thema(t)]
+    """Wertungseinheiten der G-Fassung einer Aufgabe: [(unit_id, max), …].
+    Die Regel steht in app/arbeitswertung.py (mit E-Fassung)."""
+    return [(uid, mx) for uid, mx, _ in aw.g_einheiten(t)]
 
 
 def _units_mit_thema(t):
-    """Dasselbe, aber mit dem Thema JE Einheit: [(unit_id, max, topic_id), …].
-
-    Die Teilaufgabe gewinnt, die Aufgabe erbt sie weiter. So kann eine
-    Wiederholungsaufgabe vier verschiedene Themen pruefen, ohne dass jemand vier
-    Aufgaben daraus machen muss.
-    """
-    erbe = t.get("topic_id")
-    parts = t.get("parts")
-    if isinstance(parts, list) and parts:
-        return [(str(p.get("id")),
-                 (float(p["max"]) if isinstance(p.get("max"), (int, float)) and p["max"] > 0 else 1),
-                 p.get("topic_id") or erbe)
-                for p in parts if p.get("id")]
-    return [(t["id"], (float(t["max"]) if isinstance(t.get("max"), (int, float)) and t["max"] > 0 else 1), erbe)]
+    """Dasselbe mit Thema je Einheit: [(unit_id, max, topic_id), …]."""
+    return aw.g_einheiten(t)
 
 
 def _profile(work: WorkAnalysis):
     """Je SuS je Thema: (erreichte Punkte, Maximalpunkte) über die Aufgaben des
     Themas — inkl. Teilaufgaben. Altformat (Liste falscher Aufgaben) wird
-    übersetzt (gelistet = 0, sonst volle Punkte)."""
+    übersetzt (gelistet = 0, sonst volle Punkte).
+
+    Je Kind zaehlt die FASSUNG, die es geschrieben hat (G oder E, siehe
+    app/arbeitswertung.py): die E-Fassung kann andere Themen pruefen, und ein
+    Kind, das sie nicht geschrieben hat, darf darin weder stark noch schwach
+    sein."""
     tasks = work.tasks or []
     # Gruppiert wird nach Thema JE WERTUNGSEINHEIT (Teilaufgabe schlaegt Aufgabe).
     # Frueher lief die Gruppierung ueber die Aufgabe — eine Aufgabe mit vier
     # Teilaufgaben zu vier Themen landete komplett unter einem davon.
-    topic_units = {}   # topic_id -> [(unit_id, max), …]
     topic_tasks = {}   # topic_id -> [Aufgaben-ids]  (fuer die Rueckgabe)
     for t in tasks:
-        for uid, umax, tid in _units_mit_thema(t):
-            if not tid:
-                continue
-            topic_units.setdefault(tid, []).append((uid, umax))
-            if t["id"] not in topic_tasks.setdefault(tid, []):
+        for _, _, tid in aw.alle_einheiten(t):
+            if tid and t["id"] not in topic_tasks.setdefault(tid, []):
                 topic_tasks[tid].append(t["id"])
     results = work.results or {}
-
-    def unit_pts(entry, uid, umax):
-        if isinstance(entry, list):
-            return 0 if uid in entry else umax   # Altformat (keine Teilaufgaben)
-        v = (entry or {}).get(uid)
-        return float(v) if isinstance(v, (int, float)) else 0    # nicht bewertet = 0
 
     absent = {str(x) for x in (work.absent or [])}
     out = {}  # student_id -> {topic_id: [erreicht, max]}
@@ -487,13 +508,13 @@ def _profile(work: WorkAnalysis):
         if entry == "abwesend" or str(sid) in absent:   # abwesend: raus aus der Statistik
             continue
         prof = {}
-        for topic_id, einheiten in topic_units.items():
-            erreicht = 0.0
-            mx = 0.0
-            for uid, umax in einheiten:
-                erreicht += unit_pts(entry, uid, umax)
-                mx += umax
-            prof[topic_id] = [erreicht, mx]
+        for t in tasks:
+            for uid, umax, tid in aw.einheiten_fuer(work, sid, t):
+                if not tid:
+                    continue
+                e_m = prof.setdefault(tid, [0.0, 0.0])
+                e_m[0] += aw.punkte(entry, uid, umax)
+                e_m[1] += umax
         out[sid] = prof
     return out, topic_tasks
 
@@ -511,12 +532,6 @@ def _fehler_gezaehlt(work: WorkAnalysis):
 
     Liefert [(student_id_str, unit_id, art, topic_id), …].
     """
-    umax = {}
-    utopic = {}
-    for t in (work.tasks or []):
-        for uid, mx, tid in _units_mit_thema(t):
-            umax[uid] = mx
-            utopic[uid] = tid
     absent = {str(x) for x in (work.absent or [])}
     results = work.results or {}
     out = []
@@ -524,6 +539,14 @@ def _fehler_gezaehlt(work: WorkAnalysis):
         if str(sid) in absent or results.get(str(sid)) == "abwesend":
             continue
         entry = results.get(str(sid))
+        # Nur die Fassung, die das Kind geschrieben hat: eine Angabe an der
+        # anderen ist ein Rest aus dem Umschalten.
+        umax = {}
+        utopic = {}
+        for t in (work.tasks or []):
+            for uid, mx, tid in aw.einheiten_fuer(work, sid, t):
+                umax[uid] = mx
+                utopic[uid] = tid
         for uid, art in (zeile or {}).items():
             if uid not in umax:
                 continue
@@ -688,47 +711,38 @@ async def remediate(work_id: int, body: RemediateIn, user: User = Depends(requir
 # haben keine Herkunft — für sie zählt zusätzlich der gleiche NAME. Beides
 # zusammen deckt Bestand und Zukunft ab, ohne dass jemand etwas nachpflegt.
 
-def _pct_liste(w: WorkAnalysis) -> list[float]:
+def _pct_liste(w: WorkAnalysis, scale=None) -> list[float]:
     """Erreichte Prozent je gewertetem Kind — dieselbe Rechnung wie im Vergleich
-    der Oberfläche, nur an einer Stelle."""
-    tasks = w.tasks or []
-    gesamt = sum(mx for t in tasks for _, mx in _units(t))
-    if not gesamt:
+    der Oberfläche, nur an einer Stelle (app/arbeitswertung.py, mit E-Bonus)."""
+    if not aw.basis(w.tasks):
         return []
     absent = {str(x) for x in (w.absent or [])}
     aus = []
     for sid, r in (w.results or {}).items():
         if not r or r == "abwesend" or str(sid) in absent:
             continue
-        erreicht = 0.0
-        for t in tasks:
-            for uid, umax in _units(t):
-                if isinstance(r, list):
-                    erreicht += 0 if uid in r else umax     # Altformat
-                else:
-                    v = r.get(uid)
-                    erreicht += float(v) if isinstance(v, (int, float)) else 0
-        aus.append(round(erreicht / gesamt * 100, 1))
+        aus.append(round(aw.wertung(w, sid, w.scale or scale)["pct"], 1))
     return aus
 
 
 def _punkte_je_kind(w: WorkAnalysis) -> tuple[list[str], dict]:
-    """(gewertete Kinder, {unit_id: {sid: Punkte}}) — Grundlage aller Kennzahlen."""
+    """(gewertete Kinder, {unit_id: {sid: Punkte}}) — Grundlage aller Kennzahlen.
+
+    Eine Einheit fuehrt nur die Kinder, die ihre Fassung geschrieben haben: wer
+    bei Aufgabe 3 die G-Fassung schrieb, hat in der E-Fassung keine 0, sondern
+    gar nichts — sonst saehe die E-Aufgabe aus, als haette die halbe Klasse sie
+    leer gelassen."""
     absent = {str(x) for x in (w.absent or [])}
     kinder = [str(sid) for sid, r in (w.results or {}).items()
               if r and r != "abwesend" and str(sid) not in absent]
     punkte: dict = {}
     for t in (w.tasks or []):
-        for uid, umax in _units(t):
-            je = {}
-            for sid in kinder:
-                r = (w.results or {}).get(sid) or (w.results or {}).get(int(sid) if sid.isdigit() else sid)
-                if isinstance(r, list):
-                    je[sid] = 0.0 if uid in r else float(umax)      # Altformat
-                else:
-                    v = (r or {}).get(uid)
-                    je[sid] = float(v) if isinstance(v, (int, float)) else 0.0
-            punkte[uid] = je
+        for uid, _, _ in aw.alle_einheiten(t):
+            punkte[uid] = {}
+        for sid in kinder:
+            r = (w.results or {}).get(sid) or (w.results or {}).get(int(sid) if sid.isdigit() else sid)
+            for uid, umax, _ in aw.einheiten_fuer(w, sid, t):
+                punkte[uid][sid] = aw.punkte(r, uid, umax)
     return kinder, punkte
 
 
@@ -769,9 +783,14 @@ def _je_einheit(w: WorkAnalysis) -> list[dict]:
 
     aus = []
     for t in (w.tasks or []):
-        teile = _units_mit_thema(t)
-        for i, (uid, umax, topic_id) in enumerate(teile):
-            xs = [punkte.get(uid, {}).get(sid, 0.0) for sid in kinder]
+        e = aw.e_fassung(t)
+        fassungen = [("", t, aw.g_einheiten(t))] + ([("E", e, aw.e_einheiten(t))] if e else [])
+        for stufe, teil, i, uid, umax, topic_id in [
+                (stufe, teil, i, *einheit)
+                for stufe, teil, teile in fassungen for i, einheit in enumerate(teile)]:
+            je = punkte.get(uid, {})
+            mit = [sid for sid in kinder if sid in je]
+            xs = [je[sid] for sid in mit]
             n = len(xs)
             summe = sum(xs)
             moeglich = umax * n
@@ -779,12 +798,13 @@ def _je_einheit(w: WorkAnalysis) -> list[dict]:
             sd = ((sum((x - mitte) ** 2 for x in xs) / (n - 1)) ** 0.5) if n > 1 else 0.0
             # part-whole-korrigiert: die eigene Aufgabe aus der Gesamtleistung
             # herausrechnen, sonst korreliert jede Aufgabe mit sich selbst.
-            rest = [gesamt[sid] - punkte.get(uid, {}).get(sid, 0.0) for sid in kinder]
-            teil_label = (t.get("parts") or [{}])[i].get("label") if t.get("parts") else ""
+            rest = [gesamt[sid] - je[sid] for sid in mit]
+            teil_label = (teil.get("parts") or [{}])[i].get("label") if teil.get("parts") else ""
             aus.append({
                 "unit_id": uid,
                 "task_id": t.get("id"),
-                "label": f"{t.get('label') or ''}".strip(),
+                "stufe": stufe,
+                "label": f"{t.get('label') or ''}{' (E)' if stufe else ''}".strip(),
                 "teil": (teil_label or "").strip(),
                 "topic_id": topic_id,
                 "form": bool(t.get("form")),
@@ -827,7 +847,7 @@ async def vergleich(work_id: int, user: User = Depends(require_module), db: Asyn
 
     arbeiten = []
     for x in gruppe:
-        pl = _pct_liste(x)
+        pl = _pct_liste(x, user.grade_scale)
         arbeiten.append({
             "id": x.id, "name": x.name, "class_id": x.class_id,
             "class_name": klassen.get(x.class_id, ""),

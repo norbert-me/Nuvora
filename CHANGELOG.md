@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Klassenarbeit: Wahlaufgaben E/G** — eine Aufgabe bekommt mit „+E" eine
+  E-Fassung (eigene Teilaufgaben, Punkte, Themen); im Raster wählt man je Kind
+  G oder E. Basis ist die G-Punktzahl, E-Punkte darüber zählen als Bonus
+  (höchstens eine Notenstufe).
 - **Stundenplan:** ein neuer Stand (auch aus dem Untis-Import) ersetzt eine
   Fassung, die erst später im Halbjahr begann — vorher blieb sie ohne Kurs
   daneben stehen.

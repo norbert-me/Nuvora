@@ -24,6 +24,7 @@ import { alsJson, hol } from "../core/melden.js";
 import NotenUebernahme from "../components/NotenUebernahme.jsx";
 import { konfidenzProzent, mittel, streuung, trennschaerfe } from "../core/aufgabenstatistik.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
+import { alleEinheiten, aufgabenPunkte, basis, eEinheiten, eFassung, einheitenFuer, fassung, gEinheiten, punkte as punkteIn, wertung } from "../core/arbeitswertung.js";
 
 const API = "/api/klassenarbeit";
 
@@ -202,7 +203,7 @@ export default function Klassenarbeit() {
     if (!next || !next.id) return false;
     // scale: echtes dict = Override, sonst {} (Server setzt zurueck auf Profil).
     const scaleOut = (next.scale && Object.keys(next.scale).length) ? next.scale : {};
-    const r = await fetch(`${API}/works/${next.id}`, alsJson("PUT", { name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [], fehler: next.fehler || {} })).catch(() => null);
+    const r = await fetch(`${API}/works/${next.id}`, alsJson("PUT", { name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [], fehler: next.fehler || {}, e_wahl: next.e_wahl || {} })).catch(() => null);
     if (!r || !r.ok) { showAlert(t("common.notWork")); return false; }
     setSavedWork(next);
     if (verknuepft.length) {
@@ -381,32 +382,65 @@ export default function Klassenarbeit() {
 
   const addTask = () => persist({ ...work, tasks: [...(work.tasks || []), { id: newId(), label: "", topic_id: null, max: 1, form: false, parts: [] }] });
   const setTask = (id, patch) => persist({ ...work, tasks: work.tasks.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
+  // Ohne die Aufgabe in der E-Wahl: eine Wahl fuer eine Aufgabe ohne E-Fassung
+  // waere ein Geist (der Server wirft sie ohnehin weg).
+  const ohneWahl = (wahl, tid) => Object.fromEntries(
+    Object.entries(wahl || {})
+      .map(([sid, l]) => [sid, (l || []).filter((x) => String(x) !== String(tid))])
+      .filter(([, l]) => l.length));
   const delTask = (id) => {
     const tk = (work.tasks || []).find((x) => x.id === id);
-    const ids = new Set(tk ? units(tk).map((u) => String(u.id)) : [String(id)]);
-    persist({ ...work, tasks: work.tasks.filter((x) => x.id !== id), results: cleanResults(work.results, ids), fehler: cleanFehler(work.fehler, ids) });
+    const ids = new Set(tk ? alleEinheiten(tk).map((u) => u.id) : [String(id)]);
+    persist({ ...work, tasks: work.tasks.filter((x) => x.id !== id), results: cleanResults(work.results, ids), fehler: cleanFehler(work.fehler, ids), e_wahl: ohneWahl(work.e_wahl, id) });
   };
-  // Teilaufgaben: eine erste Teilaufgabe erbt id+max der Aufgabe (Punkte bleiben).
-  const addPart = (tid) => {
+  // Eine Aufgabe hat bis zu zwei Fassungen: G (die Aufgabe selbst) und E
+  // (`task.e`, eigene Teilaufgaben, Punkte, Themen). Die Teilaufgaben-Griffe
+  // gelten fuer beide — `stufe` sagt, welche gemeint ist.
+  const teilVon = (tk, stufe) => (stufe === "E" ? tk.e : tk);
+  const mitTeil = (tk, stufe, patch) => (stufe === "E" ? { ...tk, e: { ...tk.e, ...patch } } : { ...tk, ...patch });
+  // Teilaufgaben: eine erste Teilaufgabe erbt id+max der Fassung (Punkte bleiben).
+  const addPart = (tid, stufe = "G") => {
     const tk = work.tasks.find((x) => x.id === tid); if (!tk) return;
-    const parts = (tk.parts && tk.parts.length) ? [...tk.parts] : [{ id: tk.id, label: "a", max: Number(tk.max) > 0 ? Number(tk.max) : 1 }];
+    const teil = teilVon(tk, stufe); if (!teil) return;
+    const parts = (teil.parts && teil.parts.length) ? [...teil.parts] : [{ id: teil.id, label: "a", max: Number(teil.max) > 0 ? Number(teil.max) : 1 }];
     parts.push({ id: newId(), label: partLabel(parts.length), max: 1, topic_id: null });
-    setTask(tid, { parts });
+    persist({ tasks: work.tasks.map((x) => (x.id === tid ? mitTeil(tk, stufe, { parts }) : x)) });
   };
-  const setPart = (tid, pid, patch) => {
+  const setPart = (tid, pid, patch, stufe = "G") => {
     const tk = work.tasks.find((x) => x.id === tid); if (!tk) return;
-    setTask(tid, { parts: units(tk).map((u) => (u.id === pid ? { ...u, ...patch } : u)) });
+    const teil = teilVon(tk, stufe); if (!teil) return;
+    persist({ tasks: work.tasks.map((x) => (x.id === tid ? mitTeil(tk, stufe, { parts: units(teil).map((u) => (u.id === pid ? { ...u, ...patch } : u)) }) : x)) });
   };
-  const delPart = (tid, pid) => {
+  const delPart = (tid, pid, stufe = "G") => {
     const tk = work.tasks.find((x) => x.id === tid); if (!tk) return;
-    const parts = units(tk).filter((u) => u.id !== pid);
+    const teil = teilVon(tk, stufe); if (!teil) return;
+    const parts = units(teil).filter((u) => u.id !== pid);
     const weg = new Set([String(pid)]);
-    const results = cleanResults(work.results, weg);
-    const fehler = cleanFehler(work.fehler, weg);
-    // Bleibt nur ein Teil übrig: zurück zur „ohne Teile"-Form (Max an der Aufgabe).
-    if (parts.length <= 1) { const only = parts[0]; persist({ ...work, tasks: work.tasks.map((x) => (x.id === tid ? { ...x, parts: [], max: only ? unitMax(only) : 1 } : x)), results, fehler }); }
-    else persist({ ...work, tasks: work.tasks.map((x) => (x.id === tid ? { ...x, parts } : x)), results, fehler });
+    // Bleibt nur ein Teil übrig: zurück zur „ohne Teile"-Form (Max an der Fassung).
+    const patch = parts.length <= 1 ? { parts: [], max: parts[0] ? unitMax(parts[0]) : 1 } : { parts };
+    persist({ tasks: work.tasks.map((x) => (x.id === tid ? mitTeil(tk, stufe, patch) : x)), results: cleanResults(work.results, weg), fehler: cleanFehler(work.fehler, weg) });
   };
+  // E-Fassung an- und abhaengen. Neu startet sie mit der Punktzahl der G-Fassung
+  // — meist hat sie mehr, aber so steht keine 1 da, die erst niemand bemerkt.
+  const addE = (tid) => {
+    const tk = work.tasks.find((x) => x.id === tid); if (!tk || tk.e) return;
+    setTask(tid, { e: { id: newId(), topic_id: null, max: taskMax(tk), parts: [] } });
+  };
+  const delE = (tid) => {
+    const tk = work.tasks.find((x) => x.id === tid); if (!tk || !tk.e) return;
+    const weg = new Set(eEinheiten(tk).map((u) => u.id));
+    const { e: _weg, ...ohne } = tk;
+    persist({ tasks: work.tasks.map((x) => (x.id === tid ? ohne : x)), results: cleanResults(work.results, weg), fehler: cleanFehler(work.fehler, weg), e_wahl: ohneWahl(work.e_wahl, tid) });
+  };
+  // Welche Fassung hat das Kind geschrieben? Fehlt die Angabe, gilt G.
+  const wahlMit = (sid, tid, stufe) => {
+    const cur = new Set((((work.e_wahl || {})[String(sid)]) || []).map(String));
+    if (stufe === "E") cur.add(String(tid)); else cur.delete(String(tid));
+    const e_wahl = { ...(work.e_wahl || {}) };
+    if (cur.size) e_wahl[String(sid)] = [...cur]; else delete e_wahl[String(sid)];
+    return e_wahl;
+  };
+  const setFassung = (sid, tid, stufe) => persist({ e_wahl: wahlMit(sid, tid, stufe) });
   // Fehlerart je Zelle: leer → ansatz → rechnen → … → leer. Ein Klick statt
   // eines Auswahlfelds, weil beim Korrigieren jede Zelle einmal angefasst wird
   // und ein Dropdown je Zelle drei Handgriffe braucht statt einem.
@@ -422,14 +456,17 @@ export default function Klassenarbeit() {
   };
 
   const pointsOf = (sid, uid) => { const v = ((work.results || {})[String(sid)] || {})[uid]; return v == null ? "" : v; };
-  const setPoints = (sid, uid, val) => {
+  // `wechsel` = [taskId, stufe]: wer in die andere Fassung tippt, hat diese
+  // geschrieben — Punkte und Wahl gehen in EINEM Schritt in den Entwurf.
+  const setPoints = (sid, uid, val, wechsel = null) => {
     const row = { ...((work.results || {})[String(sid)] || {}) };
     if (val === "" || val == null) delete row[uid]; else row[uid] = Math.max(0, Number(val));
     const results = { ...(work.results || {}) };
     if (Object.keys(row).length) results[String(sid)] = row; else delete results[String(sid)];
-    persist({ ...work, results });
+    persist(wechsel ? { results, e_wahl: wahlMit(sid, wechsel[0], wechsel[1]) } : { results });
   };
-  const totalMax = () => rund((work.tasks || []).reduce((n, tk) => n + taskMax(tk), 0), 2);
+  // Hoechstpunktzahl = Summe der G-Fassungen; E-Punkte darueber sind Bonus.
+  const totalMax = () => rund(basis(work.tasks), 2);
   // Ist zu diesem Kind ueberhaupt etwas erfasst? Eine eingetragene 0 zaehlt,
   // ein leeres Feld nicht — genau darin unterscheiden sich „hat nichts
   // geloest" und „ist noch nicht korrigiert".
@@ -441,7 +478,9 @@ export default function Klassenarbeit() {
     return Object.values(r).some((v) => v != null && v !== "");
   };
 
-  const sumOf = (sid) => { const r = (work.results || {})[String(sid)]; if (!r || r === "abwesend") return 0; return rund((work.tasks || []).reduce((n, tk) => n + units(tk).reduce((m, u) => { const v = r[u.id]; return m + (v == null ? 0 : Number(v)); }, 0), 0), 2); };
+  // Summe und Note je Kind aus core/arbeitswertung.js — dieselbe Rechnung wie
+  // am Server (Wahlaufgaben: je Aufgabe die geschriebene Fassung, E-Bonus).
+  const wertungOf = (sid) => wertung(work, sid, effScale);
   // Abwesend ist ein eigenes Feld (work.absent) — die Punkte in results bleiben
   // erhalten, „abwesend" heisst nur „aus der Klassenstatistik raus". Alt-Marker
   // (results[sid] === "abwesend", ohne Punkte) wird weiter als abwesend erkannt.
@@ -466,20 +505,12 @@ export default function Klassenarbeit() {
     if (!work) return null;
     const tasks = work.tasks || [];
     const results = work.results || {};
-    const uMax = {}; tasks.forEach((tk) => units(tk).forEach((u) => { uMax[u.id] = unitMax(u); }));
-    // Themen je WERTUNGSEINHEIT, nicht je Aufgabe: eine Teilaufgabe kann ein
-    // eigenes Thema tragen und erbt sonst das der Aufgabe. Dieselbe Regel wie im
-    // Server (_units_mit_thema in klassenarbeit.py) — beide Seiten müssen hier
-    // dasselbe rechnen, sonst zeigt die Seite andere Zahlen als die Auswertung.
-    const topicUnits = {};
-    const unitTopic = {};   // Einheit → Thema (fuer die Fehlerarten weiter unten)
-    tasks.forEach((tk) => units(tk).forEach((u) => {
-      const tid = u.topic_id || tk.topic_id;
-      if (tid) { (topicUnits[tid] ||= []).push(u); unitTopic[u.id] = tid; }
-    }));
-    const pu = (sid, uid) => { const r = results[String(sid)]; if (!r || r === "abwesend") return 0; const v = r[uid]; return v == null ? 0 : Number(v); };
-    const pt = (sid, tk) => units(tk).reduce((n, u) => n + pu(sid, u.id), 0);      // Punkte einer Aufgabe
-    const tkMax = (tk) => units(tk).reduce((n, u) => n + uMax[u.id], 0);
+    // Alle Einheiten BEIDER Fassungen; je Kind zaehlt nur die geschriebene
+    // (core/arbeitswertung.js — dieselbe Regel wie _profile im Server). Themen
+    // haengen an der Einheit: eine Teilaufgabe kann ein eigenes Thema tragen
+    // und erbt sonst das der Fassung bzw. Aufgabe.
+    const uMax = {}; tasks.forEach((tk) => alleEinheiten(tk).forEach((u) => { uMax[u.id] = u.max; }));
+    const pu = (sid, uid) => punkteIn(results[String(sid)], uid, uMax[uid] ?? 1);
     // Zeilen ohne jeden Eintrag zählen als 0 (leere/durchgefallene Arbeit) — nur
     // „krank" (abwesend) bleibt aussen vor. Damit die Auswertung aber nicht schon
     // vor der ersten Eingabe voller Nullen steht, erst wenn irgendein Wert da ist.
@@ -496,74 +527,86 @@ export default function Klassenarbeit() {
       return Object.values(r).some((v) => v != null && v !== "");
     };
     const graded = students.filter(erfasstIst);
-    // Gesamtpunkte je SuS (für Trennschärfe = Item-Total-Korrelation).
-    const totals = graded.map((s) => tasks.reduce((n, tk) => n + pt(s.id, tk), 0));
+    // Je Kind seine Wertung und sein Themenprofil — beides in der Fassung,
+    // die es je Aufgabe geschrieben hat.
+    const wert = new Map(graded.map((s) => [s.id, wertung(work, s.id, effScale)]));
+    const themenVon = (sid) => {
+      const d = {};
+      tasks.forEach((tk) => einheitenFuer(work, sid, tk).forEach((u) => {
+        if (!u.topic) return;
+        const x = (d[u.topic] ||= [0, 0]); x[0] += pu(sid, u.id); x[1] += u.max;
+      }));
+      return d;
+    };
+    const profil = new Map(graded.map((s) => [s.id, themenVon(s.id)]));
+    const themenIds = [...new Set([...profil.values()].flatMap((d) => Object.keys(d)))];
     const mean = mittel, sdOf = streuung;   // beide aus core/aufgabenstatistik.js
 
-    const topicsOut = Object.entries(topicUnits).map(([tid, us]) => {
-      let e = 0, m = 0; graded.forEach((s) => us.forEach((u) => { e += pu(s.id, u.id); m += uMax[u.id]; }));
+    const topicsOut = themenIds.map((tid) => {
+      let e = 0, m = 0; graded.forEach((s) => { const x = profil.get(s.id)[tid]; if (x) { e += x[0]; m += x[1]; } });
       return { topic_id: Number(tid), label: topicLabel(Number(tid)), pct: m ? Math.round((e / m) * 100) : 0 };
     }).sort((a, b) => a.pct - b.pct);
+    const schwachVon = (sid) => Object.entries(profil.get(sid)).filter(([, [e, m]]) => m && e / m < 0.5).map(([tid]) => topicLabel(Number(tid)));
     // Nach Thema gruppiert: {label, namen[], anteil}. Sortiert nach Anzahl —
     // das Thema, an dem die halbe Klasse haengt, gehoert nach oben, nicht das
     // erste im Alphabet.
     const weakGroups = (() => {
       const map = new Map();
-      graded.forEach((s) => {
-        Object.entries(topicUnits).forEach(([tid, us]) => {
-          let e = 0, m = 0; us.forEach((u) => { e += pu(s.id, u.id); m += uMax[u.id]; });
-          if (m && e / m < 0.5) {
-            const label = topicLabel(Number(tid));
-            if (!map.has(label)) map.set(label, []);
-            map.get(label).push(s.name);
-          }
-        });
-      });
+      graded.forEach((s) => schwachVon(s.id).forEach((label) => {
+        if (!map.has(label)) map.set(label, []);
+        map.get(label).push(s.name);
+      }));
       return [...map.entries()]
         .map(([label, namen]) => ({ label, namen, anteil: graded.length ? Math.round(namen.length / graded.length * 100) : 0 }))
         .sort((a, b) => b.namen.length - a.namen.length);
     })();
 
     const studentsOut = graded.map((s) => {
-      const weak = Object.entries(topicUnits).filter(([, us]) => { let e = 0, m = 0; us.forEach((u) => { e += pu(s.id, u.id); m += uMax[u.id]; }); return m && e / m < 0.5; }).map(([tid]) => topicLabel(Number(tid)));
+      const weak = schwachVon(s.id);
       return weak.length ? { student_id: s.id, name: s.name, weak } : null;
     }).filter(Boolean);
     // je Aufgabe: Ø-Punkte (⌀/Max), Trefferquote, Trennschärfe (Item-Total-
     // Korrelation) und 95%-Konfidenzintervall der mittleren Trefferquote.
-    const perTask = tasks.map((tk, i) => {
-      const xs = graded.map((s) => pt(s.id, tk));
-      const mx = tkMax(tk);
-      const e = xs.reduce((a, b) => a + b, 0);
-      const m = graded.length * mx;
-      const avgP = mean(xs);
-      // Trennschärfe und 95%-KI rechnet core/aufgabenstatistik.js — dieselben
-      // vierzehn Zeilen standen hier und gleich noch einmal bei den Teilaufgaben.
-      const disc = trennschaerfe(xs, totals);
-      const { ciLow, ciHigh } = konfidenzProzent(xs, mx);
-      const nullAnteil = xs.length ? Math.round(xs.filter((x) => x === 0).length / xs.length * 100) : null;
-      const vollAnteil = xs.length ? Math.round(xs.filter((x) => x >= mx).length / xs.length * 100) : null;
-      return { id: tk.id, label: tk.label || `${i + 1}.`, pct: m ? Math.round((e / m) * 100) : 0,
-               avgP: Math.round(avgP * 10) / 10, max: mx, disc, ciLow, ciHigh,
-               nullAnteil, vollAnteil, form: !!tk.form };
-    });
-    // Ø je Teilaufgabe (nur wo eine Aufgabe echte Teile hat) — inkl. Trennschärfe
-    // (Item-Total-Korrelation) + 95%-KI, wie bei den ganzen Aufgaben.
+    // Eine Aufgabe mit E-Fassung steht ZWEIMAL da — je Fassung mit genau den
+    // Kindern, die sie geschrieben haben: es sind zwei verschiedene Aufgaben,
+    // und ein Mittel ueber beide sagte ueber keine etwas.
+    const perTask = [];
     const perUnit = [];
     tasks.forEach((tk, i) => {
-      const us = units(tk); if (us.length < 2) return;
-      us.forEach((u) => {
-        const xs = graded.map((s) => pu(s.id, u.id));
-        const umx = uMax[u.id];
-        const avgP = mean(xs);
-        const disc = trennschaerfe(xs, totals);
-        const { ciLow, ciHigh } = konfidenzProzent(xs, umx);
-        perUnit.push({ id: u.id, taskId: tk.id, label: u.label || "", avgP: Math.round(avgP * 10) / 10, max: umx, pct: umx ? Math.round((avgP / umx) * 100) : 0, disc, ciLow, ciHigh });
+      const fassungen = [{ stufe: "G", us: gEinheiten(tk) }, ...(eFassung(tk) ? [{ stufe: "E", us: eEinheiten(tk) }] : [])];
+      fassungen.forEach(({ stufe, us }) => {
+        const kinder = graded.filter((s) => fassung(work, s.id, tk) === stufe);
+        if (fassungen.length > 1 && !kinder.length) return;
+        const zid = stufe === "E" ? `${tk.id}~E` : tk.id;
+        const xs = kinder.map((s) => us.reduce((n, u) => n + pu(s.id, u.id), 0));
+        const tot = kinder.map((s) => wert.get(s.id).erreicht);
+        const mx = us.reduce((n, u) => n + u.max, 0);
+        const e = xs.reduce((a, b) => a + b, 0);
+        const m = kinder.length * mx;
+        // Trennschärfe und 95%-KI rechnet core/aufgabenstatistik.js — dieselben
+        // vierzehn Zeilen standen hier und gleich noch einmal bei den Teilaufgaben.
+        const disc = trennschaerfe(xs, tot);
+        const { ciLow, ciHigh } = konfidenzProzent(xs, mx);
+        const nullAnteil = xs.length ? Math.round(xs.filter((x) => x === 0).length / xs.length * 100) : null;
+        const vollAnteil = xs.length ? Math.round(xs.filter((x) => x >= mx).length / xs.length * 100) : null;
+        perTask.push({ id: zid, label: `${tk.label || `${i + 1}.`}${fassungen.length > 1 ? ` (${stufe})` : ""}`, pct: m ? Math.round((e / m) * 100) : 0,
+                       avgP: Math.round(mean(xs) * 10) / 10, max: mx, disc, ciLow, ciHigh,
+                       nullAnteil, vollAnteil, form: !!tk.form });
+        // Ø je Teilaufgabe (nur wo eine Fassung echte Teile hat).
+        if (us.length < 2) return;
+        us.forEach((u) => {
+          const ux = kinder.map((s) => pu(s.id, u.id));
+          const avgP = mean(ux);
+          const d2 = trennschaerfe(ux, tot);
+          const ki = konfidenzProzent(ux, u.max);
+          perUnit.push({ id: u.id, taskId: zid, label: u.label || "", avgP: Math.round(avgP * 10) / 10, max: u.max, pct: u.max ? Math.round((avgP / u.max) * 100) : 0, disc: d2, ciLow: ki.ciLow, ciHigh: ki.ciHigh });
+        });
       });
     });
 
-    // Endnote je SuS: Σ/Max → Note mit Tendenz + Notenwert; Verteilung + Kennzahlen.
-    const tm = tasks.reduce((n, tk) => n + tkMax(tk), 0);
-    const notes = graded.map((s) => { const sum = tasks.reduce((n, tk) => n + pt(s.id, tk), 0); const d = gradeDetailed(tm ? (sum / tm) * 100 : 0, effScale); return { name: s.name, note: d.note, wert: d.wert, grade: d.grade }; });
+    // Endnote je SuS: Wertung (Basis + E-Bonus) → Note mit Tendenz + Notenwert.
+    const tm = basis(tasks);
+    const notes = graded.map((s) => { const d = gradeDetailed(wert.get(s.id).pct, effScale); return { name: s.name, note: d.note, wert: d.wert, grade: d.grade }; });
     const werte = notes.map((x) => x.wert).sort((a, b) => a - b);
     const dist = [1, 2, 3, 4, 5, 6].map((g) => notes.filter((x) => x.grade === g).length);
     // Teilnoten-Verteilung (Tendenz: 1+ 1 2+ 2 2- …) — feinere Alternative.
@@ -575,7 +618,7 @@ export default function Klassenarbeit() {
     const stats = werte.length ? { min: werte[0], q1: r2(quantile(werte, 0.25)), med: r2(quantile(werte, 0.5)), q3: r2(quantile(werte, 0.75)), max: werte[werte.length - 1], sd: r2(stdev(werte)) } : null;
     const minPts = [1, 2, 3, 4, 5].map((g) => ({ grade: g, pts: Math.ceil(((effScale[g] || 0) / 100) * tm) }));
     // Klassen-Kennzahlen wie CardVote: Ø-Prozent, Median-Prozent, 95%-KI, Anwesend.
-    const pctArr = graded.map((s) => (tm ? (tasks.reduce((n, tk) => n + pt(s.id, tk), 0) / tm) * 100 : 0));
+    const pctArr = graded.map((s) => wert.get(s.id).pct);
     const avgPct = pctArr.length ? Math.round(mean(pctArr)) : null;
     const medPct = pctArr.length ? Math.round(quantile([...pctArr].sort((a, b) => a - b), 0.5)) : null;
     const sdPct = pctArr.length ? Math.round(sdOf(pctArr) * 10) / 10 : null;
@@ -587,13 +630,16 @@ export default function Klassenarbeit() {
     // klassenarbeit.py): nur gewertete Kinder, und nur Zellen, in denen
     // wirklich Punkte fehlen. Beide Seiten muessen hier dasselbe rechnen, sonst
     // zeigt die Seite andere Zahlen als die API.
+    // Und nur in der Fassung, die das Kind geschrieben hat.
+    const meineEinheiten = (sid) => new Map(tasks.flatMap((tk) => einheitenFuer(work, sid, tk).map((u) => [u.id, u])));
     const fehlerRoh = [];
     graded.forEach((s) => {
       const zeile = (work.fehler || {})[String(s.id)] || {};
+      const meine = meineEinheiten(s.id);
       Object.entries(zeile).forEach(([uid, art]) => {
-        if (!(uid in uMax)) return;
-        if (pu(s.id, uid) >= uMax[uid]) return;
-        fehlerRoh.push({ sid: s.id, name: s.name, uid, art, topic: unitTopic[uid] || null });
+        const u = meine.get(uid);
+        if (!u || pu(s.id, uid) >= u.max) return;
+        fehlerRoh.push({ sid: s.id, name: s.name, uid, art, topic: u.topic || null });
       });
     });
     const zaehl = (arten) => arten.reduce((d, a2) => ({ ...d, [a2]: (d[a2] || 0) + 1 }), {});
@@ -621,22 +667,21 @@ export default function Klassenarbeit() {
     // Kind geschrieben hat, geht niemanden etwas an. Kein Rang, kein
     // Klassenschnitt, keine fremden Namen.
     const bogen = graded.map((s) => {
-      const sum = tasks.reduce((n, tk) => n + pt(s.id, tk), 0);
-      const pct = tm ? (sum / tm) * 100 : 0;
-      const themen = Object.entries(topicUnits).map(([tid, us]) => {
-        let e = 0, m = 0; us.forEach((u) => { e += pu(s.id, u.id); m += uMax[u.id]; });
-        return { label: topicLabel(Number(tid)), erreicht: e, max: m, pct: m ? Math.round(e / m * 100) : 0 };
-      }).sort((a2, b2) => a2.pct - b2.pct);
+      const w = wert.get(s.id);
+      const themen = Object.entries(profil.get(s.id)).map(([tid, [e, m]]) => (
+        { label: topicLabel(Number(tid)), erreicht: e, max: m, pct: m ? Math.round(e / m * 100) : 0 }
+      )).sort((a2, b2) => a2.pct - b2.pct);
       const eigene = (work.fehler || {})[String(s.id)] || {};
+      const meine = meineEinheiten(s.id);
       const arten = Object.entries(eigene)
-        .filter(([uid]) => uid in uMax && pu(s.id, uid) < uMax[uid])
+        .filter(([uid]) => meine.has(uid) && pu(s.id, uid) < meine.get(uid).max)
         .map(([, art]) => art);
       const haeufigste = arten.length
         ? Object.entries(zaehl(arten)).sort((a2, b2) => b2[1] - a2[1] || (a2[0] < b2[0] ? -1 : 1))[0][0]
         : null;
       return {
-        student_id: s.id, name: s.name, punkte: sum, max: tm, pct: Math.round(pct),
-        note: tm ? gradeFromPct(pct, effScale) : null,
+        student_id: s.id, name: s.name, punkte: rund(w.erreicht, 2), max: tm, pct: Math.round(w.pct),
+        note: tm ? gradeFromPct(w.pct, effScale) : null,
         // ≥ 75 % sass, < 50 % ist Baustelle. Dazwischen steht bewusst nichts:
         // ein Blatt, auf dem jedes Thema kommentiert ist, liest niemand.
         sass: themen.filter((x) => x.pct >= 75),
@@ -661,6 +706,36 @@ export default function Klassenarbeit() {
   // fuellen sie selbst) weichen ab.
   const th = { ...thBase, padding: "6px 8px", borderBottom: "2px solid var(--border)" };
   const td = { ...tdBase, padding: 0 };
+
+  // Teilaufgaben einer Fassung (G = die Aufgabe, E = task.e). Eine Zeile je
+  // Teilaufgabe statt Chips nebeneinander: jede bekommt ein eigenes Thema, und
+  // dafür ist in einem Chip kein Platz. „Aufgabe 1: Wiederholung" prüft in a)
+  // Kopfrechnen, in b) Umwandeln, in c) Runden — hängt das Thema nur oben an der
+  // Aufgabe, wird daraus ein Topf, und die Auswertung sagt „Wiederholung
+  // schwach" statt „Runden schwach".
+  // Spalten einer Aufgabe im Raster. Ohne E-Fassung wie immer (Einheiten, bei
+  // echten Teilaufgaben dazu die Summe). Mit E-Fassung: der G/E-Schalter je
+  // Kind, die G-Einheiten, die E-Einheiten und die Summe der geschriebenen.
+  const spalten = (tk) => {
+    const g = units(tk).map((u) => ({ art: "einheit", stufe: "G", u, mitStufe: !!tk.e }));
+    if (!eFassung(tk)) return units(tk).length > 1 ? [...g, { art: "summe" }] : g;
+    const e = units(tk.e).map((u) => ({ art: "einheit", stufe: "E", u, mitStufe: true }));
+    return [{ art: "wahl" }, ...g, ...e, { art: "summe" }];
+  };
+  const teileListe = (task, stufe) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8, paddingLeft: stufe === "E" ? 0 : 26 }}>
+      {units(teilVon(task, stufe)).map((u) => (
+        <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", background: "var(--bg2)", borderRadius: CONTROL_R, padding: "4px 6px" }}>
+          <input value={u.label} onChange={(e) => setPart(task.id, u.id, { label: e.target.value }, stufe)} title={t("klassenarbeit.partLabel")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 34, textAlign: "center" }} />
+          <SuchSelect value={u.topic_id ? String(u.topic_id) : ""} onChange={(v) => setPart(task.id, u.id, { topic_id: v ? Number(v) : null }, stufe)}
+            title={t("klassenarbeit.partTopicHint")} leerLabel={t("klassenarbeit.partTopicInherit")}
+            style={{ flex: "1 1 120px", minWidth: 0 }} optionen={themenOptionen} />
+          <input type="number" min="0.5" step="0.5" value={u.max} onChange={(e) => setPart(task.id, u.id, { max: Math.max(0.5, Number(e.target.value) || 0.5) }, stufe)} title={t("klassenarbeit.maxPoints")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 48, textAlign: "center" }} />
+          <button onClick={() => delPart(task.id, u.id, stufe)} className="icon-btn" style={{ ...iconBtn, padding: 3, minWidth: 32, minHeight: 32 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
+        </div>
+      ))}
+    </div>
+  );
 
   const hasRoster = classId != null;
   return (
@@ -753,6 +828,7 @@ export default function Klassenarbeit() {
                     sein Inhalt. */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, color: "var(--text3)", width: 24, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
+                  {task.e && <span style={{ ...chipStyle, fontSize: 11, fontWeight: 700, flexShrink: 0 }} title={t("klassenarbeit.gFassungHint")}>G</span>}
                   <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.taskOptional", { n: i + 1 })} title={t("klassenarbeit.taskOptionalHint")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: "1 1 150px", minWidth: 0 }} />
                   <SuchSelect value={task.topic_id ? String(task.topic_id) : ""} onChange={(v) => setTask(task.id, { topic_id: v ? Number(v) : null })}
                     leerLabel={t("klassenarbeit.topicNone")} style={{ flex: "1 1 180px", minWidth: 0, maxWidth: 340 }}
@@ -786,30 +862,41 @@ export default function Klassenarbeit() {
                       }} />
                     {t("klassenarbeit.form")}
                   </label>
+                  {!task.e && (
+                    <button onClick={() => addE(task.id)} style={{ ...toolbarBtn, padding: "0 8px", flexShrink: 0 }}
+                      title={t("klassenarbeit.eFassungAdd")} aria-label={t("klassenarbeit.eFassungAdd")}>+E</button>
+                  )}
                   <button onClick={() => addPart(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4, minWidth: 32, minHeight: 32, flexShrink: 0 }}
                     title={t("klassenarbeit.addPartHint")} aria-label={t("klassenarbeit.addPart")}>
                     <Icon d={ICONS.plus} size={15} color="var(--accent)" />
                   </button>
                   <button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4, minWidth: 32, minHeight: 32, flexShrink: 0 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
                 </div>
-                {hasParts && (
-                  /* Eine Zeile je Teilaufgabe statt Chips nebeneinander: jede
-                     bekommt ein eigenes Thema, und dafür ist in einem Chip kein
-                     Platz. „Aufgabe 1: Wiederholung" prüft in a) Kopfrechnen,
-                     in b) Umwandeln, in c) Runden — hängt das Thema nur oben an
-                     der Aufgabe, wird daraus ein Topf, und die Auswertung sagt
-                     „Wiederholung schwach" statt „Runden schwach". */
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8, paddingLeft: 26 }}>
-                    {units(task).map((u) => (
-                      <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", background: "var(--bg2)", borderRadius: CONTROL_R, padding: "4px 6px" }}>
-                        <input value={u.label} onChange={(e) => setPart(task.id, u.id, { label: e.target.value })} title={t("klassenarbeit.partLabel")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 34, textAlign: "center" }} />
-                        <SuchSelect value={u.topic_id ? String(u.topic_id) : ""} onChange={(v) => setPart(task.id, u.id, { topic_id: v ? Number(v) : null })}
-                          title={t("klassenarbeit.partTopicHint")} leerLabel={t("klassenarbeit.partTopicInherit")}
-                          style={{ flex: "1 1 120px", minWidth: 0 }} optionen={themenOptionen} />
-                        <input type="number" min="0.5" step="0.5" value={u.max} onChange={(e) => setPart(task.id, u.id, { max: Math.max(0.5, Number(e.target.value) || 0.5) })} title={t("klassenarbeit.maxPoints")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 48, textAlign: "center" }} />
-                        <button onClick={() => delPart(task.id, u.id)} className="icon-btn" style={{ ...iconBtn, padding: 3, minWidth: 32, minHeight: 32 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
-                      </div>
-                    ))}
+                {hasParts && teileListe(task, "G")}
+                {/* E-Fassung (Wahlaufgabe): eigene Teilaufgaben, Punkte und
+                    Themen. Welches Kind sie geschrieben hat, wird im Raster
+                    je Kind umgeschaltet. */}
+                {task.e && (
+                  <div style={{ marginTop: 8, marginLeft: 26, padding: "6px 8px", borderRadius: CONTROL_R, border: `1px solid ${C.info}55`, background: C.info + "0d" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ ...chipStyle, fontSize: 11, fontWeight: 700, background: C.info, color: C.aufAkzent, flexShrink: 0 }} title={t("klassenarbeit.eFassungHint")}>E</span>
+                      <SuchSelect value={task.e.topic_id ? String(task.e.topic_id) : ""} onChange={(v) => setTask(task.id, { e: { ...task.e, topic_id: v ? Number(v) : null } })}
+                        leerLabel={t("klassenarbeit.partTopicInherit")} style={{ flex: "1 1 180px", minWidth: 0, maxWidth: 340 }} optionen={themenOptionen} />
+                      {task.e.parts && task.e.parts.length ? (
+                        <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap", flexShrink: 0 }}>{t("klassenarbeit.maxPoints")}: <b>{komma(taskMax(task.e))}</b></span>
+                      ) : (
+                        <label style={{ fontSize: 12, color: "var(--text3)", display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0 }}>
+                          {t("klassenarbeit.maxPoints")}
+                          <input type="number" min="0.5" step="0.5" value={task.e.max ?? 1} onChange={(e) => setTask(task.id, { e: { ...task.e, max: Math.max(0.5, Number(e.target.value) || 0.5) } })} style={{ ...inputStyle, fontSize: 13, padding: "6px 6px", width: 56, textAlign: "center" }} />
+                        </label>
+                      )}
+                      <button onClick={() => addPart(task.id, "E")} className="icon-btn" style={{ ...iconBtn, padding: 4, minWidth: 32, minHeight: 32, flexShrink: 0 }}
+                        title={t("klassenarbeit.addPartHint")} aria-label={t("klassenarbeit.addPart")}>
+                        <Icon d={ICONS.plus} size={15} color="var(--accent)" />
+                      </button>
+                      <button onClick={() => delE(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4, minWidth: 32, minHeight: 32, flexShrink: 0 }} title={t("klassenarbeit.eFassungWeg")} aria-label={t("klassenarbeit.eFassungWeg")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+                    </div>
+                    {task.e.parts && task.e.parts.length > 0 && teileListe(task, "E")}
                   </div>
                 )}
               </div>
@@ -848,27 +935,25 @@ export default function Klassenarbeit() {
                 <thead>
                   <tr>
                     <th rowSpan={2} style={{ ...th, ...klebtLinks, textAlign: "left", minWidth: 130, zIndex: 2 }}>{t("common.name")}</th>
-                    {(work.tasks || []).map((tk, i) => <th key={tk.id} colSpan={units(tk).length + (units(tk).length > 1 ? 1 : 0)} style={{ ...th, minWidth: 46, borderLeft: "1px solid var(--border)" }} title={tk.label}>{tk.label || (i + 1)}</th>)}
+                    {(work.tasks || []).map((tk, i) => <th key={tk.id} colSpan={spalten(tk).length} style={{ ...th, minWidth: 46, borderLeft: "1px solid var(--border)" }} title={tk.label}>{tk.label || (i + 1)}</th>)}
                     <th rowSpan={2} style={{ ...th, minWidth: 58, borderLeft: "1px solid var(--border)" }}>Σ / {komma(totalMax())}</th>
                     {/* Note: in der SuS-/Präsentationsansicht unsichtbar, weil das
                         ganze Raster oben schon hinter !hideIndividual haengt. */}
                     <th rowSpan={2} style={{ ...th, minWidth: 44 }}>{t("klassenarbeit.grade")}</th>
                   </tr>
                   <tr>
-                    {(work.tasks || []).flatMap((tk) => {
-                      const sub = units(tk).length > 1;   // echte Teilaufgaben
-                      const cols = units(tk).map((u, j) => (
-                        <th key={u.id} style={{ ...th, minWidth: 44, fontWeight: 500, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>{u.label || ""}<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{komma(unitMax(u))}</div></th>
-                      ));
-                      // Summe der Teilaufgaben je Aufgabe (nur wenn es Teile gibt).
-                      if (sub) cols.push(<th key={tk.id + "-sum"} style={{ ...th, minWidth: 46, fontWeight: 700, background: "var(--bg2)" }}>Σ<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{komma(taskMax(tk))}</div></th>);
-                      return cols;
-                    })}
+                    {(work.tasks || []).flatMap((tk) => spalten(tk).map((sp, j) => {
+                      const rand = j === 0 ? "1px solid var(--border)" : undefined;
+                      if (sp.art === "wahl") return <th key={tk.id + "-wahl"} style={{ ...th, minWidth: 34, fontWeight: 500, borderLeft: rand }} title={t("klassenarbeit.wahlHint")}>G/E</th>;
+                      if (sp.art === "summe") return <th key={tk.id + "-sum"} style={{ ...th, minWidth: 46, fontWeight: 700, background: "var(--bg2)" }}>Σ<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{komma(taskMax(tk))}</div></th>;
+                      const u = sp.u;
+                      return <th key={u.id} style={{ ...th, minWidth: 44, fontWeight: 500, borderLeft: rand, ...(sp.stufe === "E" ? { color: C.info } : {}) }}>{sp.mitStufe ? `${sp.stufe}${u.label ? " " + u.label : ""}` : (u.label || "")}<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{komma(unitMax(u))}</div></th>;
+                    }))}
                   </tr>
                 </thead>
                 <tbody>
                   {students.map((s) => {
-                    const sum = sumOf(s.id); const tm = totalMax(); const abw = isAbsent(s.id);
+                    const wt = wertungOf(s.id); const sum = wt.erreicht; const tm = totalMax(); const abw = isAbsent(s.id);
                     // Nichts eingetragen heisst NICHT „null Punkte". Vor dem
                     // Korrigieren stand in jeder Zeile 0/59 und eine 6 — eine
                     // Wand aus roten Sechsen fuer eine Arbeit, die noch niemand
@@ -879,7 +964,7 @@ export default function Klassenarbeit() {
                     // Note auch für Abwesende zeigen (Punkte bleiben ja erhalten) — nur
                     // die Klassenstatistik unten rechnet sie raus. Anzeige umschaltbar:
                     // Tendenznote (2+) oder Notenwert in 0,3-Schritten (2,3).
-                    const gd = (erfasst && tm) ? gradeDetailed((sum / tm) * 100, effScale) : null;
+                    const gd = (erfasst && tm) ? gradeDetailed(wt.pct, effScale) : null;
                     const note = gd ? (gradeMode === "wert" ? komma(gd.wert) : gd.note) : "";
                     return (
                       <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
@@ -897,37 +982,60 @@ export default function Klassenarbeit() {
                           </span>
                         </td>
                         {(work.tasks || []).flatMap((tk) => {
-                          const sub = units(tk).length > 1;
-                          const cells = units(tk).map((u, j) => (
-                            <td key={u.id} style={{ ...td, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>
-                              {/* Abwesende bleiben editierbar — Punkte werden nur nicht in die
-                                  Klassenstatistik gerechnet, aber nicht gelöscht. */}
-                              <input type="number" min="0" step="0.5" max={unitMax(u)} value={pointsOf(s.id, u.id)} onChange={(e) => setPoints(s.id, u.id, e.target.value === "" ? "" : Math.min(unitMax(u), Math.max(0, Number(e.target.value))))}
-                                style={{ width: 42, height: 32, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
-                              {/* Die Fehlerart steht nur da, wo Punkte fehlen —
-                                  an einer Aufgabe mit voller Punktzahl gibt es
-                                  keinen Fehler zu benennen. Genau dieselbe
-                                  Regel rechnet der Server (_fehler_gezaehlt). */}
-                              {fehlerModus && (() => {
-                                const p = pointsOf(s.id, u.id);
-                                if (p === "" || Number(p) >= unitMax(u)) return null;
-                                const f = FEHLER.find((x) => x.key === fehlerOf(s.id, u.id));
-                                return (
-                                  <button onClick={() => cycleFehler(s.id, u.id)}
-                                    title={f ? t(`klassenarbeit.fehler.${f.key}`) : t("klassenarbeit.fehlerSet")}
-                                    style={{ ...fehlerChip, display: "block", margin: "0 auto 2px", cursor: "pointer",
-                                      background: f ? f.color : "transparent", color: f ? C.aufAkzent : "var(--text3)",
-                                      border: f ? "none" : "1px dashed var(--border2)" }}>
-                                    {f ? f.ab : "+"}
-                                  </button>
-                                );
-                              })()}
-                            </td>
-                          ));
-                          if (sub) { const ts = units(tk).reduce((n, u) => n + (Number(pointsOf(s.id, u.id)) || 0), 0); cells.push(<td key={tk.id + "-sum"} style={{ ...td, fontWeight: 700, background: "var(--bg2)", color: "var(--text2)" }}>{kommaRund(ts, 2)}</td>); }
-                          return cells;
+                          const hatE = !!eFassung(tk);
+                          const aktiv = fassung(work, s.id, tk);
+                          return spalten(tk).map((sp, j) => {
+                            const rand = j === 0 ? "1px solid var(--border)" : undefined;
+                            if (sp.art === "wahl") return (
+                              <td key={tk.id + "-wahl"} style={{ ...td, borderLeft: rand, textAlign: "center" }}>
+                                {/* Welche Fassung hat das Kind geschrieben? Ein Klick
+                                    wechselt; wer in die andere Fassung tippt, wechselt
+                                    ebenfalls. Die Punkte der anderen bleiben stehen,
+                                    zaehlen aber nicht. */}
+                                <button onClick={() => setFassung(s.id, tk.id, aktiv === "E" ? "G" : "E")} aria-pressed={aktiv === "E"}
+                                  title={t("klassenarbeit.wahlHint")}
+                                  style={{ ...fehlerChip, cursor: "pointer", border: "none", minWidth: 24, minHeight: 24,
+                                    background: aktiv === "E" ? C.info : "var(--bg3)", color: aktiv === "E" ? C.aufAkzent : "var(--text2)" }}>{aktiv}</button>
+                              </td>
+                            );
+                            if (sp.art === "summe") {
+                              const ts = aufgabenPunkte(work, s.id, tk);
+                              return <td key={tk.id + "-sum"} style={{ ...td, fontWeight: 700, background: "var(--bg2)", color: "var(--text2)" }}>{kommaRund(ts, 2)}</td>;
+                            }
+                            const u = sp.u;
+                            const an = !hatE || sp.stufe === aktiv;
+                            return (
+                              <td key={u.id} style={{ ...td, borderLeft: rand, ...(an ? {} : { opacity: 0.35 }) }}>
+                                {/* Abwesende bleiben editierbar — Punkte werden nur nicht in die
+                                    Klassenstatistik gerechnet, aber nicht gelöscht. */}
+                                <input type="number" min="0" step="0.5" max={unitMax(u)} value={pointsOf(s.id, u.id)}
+                                  onChange={(e) => setPoints(s.id, u.id, e.target.value === "" ? "" : Math.min(unitMax(u), Math.max(0, Number(e.target.value))), an ? null : [tk.id, sp.stufe])}
+                                  style={{ width: 42, height: 32, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
+                                {/* Die Fehlerart steht nur da, wo Punkte fehlen —
+                                    an einer Aufgabe mit voller Punktzahl gibt es
+                                    keinen Fehler zu benennen, und an der nicht
+                                    geschriebenen Fassung auch nicht. Genau
+                                    dieselbe Regel rechnet der Server (_fehler_gezaehlt). */}
+                                {fehlerModus && an && (() => {
+                                  const p = pointsOf(s.id, u.id);
+                                  if (p === "" || Number(p) >= unitMax(u)) return null;
+                                  const f = FEHLER.find((x) => x.key === fehlerOf(s.id, u.id));
+                                  return (
+                                    <button onClick={() => cycleFehler(s.id, u.id)}
+                                      title={f ? t(`klassenarbeit.fehler.${f.key}`) : t("klassenarbeit.fehlerSet")}
+                                      style={{ ...fehlerChip, display: "block", margin: "0 auto 2px", cursor: "pointer",
+                                        background: f ? f.color : "transparent", color: f ? C.aufAkzent : "var(--text3)",
+                                        border: f ? "none" : "1px dashed var(--border2)" }}>
+                                      {f ? f.ab : "+"}
+                                    </button>
+                                  );
+                                })()}
+                              </td>
+                            );
+                          });
                         })}
-                        <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: !erfasst ? "var(--text3)" : abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{erfasst ? `${kommaRund(sum, 2)}/${komma(tm)}` : `–/${komma(tm)}`}{abw ? ` (${t("klassenarbeit.absentShort")})` : ""}</td>
+                        <td title={erfasst && wt.bonusPct > 0 ? t("klassenarbeit.eBonus", { p: kommaRund(wt.bonusPct, 1) }) : undefined}
+                          style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: !erfasst ? "var(--text3)" : abw ? "var(--text3)" : (tm && wt.pct < 50 ? C.danger : "var(--text)") }}>{erfasst ? `${kommaRund(sum, 2)}/${komma(tm)}` : `–/${komma(tm)}`}{abw ? ` (${t("klassenarbeit.absentShort")})` : ""}</td>
                         <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{note}</td>
                       </tr>
                     );
@@ -1256,10 +1364,8 @@ export default function Klassenarbeit() {
 // Notenbuch tragen. Eine bewusst eingetragene 0 zaehlt, ein leeres Feld nicht.
 // Krank/abwesend bekommt ohnehin keine Note.
 function notenAusArbeit(students, work, scale) {
-  const uIds = (tk) => (tk.parts && tk.parts.length) ? tk.parts.map((u) => u.id) : [tk.id];
-  const uMaxT = (tk) => (tk.parts && tk.parts.length) ? tk.parts.reduce((n, u) => n + (Number(u.max) > 0 ? Number(u.max) : 1), 0) : (Number(tk.max) > 0 ? Number(tk.max) : 1);
-  const totalMax = rund((work.tasks || []).reduce((n, tk) => n + uMaxT(tk), 0), 2);
   const absentU = new Set((work.absent || []).map(String));
+  if (!basis(work.tasks)) return [];
   return students
     .filter((s) => {
       if (absentU.has(String(s.id))) return false;
@@ -1268,33 +1374,31 @@ function notenAusArbeit(students, work, scale) {
       if (Array.isArray(r)) return true;                  // Altformat
       return Object.values(r).some((v) => v != null && v !== "");
     })
-    .map((s) => {
-      const row = (work.results || {})[String(s.id)] || {};
-      const sum = (work.tasks || []).reduce((n, tk) => n + uIds(tk).reduce((m, id) => m + (Number(row[id]) || 0), 0), 0);
-      // Notenwert mit Tendenz (±0,3) — wie in der Excel-Auswertung.
-      return { student_id: s.id, value: gradeDetailed(totalMax ? (sum / totalMax) * 100 : 0, scale).wert };
-    }).filter((g) => g.value >= 1 && g.value <= 6);
+    // Notenwert mit Tendenz (±0,3) — wie in der Excel-Auswertung; Prozent aus
+    // core/arbeitswertung.js (Wahlaufgaben: geschriebene Fassung, E-Bonus).
+    .map((s) => ({ student_id: s.id, value: gradeDetailed(wertung(work, s.id, scale).pct, scale).wert }))
+    .filter((g) => g.value >= 1 && g.value <= 6);
 }
 
 // ── Vergleich ────────────────────────────────────────────────────────────────
 // Je Arbeit die erreichten Prozent je bewertetem (nicht abwesendem) SuS.
 // Altformat (results[sid] = [falsche Aufgaben-IDs]) wird mitgerechnet.
 function pctList(work) {
-  const tasks = work.tasks || [];
-  const uIds = (tk) => (tk.parts && tk.parts.length) ? tk.parts.map((u) => u.id) : [tk.id];
-  const uMaxT = (tk) => (tk.parts && tk.parts.length) ? tk.parts.reduce((n, u) => n + (Number(u.max) > 0 ? Number(u.max) : 1), 0) : (Number(tk.max) > 0 ? Number(tk.max) : 1);
-  const tm = rund(tasks.reduce((n, tk) => n + uMaxT(tk), 0), 2);
-  if (!tm) return [];
+  if (!basis(work.tasks)) return [];
+  const scale = work.scale && Object.keys(work.scale).length ? work.scale : profilSkala();
   const absent = new Set((work.absent || []).map(String));
   const out = [];
   for (const [sid, r] of Object.entries(work.results || {})) {
     if (!r || r === "abwesend" || absent.has(String(sid))) continue;
-    let e = 0;
-    if (Array.isArray(r)) { const bad = new Set(r.map(String)); tasks.forEach((tk) => { if (!bad.has(String(tk.id))) e += uMaxT(tk); }); }
-    else tasks.forEach((tk) => uIds(tk).forEach((id) => { const v = r[id]; e += (v == null ? 0 : Number(v)); }));
-    out.push(Math.round((e / tm) * 100));
+    out.push(Math.round(wertung(work, sid, scale).pct));
   }
   return out;
+}
+
+// Notenschluessel aus dem Profil — der E-Bonus ist auf eine Notenstufe gedeckelt
+// und braucht deshalb die Stufengrenzen.
+function profilSkala() {
+  try { return JSON.parse(localStorage.getItem("user"))?.grade_scale || DEFAULT_SCALE; } catch { return DEFAULT_SCALE; }
 }
 
 function quartiles(arr) {

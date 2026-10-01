@@ -31,18 +31,17 @@ from .models import Session, WorkAnalysis
 from .scoring import note_aus_pct
 
 
-def _arbeit_prozent(w: WorkAnalysis) -> dict:
+def _arbeit_prozent(w: WorkAnalysis, scale=None) -> dict:
     """Je Kind der erreichte Anteil an einer Klassenarbeit (0..100).
 
     Abwesende bleiben draußen — „nicht mitgeschrieben" ist keine Leistung von
     null. Kinder ohne eine einzige eingetragene Zahl ebenso: das ist „noch
-    nicht korrigiert", nicht „alles falsch".
+    nicht korrigiert", nicht „alles falsch". Gerechnet wird in
+    app/arbeitswertung.py (Wahlaufgaben: E-Fassung mit Bonus).
     """
-    from .routers.klassenarbeit import _units
+    from . import arbeitswertung as aw
 
-    umax = {uid: mx for t in (w.tasks or []) for uid, mx in _units(t)}
-    gesamt = sum(umax.values())
-    if not gesamt:
+    if not aw.basis(w.tasks):
         return {}
     absent = {str(x) for x in (w.absent or [])}
     out = {}
@@ -51,9 +50,7 @@ def _arbeit_prozent(w: WorkAnalysis) -> dict:
             continue
         if not any(isinstance(v, (int, float)) for v in eintrag.values()):
             continue
-        erreicht = sum(float(v) for uid, v in eintrag.items()
-                       if uid in umax and isinstance(v, (int, float)))
-        out[str(sid)] = max(0.0, min(100.0, erreicht / gesamt * 100))
+        out[str(sid)] = max(0.0, min(100.0, aw.wertung(w, sid, scale)["pct"]))
     return out
 
 
@@ -108,10 +105,10 @@ async def klasse(db: AsyncSession, user, class_id: int, *, cardvote: bool, auswe
             WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id
         ).order_by(WorkAnalysis.created_at))).scalars().all()
         for w in arbeiten:
-            prozente = _arbeit_prozent(w)
+            skala = w.scale or user.grade_scale
+            prozente = _arbeit_prozent(w, skala)
             if not prozente:
                 continue
-            skala = w.scale or user.grade_scale
             erhebungen.append({"quelle": "arbeit", "id": w.id, "name": w.name or "Klassenarbeit",
                                "date": w.created_at.isoformat() if w.created_at else None})
             for sid, pct in prozente.items():
