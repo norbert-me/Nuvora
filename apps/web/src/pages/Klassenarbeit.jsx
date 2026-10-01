@@ -46,6 +46,11 @@ const FEHLER_CYCLE = ["", ...FEHLER.map((f) => f.key)];
 // Das Kuerzel in der Zelle: abgeleitet aus chipStyle (dieselbe Pillenform wie
 // ueberall), nur schmaler — es steht unter einem 42 px breiten Zahlenfeld.
 const fehlerChip = { ...chipStyle, fontSize: 11, fontWeight: 700, padding: "1px 6px", minWidth: 20, textAlign: "center" };
+// Tönung fuer Zeile und Spalte des Feldes, in dem getippt wird. Die klebende
+// Namenszelle braucht eine DECKENDE Fassung, sonst scheint beim Scrollen das
+// Raster durch.
+const FOKUS_TON = "color-mix(in srgb, var(--accent) 10%, transparent)";
+const FOKUS_TON_DECKEND = "color-mix(in srgb, var(--accent) 14%, var(--card))";
 const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 // Eine Zeile „je Aufgabe/Teilaufgabe": Label, Ø-Punkte, farbige %-Zahl, Balken
@@ -121,6 +126,10 @@ export default function Klassenarbeit() {
   useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ } }, []);
   const [hideIndividual, setHideIndividual] = useState(false); // #55: SuS-Ansicht — einzelne Leistungen + Noten aus
   const [fehlerModus, setFehlerModus] = useState(false);      // Fehlerart je Zelle erfassen (aus)
+  // Wo wird gerade getippt? Zeile (Kind) und Spalte (Einheit) des Feldes mit
+  // dem Fokus werden hervorgehoben — beim Uebertragen vom Papier verrutscht
+  // man sonst in die Nachbarzeile. Folgt dem Fokus, kein eigener Schalter.
+  const [fokus, setFokus] = useState(null);   // { sid, uid }
   const [scaleOpen, setScaleOpen] = useState(false); // Notenschlüssel-Editor auf/zu
   const [expandedTasks, setExpandedTasks] = useState(() => new Set()); // aufgeklappte Teilaufgaben-Auswertung
   const [infoOpen, setInfoOpen] = useState(false); // „Auswertung verstehen"
@@ -900,7 +909,7 @@ export default function Klassenarbeit() {
                       if (sp.art === "summe") return <th key={tk.id + "-sum"} style={{ ...th, minWidth: 46, fontWeight: 700, background: "var(--bg2)" }}>Σ<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{komma(taskMax(tk))}</div></th>;
                       const u = sp.u;
                       const st = sp.anders ? andereStufe : eigeneStufe;
-                      return <th key={u.id} style={{ ...th, minWidth: 44, fontWeight: 500, borderLeft: rand, ...(sp.anders ? { color: C.info } : {}) }}>{sp.mitStufe ? `${st}${u.label ? " " + u.label : ""}` : (u.label || "")}<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{komma(unitMax(u))}</div></th>;
+                      return <th key={u.id} style={{ ...th, minWidth: 44, fontWeight: 500, borderLeft: rand, ...(sp.anders ? { color: C.info } : {}), ...(fokus && fokus.uid === u.id ? { background: FOKUS_TON, color: "var(--accent)", fontWeight: 700 } : {}) }}>{sp.mitStufe ? `${st}${u.label ? " " + u.label : ""}` : (u.label || "")}<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{komma(unitMax(u))}</div></th>;
                     }))}
                   </tr>
                 </thead>
@@ -920,8 +929,9 @@ export default function Klassenarbeit() {
                     const gd = (erfasst && tm) ? gradeDetailed(wt.pct, effScale) : null;
                     const note = gd ? (gradeMode === "wert" ? komma(gd.wert) : gd.note) : "";
                     return (
-                      <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
-                        <td style={{ ...td, ...klebtLinks, textAlign: "left", padding: "4px 8px", fontWeight: 500, whiteSpace: "nowrap" }}>
+                      <tr key={s.id} style={{ ...(abw ? { opacity: 0.5 } : {}), ...(fokus && fokus.sid === s.id ? { background: FOKUS_TON } : {}) }}>
+                        <td style={{ ...td, ...klebtLinks, textAlign: "left", padding: "4px 8px", fontWeight: 500, whiteSpace: "nowrap",
+                          ...(fokus && fokus.sid === s.id ? { background: FOKUS_TON_DECKEND, boxShadow: "inset 3px 0 0 var(--accent)" } : {}) }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                             {/* Anwesenheit: Auge / durchgestrichenes Auge —
                                 „zaehlt in der Auswertung mit" bzw. „bleibt
@@ -958,10 +968,11 @@ export default function Klassenarbeit() {
                             const u = sp.u;
                             const an = !hatAndere || sp.anders === anders;
                             return (
-                              <td key={u.id} style={{ ...td, borderLeft: rand, ...(an ? {} : { opacity: 0.35 }) }}>
+                              <td key={u.id} style={{ ...td, borderLeft: rand, ...(an ? {} : { opacity: 0.35 }), ...(fokus && fokus.uid === u.id ? { background: FOKUS_TON } : {}) }}>
                                 {/* Abwesende bleiben editierbar — Punkte werden nur nicht in die
                                     Klassenstatistik gerechnet, aber nicht gelöscht. */}
                                 <input type="number" min="0" step="0.5" max={unitMax(u)} value={pointsOf(s.id, u.id)}
+                                  onFocus={() => setFokus({ sid: s.id, uid: u.id })} onBlur={() => setFokus(null)}
                                   onChange={(e) => setPoints(s.id, u.id, e.target.value === "" ? "" : Math.min(unitMax(u), Math.max(0, Number(e.target.value))), an ? null : [tk.id, sp.anders])}
                                   style={{ width: 42, height: 32, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
                                 {/* Die Fehlerart steht nur da, wo Punkte fehlen —
@@ -988,7 +999,7 @@ export default function Klassenarbeit() {
                           });
                         })}
                         <td title={erfasst && wt.bonusPct > 0 ? t("klassenarbeit.eBonus", { p: kommaRund(wt.bonusPct, 1) }) : undefined}
-                          style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: !erfasst ? "var(--text3)" : abw ? "var(--text3)" : (tm && wt.pct < 50 ? C.danger : "var(--text)") }}>{erfasst ? `${kommaRund(sum, 2)}/${komma(tm)}` : `–/${komma(tm)}`}{abw ? ` (${t("klassenarbeit.absentShort")})` : ""}</td>
+                          style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: !erfasst ? "var(--text3)" : abw ? "var(--text3)" : (tm && wt.pct < 50 ? C.danger : "var(--text)") }}>{erfasst ? `${kommaRund(sum, 2)}/${komma(tm)}` : `–/${komma(tm)}`}</td>
                         <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{note}</td>
                       </tr>
                     );

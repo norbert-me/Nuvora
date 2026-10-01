@@ -14,6 +14,11 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- **Klassenarbeit:** beim Eintragen sind Zeile und Spalte des Feldes
+  hervorgehoben; „abwesend" steht nicht mehr zusätzlich hinter der Punktzahl.
+
 ## 4.4.5 — 01.10.2026
 
 - **Klassenarbeit: Wahlaufgaben E/G** — in einer E/G-Arbeit wählt man im

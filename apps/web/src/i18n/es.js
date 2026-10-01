@@ -1688,7 +1688,6 @@ export default {
   "klassenarbeit.fromPts": "desde {{pts}}",
   "klassenarbeit.absent": "Marcar ausente",
   "klassenarbeit.present": "Marcar presente",
-  "klassenarbeit.absentShort": "aus.",
   "klassenarbeit.gradeResult": "Distribución de notas",
   "klassenarbeit.noTopics": "Ninguna tarea tiene tema aún.",
   "klassenarbeit.weakStudents": "Temas débiles por alumno",

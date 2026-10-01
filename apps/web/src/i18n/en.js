@@ -1687,7 +1687,6 @@ export default {
   "klassenarbeit.fromPts": "from {{pts}}",
   "klassenarbeit.absent": "Mark absent",
   "klassenarbeit.present": "Mark present",
-  "klassenarbeit.absentShort": "abs.",
   "klassenarbeit.gradeResult": "Grade distribution",
   "klassenarbeit.noTopics": "No task has a topic yet.",
   "klassenarbeit.weakStudents": "Weak topics per student",

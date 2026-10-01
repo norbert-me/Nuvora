@@ -1670,7 +1670,6 @@ export default {
   "klassenarbeit.fromPts": "ab {{pts}}",
   "klassenarbeit.absent": "Als abwesend markieren",
   "klassenarbeit.present": "Wieder anwesend",
-  "klassenarbeit.absentShort": "abw.",
   "klassenarbeit.gradeResult": "Notenverteilung",
   "klassenarbeit.noTopics": "Noch keine Aufgabe hat ein Thema.",
   "klassenarbeit.weakStudents": "Schwache Themen je Schüler",
