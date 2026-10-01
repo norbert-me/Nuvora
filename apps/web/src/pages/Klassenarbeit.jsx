@@ -571,9 +571,13 @@ export default function Klassenarbeit() {
     // Eine Aufgabe mit E-Fassung steht ZWEIMAL da — je Fassung mit genau den
     // Kindern, die sie geschrieben haben: es sind zwei verschiedene Aufgaben,
     // und ein Mittel ueber beide sagte ueber keine etwas.
+    // Die Darstellung steht nicht darin: sie prueft keine Aufgabe, sondern die
+    // Form der ganzen Arbeit, und eine Trefferquote daneben laede zum
+    // Vergleich mit den Sachaufgaben ein. In die Note zaehlt sie weiter.
     const perTask = [];
     const perUnit = [];
     tasks.forEach((tk, i) => {
+      if (tk.form) return;
       const fassungen = [{ stufe: eigeneStufe, anders: false, us: eigeneEinheiten(tk) },
         ...(andereFassung(wk, tk) ? [{ stufe: andereStufe, anders: true, us: andereEinheiten(wk, tk) }] : [])];
       fassungen.forEach(({ stufe, anders, us }) => {
