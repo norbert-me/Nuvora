@@ -14,7 +14,7 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.4.5 — 01.10.2026
 
 - **Klassenarbeit: Wahlaufgaben E/G** — in einer E/G-Arbeit wählt man im
   Raster je Kind und Aufgabe, ob es die Aufgabe des anderen Blatts geschrieben
@@ -35,6 +35,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - **Verlaufsplan: Tabellen im Phasentext** — Knöpfe „Tabelle", „Zeile",
   „Spalte" unter dem Textfeld, Vorschau darunter; der Termin-Dialog ist
   breiter.
+- Abhängigkeiten aktualisiert, gemeldete Sicherheitslücken in Bibliotheken behoben.
 
 ## 4.4.4 — 24.09.2026
 
