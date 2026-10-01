@@ -19,6 +19,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - **Klassenarbeit:** beim Eintragen sind Zeile und Spalte des Feldes
   hervorgehoben; „abwesend" steht nicht mehr zusätzlich hinter der Punktzahl.
 - Klassenarbeit: die Darstellung hat keinen E/G-Umschalter mehr.
+- **Noten und Klassenarbeitspunkte speichern sich selbst** — kurz nach der
+  Eingabe, ohne Knopf. Spalten, Aufgaben und Notenschlüssel behalten die
+  Speichern-Leiste.
 
 ## 4.4.5 — 01.10.2026
 

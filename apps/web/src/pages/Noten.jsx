@@ -18,7 +18,7 @@ import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
-import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
+import { DialogFuss, nurGeaendertIn, useAutoSpeichern, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useAktiv, useZielFilter } from "../core/modules.js";
 import { datumKurz } from "../core/grades.js";
@@ -430,10 +430,18 @@ export default function Noten() {
         await fetch(`${API}/sections/${sec.id}/categories/reorder`, alsJson("PUT", { ids: wert[ck] })).catch(() => {});
     }
     if (!ok) setError(t("common.notWork"));
-    frisch.current = true;
+    // Verworfen wird nur nach einem Fehlschlag (dann zeigt die Tabelle, was
+    // wirklich ankam). Nach Erfolg uebernimmt useEntwurf den frischen Stand
+    // selbst — und behaelt dabei, was waehrend des Speicherns schon wieder
+    // getippt wurde. Ein Verwerfen hier schluckte diese Eingabe, und beim
+    // automatischen Speichern ist das kein Randfall.
+    frisch.current = !ok;
     await load(classId);
     return ok;
   });
+  // Noten, Kommentare und gesetzte Noten speichern sich selbst (useAutoSpeichern);
+  // die Reihenfolge von Abschnitten und Spalten bleibt bei der Leiste.
+  const autoSpeichern = useAutoSpeichern(entwurf, (w) => nurGeaendertIn(w, basis, (k) => /^(n|k|so|to):/.test(k)));
   // Frische Serverdaten (anderes Halbjahr, andere Klasse, nach dem Speichern)
   // beenden die Arbeitskopie — sonst zeigte die Tabelle die alten Werte weiter.
   useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
@@ -957,7 +965,7 @@ export default function Noten() {
       {/* Unten schwebend, damit sie beim Rollen durch die Tabelle nicht
           verschwindet. Fixiert = ohne Einfluss auf die gemessene Kopfhöhe
           (--kopf2/--spalte1), die hier empfindlich ist. */}
-      <SpeicherBalken entwurf={entwurf} />
+      <SpeicherBalken entwurf={entwurf} zeigen={autoSpeichern.zeigen} />
 
       {infoFuer && (
         <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} classId={classId} kursId={kursId} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} />

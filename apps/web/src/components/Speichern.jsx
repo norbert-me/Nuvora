@@ -71,19 +71,27 @@ export function useEntwurf(gespeichert, speichernFn) {
 
   const geaendert = beruehrt.current && !gleich(wert, gespeichert);
 
+  // Zaehlt jeden Griff. Wer weitertippt, waehrend gespeichert wird (beim
+  // automatischen Speichern der Normalfall), hat danach noch etwas offen — der
+  // Entwurf darf dann NICHT als uebernommen gelten, sonst ueberschriebe der
+  // frische Serverstand die neue Eingabe.
+  const stand = useRef(0);
   const setz = useCallback((teil) => {
     beruehrt.current = true;
+    stand.current += 1;
     setWert((v) => ({ ...v, ...(typeof teil === "function" ? teil(v) : teil) }));
   }, []);
 
   const speichern = useCallback(async () => {
     if (laeuft) return false;           // Doppelklick zählt einmal
     setLaeuft(true);
+    const beginn = stand.current;
     try {
       const ok = await speichernFn(wert);
       // Nur bei Erfolg loslassen: sonst gaelte der Entwurf als uebernommen und
-      // der naechste Nachschub vom Server ueberschriebe, was nie ankam.
-      if (ok !== false) beruehrt.current = false;
+      // der naechste Nachschub vom Server ueberschriebe, was nie ankam. Und nur,
+      // wenn in der Zwischenzeit niemand weitergetippt hat.
+      if (ok !== false && stand.current === beginn) beruehrt.current = false;
       return ok !== false;
     } finally {
       setLaeuft(false);
@@ -94,6 +102,44 @@ export function useEntwurf(gespeichert, speichernFn) {
 
   return useMemo(() => ({ wert, setz, geaendert, speichern, verwerfen, laeuft }),
     [wert, setz, geaendert, speichern, verwerfen, laeuft]);
+}
+
+/**
+ * Automatisch speichern — fuer EINGABEN in einem Raster (Noten, Punkte), nicht
+ * fuer den Aufbau einer Maske.
+ *
+ * Entschieden am 01.10.2026 auf Wunsch des Nutzers: „bei Eingaben von Noten
+ * oder Klassenarbeitspunkten muss ich nicht immer speichern — dafür kann ich ja
+ * zurück verwenden". Eine Notentabelle wird Zelle fuer Zelle gefuellt; nach
+ * jeder dritten Zelle „Speichern" zu druecken ist Arbeit ohne Entscheidung.
+ * Spalten, Aufgaben, Namen und Notenschluessel bleiben bei der Leiste: dort
+ * baut man etwas, und dort gilt weiter die Regel mit dem Knopf.
+ *
+ * `nurEingabe(wert)` sagt, ob das Offene AUSSCHLIESSLICH Eingaben sind; nur
+ * dann wird nach `ms` ohne weiteren Griff gespeichert. Schlaegt das Speichern
+ * fehl, bleibt die Leiste stehen (`zeigen`), damit nichts still verloren geht.
+ * Rueckgabe: `{ zeigen }` — ob die Speicherleiste sichtbar sein soll.
+ */
+/** Unterscheiden sich `wert` und `basis` NUR in Feldern, fuer die
+ *  `istEingabe(schluessel)` ja sagt? (Fuer `useAutoSpeichern`.) */
+export function nurGeaendertIn(wert, basis, istEingabe) {
+  const keys = new Set([...Object.keys(wert || {}), ...Object.keys(basis || {})]);
+  for (const k of keys) if (!gleich((wert || {})[k], (basis || {})[k]) && !istEingabe(k)) return false;
+  return true;
+}
+
+export function useAutoSpeichern(entwurf, nurEingabe, ms = 800) {
+  const [fehler, setFehler] = useState(false);
+  const auto = entwurf.geaendert && !fehler && nurEingabe(entwurf.wert);
+  const { wert, speichern, laeuft } = entwurf;
+  useEffect(() => {
+    if (!auto || laeuft) return undefined;
+    const z = setTimeout(async () => { if (!(await speichern())) setFehler(true); }, ms);
+    return () => clearTimeout(z);
+  }, [auto, laeuft, wert, speichern, ms]);
+  // Neuer Griff nach einem Fehlschlag: erneut versuchen duerfen.
+  useEffect(() => { setFehler(false); }, [wert]);
+  return { zeigen: entwurf.geaendert && !auto };
 }
 
 /**

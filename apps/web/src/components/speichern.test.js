@@ -50,3 +50,15 @@ describe("Entwurf: zurückgenommen heißt nichts offen", () => {
     expect(gleich({ p: "" }, {})).toBe(false);
   });
 });
+
+import { nurGeaendertIn } from "./Speichern.jsx";
+
+describe("Automatisch speichern: nur Eingaben", () => {
+  const eingabe = (k) => k.startsWith("n:");
+  it("nur Noten geändert: ja", () => {
+    expect(nurGeaendertIn({ "n:1:2": 2, os: [1, 2] }, { "n:1:2": null, os: [1, 2] }, eingabe)).toBe(true);
+  });
+  it("Reihenfolge geändert: nein", () => {
+    expect(nurGeaendertIn({ "n:1:2": 2, os: [2, 1] }, { "n:1:2": null, os: [1, 2] }, eingabe)).toBe(false);
+  });
+});

@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ANTWORT_COLORS, Boxplot, Segment, segmentBtn, COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, td as tdBase, th as thBase, toolbarBtn, toolbarIconBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
-import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
+import { DialogFuss, nurGeaendertIn, useAutoSpeichern, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
@@ -226,6 +226,10 @@ export default function Klassenarbeit() {
     return true;
   });
   useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
+  // Eingaben im Raster (Punkte, abwesend, Fehlerart, Wechsel E/G) speichern sich
+  // selbst (useAutoSpeichern); Aufgaben, Name und Notenschluessel bleiben bei
+  // der Leiste.
+  const autoSpeichern = useAutoSpeichern(entwurf, (w) => nurGeaendertIn(w, savedWork, (k) => ["results", "absent", "fehler", "wechsel"].includes(k)));
   const work = entwurf.wert;
   // Die SuS DIESER Arbeit: bei einer E- oder G-Arbeit nur die des Niveaus — sie
   // haben das Blatt geschrieben, die anderen ein anderes. Ohne Niveau alle.
@@ -1315,7 +1319,7 @@ export default function Klassenarbeit() {
       )}
       {/* Unten schwebend: das Punkte-Raster ist länger als der Bildschirm, oben
           wäre der Knopf nach der dritten Zeile weg. */}
-      <SpeicherBalken entwurf={entwurf} />
+      <SpeicherBalken entwurf={entwurf} zeigen={autoSpeichern.zeigen} />
     </div>
   );
 }

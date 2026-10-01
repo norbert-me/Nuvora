@@ -15,7 +15,10 @@ import { createPortal } from "react-dom";
 import Speicherleiste from "./Speichern.jsx";
 import { CONTROL_R, SHADOW } from "./Icons.jsx";
 
-export default function SpeicherBalken({ entwurf, style }) {
+// `zeigen` (optional): sichtbar ja/nein von aussen — beim automatischen
+// Speichern (`useAutoSpeichern`) steht der Balken nur, wenn etwas offen ist,
+// das NICHT von selbst gespeichert wird, oder wenn das Speichern scheiterte.
+export default function SpeicherBalken({ entwurf, style, zeigen = entwurf.geaendert }) {
   // Am `body` und nicht in der Seite: eine Karte mit `overflow` oder
   // `transform` darueber sperrt ein `position: fixed` darin ein, und der Balken
   // stuende wieder irgendwo statt am Bildschirmrand (Sitzplan zoomt, der
@@ -25,7 +28,7 @@ export default function SpeicherBalken({ entwurf, style }) {
   return createPortal(
     <div style={{
       position: "fixed", left: "50%", bottom: "max(16px, env(safe-area-inset-bottom))", transform: "translateX(-50%)", zIndex: 60,
-      display: entwurf.geaendert ? "flex" : "none", alignItems: "center",
+      display: zeigen ? "flex" : "none", alignItems: "center",
       padding: "8px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)",
       background: "var(--card)", boxShadow: SHADOW.schwebend, maxWidth: "calc(100vw - 24px)",
       ...style,
