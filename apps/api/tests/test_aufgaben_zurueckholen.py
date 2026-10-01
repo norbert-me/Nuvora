@@ -7,7 +7,6 @@ genau eine Tabelle zurück — und nur die Zeilen, die fehlen.
 """
 import io
 import json
-import os
 import zipfile
 
 import pytest

@@ -144,7 +144,7 @@ def bild_sparsam(daten: bytes, mime: str, name: str = "") -> tuple[bytes, str, s
                 neuer_name = name[:-4] + ".jpg"
             return neu, "image/jpeg", neuer_name
     except Exception:
-        pass
+        pass    # Verkleinern ist Kuer: scheitert es, geht das Original durch
     return daten, mime, name
 
 

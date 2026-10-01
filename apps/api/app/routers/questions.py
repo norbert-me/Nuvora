@@ -1,5 +1,4 @@
 import os
-import re
 import uuid
 from io import BytesIO
 from typing import Optional

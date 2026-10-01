@@ -440,7 +440,7 @@ def teste_sicherheit(api, b):
         """
         _status, text = api.call("GET", "/", roh=True)
         import re as _re
-        fremd = [m.group(2).strip() for m in _re.finditer(r"<script([^>]*)>(.*?)</script>", text or "", _re.S | _re.I)
+        fremd = [m.group(2).strip() for m in _re.finditer(r"<script([^>]*)>(.*?)</script[^>]*>", text or "", _re.S | _re.I)
                  if m.group(2).strip()]
         if fremd:
             wer = "Cloudflare" if "__CF$cv$params" in fremd[0] or "cdn-cgi" in fremd[0] else "ein vorgeschalteter Dienst"

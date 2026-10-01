@@ -260,7 +260,7 @@ async def fragen_anhaengen(set_id: int, body: FragenAnhaengen, user: User = Depe
     # Wie beim Ordner: zum Loeschen zaehlt nur der eigene Besitz. `ensure_set_access`
     # laesst besitzlose Quizze durch — das ist beim Ansehen gewollt und beim
     # Wegnehmen ein Loch.
-    qs = await nur_eigenes(db, QuestionSet, set_id, user, "Quiz nicht gefunden", "Keine Berechtigung")
+    await nur_eigenes(db, QuestionSet, set_id, user, "Quiz nicht gefunden", "Keine Berechtigung")
     rate_limit("set_anhaengen", f"u{user.id}", 60, 60, "Zu viele Zuweisungen. Bitte kurz warten.")
     await _eigene_fragen(db, user, body.question_ids)
 

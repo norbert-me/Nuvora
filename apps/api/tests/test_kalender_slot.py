@@ -4,7 +4,6 @@ kurs_id riete die Anzeige den falschen Kurs (Bug: Kurs „mathe 7.5" gewählt,
 Plan zeigt Klassenname „7.5 LZ").
 """
 import pytest
-from fastapi import HTTPException
 
 from app.models import User, SchoolClass, Kurs, KursTag, UserModule
 from app.routers import kalender as KAL

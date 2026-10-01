@@ -70,7 +70,7 @@ def _items(roh) -> list:
                 try:
                     sauber[zahl] = float(it[zahl])
                 except (TypeError, ValueError):
-                    pass
+                    pass    # keine Zahl: das Feld faellt weg, die Tafel bleibt gueltig
         for text in ("text", "color", "bold", "align", "bis", "titel", "kurs_id", "muted", "_ref"):
             if text in it:
                 wert = it[text]

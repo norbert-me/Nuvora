@@ -18,7 +18,7 @@ import { dauerhaftAnfragen } from "./core/ablage.js";
 // Jeder Speicherzugriff im Rahmen laeuft ueber core/speicher.js: in Safaris
 // privatem Modus wirft `localStorage` schon beim Zugriff, und ein Wurf HIER
 // (im globalen fetch) haette jeden einzelnen API-Aufruf mitgerissen.
-import { lies, liesJson, schreib, schreibJson, loesche, schluessel, speicherNutzbar } from "./core/speicher.js";
+import { lies, liesJson, schreib, schreibJson, loesche, speicherNutzbar } from "./core/speicher.js";
 
 // Global fetch interceptor: add auth token to all /api/ requests
 const _origFetch = window.fetch;
@@ -291,7 +291,7 @@ import GuidedTour, { tourFor, tourFuerOrt } from "./components/GuidedTour.jsx";
 import { uebernehmen as ansichtenUebernehmen, vergessen as ansichtenVergessen } from "./core/ansichten.js";
 import Suche from "./components/Suche.jsx";
 import { useModules, useZielFilter } from "./core/modules.js";
-import { istAdmin, istBetreiber } from "./core/admin.js";
+import { istBetreiber } from "./core/admin.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";

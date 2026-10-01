@@ -1354,7 +1354,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
             if msg.get("type") in ("remote", "host_state", "session_finished"):
                 await ws.broadcast(session_id, msg)
     except WebSocketDisconnect:
-        pass
+        pass    # Gegenstelle weg: kein Fehler, aufgeraeumt wird im finally
     finally:
         ws.disconnect(session_id, websocket)
 

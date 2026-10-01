@@ -51,7 +51,7 @@ class _Tropfen(BaseHTTPRequestHandler):
                 self.wfile.flush()
                 time.sleep(0.1)
         except OSError:
-            pass
+            pass    # der Client hat abgebrochen — genau das ist der Fall, den der Test herbeifuehrt
 
     def log_message(self, *a):
         pass

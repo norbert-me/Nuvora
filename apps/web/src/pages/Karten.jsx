@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { AddButton, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_H, CONTROL_R, dateiWaehlen, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, menuRow, Modal as UiModal, modalOverlay, modalPanel, NiveauToggle, overlayGuard, pageApp, pageForm, panelStyle, Popover, REIFE_COLORS, Segment, segmentBtn, selectStyle, Skeleton, td as tdBasis, th as thBasis, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { AddButton, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_H, CONTROL_R, dateiWaehlen, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, menuRow, Modal as UiModal, modalOverlay, modalPanel, NiveauToggle, overlayGuard, pageApp, pageForm, panelStyle, Popover, REIFE_COLORS, selectStyle, Skeleton, td as tdBasis, th as thBasis, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import { themenIndex } from "../core/topics.js";
