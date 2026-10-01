@@ -7,6 +7,7 @@ import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import Themenstand from "../components/Themenstand.jsx";
 import Notenverlauf from "../components/Notenverlauf.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { erhebungLink } from "../core/erhebung.js";
 
 const API = "/api";
 
@@ -29,6 +30,7 @@ export default function StudentEvaluation() {
     const s = test.student_scores[student.card_id];
     return {
       session_id: test.session_id,
+      link: erhebungLink(test, classId),
       name: test.set_name || test.name || t("cv.thTest"),
       date: test.date,
       present: s?.present || false,
@@ -113,7 +115,7 @@ export default function StudentEvaluation() {
           {results.map((r) => (
             <tr key={r.session_id} style={{ borderBottom: "1px solid var(--border)", opacity: r.present ? 1 : 0.4 }}>
               <td style={tdStyle}>
-                <Link to={`/cardvote/evaluation/${r.session_id}`} style={{ color: "var(--accent)", textDecoration: "none" }}>
+                <Link to={r.link} style={{ color: "var(--accent)", textDecoration: "none" }}>
                   {r.name}
                 </Link>
               </td>

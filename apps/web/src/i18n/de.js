@@ -2313,6 +2313,8 @@ export default {
   "cv.backOverview": "Zurück zur Übersicht",
   "cv.classPrefix": "Klasse",
   "cv.overallEval": "Gesamtauswertung",
+  "cv.klassenarbeit": "Klassenarbeit",
+  "cv.kaKurz": "KA",
   "cv.loadFailed": "Auswertung konnte nicht geladen werden.",
   "cv.noTestsForClass": "Noch keine Tests für diese Klasse.",
   "cv.sessionFallback": "Session #{{id}}",

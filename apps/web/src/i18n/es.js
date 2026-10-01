@@ -2324,6 +2324,8 @@ export default {
   "cv.backOverview": "Volver al resumen",
   "cv.classPrefix": "Clase",
   "cv.overallEval": "Evaluación global",
+  "cv.klassenarbeit": "Examen",
+  "cv.kaKurz": "EX",
   "cv.loadFailed": "No se pudo cargar la evaluación.",
   "cv.noTestsForClass": "Todavía no hay tests para esta clase.",
   "cv.sessionFallback": "Sesión n.º {{id}}",

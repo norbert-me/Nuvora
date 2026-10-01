@@ -664,8 +664,8 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
     # sortierte Liste laeuft der gedruckten Kartenreihe davon, sobald zwei
     # Kinder den Anfangsbuchstaben tauschen. _kurs_roster liefert genau diese
     # Ordnung schon — also uebernehmen statt neu sortieren.
-    students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""}
-                for s in await _kurs_roster(db, class_id)]
+    roster = await _kurs_roster(db, class_id)
+    students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""} for s in roster]
 
     result = await db.execute(
         select(Session).where(Session.class_id == class_id, Session.archived == False).order_by(Session.created_at)
@@ -732,12 +732,64 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
             "student_scores": student_scores,
         })
 
+    # Klassenarbeiten daneben — nur mit Modul Auswertung (Regel 3), sonst
+    # bleibt die Tabelle, wie sie war. Gerechnet wird mit app/arbeitswertung.py
+    # (Wahlaufgaben, Bonus), nicht nachgebaut. Eine E/G-Arbeit ist EINE Spalte:
+    # jedes Kind steht in seinem Blatt.
+    if await is_active(db, user.id, "auswertung"):
+        tests += await _arbeiten_als_spalten(db, user, class_id, roster)
+        tests.sort(key=lambda x: x.get("created_at") or "")
+
     return {
         "class_id": class_id,
         "class_name": school_class.name,
         "students": students,
         "tests": tests,
     }
+
+
+async def _arbeiten_als_spalten(db, user, class_id: int, roster) -> list:
+    from ..models import WorkAnalysis
+    arbeiten = (await db.execute(select(WorkAnalysis).where(
+        WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id
+    ).order_by(WorkAnalysis.created_at))).scalars().all()
+    _aw.partner_anhaengen(arbeiten)
+    nach_id = {w.id: w for w in arbeiten}
+    karte = {str(s.id): s.card_id for s in roster}
+    spalten = []
+    for w in arbeiten:
+        p = nach_id.get(w.partner_id)
+        # Das Paar steht einmal da: unter dem E-Blatt (bzw. dem, das zuerst kommt).
+        if p is not None and (w.niveau or "") == "G" and (p.niveau or "") == "E":
+            continue
+        blaetter = [w] + ([p] if p is not None else [])
+        scores = {}
+        hoechst = 0.0
+        for b in blaetter:
+            basis = _aw.basis(b.tasks)
+            hoechst = max(hoechst, basis)
+            absent = {str(x) for x in (b.absent or [])}
+            for sid, eintrag in (b.results or {}).items():
+                cid = karte.get(str(sid))
+                if cid is None or str(sid) in absent or not isinstance(eintrag, dict):
+                    continue
+                if not any(isinstance(v, (int, float)) for v in eintrag.values()):
+                    continue      # noch nicht korrigiert — keine 0
+                r = _aw.wertung(b, sid, b.scale or user.grade_scale)
+                scores[cid] = {"score": round(r["erreicht"], 2), "total": basis, "present": True,
+                               "pct": round(r["pct"], 1), "niveau": b.niveau or ""}
+        if not hoechst:
+            continue
+        spalten.append({
+            "art": "arbeit", "work_id": w.id, "kurs_id": w.kurs_id,
+            "session_id": f"arbeit-{w.id}",
+            "name": w.name or "Klassenarbeit",
+            "set_name": f"{w.name or 'Klassenarbeit'}{' (E/G)' if p is not None else ''}",
+            "created_at": w.created_at.isoformat() if w.created_at else None,
+            "max_score": hoechst,
+            "student_scores": scores,
+        })
+    return spalten
 
 
 # --- Statistics Dashboard ---

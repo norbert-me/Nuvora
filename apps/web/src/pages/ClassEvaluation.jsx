@@ -6,6 +6,7 @@ import { kommaRund, prozent } from "../core/zahl.js";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { erhebungLink } from "../core/erhebung.js";
 
 const API = "/api";
 
@@ -52,7 +53,13 @@ export default function ClassEvaluation() {
     );
   }
 
-  const totalMaxScore = tests.reduce((sum, t) => sum + t.max_score, 0);
+  // Klassenarbeiten (`art: "arbeit"`) stehen als eigene Spalten da, zaehlen
+  // aber NICHT in Gesamt und %: ein Quiz ueber vier Fragen und eine Arbeit
+  // ueber 40 Punkte sind nicht gleich viel wert, und eine Summe ueber beide
+  // waere eine Note, die niemand vergeben hat (CLAUDE.md, Notenverlauf). Was
+  // daraus fuers Zeugnis folgt, entscheidet das Notenbuch mit seinen Gewichten.
+  const zaehlt = (test) => test.art !== "arbeit";
+  const totalMaxScore = tests.filter(zaehlt).reduce((sum, t) => sum + t.max_score, 0);
 
   const studentRows = students.map((student) => {
     let totalScore = 0;
@@ -62,8 +69,10 @@ export default function ClassEvaluation() {
     const perTest = tests.map((test) => {
       const s = test.student_scores[student.card_id];
       if (!s || !s.present) return { score: null, total: test.max_score, present: false };
-      totalScore += s.score;
-      totalPossible += s.total;
+      if (zaehlt(test)) {
+        totalScore += s.score;
+        totalPossible += s.total;
+      }
       testsPresent++;
       return { score: s.score, total: s.total, present: true };
     });
@@ -100,7 +109,9 @@ export default function ClassEvaluation() {
   });
 
   const presentStudents = sorted.filter((s) => s.testsPresent > 0);
-  const classAvgPct = Math.round(mittel(presentStudents.map((s) => s.pct)));
+  // Nur wer ein QUIZ mitgeschrieben hat, hat eine Gesamtquote (siehe `zaehlt`).
+  const mitQuote = presentStudents.map((s) => s.pct).filter((p) => p != null);
+  const classAvgPct = mitQuote.length ? Math.round(mittel(mitQuote)) : null;
 
   const pctValues = presentStudents.map((s) => s.pct).filter((p) => p != null).sort((a, b) => a - b);
   // War `pctValues[floor(n/2)]` — bei gerader Klassenstärke der OBERE der
@@ -125,8 +136,8 @@ export default function ClassEvaluation() {
 
       {/* Stat tiles */}
       <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
-        <StatCard label={t("cv.statTests")} value={tests.length} />
-        <StatCard label={t("cv.statAvgTotal")} value={`${classAvgPct}%`} />
+        <StatCard label={t("cv.statTests")} value={tests.filter(zaehlt).length} />
+        {classAvgPct != null && <StatCard label={t("cv.statAvgTotal")} value={`${classAvgPct}%`} />}
         {med != null && <StatCard label={t("cv.statMedian")} value={`${med}%`} />}
         {best != null && <StatCard label={t("cv.statBest")} value={`${best}%`} />}
         {worst != null && <StatCard label={t("cv.statWorst")} value={`${worst}%`} />}
@@ -167,10 +178,11 @@ export default function ClassEvaluation() {
                     style={{ ...th, textAlign: "center", fontSize: 12, padding: "8px 6px", maxWidth: 80 }}
                   >
                     <Link
-                      to={`/cardvote/evaluation/${test.session_id}`}
+                      to={erhebungLink(test, id)}
                       style={{ color: "var(--accent)", textDecoration: "none", whiteSpace: "normal", wordBreak: "break-word", display: "block", lineHeight: 1.3 }}
-                      title={`${test.name} (${label})`}
+                      title={test.art === "arbeit" ? `${t("cv.klassenarbeit")}: ${label}` : `${test.name} (${label})`}
                     >
+                      {test.art === "arbeit" && <span style={{ ...chipStyle, fontSize: 11, padding: "0 6px", marginRight: 4 }}>{t("cv.kaKurz")}</span>}
                       {label.length > 20 ? label.slice(0, 18) + "…" : label}
                     </Link>
                   </th>
@@ -244,7 +256,7 @@ export default function ClassEvaluation() {
               ))}
               <td style={td}></td>
               <td style={{ ...td, textAlign: "center", fontWeight: 700, color: "var(--text2)", fontSize: 12 }}>
-                {classAvgPct}%
+                {classAvgPct != null ? `${classAvgPct}%` : "–"}
               </td>
             </tr>
           </tfoot>
