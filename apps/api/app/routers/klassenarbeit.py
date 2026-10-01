@@ -85,7 +85,7 @@ class WorkPut(BaseModel):
     scale: Optional[dict] = None        # Notenschlüssel {"1":87,…} oder null = Profil
     absent: Optional[list] = None       # abwesende student_ids (Punkte bleiben)
     fehler: Optional[dict] = None       # {student_id: {unit_id: Fehlerart}}
-    e_wahl: Optional[dict] = None       # {student_id: [task_id]} — E-Fassung geschrieben
+    wechsel: Optional[dict] = None      # {student_id: [task_id]} — Fassung des anderen Blatts geschrieben
 
 
 class WorkOut(BaseModel):
@@ -99,7 +99,7 @@ class WorkOut(BaseModel):
     scale: Optional[dict] = None
     absent: list = []
     fehler: dict = {}
-    e_wahl: dict = {}
+    wechsel: dict = {}
     niveau: str = ""
     partner_id: Optional[int] = None
     model_config = {"from_attributes": True}
@@ -135,7 +135,7 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
 async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     rows = (await db.execute(select(WorkAnalysis).where(*_keyw(user, class_id, kurs_id)).order_by(WorkAnalysis.created_at.desc()))).scalars().all()
-    return [WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, e_wahl=w.e_wahl or {}, niveau=w.niveau or "") for w in rows]
+    return [WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "") for w in rows]
 
 
 @router.post("/works", response_model=WorkOut, status_code=201)
@@ -263,6 +263,8 @@ async def copy_work(work_id: int, body: WorkCopyIn, user: User = Depends(require
 @router.put("/works/{work_id}", response_model=WorkOut)
 async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     w = await _owned_work(db, user, work_id)
+    # Das andere Blatt kennt die Einheiten der Wahlaufgaben (app/arbeitswertung.py).
+    await aw.partner_laden(db, w)
     if body.name is not None:
         w.name = body.name.strip()[:200]
         # Der Name gehoert der ARBEIT, nicht dem Blatt: beide Blaetter heissen
@@ -307,19 +309,6 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
             cp = _teile(t.get("parts"))
             if cp:
                 ct["parts"] = cp
-            # E-Fassung (Wahlaufgabe): eigene Teilaufgaben, Punkte und Themen.
-            # Welches Kind sie geschrieben hat, steht in e_wahl; gewertet wird in
-            # app/arbeitswertung.py.
-            e = t.get("e")
-            if isinstance(e, dict):
-                etid = e.get("topic_id")
-                ce = {"id": str(e.get("id") or f"{ct['id']}e")[:40],
-                      "topic_id": etid if (isinstance(etid, int) and etid in own) else None,
-                      "max": _num(e.get("max"), 1)}
-                cep = _teile(e.get("parts"))
-                if cep:
-                    ce["parts"] = cep
-                ct["e"] = ce
             clean.append(ct)
         w.tasks = clean
     if body.results is not None:
@@ -328,7 +317,7 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
         # Punkte bleiben in 0..Maximum der Wertungseinheit: ein Vertipper (77
         # statt 7) ergäbe sonst über 100 % und damit einen Notenwert unter 1,0 —
         # den die Übernahme ins Notenbuch stillschweigend wegwirft.
-        umax = {uid: mx for t in (w.tasks or []) for uid, mx, _ in aw.alle_einheiten(t)}
+        umax = {uid: mx for t in (w.tasks or []) for uid, mx, _ in aw.alle_einheiten(w, t)}
         def _punkte(uid, p):
             if isinstance(p, bool) or not isinstance(p, (int, float)):
                 return 0
@@ -365,7 +354,7 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
         # eine Nebenangabe, und eine verlorene Korrektur waere der teurere
         # Fehler. Unbekannte Einheiten ebenso — sie entstehen, wenn eine
         # Teilaufgabe geloescht wird, waehrend jemand anders noch korrigiert.
-        gueltige = {uid for t in (w.tasks or []) for uid, _, _ in aw.alle_einheiten(t)}
+        gueltige = {uid for t in (w.tasks or []) for uid, _, _ in aw.alle_einheiten(w, t)}
         fout = {}
         for k, v in list(body.fehler.items())[:400]:
             if not isinstance(v, dict):
@@ -375,29 +364,29 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
             if zeile:
                 fout[str(k)] = zeile
         w.fehler = fout or None
-    if body.e_wahl is not None:
-        # {student_id: [task_id]} — nur eigene Kinder und nur Aufgaben, die
-        # wirklich eine E-Fassung haben. Eine Aufgabe ohne E-Fassung ist fuer
-        # jedes Kind G; ein Eintrag dafuer waere ein Geist.
-        mit_e = {str(t.get("id")) for t in (w.tasks or []) if aw.e_fassung(t)}
-        roh_ids = {int(k) for k in list(body.e_wahl.keys())[:400] if str(k).isdigit()}
+    if body.wechsel is not None:
+        # {student_id: [task_id]} — nur eigene Kinder und nur Aufgaben, zu denen
+        # das andere Blatt eine Fassung an derselben Stelle hat. Alles andere
+        # waere ein Geist.
+        mit_alt = {str(t.get("id")) for t in (w.tasks or []) if aw.andere_fassung(w, t)}
+        roh_ids = {int(k) for k in list(body.wechsel.keys())[:400] if str(k).isdigit()}
         eigene = set((await db.execute(
             select(Student.id).join(SchoolClass, Student.class_id == SchoolClass.id)
             .where(Student.id.in_(roh_ids), SchoolClass.owner_id == user.id))).scalars().all()) if roh_ids else set()
-        wahl = {}
-        for k, v in list(body.e_wahl.items())[:400]:
+        wechsel = {}
+        for k, v in list(body.wechsel.items())[:400]:
             if not str(k).isdigit() or int(k) not in eigene or not isinstance(v, list):
                 continue
-            ids = sorted({str(x)[:40] for x in v[:100]} & mit_e)
+            ids = sorted({str(x)[:40] for x in v[:100]} & mit_alt)
             if ids:
-                wahl[str(k)] = ids
-        w.e_wahl = wahl or None
+                wechsel[str(k)] = ids
+        w.wechsel = wechsel or None
     if body.absent is not None:
         # Abwesende als eindeutige String-IDs; Punkte in results bleiben unberuehrt.
         w.absent = list({str(x)[:40] for x in body.absent[:400]}) or None
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, e_wahl=w.e_wahl or {}, niveau=w.niveau or "")
+    return WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "")
 
 
 @router.post("/works/{work_id}/teilen", response_model=List[WorkOut])
@@ -424,19 +413,17 @@ async def split_work(work_id: int, user: User = Depends(require_module), db: Asy
 
     res_e, res_g = teile(w.results)
     feh_e, feh_g = teile(w.fehler)
-    wahl_e, wahl_g = teile(w.e_wahl)
     abw = [str(x) for x in (w.absent or [])]
     g = WorkAnalysis(owner_id=user.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name,
                      niveau="G", tasks=_copy.deepcopy(w.tasks or []),
                      scale=_copy.deepcopy(w.scale) if w.scale else None,
-                     results=res_g, fehler=feh_g or None, e_wahl=wahl_g or None,
+                     results=res_g, fehler=feh_g or None,
                      absent=[x for x in abw if x in g_ids] or None)
     db.add(g)
     await db.flush()
     w.niveau = "E"
     w.results = res_e
     w.fehler = feh_e or None
-    w.e_wahl = wahl_e or None
     w.absent = [x for x in abw if x not in g_ids] or None
     w.partner_id, g.partner_id = g.id, w.id
     await db.commit()
@@ -444,7 +431,7 @@ async def split_work(work_id: int, user: User = Depends(require_module), db: Asy
     await db.refresh(g)
     return [WorkOut(id=x.id, partner_id=x.partner_id, source_id=x.source_id, class_id=x.class_id, kurs_id=x.kurs_id,
                     name=x.name, tasks=x.tasks or [], results=x.results or {}, scale=x.scale,
-                    absent=x.absent or [], fehler=x.fehler or {}, e_wahl=x.e_wahl or {}, niveau=x.niveau or "") for x in (w, g)]
+                    absent=x.absent or [], fehler=x.fehler or {}, wechsel=x.wechsel or {}, niveau=x.niveau or "") for x in (w, g)]
 
 
 @router.delete("/works/{work_id}", status_code=204)
@@ -473,13 +460,13 @@ class RemediateIn(BaseModel):
 
 def _units(t):
     """Wertungseinheiten der G-Fassung einer Aufgabe: [(unit_id, max), …].
-    Die Regel steht in app/arbeitswertung.py (mit E-Fassung)."""
-    return [(uid, mx) for uid, mx, _ in aw.g_einheiten(t)]
+    Die Regel steht in app/arbeitswertung.py."""
+    return [(uid, mx) for uid, mx, _ in aw.eigene_einheiten(t)]
 
 
 def _units_mit_thema(t):
     """Dasselbe mit Thema je Einheit: [(unit_id, max, topic_id), …]."""
-    return aw.g_einheiten(t)
+    return aw.eigene_einheiten(t)
 
 
 def _profile(work: WorkAnalysis):
@@ -488,7 +475,7 @@ def _profile(work: WorkAnalysis):
     übersetzt (gelistet = 0, sonst volle Punkte).
 
     Je Kind zaehlt die FASSUNG, die es geschrieben hat (G oder E, siehe
-    app/arbeitswertung.py): die E-Fassung kann andere Themen pruefen, und ein
+    app/arbeitswertung.py): die andere Fassung kann andere Themen pruefen, und ein
     Kind, das sie nicht geschrieben hat, darf darin weder stark noch schwach
     sein."""
     tasks = work.tasks or []
@@ -497,7 +484,7 @@ def _profile(work: WorkAnalysis):
     # Teilaufgaben zu vier Themen landete komplett unter einem davon.
     topic_tasks = {}   # topic_id -> [Aufgaben-ids]  (fuer die Rueckgabe)
     for t in tasks:
-        for _, _, tid in aw.alle_einheiten(t):
+        for _, _, tid in aw.alle_einheiten(work, t):
             if tid and t["id"] not in topic_tasks.setdefault(tid, []):
                 topic_tasks[tid].append(t["id"])
     results = work.results or {}
@@ -565,6 +552,7 @@ def _fehler_gezaehlt(work: WorkAnalysis):
 async def analysis(work_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Auswertung: je Thema Trefferquote der Klasse + je SuS die schwachen Themen."""
     w = await _owned_work(db, user, work_id)
+    await aw.partner_laden(db, w)
     prof, topic_tasks = _profile(w)
     names = {t.id: t.name for t in (await db.execute(select(Topic).where(Topic.owner_id == user.id))).scalars().all()}
     parents = {t.id: t.parent_id for t in (await db.execute(select(Topic).where(Topic.owner_id == user.id))).scalars().all()}
@@ -647,6 +635,7 @@ async def remediate(work_id: int, body: RemediateIn, user: User = Depends(requir
     from sqlalchemy import update as _update
     from ..models import CardDeck, Card, CardReview, Exercise
     w = await _owned_work(db, user, work_id)
+    await aw.partner_laden(db, w)
     prof, _ = _profile(w)
     weak_by_student = {}
     for sid, pr in prof.items():
@@ -737,7 +726,7 @@ def _punkte_je_kind(w: WorkAnalysis) -> tuple[list[str], dict]:
               if r and r != "abwesend" and str(sid) not in absent]
     punkte: dict = {}
     for t in (w.tasks or []):
-        for uid, _, _ in aw.alle_einheiten(t):
+        for uid, _, _ in aw.alle_einheiten(w, t):
             punkte[uid] = {}
         for sid in kinder:
             r = (w.results or {}).get(sid) or (w.results or {}).get(int(sid) if sid.isdigit() else sid)
@@ -783,8 +772,10 @@ def _je_einheit(w: WorkAnalysis) -> list[dict]:
 
     aus = []
     for t in (w.tasks or []):
-        e = aw.e_fassung(t)
-        fassungen = [("", t, aw.g_einheiten(t))] + ([("E", e, aw.e_einheiten(t))] if e else [])
+        a = aw.andere_fassung(w, t)
+        # Die andere Fassung heisst nach ihrem Blatt („E" auf dem G-Blatt).
+        andere = "G" if (getattr(w, "niveau", "") or "") == "E" else "E"
+        fassungen = [("", t, aw.eigene_einheiten(t))] + ([(andere, a, aw.andere_einheiten(w, t))] if a else [])
         for stufe, teil, i, uid, umax, topic_id in [
                 (stufe, teil, i, *einheit)
                 for stufe, teil, teile in fassungen for i, einheit in enumerate(teile)]:
@@ -804,7 +795,7 @@ def _je_einheit(w: WorkAnalysis) -> list[dict]:
                 "unit_id": uid,
                 "task_id": t.get("id"),
                 "stufe": stufe,
-                "label": f"{t.get('label') or ''}{' (E)' if stufe else ''}".strip(),
+                "label": f"{t.get('label') or ''}{f' ({stufe})' if stufe else ''}".strip(),
                 "teil": (teil_label or "").strip(),
                 "topic_id": topic_id,
                 "form": bool(t.get("form")),
@@ -832,6 +823,7 @@ async def vergleich(work_id: int, user: User = Depends(require_module), db: Asyn
     name = (w.name or "").strip().lower()
 
     alle = (await db.execute(select(WorkAnalysis).where(WorkAnalysis.owner_id == user.id))).scalars().all()
+    aw.partner_anhaengen(alle)
     gruppe = [x for x in alle
               if (x.id == wurzel or x.source_id == wurzel
                   # Bestand ohne Herkunft: gleicher Name zaehlt mit. Sonst waere

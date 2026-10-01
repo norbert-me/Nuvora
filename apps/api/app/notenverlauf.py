@@ -37,7 +37,7 @@ def _arbeit_prozent(w: WorkAnalysis, scale=None) -> dict:
     Abwesende bleiben draußen — „nicht mitgeschrieben" ist keine Leistung von
     null. Kinder ohne eine einzige eingetragene Zahl ebenso: das ist „noch
     nicht korrigiert", nicht „alles falsch". Gerechnet wird in
-    app/arbeitswertung.py (Wahlaufgaben: E-Fassung mit Bonus).
+    app/arbeitswertung.py (Wahlaufgaben: Fassung des anderen Blatts, mit Bonus).
     """
     from . import arbeitswertung as aw
 
@@ -104,6 +104,8 @@ async def klasse(db: AsyncSession, user, class_id: int, *, cardvote: bool, auswe
         arbeiten = (await db.execute(select(WorkAnalysis).where(
             WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id
         ).order_by(WorkAnalysis.created_at))).scalars().all()
+        from . import arbeitswertung as aw
+        aw.partner_anhaengen(arbeiten)    # Wahlaufgaben: das andere Blatt
         for w in arbeiten:
             skala = w.scale or user.grade_scale
             prozente = _arbeit_prozent(w, skala)

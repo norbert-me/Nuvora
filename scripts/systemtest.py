@@ -460,40 +460,47 @@ def inhalt_auswertung(api, u, spuren):
     if (nachher.get("fehler") or {}).get(str(u.students[0])):
         raise AssertionError(f"Erfundene Fehlerart angenommen: {nachher.get('fehler')}")
 
-    # Wahlaufgabe: Aufgabe b hat eine E-Fassung mit zwei Teilaufgaben, das
-    # erste Kind schreibt sie, das zweite die G-Fassung. Basis bleibt die
-    # G-Punktzahl (4 + 6 = 10); E-Punkte darueber sind Bonus, hoechstens eine
-    # Notenstufe (app/arbeitswertung.py).
+    # Wahlaufgabe: eine E/G-Arbeit (zwei Blaetter). Aufgabe b hat im E-Blatt
+    # zwei Teilaufgaben; das erste Kind steht auf dem G-Blatt, schreibt bei b
+    # aber die E-Fassung. Basis bleibt die eigene (G-)Punktzahl (4 + 6 = 10);
+    # Punkte darueber sind Bonus, hoechstens eine Notenstufe
+    # (app/arbeitswertung.py). Die Punkte liegen im G-Blatt unter "~<id>".
     wahl = api.call("POST", "/api/klassenarbeit/works",
-                    {"class_id": u.class_id, "name": f"{PRAEFIX} Wahlaufgabe"}, erwartet=(201,))
-    spuren.append(("Wahlaufgabe", lambda: api.call(
+                    {"class_id": u.class_id, "name": f"{PRAEFIX} Wahlaufgabe", "niveau": "G"}, erwartet=(201,))
+    spuren.append(("Wahlaufgabe G", lambda: api.call(
         "DELETE", f"/api/klassenarbeit/works/{wahl['id']}", erwartet=(204, 404))))
-    api.call("PUT", f"/api/klassenarbeit/works/{wahl['id']}", {
+    wahl_e = api.call("POST", "/api/klassenarbeit/works",
+                      {"class_id": u.class_id, "niveau": "E", "partner_id": wahl["id"]}, erwartet=(201,))
+    spuren.append(("Wahlaufgabe E", lambda: api.call(
+        "DELETE", f"/api/klassenarbeit/works/{wahl_e['id']}", erwartet=(204, 404))))
+    api.call("PUT", f"/api/klassenarbeit/works/{wahl_e['id']}", {
         "tasks": [{"id": "a1", "max": 4},
-                  {"id": "b1", "max": 6, "e": {"id": "b1e", "parts": [{"id": "e1", "max": 4}, {"id": "e2", "max": 4}]}}],
-        "results": {str(u.students[0]): {"a1": 2, "e1": 4, "e2": 4},
-                    str(u.students[1]): {"a1": 4, "b1": 3}},
-        # a1 hat keine E-Fassung: die Angabe muss herausfallen.
-        "e_wahl": {str(u.students[0]): ["a1", "b1"]},
+                  {"id": "b1", "parts": [{"id": "e1", "max": 4}, {"id": "e2", "max": 4}]}],
+    }, erwartet=(200,))
+    api.call("PUT", f"/api/klassenarbeit/works/{wahl['id']}", {
+        "tasks": [{"id": "a1", "max": 4}, {"id": "b1", "max": 6}, {"id": "c1", "max": 2}],
+        "results": {str(u.students[0]): {"a1": 2, "~e1": 4, "~e2": 4, "c1": 2},
+                    str(u.students[1]): {"a1": 4, "b1": 3, "c1": 2}},
+        # c1 hat im E-Blatt kein Gegenstueck: die Angabe muss herausfallen.
+        "wechsel": {str(u.students[0]): ["b1", "c1"]},
     }, erwartet=(200,))
     gelesen = _finde(api.call("GET", f"/api/klassenarbeit/classes/{u.class_id}/works",
                               erwartet=(200,)), id=wahl["id"])
-    if (gelesen or {}).get("e_wahl") != {str(u.students[0]): ["b1"]}:
-        raise AssertionError(f"Wahl der Fassung nicht wie geschrieben: {gelesen and gelesen.get('e_wahl')}")
-    if ((gelesen.get("tasks") or [{}, {}])[1].get("e") or {}).get("id") != "b1e":
-        raise AssertionError(f"E-Fassung nicht gespeichert: {gelesen.get('tasks')}")
+    if (gelesen or {}).get("wechsel") != {str(u.students[0]): ["b1"]}:
+        raise AssertionError(f"Wechsel nicht wie geschrieben: {gelesen and gelesen.get('wechsel')}")
     verg = api.call("GET", f"/api/klassenarbeit/works/{wahl['id']}/vergleich", erwartet=(200,))
     eigene = _finde(verg["arbeiten"], id=wahl["id"])
     pcts = sorted(eigene.get("pct_liste") or [])
-    # Kind 2: (4 + 3) / 10 = 70 %. Kind 1: Basis 8 / 10 = 80 %, dazu Bonus bis
-    # zur naechsten Notengrenze — also mehr als 80, aber nie die vollen 20.
-    if len(pcts) != 2 or pcts[0] != 70 or not (80 < pcts[1] < 100):
-        raise AssertionError(f"Wertung der Wahlaufgabe falsch: {pcts} (erwartet 70 und 80 < x < 100)")
+    # Kind 2: (4 + 3 + 2) / 12 = 75 %. Kind 1: Basis (2 + 6 + 2) / 12 = 83,3 %,
+    # dazu Bonus bis zur naechsten Notengrenze — also mehr, aber nie 100.
+    if len(pcts) != 2 or pcts[0] != 75 or not (83.3 < pcts[1] < 100):
+        raise AssertionError(f"Wertung der Wahlaufgabe falsch: {pcts} (erwartet 75 und 83,3 < x < 100)")
     einheiten = {e["unit_id"]: e for e in eigene.get("einheiten") or []}
-    if (einheiten.get("b1") or {}).get("n") != 1 or (einheiten.get("e1") or {}).get("n") != 1:
+    if (einheiten.get("b1") or {}).get("n") != 1 or (einheiten.get("~e1") or {}).get("n") != 1:
         raise AssertionError(f"Aufgabenstatistik mischt die Fassungen: "
-                             f"b1={einheiten.get('b1')}, e1={einheiten.get('e1')}")
-    api.call("DELETE", f"/api/klassenarbeit/works/{wahl['id']}", erwartet=(204, 404))
+                             f"b1={einheiten.get('b1')}, ~e1={einheiten.get('~e1')}")
+    for x in (wahl, wahl_e):
+        api.call("DELETE", f"/api/klassenarbeit/works/{x['id']}", erwartet=(204, 404))
 
     # Kopie in dieselbe Klasse (eine zweite Klasse gibt es im Test nicht): die
     # Aufgaben muessen mitkommen, die PUNKTE nicht. Eine Kopie mit fremden

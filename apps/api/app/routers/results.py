@@ -22,6 +22,7 @@ from ..scoring import bewerte, e_modus_von, gefehlt_von, note_aus_pct, status_of
 from .anwesenheit import summary as _anwesenheit_summary
 from .karten import themen_lernstand
 from .klassenarbeit import _profile as _arbeit_profil
+from .. import arbeitswertung as _aw
 from .. import fruehwarnung as fw
 from .. import notenverlauf
 from .. import rueckmeldung
@@ -933,6 +934,8 @@ async def _arbeiten_als_tests(db, user, class_id: int, id_zu_karte: dict):
         select(WorkAnalysis).where(WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id)
         .order_by(WorkAnalysis.created_at)
     )).scalars().all()
+    # Wahlaufgaben rechnen mit dem anderen Blatt (beide liegen in dieser Klasse).
+    _aw.partner_anhaengen(arbeiten)
 
     tests = []
     for w in arbeiten:
@@ -1170,6 +1173,7 @@ async def themenprofil(class_id: int, student_id: Optional[int] = None,
         arbeiten = (await db.execute(select(WorkAnalysis).where(
             WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id
         ).order_by(WorkAnalysis.created_at))).scalars().all()
+        _aw.partner_anhaengen(arbeiten)
         for w in arbeiten:
             if not w.created_at:
                 continue

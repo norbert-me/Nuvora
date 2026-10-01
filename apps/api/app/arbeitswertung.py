@@ -1,94 +1,116 @@
 """Wertung einer Klassenarbeit je Kind — an EINER Stelle.
 
-Eine Aufgabe kann zwei Fassungen haben: die G-Fassung (die Aufgabe selbst) und
-eine E-Fassung (`task["e"]`) mit eigenen Teilaufgaben, eigenen Punkten und
-eigenen Themen. Die Kinder duerfen in der Arbeit je Aufgabe waehlen; welche
-Fassung ein Kind geschrieben hat, steht in `work.e_wahl` ({sid: [task_id, …]},
-aufgefuehrt sind nur die E-Aufgaben — fehlt die Angabe, gilt G).
+Wahlaufgaben: eine E/G-Arbeit besteht aus zwei Blaettern (E und G, verbunden
+ueber `partner_id`). Ein Kind steht auf dem Blatt seines Niveaus, darf aber je
+Aufgabe die Fassung des ANDEREN Blatts schreiben — Aufgabe 3 des G-Blatts und
+Aufgabe 3 des E-Blatts sind zwei Fassungen derselben Aufgabe (gleiche
+Position). Sie unterscheiden sich in Teilaufgaben, Punkten und Themen.
 
-Die Regel (entschieden am 01.10.2026): **Die Basis ist die G-Punktzahl.** Je
-Aufgabe zaehlt, was das Kind in seiner Fassung erreicht hat, bis zur G-Hoechst-
-punktzahl dieser Aufgabe in die Basis; was eine E-Fassung darueber hinaus
-einbringt, ist Bonus. Der Bonus ist auf **eine Notenstufe** gedeckelt — dieselbe
-Grenze wie beim E-Bonus im Quiz (`scoring.naechste_stufe`), sonst waere die
-E-Fassung ein Weg an jeder Notengrenze vorbei.
+Wer wo gewechselt hat, steht am eigenen Blatt in `work.wechsel`
+({sid: [task_id, …]}). Die Punkte dafuer liegen ebenfalls im eigenen Blatt,
+unter den Einheiten des anderen Blatts mit dem Vorsatz `ANDERE` ("~") — beide
+Blaetter entstehen oft als Kopie voneinander und tragen dieselben ids.
 
-Eine Arbeit ohne E-Fassungen rechnet genau wie vorher: Basis = alle Punkte,
-Bonus = 0.
+Die Regel (entschieden am 01.10.2026): **Die Basis ist die Fassung des eigenen
+Blatts.** Je Aufgabe zaehlt das Erreichte bis zur Hoechstpunktzahl der eigenen
+Fassung in die Basis; was die andere Fassung darueber hinaus einbringt, ist
+Bonus — gedeckelt auf **eine Notenstufe** (`scoring.naechste_stufe`, dieselbe
+Grenze wie beim E-Bonus im Quiz). Ein G-Kind, das die groessere E-Aufgabe
+schreibt, kann also Bonus holen; ein E-Kind, das zur kleineren G-Aufgabe
+greift, bekommt deren Punkte und keinen Bonus.
+
+Das andere Blatt haengt NICHT in der Tabelle, sondern wird zum Rechnen
+angehaengt (`partner_anhaengen`, `partner_laden` -> Attribut `_alt`). Fehlt es
+(Blatt geloescht), rechnet jede Aufgabe mit der eigenen Fassung.
 
 Die Regel steht doppelt — hier und in `apps/web/src/core/arbeitswertung.js`
-(die Seite rechnet beim Tippen live) — und muss zusammen geaendert werden.
-Blatt: importiert nur `scoring`, damit Router und `notenverlauf` es holen
-koennen, ohne einander zu importieren.
+— und muss zusammen geaendert werden. Blatt: importiert nur `scoring`.
 """
 from .scoring import kaufmaennisch, naechste_stufe
+
+ANDERE = "~"
 
 
 def _max(x) -> float:
     return float(x) if isinstance(x, (int, float)) and not isinstance(x, bool) and x > 0 else 1.0
 
 
-def einheiten(teil: dict, erbe=None) -> list:
-    """Wertungseinheiten einer Fassung: [(unit_id, max, topic_id), …].
-
-    Teilaufgaben, wenn es welche gibt, sonst die Fassung selbst. Das Thema der
-    Teilaufgabe schlaegt das der Fassung, das wiederum das der Aufgabe (`erbe`).
-    """
+def einheiten(teil: dict, vorsatz: str = "") -> list:
+    """Wertungseinheiten einer Aufgabe: [(unit_id, max, topic_id), …] —
+    Teilaufgaben, wenn es welche gibt, sonst die Aufgabe selbst. Das Thema der
+    Teilaufgabe schlaegt das der Aufgabe."""
     if not isinstance(teil, dict):
         return []
-    eigen = teil.get("topic_id") or erbe
+    erbe = teil.get("topic_id")
     parts = teil.get("parts")
     if isinstance(parts, list) and parts:
-        return [(str(p.get("id")), _max(p.get("max")), p.get("topic_id") or eigen)
+        return [(vorsatz + str(p.get("id")), _max(p.get("max")), p.get("topic_id") or erbe)
                 for p in parts if isinstance(p, dict) and p.get("id")]
     if not teil.get("id"):
         return []
-    return [(str(teil["id"]), _max(teil.get("max")), eigen)]
+    return [(vorsatz + str(teil["id"]), _max(teil.get("max")), erbe)]
 
 
-def e_fassung(task: dict):
-    e = task.get("e") if isinstance(task, dict) else None
-    return e if isinstance(e, dict) and e.get("id") else None
+# ── das andere Blatt ──
+
+def partner_anhaengen(works) -> None:
+    """Haengt jedem Blatt die Aufgaben seines Partners an, sofern der in der
+    Liste steht (beide Blaetter liegen in derselben Klasse)."""
+    nach_id = {w.id: w for w in works}
+    for w in works:
+        p = nach_id.get(getattr(w, "partner_id", None))
+        w._alt = list(p.tasks or []) if p is not None else []
 
 
-def g_einheiten(task: dict) -> list:
+async def partner_laden(db, w) -> None:
+    """Dasselbe fuer ein einzelnes Blatt: den Partner aus der Datenbank holen."""
+    from .models import WorkAnalysis
+    p = await db.get(WorkAnalysis, w.partner_id) if getattr(w, "partner_id", None) else None
+    w._alt = list(p.tasks or []) if p is not None and p.owner_id == w.owner_id else []
+
+
+def andere_fassung(work, task: dict):
+    """Die Aufgabe an derselben Stelle im anderen Blatt — oder None."""
+    alt = getattr(work, "_alt", None) or []
+    for i, t in enumerate(work.tasks or []):
+        if t is task or t.get("id") == task.get("id"):
+            return alt[i] if i < len(alt) and isinstance(alt[i], dict) else None
+    return None
+
+
+def eigene_einheiten(task: dict) -> list:
     return einheiten(task)
 
 
-def e_einheiten(task: dict) -> list:
-    e = e_fassung(task)
-    return einheiten(e, task.get("topic_id")) if e else []
+def andere_einheiten(work, task: dict) -> list:
+    a = andere_fassung(work, task)
+    return einheiten(a, ANDERE) if a else []
 
 
-def alle_einheiten(task: dict) -> list:
+def alle_einheiten(work, task: dict) -> list:
     """Beide Fassungen — fuer alles, was nur wissen will, welche Einheiten es gibt."""
-    return g_einheiten(task) + e_einheiten(task)
+    return eigene_einheiten(task) + andere_einheiten(work, task)
 
 
-def g_max(task: dict) -> float:
-    return sum(mx for _, mx, _ in g_einheiten(task))
+def eigene_max(task: dict) -> float:
+    return sum(mx for _, mx, _ in eigene_einheiten(task))
 
 
 def basis(tasks) -> float:
-    """Hoechstpunktzahl der Arbeit = Summe der G-Fassungen."""
-    return sum(g_max(t) for t in (tasks or []))
+    """Hoechstpunktzahl des Blatts = Summe der eigenen Fassungen."""
+    return sum(eigene_max(t) for t in (tasks or []))
 
 
-def e_aufgaben(work, sid) -> set:
-    wahl = (getattr(work, "e_wahl", None) or {}).get(str(sid)) or []
-    return {str(x) for x in wahl} if isinstance(wahl, list) else set()
-
-
-def fassung(work, sid, task: dict) -> str:
-    """"E" oder "G" — welche Fassung dieses Kind bei dieser Aufgabe schrieb."""
-    if e_fassung(task) and str(task.get("id")) in e_aufgaben(work, sid):
-        return "E"
-    return "G"
+def gewechselt(work, sid, task: dict) -> bool:
+    """Hat dieses Kind bei dieser Aufgabe die Fassung des anderen Blatts geschrieben?"""
+    liste = (getattr(work, "wechsel", None) or {}).get(str(sid)) or []
+    return (isinstance(liste, list) and str(task.get("id")) in {str(x) for x in liste}
+            and andere_fassung(work, task) is not None)
 
 
 def einheiten_fuer(work, sid, task: dict) -> list:
     """Die Einheiten der Fassung, die das Kind geschrieben hat."""
-    return e_einheiten(task) if fassung(work, sid, task) == "E" else g_einheiten(task)
+    return andere_einheiten(work, task) if gewechselt(work, sid, task) else eigene_einheiten(task)
 
 
 def punkte(eintrag, uid: str, umax: float) -> float:
@@ -107,9 +129,9 @@ def wertung(work, sid, scale=None) -> dict:
     for t in tasks:
         e = sum(punkte(eintrag, uid, mx) for uid, mx, _ in einheiten_fuer(work, sid, t))
         erreicht += e
-        gm = g_max(t)
-        in_basis += min(e, gm)
-        ueber += max(0.0, e - gm)
+        em = eigene_max(t)
+        in_basis += min(e, em)
+        ueber += max(0.0, e - em)
     if not gesamt:
         return {"erreicht": erreicht, "basis": 0.0, "base_pct": 0.0, "bonus_pct": 0.0, "pct": 0.0}
     base_pct = in_basis / gesamt * 100

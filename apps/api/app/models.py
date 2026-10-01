@@ -1553,11 +1553,10 @@ class WorkAnalysis(Base):
     # (siehe _fehler_gezaehlt) — sonst muesste jede Punkteaenderung in eine
     # zweite Tabelle greifen, und genau da entstehen die Geisterwerte.
     fehler: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    # Wahlaufgaben: welche Aufgaben ein Kind in der E-Fassung geschrieben hat
-    # ({"<student_id>": ["t3", …]}; fehlt eine Aufgabe, gilt G). Die E-Fassung
-    # selbst steht an der Aufgabe (tasks[i]["e"]); gewertet wird in
-    # app/arbeitswertung.py.
-    e_wahl: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Wahlaufgaben einer E/G-Arbeit: bei welchen Aufgaben ein Kind die Fassung
+    # des ANDEREN Blatts geschrieben hat ({"<student_id>": ["t3", …]}, gleiche
+    # Position im Partnerblatt). Gewertet wird in app/arbeitswertung.py.
+    wechsel: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     # Abwesende SuS (Liste von student_id als String). Orthogonal zu results:
     # abwesend heisst „aus der Klassenstatistik rausrechnen", loescht aber die
     # erreichten Punkte NICHT — kommt der SuS zurueck, sind sie noch da.

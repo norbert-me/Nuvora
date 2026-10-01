@@ -16,10 +16,14 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
-- **Klassenarbeit: Wahlaufgaben E/G** — eine Aufgabe bekommt mit „+E" eine
-  E-Fassung (eigene Teilaufgaben, Punkte, Themen); im Raster wählt man je Kind
-  G oder E. Basis ist die G-Punktzahl, E-Punkte darüber zählen als Bonus
+- **Klassenarbeit: Wahlaufgaben E/G** — in einer E/G-Arbeit wählt man im
+  Raster je Kind und Aufgabe, ob es die Aufgabe des anderen Blatts geschrieben
+  hat. Basis ist die eigene Punktzahl, Punkte darüber zählen als Bonus
   (höchstens eine Notenstufe).
+- Klassenarbeit: **„+ Darstellung"** unter den Aufgaben statt eines Hakens an
+  jeder Aufgabe; der Knopf verschwindet, sobald es sie gibt.
+- **Speichern-Leiste** verschwindet wieder, wenn man eine Änderung von Hand
+  zurücknimmt.
 - **Stundenplan:** ein neuer Stand (auch aus dem Untis-Import) ersetzt eine
   Fassung, die erst später im Halbjahr begann — vorher blieb sie ohne Kurs
   daneben stehen.

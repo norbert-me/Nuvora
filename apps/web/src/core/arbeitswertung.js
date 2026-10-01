@@ -2,41 +2,46 @@
 // Die Seite rechnet beim Tippen live, Notenverlauf und Vergleich am Server;
 // wer hier etwas ändert, ändert es dort mit.
 //
-// Wahlaufgaben: eine Aufgabe kann eine E-Fassung haben (`task.e`, eigene
-// Teilaufgaben, Punkte, Themen). Welche Fassung ein Kind schrieb, steht in
-// `work.e_wahl` ({sid: [taskId, …]}, nur E — fehlt die Angabe, gilt G).
-// Basis ist die G-Punktzahl; was eine E-Fassung darüber hinaus bringt, ist
-// Bonus, höchstens eine Notenstufe (wie beim E-Bonus im Quiz).
+// Wahlaufgaben: eine E/G-Arbeit hat zwei Blätter (partner_id). Ein Kind darf je
+// Aufgabe die Fassung des ANDEREN Blatts schreiben — gleiche Position dort.
+// Welche, steht in `work.wechsel` ({sid: [taskId, …]}); die Punkte liegen im
+// eigenen Blatt unter den Einheiten des anderen mit Vorsatz "~". Das andere
+// Blatt wird zum Rechnen angehängt (`work._alt` = seine Aufgaben).
+// Basis ist die eigene Fassung; was die andere darüber hinaus bringt, ist Bonus,
+// höchstens eine Notenstufe (wie beim E-Bonus im Quiz).
 import { naechsteStufe } from "./scoring.js";
 
+export const ANDERE = "~";
 const maxVon = (x) => (Number(x) > 0 ? Number(x) : 1);
 
-// Wertungseinheiten einer Fassung: [{ id, max, topic, label }]. Teilaufgaben,
-// wenn es welche gibt, sonst die Fassung selbst. Thema: Teilaufgabe vor
-// Fassung vor Aufgabe (`erbe`).
-export function einheiten(teil, erbe = null) {
+// Wertungseinheiten einer Aufgabe: [{ id, max, topic, label }]. Teilaufgaben,
+// wenn es welche gibt, sonst die Aufgabe selbst.
+export function einheiten(teil, vorsatz = "") {
   if (!teil) return [];
-  const eigen = teil.topic_id || erbe || null;
+  const erbe = teil.topic_id || null;
   if (Array.isArray(teil.parts) && teil.parts.length) {
-    return teil.parts.filter((p) => p && p.id).map((p) => ({ id: String(p.id), max: maxVon(p.max), topic: p.topic_id || eigen, label: p.label || "" }));
+    return teil.parts.filter((p) => p && p.id).map((p) => ({ id: vorsatz + String(p.id), max: maxVon(p.max), topic: p.topic_id || erbe, label: p.label || "" }));
   }
-  return teil.id ? [{ id: String(teil.id), max: maxVon(teil.max), topic: eigen, label: "" }] : [];
+  return teil.id ? [{ id: vorsatz + String(teil.id), max: maxVon(teil.max), topic: erbe, label: "" }] : [];
 }
 
-export const eFassung = (task) => (task && task.e && task.e.id ? task.e : null);
-export const gEinheiten = (task) => einheiten(task);
-export const eEinheiten = (task) => (eFassung(task) ? einheiten(task.e, task.topic_id) : []);
-export const alleEinheiten = (task) => [...gEinheiten(task), ...eEinheiten(task)];
-export const gMax = (task) => gEinheiten(task).reduce((n, u) => n + u.max, 0);
-export const basis = (tasks) => (tasks || []).reduce((n, t) => n + gMax(t), 0);
+export function andereFassung(work, task) {
+  const alt = (work && work._alt) || [];
+  const i = ((work && work.tasks) || []).findIndex((t) => t === task || t.id === task.id);
+  return i >= 0 && i < alt.length && alt[i] ? alt[i] : null;
+}
+export const eigeneEinheiten = (task) => einheiten(task);
+export const andereEinheiten = (work, task) => { const a = andereFassung(work, task); return a ? einheiten(a, ANDERE) : []; };
+export const alleEinheiten = (work, task) => [...eigeneEinheiten(task), ...andereEinheiten(work, task)];
+export const eigeneMax = (task) => eigeneEinheiten(task).reduce((n, u) => n + u.max, 0);
+export const basis = (tasks) => (tasks || []).reduce((n, t) => n + eigeneMax(t), 0);
 
-export function fassung(work, sid, task) {
-  if (!eFassung(task)) return "G";
-  const wahl = ((work && work.e_wahl) || {})[String(sid)];
-  return Array.isArray(wahl) && wahl.map(String).includes(String(task.id)) ? "E" : "G";
+export function gewechselt(work, sid, task) {
+  const liste = ((work && work.wechsel) || {})[String(sid)];
+  return Array.isArray(liste) && liste.map(String).includes(String(task.id)) && !!andereFassung(work, task);
 }
 
-export const einheitenFuer = (work, sid, task) => (fassung(work, sid, task) === "E" ? eEinheiten(task) : gEinheiten(task));
+export const einheitenFuer = (work, sid, task) => (gewechselt(work, sid, task) ? andereEinheiten(work, task) : eigeneEinheiten(task));
 
 export function punkte(eintrag, uid, umax) {
   if (Array.isArray(eintrag)) return eintrag.map(String).includes(uid) ? 0 : umax;   // Altformat
@@ -57,10 +62,10 @@ export function wertung(work, sid, scale) {
   let erreicht = 0, inBasis = 0, ueber = 0;
   tasks.forEach((t) => {
     const e = aufgabenPunkte(work, sid, t);
-    const gm = gMax(t);
+    const em = eigeneMax(t);
     erreicht += e;
-    inBasis += Math.min(e, gm);
-    ueber += Math.max(0, e - gm);
+    inBasis += Math.min(e, em);
+    ueber += Math.max(0, e - em);
   });
   if (!gesamt) return { erreicht, basis: 0, basePct: 0, bonusPct: 0, pct: 0 };
   const basePct = (inBasis / gesamt) * 100;
