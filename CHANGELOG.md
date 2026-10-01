@@ -19,7 +19,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - **Klassenarbeit:** beim Eintragen sind Zeile und Spalte des Feldes
   hervorgehoben; „abwesend" steht nicht mehr zusätzlich hinter der Punktzahl.
 - Klassenarbeit: die Darstellung hat keinen E/G-Umschalter mehr und steht
-  nicht mehr in der Trefferquote je Aufgabe.
+  nicht mehr in der Trefferquote je Aufgabe; die Trennschärfe der übrigen
+  Aufgaben rechnet ohne sie.
 - **Hochladen abbrechen:** × neben dem Fortschrittsbalken (Anhänge an
   Klassenarbeit, Themen, Stunden).
 - **PDFs bis 15 MB** lassen sich wieder hochladen — der Proxy wies alles über

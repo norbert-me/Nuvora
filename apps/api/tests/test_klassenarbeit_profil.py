@@ -129,3 +129,14 @@ def test_darstellung_ist_gekennzeichnet_und_bleibt_in_der_wertung():
     e = _je_einheit(w)[0]
     assert e["form"] is True
     assert e["pct"] == 83          # 5 von 6 Punkten
+
+
+def test_darstellung_zaehlt_nicht_zur_gesamtleistung_der_trennschaerfe():
+    # Zwei Sachaufgaben, die gleich trennen; die Darstellung laeuft gegenlaeufig.
+    # Mitgezaehlt drehte sie die Trennschaerfe von a um.
+    tasks = [{"id": "a", "max": 4}, {"id": "b", "max": 4},
+             {"id": "d", "max": 10, "form": True}]
+    res = {"1": {"a": 4, "b": 4, "d": 0}, "2": {"a": 2, "b": 2, "d": 5},
+           "3": {"a": 0, "b": 0, "d": 10}}
+    zeilen = {z["unit_id"]: z for z in _je_einheit(FakeWork(tasks, res))}
+    assert zeilen["a"]["trenn"] == 1.0

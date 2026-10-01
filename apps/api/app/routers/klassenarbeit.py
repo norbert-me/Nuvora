@@ -768,7 +768,11 @@ def _je_einheit(w: WorkAnalysis) -> list[dict]:
                  missverstaendlichen unterscheiden.
     """
     kinder, punkte = _punkte_je_kind(w)
-    gesamt = {sid: sum(je.get(sid, 0.0) for je in punkte.values()) for sid in kinder}
+    # Die Gesamtleistung ohne Darstellung: sie bewertet die Form der Arbeit,
+    # nicht den Stoff — mitgezaehlt verschoebe sie die Trennschaerfe jeder
+    # Sachaufgabe (wer sauber schreibt, „trennt" dann scheinbar besser).
+    form = {uid for t in (w.tasks or []) if t.get("form") for uid, _, _ in aw.alle_einheiten(w, t)}
+    gesamt = {sid: sum(je.get(sid, 0.0) for uid, je in punkte.items() if uid not in form) for sid in kinder}
 
     aus = []
     for t in (w.tasks or []):

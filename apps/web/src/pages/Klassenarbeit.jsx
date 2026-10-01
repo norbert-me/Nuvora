@@ -574,6 +574,7 @@ export default function Klassenarbeit() {
     // Die Darstellung steht nicht darin: sie prueft keine Aufgabe, sondern die
     // Form der ganzen Arbeit, und eine Trefferquote daneben laede zum
     // Vergleich mit den Sachaufgaben ein. In die Note zaehlt sie weiter.
+    const sachSumme = (sid) => tasks.reduce((n, tk) => n + (tk.form ? 0 : aufgabenPunkte(wk, sid, tk)), 0);
     const perTask = [];
     const perUnit = [];
     tasks.forEach((tk, i) => {
@@ -585,7 +586,9 @@ export default function Klassenarbeit() {
         if (fassungen.length > 1 && !kinder.length) return;
         const zid = anders ? `${tk.id}~` : tk.id;
         const xs = kinder.map((s) => us.reduce((n, u) => n + pu(s.id, u.id), 0));
-        const tot = kinder.map((s) => wert.get(s.id).erreicht);
+        // Gesamtleistung OHNE Darstellung — sie bewertet die Form, nicht den
+        // Stoff, und verschoebe sonst die Trennschaerfe jeder Sachaufgabe.
+        const tot = kinder.map((s) => sachSumme(s.id));
         const mx = us.reduce((n, u) => n + u.max, 0);
         const e = xs.reduce((a, b) => a + b, 0);
         const m = kinder.length * mx;
