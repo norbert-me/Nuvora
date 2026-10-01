@@ -24,7 +24,11 @@ from app.routers.kalender import ics_feed
 # Die CalDAV-Werkbank (Anwendung, Geraete-Passwort, ASGI-Aufruf) steht schon in
 # test_caldav.py — sie hier abzuschreiben waere eine zweite Fassung, die beim
 # ersten Umbau veraltet.
-from test_caldav import _kal, _ruf, welt  # noqa: F401
+import test_caldav
+from test_caldav import _kal, _ruf
+
+# Die Fixture aus test_caldav — pytest findet sie ueber den Namen im Modul.
+welt = test_caldav.welt
 
 
 class _Req:
