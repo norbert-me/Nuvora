@@ -21,6 +21,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Klassenarbeit: die Darstellung hat keinen E/G-Umschalter mehr und steht
   nicht mehr in der Trefferquote je Aufgabe; die Trennschärfe der übrigen
   Aufgaben rechnet ohne sie.
+- Klassenarbeit: **Aufgaben zuklappbar** — zu, sobald es welche gibt; die Zeile
+  nennt Anzahl und Punkte.
 - **Hochladen abbrechen:** × neben dem Fortschrittsbalken (Anhänge an
   Klassenarbeit, Themen, Stunden).
 - **PDFs bis 15 MB** lassen sich wieder hochladen — der Proxy wies alles über

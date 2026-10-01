@@ -1627,6 +1627,7 @@ export default {
   "klassenarbeit.taskOptional": "Tarea {{n}} (nombre opcional)",
   "klassenarbeit.taskOptionalHint": "Nombre opcional — sin nombre se usa el número",
   "klassenarbeit.tasksHeading": "Tareas (con tema y puntos máximos)",
+  "klassenarbeit.tasksSumme": "{{n}} tareas · {{p}} puntos",
   "klassenarbeit.maxPoints": "máx",
   "klassenarbeit.topic": "Tema",
   "klassenarbeit.topicNone": "— sin tema —",

@@ -130,6 +130,9 @@ export default function Klassenarbeit() {
   // dem Fokus werden hervorgehoben — beim Uebertragen vom Papier verrutscht
   // man sonst in die Nachbarzeile. Folgt dem Fokus, kein eigener Schalter.
   const [fokus, setFokus] = useState(null);   // { sid, uid }
+  // Aufgaben-Editor auf/zu: offen, wenn die Arbeit ohne Aufgaben geoeffnet
+  // wird, sonst zu (Effekt unten); null nur bis dahin.
+  const [aufgabenOffen, setAufgabenOffen] = useState(null);
   const [scaleOpen, setScaleOpen] = useState(false); // Notenschlüssel-Editor auf/zu
   const [expandedTasks, setExpandedTasks] = useState(() => new Set()); // aufgeklappte Teilaufgaben-Auswertung
   const [infoOpen, setInfoOpen] = useState(false); // „Auswertung verstehen"
@@ -231,6 +234,11 @@ export default function Klassenarbeit() {
   // der Leiste.
   const autoSpeichern = useAutoSpeichern(entwurf, (w) => nurGeaendertIn(w, savedWork, (k) => ["results", "absent", "fehler", "wechsel"].includes(k)));
   const work = entwurf.wert;
+  const aufgabenAuf = aufgabenOffen ?? !((work && work.tasks) || []).length;
+  const offenFuer = work && work.id;
+  // Beim Oeffnen einer Arbeit EINMAL entscheiden — nicht laufend: sonst klappte
+  // der Bereich nach der ersten angelegten Aufgabe mitten im Tippen zu.
+  useEffect(() => { setAufgabenOffen(!((work && work.tasks) || []).length); }, [offenFuer]);
   // Die SuS DIESER Arbeit: bei einer E- oder G-Arbeit nur die des Niveaus — sie
   // haben das Blatt geschrieben, die anderen ein anderes. Ohne Niveau alle.
   // Gerechnet wird ohnehin nur ueber die eingetragenen Ergebnisse (_profile),
@@ -804,7 +812,18 @@ export default function Klassenarbeit() {
           </div>
 
           {/* 1) Aufgaben definieren: Bezeichnung + Thema + Maximalpunkte. */}
-          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text2)", margin: "4px 0 8px" }}>{t("klassenarbeit.tasksHeading")}</div>
+          {/* Die Aufgaben stellt man einmal ein — danach stehen sie beim
+              Eintragen nur im Weg. Zugeklappt, sobald es welche gibt; die
+              Zeile sagt, was darin steckt. */}
+          <button type="button" onClick={() => setAufgabenOffen(!aufgabenAuf)} aria-expanded={aufgabenAuf}
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", border: "none", background: "none", padding: "4px 0", margin: "4px 0 8px", cursor: "pointer", textAlign: "left", color: "var(--text2)" }}>
+            <span style={{ display: "inline-flex", transform: aufgabenAuf ? "rotate(90deg)" : "none", transition: "transform 0.15s", color: "var(--text3)" }}><Icon d={ICONS.open} size={12} /></span>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>{t("klassenarbeit.tasksHeading")}</span>
+            {!aufgabenAuf && (work.tasks || []).length > 0 && (
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("klassenarbeit.tasksSumme", { n: (work.tasks || []).length, p: komma(totalMax()) })}</span>
+            )}
+          </button>
+          {aufgabenAuf && (<>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
             {(work.tasks || []).map((task, i) => {
               const hasParts = !!(task.parts && task.parts.length);
@@ -876,6 +895,7 @@ export default function Klassenarbeit() {
               <button onClick={addForm} style={btnSecondary} title={t("klassenarbeit.formHint")}>+ {t("klassenarbeit.form")}</button>
             )}
           </div>
+          </>)}
 
           {/* 2) Punkte-Raster: Zeilen = Schüler, Spalten = Aufgaben (0..max). */}
           {(work.tasks || []).length > 0 && (
