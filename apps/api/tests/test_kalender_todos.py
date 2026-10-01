@@ -25,10 +25,12 @@ from app.routers.kalender import ics_feed
 # test_caldav.py — sie hier abzuschreiben waere eine zweite Fassung, die beim
 # ersten Umbau veraltet.
 import test_caldav
-from test_caldav import _kal, _ruf
 
-# Die Fixture aus test_caldav — pytest findet sie ueber den Namen im Modul.
+# Aus test_caldav: die Fixture (pytest findet sie ueber den Namen im Modul)
+# und zwei Helfer.
 welt = test_caldav.welt
+_kal = test_caldav._kal
+_ruf = test_caldav._ruf
 
 
 class _Req:
