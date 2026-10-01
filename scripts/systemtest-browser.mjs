@@ -540,21 +540,22 @@ const bedienung = (td) => [
       // Und jetzt das, was das Notenbuch ausmacht: eine Note in die Zelle.
       // Bewusst eine NOTE, keine Beobachtung — eine Beobachtung mit Notenwert
       // weist die API zu Recht ab (Produktregel, siehe CLAUDE.md).
+      // Noten speichern sich seit 01.10.2026 SELBST (useAutoSpeichern in
+      // Noten.jsx), kurz nach der Eingabe — es gibt keinen Speichern-Knopf mehr,
+      // auf den die Probe warten koennte. Also auf die Anfrage warten, die die
+      // Note wirklich zum Server bringt, und zwar VOR dem Tippen angemeldet:
+      // nach 800 ms ist sie schon unterwegs.
+      const angekommen = seite.waitForResponse(
+        (r) => r.url().includes("/api/noten/entries") && r.request().method() === "POST", { timeout: 20000 });
       const fehler = await noteTippen(seite, MARKE_UI, "2,3");
       if (fehler) throw new Error(fehler);
       const tab = await tabSpringtWeiter(seite, MARKE_UI);
       if (tab) throw new Error(tab);
-      // Die Spalte selbst legt der Server sofort an; die NOTE dagegen sammelt
-      // die Tabelle nur im Entwurf (useEntwurf in Noten.jsx). Ohne diesen Klick
-      // prueft das Neuladen gleich einen Stand, der nie abgeschickt wurde — und
-      // die Verlassen-Warnung stuende obendrein im Weg.
-      // Der Knopf schwebt unten mittig (components/SpeicherBalken.jsx).
-      const speichern = seite.getByRole("button", { name: "Speichern", exact: true }).first();
-      await speichern.waitFor({ state: "visible", timeout: 15000 });
-      await speichern.click({ timeout: 8000 });
-      // Auf das Ergebnis warten: der Hinweis geht weg, sobald der Entwurf
-      // uebernommen ist.
-      await seite.getByText("nicht gespeichert").first().waitFor({ state: "hidden", timeout: 20000 });
+      const antwort = await angekommen;
+      if (!antwort.ok()) throw new Error(`automatisches Speichern abgelehnt: HTTP ${antwort.status()}`);
+      // Und es bleibt dabei: keine Speicherleiste fuer eine Note. Erscheint sie,
+      // hat das automatische Speichern nicht gegriffen oder ist gescheitert.
+      await seite.getByText("nicht gespeichert").first().waitFor({ state: "hidden", timeout: 10000 });
     },
     // Eigene Probe: die Spalte allein beweist nur die halbe Miete. Erst die
     // Zelle zeigt, dass auch die NOTE gespeichert wurde.
