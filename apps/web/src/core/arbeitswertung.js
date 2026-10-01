@@ -25,10 +25,15 @@ export function einheiten(teil, vorsatz = "") {
   return teil.id ? [{ id: vorsatz + String(teil.id), max: maxVon(teil.max), topic: erbe, label: "" }] : [];
 }
 
+// Gezählt wird nur unter den SACHaufgaben: die Darstellung (`form`) hat keine
+// E- oder G-Fassung, und steht sie in den Blättern an verschiedenen Stellen,
+// verschiebt sie die Zuordnung trotzdem nicht.
 export function andereFassung(work, task) {
-  const alt = (work && work._alt) || [];
-  const i = ((work && work.tasks) || []).findIndex((t) => t === task || t.id === task.id);
-  return i >= 0 && i < alt.length && alt[i] ? alt[i] : null;
+  if (!task || task.form) return null;
+  const sach = ((work && work.tasks) || []).filter((t) => t && !t.form);
+  const alt = ((work && work._alt) || []).filter((t) => t && !t.form);
+  const i = sach.findIndex((t) => t === task || t.id === task.id);
+  return i >= 0 && i < alt.length ? alt[i] : null;
 }
 export const eigeneEinheiten = (task) => einheiten(task);
 export const andereEinheiten = (work, task) => { const a = andereFassung(work, task); return a ? einheiten(a, ANDERE) : []; };

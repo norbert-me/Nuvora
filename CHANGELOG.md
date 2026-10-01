@@ -18,6 +18,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 - **Klassenarbeit:** beim Eintragen sind Zeile und Spalte des Feldes
   hervorgehoben; „abwesend" steht nicht mehr zusätzlich hinter der Punktzahl.
+- Klassenarbeit: die Darstellung hat keinen E/G-Umschalter mehr.
 
 ## 4.4.5 — 01.10.2026
 

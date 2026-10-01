@@ -1,7 +1,7 @@
 // Spiegel von apps/api/tests/test_klassenarbeit_wahl.py — dieselben Fälle, damit
 // Seite und Server dieselbe Note ausrechnen.
 import { describe, it, expect } from "vitest";
-import { einheitenFuer, gewechselt, wertung } from "./arbeitswertung.js";
+import { andereFassung, einheitenFuer, gewechselt, wertung } from "./arbeitswertung.js";
 
 const G = [{ id: "t1", max: 4, topic_id: 3 }, { id: "t2", max: 6, topic_id: 5 }];
 const E = [{ id: "t1", max: 4, topic_id: 3 }, { id: "t2", topic_id: 7, parts: [{ id: "e1", max: 4 }, { id: "e2", max: 4 }] }];
@@ -38,5 +38,13 @@ describe("Wahlaufgaben über das andere Blatt", () => {
     const w = { tasks: G, _alt: E, wechsel: { 2: ["t2"] } };
     expect(einheitenFuer(w, 2, G[1]).map((u) => [u.id, u.topic])).toEqual([["~e1", 7], ["~e2", 7]]);
     expect(einheitenFuer(w, 1, G[1]).map((u) => [u.id, u.topic])).toEqual([["t2", 5]]);
+  });
+
+  it("Darstellung hat keine andere Fassung und verschiebt nichts", () => {
+    const g = [...G, { id: "d", max: 2, form: true }];
+    const e = [{ id: "d", max: 2, form: true }, ...E];
+    const w = { tasks: g, _alt: e };
+    expect(andereFassung(w, g[2])).toBe(null);
+    expect(andereFassung(w, g[1])).toBe(e[2]);
   });
 });

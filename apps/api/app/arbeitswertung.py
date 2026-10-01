@@ -70,11 +70,19 @@ async def partner_laden(db, w) -> None:
 
 
 def andere_fassung(work, task: dict):
-    """Die Aufgabe an derselben Stelle im anderen Blatt — oder None."""
-    alt = getattr(work, "_alt", None) or []
-    for i, t in enumerate(work.tasks or []):
+    """Die Aufgabe an derselben Stelle im anderen Blatt — oder None.
+
+    Gezaehlt wird nur unter den SACHaufgaben: die Darstellung (`form`) hat
+    keine E- oder G-Fassung, sie bewertet die Form der ganzen Arbeit. Steht sie
+    in den beiden Blaettern an verschiedenen Stellen, verschiebt sie die
+    Zuordnung trotzdem nicht."""
+    if not isinstance(task, dict) or task.get("form"):
+        return None
+    sach = [t for t in (work.tasks or []) if isinstance(t, dict) and not t.get("form")]
+    alt = [t for t in (getattr(work, "_alt", None) or []) if isinstance(t, dict) and not t.get("form")]
+    for i, t in enumerate(sach):
         if t is task or t.get("id") == task.get("id"):
-            return alt[i] if i < len(alt) and isinstance(alt[i], dict) else None
+            return alt[i] if i < len(alt) else None
     return None
 
 

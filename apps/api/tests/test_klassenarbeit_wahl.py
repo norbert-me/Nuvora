@@ -70,6 +70,14 @@ def test_ohne_partnerblatt_gilt_die_eigene_fassung():
     assert aw.wertung(w, "1")["erreicht"] == 3
 
 
+def test_darstellung_hat_keine_andere_fassung_und_verschiebt_nichts():
+    g = G + [{"id": "d", "max": 2, "form": True}]
+    e = [{"id": "d", "max": 2, "form": True}] + E     # Darstellung vorn
+    w = FakeWork(g, {}, alt=e)
+    assert aw.andere_fassung(w, g[2]) is None
+    assert aw.andere_fassung(w, g[1]) is e[2]
+
+
 def test_partner_anhaengen_findet_das_blatt_in_der_liste():
     class W:
         def __init__(self, id, partner_id, tasks):
