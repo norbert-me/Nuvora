@@ -1778,6 +1778,7 @@ export default {
   "material.title": "Material",
   "material.upload": "Upload file",
   "material.uploading": "Uploading …",
+  "material.zuGross": "File too large (max. {{mb}} MB).",
   "material.empty": "No material yet. Store worksheets, PDFs etc. here (max. 15 MB).",
   "material.download": "Download",
   "material.delConfirm": "Delete file “{{name}}”?",

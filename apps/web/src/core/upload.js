@@ -10,9 +10,15 @@
 // (main.jsx) — XHR läuft an ihm vorbei und bekäme ihn sonst nicht.
 import { lies } from "./speicher.js";
 
-export function hochladen(url, formData, { onFortschritt, methode = "POST" } = {}) {
+// `signal` (AbortController): bricht den Upload ab — die Antwort ist dann
+// `{ ok: false, abgebrochen: true }`, damit der Aufrufer keinen Fehler meldet.
+export function hochladen(url, formData, { onFortschritt, methode = "POST", signal } = {}) {
   return new Promise((fertig) => {
     const xhr = new XMLHttpRequest();
+    if (signal) {
+      if (signal.aborted) { fertig({ ok: false, status: 0, daten: null, abgebrochen: true }); return; }
+      signal.addEventListener("abort", () => xhr.abort(), { once: true });
+    }
     xhr.open(methode, url);
     const token = lies("token");
     if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
@@ -33,7 +39,7 @@ export function hochladen(url, formData, { onFortschritt, methode = "POST" } = {
     };
     xhr.onload = ende;
     xhr.onerror = () => fertig({ ok: false, status: 0, daten: null });
-    xhr.onabort = () => fertig({ ok: false, status: 0, daten: null });
+    xhr.onabort = () => fertig({ ok: false, status: 0, daten: null, abgebrochen: true });
     xhr.send(formData);
   });
 }

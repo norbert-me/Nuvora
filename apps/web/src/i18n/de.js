@@ -1742,6 +1742,7 @@ export default {
   "material.title": "Material",
   "material.upload": "Datei hochladen",
   "material.uploading": "Lädt hoch …",
+  "material.zuGross": "Datei zu groß (höchstens {{mb}} MB).",
   "material.empty": "Noch kein Material. Arbeitsblätter, PDFs o. Ä. hier ablegen (max. 15 MB).",
   "material.download": "Herunterladen",
   "material.delConfirm": "Datei „{{name}}“ löschen?",

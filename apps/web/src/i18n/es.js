@@ -1779,6 +1779,7 @@ export default {
   "material.title": "Material",
   "material.upload": "Subir archivo",
   "material.uploading": "Subiendo …",
+  "material.zuGross": "Archivo demasiado grande (máx. {{mb}} MB).",
   "material.empty": "Aún no hay material. Guarda fichas, PDF, etc. aquí (máx. 15 MB).",
   "material.download": "Descargar",
   "material.delConfirm": "¿Eliminar el archivo «{{name}}»?",

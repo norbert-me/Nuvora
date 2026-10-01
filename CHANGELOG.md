@@ -19,6 +19,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - **Klassenarbeit:** beim Eintragen sind Zeile und Spalte des Feldes
   hervorgehoben; „abwesend" steht nicht mehr zusätzlich hinter der Punktzahl.
 - Klassenarbeit: die Darstellung hat keinen E/G-Umschalter mehr.
+- **Hochladen abbrechen:** × neben dem Fortschrittsbalken (Anhänge an
+  Klassenarbeit, Themen, Stunden).
+- **PDFs bis 15 MB** lassen sich wieder hochladen — der Proxy wies alles über
+  10 MB ab; zu große Dateien meldet die Seite sofort.
 - **Noten und Klassenarbeitspunkte speichern sich selbst** — kurz nach der
   Eingabe, ohne Knopf. Spalten, Aufgaben und Notenschlüssel behalten die
   Speichern-Leiste.

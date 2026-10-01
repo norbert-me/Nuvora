@@ -4,7 +4,7 @@
 // WOFUER die Datei steht ("arbeit"/"erwartung"); `titel` benennt den Kasten
 // entsprechend. Kern-Feature, kein Modul-Gate. Download laeuft ueber fetch (Bearer-Token), nicht ueber <a href>,
 // weil eine Browser-Navigation den Token nicht mitschickt.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Icon, ICONS, btnSecondary, btnSmall, iconBtn, chipStyle, cardStyle, COLORS as C, CONTROL_R, Modal } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { hochladen } from "../core/upload.js";
@@ -15,6 +15,8 @@ import { askConfirm } from "../core/dialog.jsx";
 import { hol } from "../core/melden.js";
 
 const API = "/api/material";
+// Wortgleich mit MAX_BYTES in apps/api/app/routers/material.py (15 MB).
+const MAX_MB = 15;
 
 function fmtSize(n) {
   if (n < 1024) return `${n} B`;
@@ -45,8 +47,16 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
   const load = () => hol(`${API}${q}`).then((d) => setItems(Array.isArray(d) ? d : []));
   useEffect(() => { load(); }, [topicId, entryId, methodId, workId, rolle]);
 
+  // Laufender Upload — damit das × im Balken ihn abbrechen kann.
+  const abbruch = useRef(null);
   const upload = async (file) => {
     if (!file) return;
+    // Zu gross: gleich hier sagen, statt 15 MB hochzuschicken und dann eine
+    // Absage zu bekommen. Dieselbe Grenze wie MAX_BYTES in material.py.
+    if (file.size > MAX_MB * 1024 * 1024) {
+      setErr(t("material.zuGross", { mb: MAX_MB }));
+      return;
+    }
     setErr(""); setBusy(true); setFortschritt(0);
     const fd = new FormData();
     fd.append("file", file);
@@ -57,9 +67,14 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
     if (rolle) fd.append("rolle", rolle);
     // Mit Fortschritt: eine Klassenarbeit als Scan hat schnell 20 MB, und ohne
     // Balken ist der Unterschied zwischen „laedt" und „haengt" nicht zu sehen.
-    const res = await hochladen(API, fd, { onFortschritt: setFortschritt });
+    abbruch.current = new AbortController();
+    const res = await hochladen(API, fd, { onFortschritt: setFortschritt, signal: abbruch.current.signal });
+    abbruch.current = null;
     setBusy(false); setFortschritt(null);
     if (res.ok) load();
+    else if (res.abgebrochen) return;
+    // 413 vom Proxy kommt ohne JSON — dann die eigene Meldung statt „ging nicht".
+    else if (res.status === 413 && typeof res.daten?.detail !== "string") setErr(t("material.zuGross", { mb: MAX_MB }));
     else setErr(typeof res.daten?.detail === "string" ? res.daten.detail : t("common.notWork"));
   };
 
@@ -133,7 +148,8 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
       {/* Der Balken sagt, was die Prozentzahl allein nicht sagt: dass es
           weitergeht. Bei unbekannter Gesamtgroesse (selten) bleibt er auf
           voller Breite gedaempft — „laeuft, Dauer unbekannt". */}
-      <Fortschrittsbalken wert={busy ? fortschritt : undefined} />
+      <Fortschrittsbalken wert={busy ? fortschritt : undefined}
+        onAbbrechen={() => abbruch.current?.abort()} abbrechenLabel={t("common.cancel")} />
       {err && <p style={{ color: C.danger, fontSize: 13, margin: "0 0 8px" }}>{err}</p>}
       {items.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("material.empty")}</p>
