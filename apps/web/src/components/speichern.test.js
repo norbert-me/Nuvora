@@ -28,3 +28,25 @@ describe("Speicherleiste: schweben", () => {
     expect(sollSchweben({ angeheftet: false, geaendert: true, immerUnten: true })).toBe(false);
   });
 });
+
+import { gleich } from "./Speichern.jsx";
+
+describe("Entwurf: zurückgenommen heißt nichts offen", () => {
+  it("vergleicht verschachtelt", () => {
+    const vorher = { name: "KA", results: { 1: { t1: 2 } }, tasks: [{ id: "t1", parts: [{ id: "a", max: 1 }] }] };
+    const zurueck = { name: "KA", results: { 1: { t1: 2 } }, tasks: [{ id: "t1", parts: [{ id: "a", max: 1 }] }] };
+    expect(gleich(vorher, zurueck)).toBe(true);
+    expect(gleich(vorher, { ...zurueck, results: { 1: { t1: 3 } } })).toBe(false);
+  });
+
+  it("leer ist leer", () => {
+    expect(gleich({ fehler: null }, { fehler: {} })).toBe(true);
+    expect(gleich({ wechsel: {} }, {})).toBe(true);
+    expect(gleich({ absent: [] }, { absent: ["1"] })).toBe(false);
+  });
+
+  it("0 ist nicht leer", () => {
+    expect(gleich({ p: 0 }, {})).toBe(false);
+    expect(gleich({ p: "" }, {})).toBe(false);
+  });
+});

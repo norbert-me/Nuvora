@@ -24,17 +24,28 @@ import { useBlocker } from "react-router-dom";
 import { btnPrimary, btnSecondary, btnSmall, CONTROL_R, SHADOW, COLORS as C } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
-/** Flacher Vergleich reicht: die Entwürfe sind einfache Objekte aus Feldwerten. */
-function gleich(a, b) {
+/**
+ * Ist der Entwurf derselbe Stand wie der gespeicherte? TIEF verglichen: wer
+ * etwas aendert und es wieder zuruecknimmt, hat nichts offen — und eine
+ * Speicherleiste, die dann trotzdem steht, verlangt, denselben Stand mit sich
+ * selbst zu ueberschreiben. Flach verglichen war genau das der Fall, sobald
+ * der Entwurf verschachtelt ist (Punkte je Kind, Aufgaben mit Teilaufgaben):
+ * jede Aenderung baut dort ein neues Objekt, und das ist nie dasselbe.
+ *
+ * Leer ist leer: fehlt ein Feld, ist es null, {} oder [], gilt das als gleich —
+ * ein geloeschter letzter Eintrag hinterlaesst oft ein leeres Objekt, wo vorher
+ * gar keins stand.
+ */
+const leer = (x) => x == null || (Array.isArray(x) ? x.length === 0 : typeof x === "object" && Object.keys(x).length === 0);
+export function gleich(a, b) {
   if (a === b) return true;
+  if (leer(a) && leer(b)) return true;
   if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
-  const ka = Object.keys(a), kb = Object.keys(b);
-  if (ka.length !== kb.length) return false;
-  return ka.every((k) => {
-    const x = a[k], y = b[k];
-    if (Array.isArray(x) && Array.isArray(y)) return x.length === y.length && x.every((v, i) => v === y[i]);
-    return x === y;
-  });
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) return a.length === b.length && a.every((v, i) => gleich(v, b[i]));
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const k of keys) if (!gleich(a[k], b[k])) return false;
+  return true;
 }
 
 /**
