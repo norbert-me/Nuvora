@@ -32,6 +32,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - **Fehler melden: mehrere Anhänge** (bis 5, z. B. „vorher" und „nachher").
 - **Gesamtauswertung zeigt die Klassenarbeiten** als eigene Spalten (mit Modul
   Auswertung); Gesamt und % rechnen weiter nur über die Quizze.
+- Klassenarbeit: nach dem Wechsel E → G → E stand wieder der alte Stand da
+  (z. B. ein geändertes Thema), obwohl gespeichert war.
 - Klassenarbeit: Umschalter **E | G | Alle** — „Alle“ zeigt beide Blätter
   zusammen (Note je Kind aus seinem Blatt, Schnitt und Notenverteilung).
 - Klassenarbeit: **Aufgaben zuklappbar** — zu, sobald es welche gibt; die Zeile

@@ -224,8 +224,14 @@ export default function Klassenarbeit() {
         student_ids: students.map((s) => s.id), grades: notenAusArbeit(students, partner ? { ...next, _alt: partner.tasks || [] } : next, sc), note: t("klassenarbeit.title"),
       })).catch(() => null);
     }
-    // Der Name gilt beiden Blaettern (der Server zieht das andere mit).
-    setWorks((ws) => ws.map((x) => (x.id === next.id || (next.partner_id && x.id === next.partner_id) ? { ...x, name: next.name } : x)));
+    // Die Liste der Arbeiten bekommt den GANZEN gespeicherten Stand, nicht nur
+    // den Namen: beim Wechsel E -> G -> E kommt das Blatt aus dieser Liste
+    // zurueck, und mit nur dem Namen stand dort wieder das alte Thema, obwohl
+    // das neue gespeichert war. Der Name gilt beiden Blaettern (der Server
+    // zieht das andere mit).
+    const { _alt: _ohne, ...gespeichert } = next;
+    setWorks((ws) => ws.map((x) => (x.id === next.id ? { ...x, ...gespeichert }
+      : (next.partner_id && x.id === next.partner_id) ? { ...x, name: next.name } : x)));
     return true;
   });
   useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
@@ -343,17 +349,26 @@ export default function Klassenarbeit() {
   const auswahl = works.filter((w) => !(w.niveau === "G" && partnerVon(w)));
   const auswahlLabel = (w) => (partnerVon(w) ? `${w.name} (E/G)` : w.niveau ? `${w.name} (${w.niveau})` : w.name);
   const auswahlWert = work && work.niveau === "G" && partner ? partner.id : work?.id;
+  // Ein Blatt zeigen, aber im Stand des SERVERS: die Liste `works` ist der
+  // Stand vom letzten Laden — wer am anderen Blatt (oder an einem anderen
+  // Geraet) etwas geaendert hat, saehe sonst den alten Stand.
+  const zeigeFrisch = async (ziel) => {
+    const d = await hol(`${API}/classes/${classId}/works${kq}`);
+    const liste = Array.isArray(d) ? d : null;
+    if (liste) setWorks(liste);
+    zeigeArbeit((liste && liste.find((x) => x.id === ziel.id)) || ziel);
+  };
   const waehleAusListe = (w) => {
     const p = partnerVon(w);
     const ziel = p && p.niveau === blatt ? p : w;
-    wechseln(() => zeigeArbeit(ziel));
+    wechseln(() => { zeigeFrisch(ziel); });
   };
   // Umschalten auf das andere Blatt — fehlt es, wird es angelegt (gleicher
   // Name, gleicher Kurs; der Server verbindet beide).
   const blattWechseln = async (niveau) => {
     if (!work || !work.niveau || niveau === work.niveau) return;
     setBlatt(niveau);
-    if (partner) { wechseln(() => zeigeArbeit(partner)); return; }
+    if (partner) { wechseln(() => { zeigeFrisch(partner); }); return; }
     if (entwurf.geaendert && !(await entwurf.speichern())) return;
     const neu = await legeAn(work.name, niveau, work.id);
     if (!neu) return;
