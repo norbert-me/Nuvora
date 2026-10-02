@@ -2023,8 +2023,6 @@ export default {
   "home.widgetsKeine": "Aún no hay widgets para tus módulos activos.",
   "home.tileHide": "Ocultar icono",
   "home.tileShow": "Volver a mostrar",
-  "melder.ausblenden": "Ocultar botón",
-  "melder.ausblendenTitel": "Ocultar el botón en este dispositivo (p. ej. en el proyector) — se reactiva en el perfil",
   "melder.titel": "Informar de un fallo",
   "bugadmin.titel": "Avisos de error",
   "bugadmin.schalter": "Permitir avisos",

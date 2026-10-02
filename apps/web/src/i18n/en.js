@@ -2022,8 +2022,6 @@ export default {
   "home.widgetsKeine": "There are no widgets yet for your active modules.",
   "home.tileHide": "Hide tile",
   "home.tileShow": "Show tile again",
-  "melder.ausblenden": "Hide button",
-  "melder.ausblendenTitel": "Hide the button on this device (e.g. on a projector) — turn it back on in your profile",
   "melder.titel": "Report a problem",
   "bugadmin.titel": "Bug reports",
   "bugadmin.schalter": "Allow reporting",

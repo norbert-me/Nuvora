@@ -2012,8 +2012,6 @@ export default {
   "home.widgetsKeine": "Für deine aktiven Module gibt es noch keine Widgets.",
   "home.tileHide": "Kachel ausblenden",
   "home.tileShow": "Kachel wieder zeigen",
-  "melder.ausblenden": "Knopf ausblenden",
-  "melder.ausblendenTitel": "Den Knopf auf diesem Gerät ausblenden (z. B. am Beamer) — im Profil wieder einschaltbar",
   "melder.titel": "Fehler melden",
   "bugadmin.titel": "Fehlermeldungen",
   "bugadmin.schalter": "Melden erlauben",

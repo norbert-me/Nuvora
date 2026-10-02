@@ -14,9 +14,9 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   btnPrimary, btnSecondary, btnSmall, cardStyle, COLORS as C, CONTROL_R, dateiWaehlen, DialogKopf, Icon, iconBtn, ICONS,
-  inputStyle, linkBtn, Modal, SHADOW,
+  inputStyle, Modal, SHADOW,
 } from "./Icons.jsx";
-import { beobachteMelderKnopf, melderKnopfAus, setzeMelderKnopf } from "../core/melderKnopf.js";
+import { beobachteMelderKnopf, melderKnopfAus } from "../core/melderKnopf.js";
 import { alsText, anonym, beobachte, leeren, protokoll, umgebung } from "../core/protokoll.js";
 import { alsJson } from "../core/melden.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -237,8 +237,6 @@ export default function Fehlermelder() {
 
               {fehler && <div style={{ color: C.danger, fontSize: 13, marginBottom: 8 }}>{fehler}</div>}
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
-                <button onClick={() => { schliessen(); setzeMelderKnopf(false); }} title={t("melder.ausblendenTitel")}
-                  style={{ ...linkBtn, marginRight: "auto", fontSize: 13, color: "var(--text3)" }}>{t("melder.ausblenden")}</button>
                 <button onClick={schliessen} style={btnSecondary}>{t("common.abort")}</button>
                 <button onClick={senden} disabled={busy || !text.trim()}
                   style={{ ...btnPrimary, opacity: busy || !text.trim() ? 0.5 : 1 }}>

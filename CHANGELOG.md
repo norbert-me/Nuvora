@@ -21,6 +21,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Klassenarbeit: die Darstellung hat keinen E/G-Umschalter mehr und steht
   nicht mehr in der Trefferquote je Aufgabe; die Trennschärfe der übrigen
   Aufgaben rechnet ohne sie.
+- **CardVote-Sitzung:** die Namen stehen über der Frage.
+- Fehler melden: kein „Knopf ausblenden“ mehr im Dialog (weiter im Profil).
 - **Kalender-Abo und CalDAV:** im Kalender ausgeschaltete fremde Kalender
   gehen nicht mehr ans Handy weiter; die Auswahl hängt jetzt am Konto.
 - **Startseite:** Termine aus abonnierten Kalendern stehen unter „Heute“ mit
