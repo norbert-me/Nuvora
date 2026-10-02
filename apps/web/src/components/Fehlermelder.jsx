@@ -59,8 +59,12 @@ export default function Fehlermelder() {
   // Die Grenze richtet sich nach dem, was eine Mail traegt (der Server nimmt
   // 3 MB Rohdaten); zu gross wird hier abgefangen, damit niemand erst
   // hochlaedt und dann eine Absage bekommt.
+  // Mehrere Anhaenge (vorher genau einer — „vorher" und „nachher" brauchten
+  // zwei Meldungen). Grenzen wortgleich mit ANHANG_* in main.py.
   const ANHANG_MAX = 3 * 1024 * 1024;
-  const [datei, setDatei] = useState(null); // { name, typ, groesse, daten(base64) }
+  const ANHANG_ANZAHL = 5;
+  const ANHANG_ZUSAMMEN = 10 * 1024 * 1024;
+  const [dateien, setDateien] = useState([]); // [{ id, name, typ, groesse, daten(base64) }]
   // Der Knopf soll auf sich aufmerksam machen, wenn wirklich etwas schiefging —
   // aber nur dann. Ein Dauerpunkt wäre nach zwei Tagen unsichtbar.
   const [problem, setProblem] = useState(false);
@@ -82,7 +86,7 @@ export default function Fehlermelder() {
       // Maskiert wie im Protokoll: der Pfad sagt WO es klemmte, die IDs darin
       // gehen niemanden etwas an (der Query-Teil faellt in anonym() ganz weg).
       seite: anonym(window.location.pathname),
-      ...(datei ? { anhang_name: datei.name, anhang_typ: datei.typ, anhang_daten: datei.daten } : {}),
+      anhaenge: dateien.map((d) => ({ name: d.name, typ: d.typ, daten: d.daten })),
     })).catch(() => null);
     setBusy(false);
     if (!res || !res.ok) {
@@ -97,7 +101,7 @@ export default function Fehlermelder() {
 
   const schliessen = () => {
     setOffen(false);
-    setText(""); setFertig(false); setFehler(""); setLogOffen(false); setDatei(null);
+    setText(""); setFertig(false); setFehler(""); setLogOffen(false); setDateien([]);
   };
 
 
@@ -180,20 +184,30 @@ export default function Fehlermelder() {
                     r.readAsDataURL(f);
                   });
                   if (!daten) { setFehler(t("melder.anhangFehler")); return; }
-                  setFehler("");
-                  setDatei({ name: f.name, typ: f.type || "application/octet-stream", groesse: f.size, daten });
-                }, "*/*")} style={{ ...btnSecondary, ...btnSmall }}>
+                  // Funktional gesetzt: bei mehreren gewaehlten Dateien kommen
+                  // die Rueckrufe nacheinander, und jede braucht den Stand der
+                  // vorigen, um die Grenzen zu pruefen.
+                  setDateien((alt) => {
+                    if (alt.length >= ANHANG_ANZAHL) { setFehler(t("melder.anhangAnzahl", { n: ANHANG_ANZAHL })); return alt; }
+                    if (alt.reduce((n, d) => n + d.groesse, 0) + f.size > ANHANG_ZUSAMMEN) {
+                      setFehler(t("melder.anhangZusammen", { n: Math.round(ANHANG_ZUSAMMEN / 1024 / 1024) })); return alt;
+                    }
+                    setFehler("");
+                    return [...alt, { id: `${Date.now()}-${Math.random()}`, name: f.name, typ: f.type || "application/octet-stream", groesse: f.size, daten }];
+                  });
+                }, "*/*", { mehrere: true })} disabled={dateien.length >= ANHANG_ANZAHL}
+                  style={{ ...btnSecondary, ...btnSmall, ...(dateien.length >= ANHANG_ANZAHL ? { opacity: 0.5 } : {}) }}>
                   {t("melder.anhang")}
                 </button>
-                {datei && (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
-                    {datei.name} ({Math.max(1, Math.round(datei.groesse / 1024))} KB)
-                    <button onClick={() => setDatei(null)} className="icon-btn" style={{ ...iconBtn, padding: 2, minWidth: 32, minHeight: 32, margin: "-8px 0" }}
+                {dateien.map((d) => (
+                  <span key={d.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
+                    {d.name} ({Math.max(1, Math.round(d.groesse / 1024))} KB)
+                    <button onClick={() => setDateien((alt) => alt.filter((x) => x.id !== d.id))} className="icon-btn" style={{ ...iconBtn, padding: 2, minWidth: 32, minHeight: 32, margin: "-8px 0" }}
                       title={t("common.delete")} aria-label={t("common.delete")}>
                       <Icon d={ICONS.close} size={14} />
                     </button>
                   </span>
-                )}
+                ))}
               </div>
 
               {/* Das gewaehlte Bild direkt zeigen: aus dem Dateinamen allein
@@ -201,10 +215,14 @@ export default function Fehlermelder() {
                   „screenshot 12.png" gibt es dreimal im Ordner. Die Daten
                   liegen ohnehin schon als base64 im Zustand, es geht also kein
                   zweiter Ladeweg auf. */}
-              {datei && /^image\//.test(datei.typ || "") && (
-                <img src={`data:${datei.typ};base64,${datei.daten}`} alt={datei.name}
-                  style={{ display: "block", maxWidth: "100%", maxHeight: 180, borderRadius: CONTROL_R,
-                    border: "1px solid var(--border)", margin: "0 0 12px" }} />
+              {dateien.some((d) => /^image\//.test(d.typ || "")) && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "0 0 12px" }}>
+                  {dateien.filter((d) => /^image\//.test(d.typ || "")).map((d) => (
+                    <img key={d.id} src={`data:${d.typ};base64,${d.daten}`} alt={d.name}
+                      style={{ display: "block", maxWidth: dateien.length > 1 ? 160 : "100%", maxHeight: 180, borderRadius: CONTROL_R,
+                        border: "1px solid var(--border)" }} />
+                  ))}
+                </div>
               )}
 
               {logOffen && (

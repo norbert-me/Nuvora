@@ -512,6 +512,8 @@ OHNE_TEST_ID = {
     # traegt per Entwurf Inhalte (Bildschirmfoto) und wird nur von der
     # Administration geoeffnet. Ein Rundlauf ueber ihn prueft nichts.
     "/api/admin/bugreports/{report_id}/anhang",
+    # Dasselbe fuer jeden von mehreren Anhaengen (seit 02.10.2026).
+    "/api/admin/bugreports/{report_id}/anhaenge/{anhang_id}",
 }
 
 

@@ -2039,6 +2039,8 @@ export default {
   "melder.wasGeht": "Was wird mitgeschickt?",
   "melder.anhang": "Datei anhängen",
   "melder.anhangZuGross": "Anhang zu groß (max. {{n}} MB)",
+  "melder.anhangAnzahl": "Höchstens {{n}} Anhänge.",
+  "melder.anhangZusammen": "Die Anhänge sind zusammen zu groß (höchstens {{n}} MB).",
   "melder.anhangFehler": "Anhang konnte nicht gelesen werden",
   "melder.logZu": "Protokoll zuklappen",
   "melder.logLeer": "Noch nichts passiert.",

@@ -1809,3 +1809,22 @@ class BugReport(Base):
     anhang: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
     erledigt: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class BugReportAnhang(Base):
+    """Ein Anhang einer Fehlermeldung — es koennen mehrere sein.
+
+    Vorher trug die Meldung genau EINEN Anhang in drei eigenen Spalten
+    (anhang, anhang_name, anhang_typ): wer zwei Bildschirmfotos brauchte
+    („vorher" und „nachher"), musste zweimal melden. Die alten Spalten bleiben
+    fuer den Bestand stehen; neue Meldungen legen ihre Anhaenge hier ab.
+    CASCADE: der Anhang hat ohne seine Meldung keinen Zweck.
+    """
+    __tablename__ = "bug_report_anhaenge"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    report_id: Mapped[int] = mapped_column(ForeignKey("bug_reports.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    name: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    typ: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    daten: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)

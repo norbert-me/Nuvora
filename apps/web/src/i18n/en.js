@@ -2049,6 +2049,8 @@ export default {
   "melder.wasGeht": "What is sent?",
   "melder.anhang": "Attach file",
   "melder.anhangZuGross": "Attachment too large (max. {{n}} MB)",
+  "melder.anhangAnzahl": "At most {{n}} attachments.",
+  "melder.anhangZusammen": "Attachments are too large together (max. {{n}} MB).",
   "melder.anhangFehler": "Attachment could not be read",
   "melder.logZu": "Hide log",
   "melder.logLeer": "Nothing has happened yet.",

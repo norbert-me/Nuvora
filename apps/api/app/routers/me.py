@@ -165,6 +165,9 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
         # Eigene Fehlermeldungen: sie enthalten, was die Lehrkraft selbst
         # geschrieben hat (und auf Wunsch Protokoll und Umgebung).
         "fehlermeldungen": await _rows(db, m.BugReport, m.BugReport.user_id == uid),
+        # Ihre Anhaenge (Name und Typ; die Datei selbst laedt die Administration).
+        "fehlermeldungen_anhaenge": await _rows(db, m.BugReportAnhang, m.BugReportAnhang.report_id.in_(
+            select(m.BugReport.id).where(m.BugReport.user_id == uid))),
         "pap_aufgaben": await _rows(db, m.PapAufgabe, m.PapAufgabe.owner_id == uid),
         # Die Zeichnungen der Kinder haengen an der Aufgabe, nicht am Konto —
         # ueber die Schueler-IDs, wie der Karten-Fortschritt.

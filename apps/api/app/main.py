@@ -1718,9 +1718,21 @@ class BugBody(_BaseModel):
     # automatisch eingesammelt — was mitgeht, hat die Lehrkraft ausgesucht;
     # deshalb darf er auch Inhalte tragen, waehrend Protokoll und Umgebung
     # inhaltsfrei bleiben.
+    # Mehrere Anhaenge (bis ANHANG_ANZAHL): {name, typ, daten(base64)}. Die
+    # drei Einzelfelder darunter nimmt der Server weiter an (aeltere
+    # Oberflaechen), sie landen als erster Anhang in derselben Liste.
+    anhaenge: list[dict] = []
     anhang_name: str = ""
     anhang_typ: str = ""
     anhang_daten: str = ""   # base64, ohne data:-Praefix
+
+
+# Grenzen der Anhaenge einer Meldung. Je Datei 3 MB wie bisher; zusammen
+# 10 MB, damit der Rumpf (base64 = +1/3) unter der Grenze des Proxys bleibt
+# (client_max_body_size 16M in nginx.conf).
+ANHANG_ANZAHL = 5
+ANHANG_JE = 3 * 1024 * 1024
+ANHANG_ZUSAMMEN = 10 * 1024 * 1024
 
 
 @app.get("/api/bugreport/status")
@@ -1750,7 +1762,7 @@ async def bugreport(body: BugBody, request: Request, user=Depends(get_current_us
     Adresse wird gefunden und zugemuellt; hier braucht es ein bestaetigtes
     Konto, und wer eins missbraucht, ist bekannt.
     """
-    from .models import BugReport
+    from .models import BugReport, BugReportAnhang
 
     aus = await db.get(AppSetting, "bugreport_aus")
     if aus and aus.value == "1":
@@ -1763,26 +1775,37 @@ async def bugreport(body: BugBody, request: Request, user=Depends(get_current_us
     if not text:
         raise HTTPException(400, "Bitte beschreibe kurz, was passiert ist")
 
-    daten = None
-    name = typ = ""
+    roh = list(body.anhaenge or [])
     if body.anhang_daten:
+        roh.insert(0, {"name": body.anhang_name, "typ": body.anhang_typ, "daten": body.anhang_daten})
+    if len(roh) > ANHANG_ANZAHL:
+        raise HTTPException(413, f"Höchstens {ANHANG_ANZAHL} Anhänge")
+    anhaenge = []
+    zusammen = 0
+    for a in roh:
         import base64
         import binascii
+        if not isinstance(a, dict) or not a.get("daten"):
+            continue
         try:
-            daten = base64.b64decode(body.anhang_daten, validate=True)
+            daten = base64.b64decode(str(a.get("daten")), validate=True)
         except (binascii.Error, ValueError):
             raise HTTPException(400, "Anhang konnte nicht gelesen werden")
         # Zu gross wird ABGELEHNT statt abgeschnitten: ein halber Screenshot
         # ist kein Screenshot.
-        if len(daten) > 3 * 1024 * 1024:
-            raise HTTPException(413, "Anhang zu groß (max. 3 MB)")
-        name = _sauber(body.anhang_name)[:120] or "anhang"
+        if len(daten) > ANHANG_JE:
+            raise HTTPException(413, "Anhang zu groß (max. 3 MB je Datei)")
+        zusammen += len(daten)
+        if zusammen > ANHANG_ZUSAMMEN:
+            raise HTTPException(413, "Anhänge zusammen zu groß (max. 10 MB)")
+        name = _sauber(str(a.get("name") or ""))[:120] or "anhang"
         name = name.replace("/", "_").replace("\\", "_").replace('"', "_")
-        typ = _sauber(body.anhang_typ)[:100] or "application/octet-stream"
+        typ = _sauber(str(a.get("typ") or ""))[:100] or "application/octet-stream"
         if typ.count("/") != 1 or any(c in typ for c in ";, "):
             typ = "application/octet-stream"
+        anhaenge.append((name, typ, daten))
 
-    db.add(BugReport(
+    bericht = BugReport(
         user_id=user.id, email=(user.email or "")[:200], message=text,
         seite=_sauber(body.seite)[:200], fassung=APP_VERSION,
         # Die Kennung des Browsers ist eine technische Angabe wie jede andere in
@@ -1794,8 +1817,11 @@ async def bugreport(body: BugBody, request: Request, user=Depends(get_current_us
         browser=(_sauber(request.headers.get("user-agent", ""))[:200]
                  if (body.umgebung or "").strip() else ""),
         umgebung=(body.umgebung or "").strip()[:2000],
-        log=(body.log or "").strip()[:20000],
-        anhang=daten, anhang_name=name, anhang_typ=typ))
+        log=(body.log or "").strip()[:20000])
+    db.add(bericht)
+    await db.flush()
+    for pos, (name, typ, daten) in enumerate(anhaenge):
+        db.add(BugReportAnhang(report_id=bericht.id, position=pos, name=name, typ=typ, daten=daten))
     await db.commit()
     return {"ok": True}
 
@@ -1827,7 +1853,7 @@ async def bugreports(limit: int = 10, offset: int = 0,
     """
     from sqlalchemy import select as _select
 
-    from .models import BugReport
+    from .models import BugReport, BugReportAnhang
 
     # Seitenweise: eine Meldung traegt Text, Umgebung und Protokoll, und die
     # Uebersicht zeigt Bilder — fuenfhundert davon auf einmal sind im Schulnetz
@@ -1836,12 +1862,27 @@ async def bugreports(limit: int = 10, offset: int = 0,
     ab = max(0, int(offset or 0))
     rows = (await db.execute(_select(BugReport).order_by(BugReport.created_at.desc())
                              .offset(ab).limit(grenze))).scalars().all()
+    # Die Anhaenge je Meldung — nur Name und Typ, die Bytes holt die
+    # Einzelansicht. Ein Altbestand-Anhang (Spalten an der Meldung) steht mit
+    # der id "alt" voran.
+    von = {}
+    if rows:
+        for a in (await db.execute(_select(BugReportAnhang.id, BugReportAnhang.report_id,
+                                           BugReportAnhang.name, BugReportAnhang.typ)
+                                   .where(BugReportAnhang.report_id.in_([r.id for r in rows]))
+                                   .order_by(BugReportAnhang.position, BugReportAnhang.id))).all():
+            von.setdefault(a.report_id, []).append({"id": a.id, "name": a.name, "typ": a.typ or ""})
+
+    def _liste(r):
+        alt = [{"id": "alt", "name": r.anhang_name, "typ": r.anhang_typ or ""}] if r.anhang_name else []
+        return alt + von.get(r.id, [])
     return [{
         "id": r.id, "email": r.email, "message": r.message, "seite": r.seite,
         "fassung": r.fassung, "browser": r.browser, "umgebung": r.umgebung, "log": r.log,
         # Der Typ steht in der Liste, damit die Uebersicht ein Bild als Bild
         # zeigen kann, statt nur seinen Dateinamen.
         "anhang_name": r.anhang_name, "anhang_typ": r.anhang_typ or "",
+        "anhaenge": _liste(r),
         "erledigt": r.erledigt,
         "created_at": r.created_at.isoformat() if r.created_at else "",
     } for r in rows]
@@ -1877,6 +1918,27 @@ async def bugreport_anhang(report_id: int, user=Depends(_require_admin), db=Depe
     # dass der Browser einen harmlos deklarierten Typ selbst umdeutet.
     return _Resp(content=r.anhang, media_type=r.anhang_typ or "application/octet-stream",
                  headers={"Content-Disposition": anhang_kopf(r.anhang_name or "anhang", "attachment"),
+                          "X-Content-Type-Options": "nosniff",
+                          "Cache-Control": "no-store, private"})
+
+
+@app.get("/api/admin/bugreports/{report_id}/anhaenge/{anhang_id}")
+async def bugreport_anhang_einzeln(report_id: int, anhang_id: int, user=Depends(_require_admin), db=Depends(get_db)):
+    """Einer von mehreren Anhaengen — dieselben Kopfzeilen wie oben (immer
+    Download, nosniff), aus denselben Gruenden."""
+    from sqlalchemy import select as _select
+    from sqlalchemy.orm import undefer
+    from starlette.responses import Response as _Resp
+
+    from .models import BugReportAnhang
+
+    a = (await db.execute(_select(BugReportAnhang).where(
+        BugReportAnhang.id == anhang_id, BugReportAnhang.report_id == report_id)
+        .options(undefer(BugReportAnhang.daten)))).scalar_one_or_none()
+    if not a or not a.daten:
+        raise HTTPException(404, "Kein Anhang")
+    return _Resp(content=a.daten, media_type=a.typ or "application/octet-stream",
+                 headers={"Content-Disposition": anhang_kopf(a.name or "anhang", "attachment"),
                           "X-Content-Type-Options": "nosniff",
                           "Cache-Control": "no-store, private"})
 

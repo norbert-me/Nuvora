@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import undefer
 
 from app.main import BugBody, bugreport
-from app.models import BugReport, User
+from app.models import BugReport, BugReportAnhang, User
 
 
 class _Anfrage:
@@ -43,6 +43,11 @@ async def _melden(s, konto, **felder):
     return (await s.execute(select(BugReport).options(undefer(BugReport.anhang)))).scalars().all()
 
 
+async def _anhaenge(s):
+    return (await s.execute(select(BugReportAnhang).options(undefer(BugReportAnhang.daten))
+                            .order_by(BugReportAnhang.position))).scalars().all()
+
+
 
 @pytest.mark.asyncio
 async def test_anhang_wird_gespeichert(s, konto):
@@ -52,9 +57,32 @@ async def test_anhang_wird_gespeichert(s, konto):
                          anhang_daten=base64.b64encode(daten).decode())
     assert len(rows) == 1
     r = rows[0]
-    assert (r.anhang_name, r.anhang_typ) == ("fehler.pdf", "application/pdf")
-    assert r.anhang == daten
+    # Die drei Einzelfelder (aeltere Oberflaechen) landen als erster Anhang in
+    # der Liste, nicht mehr in den Spalten der Meldung.
+    a = (await _anhaenge(s))[0]
+    assert (a.report_id, a.name, a.typ, a.daten) == (r.id, "fehler.pdf", "application/pdf", daten)
     assert r.email == "l@schule.de" and r.message == "Knopf klemmt"
+
+
+@pytest.mark.asyncio
+async def test_mehrere_anhaenge(s, konto):
+    b64 = lambda x: base64.b64encode(x).decode()  # noqa: E731
+    await _melden(s, konto, message="vorher/nachher", anhaenge=[
+        {"name": "vorher.png", "typ": "image/png", "daten": b64(b"1")},
+        {"name": "nachher.png", "typ": "image/png", "daten": b64(b"2")}])
+    assert [(a.name, a.daten) for a in await _anhaenge(s)] == [("vorher.png", b"1"), ("nachher.png", b"2")]
+
+
+@pytest.mark.asyncio
+async def test_zu_viele_oder_zusammen_zu_grosse_anhaenge(s, konto):
+    b64 = lambda x: base64.b64encode(x).decode()  # noqa: E731
+    with pytest.raises(HTTPException) as e:
+        await _melden(s, konto, message="x", anhaenge=[{"name": "a", "typ": "image/png", "daten": b64(b"1")}] * 6)
+    assert e.value.status_code == 413
+    drei_mb = b64(b"x" * (3 * 1024 * 1024))
+    with pytest.raises(HTTPException) as e:
+        await _melden(s, konto, message="x", anhaenge=[{"name": "a", "typ": "image/png", "daten": drei_mb}] * 4)
+    assert e.value.status_code == 413
 
 
 @pytest.mark.asyncio
@@ -68,13 +96,13 @@ async def test_zu_grosser_anhang_wird_abgelehnt(s, konto):
 
 @pytest.mark.asyncio
 async def test_name_und_typ_werden_entschaerft(s, konto):
-    rows = await _melden(s, konto, message="Test",
+    await _melden(s, konto, message="Test",
                          anhang_name="../../etc/passwd\nX: y",
                          anhang_typ="image/png; charset=evil",
                          anhang_daten=base64.b64encode(b"abc").decode())
-    r = rows[0]
-    assert "/" not in r.anhang_name and "\n" not in r.anhang_name
-    assert r.anhang_typ == "application/octet-stream"
+    a = (await _anhaenge(s))[0]
+    assert "/" not in a.name and "\n" not in a.name
+    assert a.typ == "application/octet-stream"
 
 
 @pytest.mark.asyncio
@@ -118,3 +146,16 @@ async def test_browserkennung_nur_mit_umgebung(s, konto):
     rows = await _melden(s, konto, message="mit Umgebung", umgebung="Fenster: 390x844")
     assert rows[0].browser == "Testbrowser"
     assert rows[0].umgebung == "Fenster: 390x844"
+
+
+@pytest.mark.asyncio
+async def test_kontoloeschung_nimmt_die_anhaenge_mit(s, konto):
+    # Die Meldung bleibt (der Text wird noch bearbeitet), ihre Anhaenge nicht:
+    # darauf stehen Namen, und sie gehoeren der Person, nicht dem Bericht.
+    from app.routers.auth import _purge_user_content
+    await _melden(s, konto, message="x", anhaenge=[{"name": "a.png", "typ": "image/png",
+                                                     "daten": base64.b64encode(b"1").decode()}])
+    await _purge_user_content(s, konto.id)
+    await s.commit()
+    assert await _anhaenge(s) == []
+    assert len((await s.execute(select(BugReport))).scalars().all()) == 1

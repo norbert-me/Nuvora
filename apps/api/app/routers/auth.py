@@ -22,7 +22,7 @@ from ..netz import client_ip as _client_ip
 from ..seed import seed_new_account
 from ..rollen import ist_admin
 from ..database import get_db
-from ..models import BugReport, CaldavToken, User, Question, MarketplaceQuiz
+from ..models import BugReport, BugReportAnhang, CaldavToken, User, Question, MarketplaceQuiz
 from .. import mailer
 
 # Im Container /app/uploads (Volume). Ueberschreibbar, damit Tests und die
@@ -55,6 +55,8 @@ async def _purge_user_content(db: AsyncSession, user_id: int):
     #     Bericht — der Meldungstext bleibt fuer die Bearbeitung stehen.
     await db.execute(sa_update(BugReport).where(BugReport.user_id == user_id).values(
         email="", anhang=None, anhang_name="", anhang_typ="", log=""))
+    await db.execute(delete(BugReportAnhang).where(BugReportAnhang.report_id.in_(
+        select(BugReport.id).where(BugReport.user_id == user_id))))
     # 3) Dateien löschen — aber nur, wenn sie AUSSCHLIESSLICH diesem Konto
     #    gehoeren. Uebernommene Kopien referenzieren dieselbe URL — als
     #    Fragebild, als Antwortbild (choice_images) und in besitzlosen

@@ -309,13 +309,17 @@ export const linkBtn = {
  * kein Label — er kann kein verstecktes `<input type=file>` umschliessen. Also
  * eins auf Zuruf bauen, oeffnen, wieder wegwerfen.
  */
-export function dateiWaehlen(onFile, accept = ".json,application/json") {
+// `mehrere: true` laesst mehrere Dateien auf einmal waehlen — `onFile` wird
+// dann je Datei einmal gerufen (in der gewaehlten Reihenfolge).
+export function dateiWaehlen(onFile, accept = ".json,application/json", { mehrere = false } = {}) {
   const feld = document.createElement("input");
   feld.type = "file";
   feld.accept = accept;
+  feld.multiple = mehrere;
   feld.style.display = "none";
   feld.addEventListener("change", () => {
-    if (feld.files[0]) onFile(feld.files[0]);
+    const liste = mehrere ? [...feld.files] : [...feld.files].slice(0, 1);
+    liste.forEach((f) => onFile(f));
     feld.remove();
   });
   document.body.appendChild(feld);

@@ -2050,6 +2050,8 @@ export default {
   "melder.wasGeht": "¿Qué se envía?",
   "melder.anhang": "Adjuntar archivo",
   "melder.anhangZuGross": "Adjunto demasiado grande (máx. {{n}} MB)",
+  "melder.anhangAnzahl": "Como máximo {{n}} archivos adjuntos.",
+  "melder.anhangZusammen": "Los adjuntos son demasiado grandes en total (máx. {{n}} MB).",
   "melder.anhangFehler": "No se pudo leer el adjunto",
   "melder.logZu": "Ocultar registro",
   "melder.logLeer": "Aún no ha pasado nada.",

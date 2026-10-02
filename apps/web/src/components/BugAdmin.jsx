@@ -62,12 +62,17 @@ export default function BugAdmin() {
   // Der Anhang kommt als Download (der Server liefert ihn nie „inline" — Typ
   // und Inhalt bestimmt der Melder). Ein <a href> schickte zudem den Token
   // nicht mit; geholt wird deshalb per fetch, gespeichert ueber einen Blob.
-  const anhangLaden = async (r) => {
-    const res = await fetch(`/api/admin/bugreports/${r.id}/anhang`).catch(() => null);
+  // Mehrere Anhaenge je Meldung; der Altbestand (ein Anhang an der Meldung
+  // selbst) kommt mit der id "alt" und hat seine eigene Adresse.
+  const anhangUrl = (r, a) => (a.id === "alt" ? `/api/admin/bugreports/${r.id}/anhang` : `/api/admin/bugreports/${r.id}/anhaenge/${a.id}`);
+  const anhaengeVon = (r) => (Array.isArray(r.anhaenge) ? r.anhaenge
+    : (r.anhang_name ? [{ id: "alt", name: r.anhang_name, typ: r.anhang_typ || "" }] : []));
+  const anhangLaden = async (r, an) => {
+    const res = await fetch(anhangUrl(r, an)).catch(() => null);
     if (!res || !res.ok) return;
     const a = document.createElement("a");
     a.href = URL.createObjectURL(await res.blob());
-    a.download = r.anhang_name || "anhang";
+    a.download = an.name || "anhang";
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -115,21 +120,25 @@ export default function BugAdmin() {
               {/* Ein Bild wird als Bild gezeigt, nicht als Dateiname: ein
                   Bildschirmfoto beantwortet die Meldung oft allein. Klick macht
                   es gross (AuthImage — der Endpunkt braucht den Token). */}
-              {r.anhang_name && /^image\//.test(r.anhang_typ || "") && (
-                <AuthImage src={`/api/admin/bugreports/${r.id}/anhang`} alt={r.anhang_name}
-                  style={{ marginTop: 8, maxHeight: 120, maxWidth: "100%", objectFit: "contain",
-                           borderRadius: cardStyle.borderRadius, border: "1px solid var(--border2)" }} />
+              {anhaengeVon(r).some((a) => /^image\//.test(a.typ || "")) && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                  {anhaengeVon(r).filter((a) => /^image\//.test(a.typ || "")).map((a) => (
+                    <AuthImage key={a.id} src={anhangUrl(r, a)} alt={a.name}
+                      style={{ maxHeight: 120, maxWidth: "100%", objectFit: "contain",
+                               borderRadius: cardStyle.borderRadius, border: "1px solid var(--border2)" }} />
+                  ))}
+                </div>
               )}
               {gross === r.id && (
                 <div style={{ marginTop: 8, fontSize: 12, color: "var(--text2)" }}>
                   <div style={{ ...sectionLabel, margin: "0 0 4px" }}>{r.seite} · {r.fassung}</div>
                   <div style={{ color: "var(--text3)", overflowWrap: "anywhere" }}>{r.browser}</div>
-                  {r.anhang_name && (
-                    <button type="button" onClick={() => anhangLaden(r)}
-                      style={{ ...linkBtn, display: "inline-block", marginTop: 6 }}>
-                      {r.anhang_name}
+                  {anhaengeVon(r).map((a) => (
+                    <button key={a.id} type="button" onClick={() => anhangLaden(r, a)}
+                      style={{ ...linkBtn, display: "inline-block", marginTop: 6, marginRight: 12 }}>
+                      {a.name}
                     </button>
-                  )}
+                  ))}
                   {(r.umgebung || r.log) && (
                     <pre style={{ maxHeight: 220, overflow: "auto", fontSize: 11, lineHeight: 1.5,
                       whiteSpace: "pre-wrap", marginTop: 6 }}>
