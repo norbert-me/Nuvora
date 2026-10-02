@@ -1729,7 +1729,7 @@ class BugBody(_BaseModel):
 
 # Grenzen der Anhaenge einer Meldung. Je Datei 3 MB wie bisher; zusammen
 # 10 MB, damit der Rumpf (base64 = +1/3) unter der Grenze des Proxys bleibt
-# (client_max_body_size 16M in nginx.conf).
+# (client_max_body_size 52M in nginx.conf).
 ANHANG_ANZAHL = 5
 ANHANG_JE = 3 * 1024 * 1024
 ANHANG_ZUSAMMEN = 10 * 1024 * 1024

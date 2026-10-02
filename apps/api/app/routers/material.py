@@ -24,7 +24,12 @@ from .auth import get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/material", tags=["material"])
 
-MAX_BYTES = 15 * 1024 * 1024          # 15 MB je Datei — reicht fuer Arbeitsblaetter/PDFs
+# 50 MB je Datei (vorher 15): eine eingescannte Klassenarbeit samt
+# Erwartungshorizont sprengte die 15 MB. Mehr als 50 verbietet sich, solange
+# Cloudflare davor steht — eine Anfrage muss in 100 Sekunden durch sein, und
+# auf einer Schulleitung sind 50 MB schon ein langer Balken. Gleiche Zahl in
+# nginx.conf (client_max_body_size) und MaterialPanel.jsx (MAX_MB).
+MAX_BYTES = 50 * 1024 * 1024
 QUOTA_BYTES = 200 * 1024 * 1024       # 200 MB je Konto — gegen unbegrenztes Vollladen (Public-Betrieb)
 
 
@@ -114,7 +119,7 @@ async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] 
     if not data:
         raise HTTPException(400, "Datei ist leer")
     if len(data) > MAX_BYTES:
-        raise HTTPException(413, "Datei zu groß (max. 15 MB)")
+        raise HTTPException(413, f"Datei zu groß (max. {MAX_BYTES // 1024 // 1024} MB)")
     mime = (file.content_type or "")[:120]
     name = (file.filename or "datei")[:255]
     # Fotos verkleinern (JPEG q80), BEVOR gehasht wird: die Inhaltsadresse muss

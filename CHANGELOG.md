@@ -36,8 +36,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   nennt Anzahl und Punkte.
 - **Hochladen abbrechen:** × neben dem Fortschrittsbalken (Anhänge an
   Klassenarbeit, Themen, Stunden).
-- **PDFs bis 15 MB** lassen sich wieder hochladen — der Proxy wies alles über
-  10 MB ab; zu große Dateien meldet die Seite sofort.
+- **Anhänge bis 50 MB** (vorher 15; der Proxy wies schon alles über 10 MB ab);
+  zu große Dateien meldet die Seite sofort.
 - **Noten und Klassenarbeitspunkte speichern sich selbst** — kurz nach der
   Eingabe, ohne Knopf. Spalten, Aufgaben und Notenschlüssel behalten die
   Speichern-Leiste.

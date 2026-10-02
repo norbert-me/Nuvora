@@ -15,8 +15,8 @@ import { askConfirm } from "../core/dialog.jsx";
 import { hol } from "../core/melden.js";
 
 const API = "/api/material";
-// Wortgleich mit MAX_BYTES in apps/api/app/routers/material.py (15 MB).
-const MAX_MB = 15;
+// Wortgleich mit MAX_BYTES in apps/api/app/routers/material.py (50 MB).
+const MAX_MB = 50;
 
 function fmtSize(n) {
   if (n < 1024) return `${n} B`;
@@ -51,7 +51,7 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
   const abbruch = useRef(null);
   const upload = async (file) => {
     if (!file) return;
-    // Zu gross: gleich hier sagen, statt 15 MB hochzuschicken und dann eine
+    // Zu gross: gleich hier sagen, statt 50 MB hochzuschicken und dann eine
     // Absage zu bekommen. Dieselbe Grenze wie MAX_BYTES in material.py.
     if (file.size > MAX_MB * 1024 * 1024) {
       setErr(t("material.zuGross", { mb: MAX_MB }));
