@@ -848,77 +848,11 @@ export default function Session() {
 
       {question && (
         <>
-          {/* Question text — large, full width */}
-          <div key={`q${question.id}`} style={{
-            // Weniger Polster, groessere Schrift: der Kasten war zur Haelfte
-            // leer, waehrend die Frage aus der letzten Reihe klein wirkte. Die
-            // gewonnene Hoehe geht an die Frage selbst, nicht an den Rand.
-            fontSize: "clamp(30px, 6.5vh, 72px)", fontWeight: 600, marginBottom: "1.5vh", padding: "clamp(10px, 1.6vh, 22px) clamp(20px, 2.5vw, 40px)",
-            background: "var(--bg2)", borderRadius: cardStyle.borderRadius, color: "var(--text)", lineHeight: 1.4,
-            animation: "nqIn 0.22s ease both",
-          }}>
-            <Latex>{question.text}</Latex>
-          </div>
-
-          {question.image_url && (
-            <div style={{ marginBottom: 20, textAlign: "center" }}>
-              <img src={question.image_url} alt="" style={{ maxWidth: "100%", maxHeight: 400, borderRadius: CONTROL_R, border: "1px solid var(--border3)" }} />
-            </div>
-          )}
-
-          {/* Answer buttons — NO colored backgrounds, just bordered. Colored on reveal */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "clamp(8px, 1.5vh, 16px)", marginBottom: "2vh", flex: 1 }}>
-            {(() => {
-              const validKeys = ["A", "B", "C", "D"].slice(0, question.num_choices || 4);
-              const extraKeys = revealed ? ["A", "B", "C", "D"].filter((k) => !validKeys.includes(k) && (counts[k] || 0) > 0) : [];
-              return [...validKeys, ...extraKeys].map((key, i) => {
-                const isExtra = !validKeys.includes(key);
-                const isCorrect = revealed && !isExtra && question.correct_answer && question.correct_answer.includes(key);
-                const isWrong = revealed && !isExtra && question.correct_answer && !question.correct_answer.includes(key);
-                const count = counts[key] || 0;
-                return (
-                  <div key={`${question.id}-${key}`} style={{
-                    // Flacher als zuvor: die Antwort ist meistens eine Zeile,
-                    // und die Hoehe fehlte oben bei der Frage.
-                    padding: "clamp(8px, 1.4vh, 18px) clamp(16px, 2vw, 28px)",
-                    background: isExtra ? "var(--bg2)" : isCorrect ? C.success : isWrong ? "var(--bg2)" : "var(--card)",
-                    color: isCorrect ? C.aufAkzent : "var(--text)",
-                    borderRadius: cardStyle.borderRadius,
-                    // Die Antwort fuellt ihr Feld aus: sie steht meistens
-                    // allein darin, und aus der letzten Reihe zaehlt jede
-                    // Stufe. Der Text nimmt die Restbreite (minWidth 0, sonst
-                    // schrumpft ein Flex-Kind nie unter seinen Inhalt).
-                    fontSize: "clamp(22px, 4.8vh, 54px)",
-                    border: isExtra ? "3px dashed var(--border2)" : isCorrect ? `3px solid ${C.success}` : "3px solid var(--border3)",
-                    opacity: isExtra ? 0.45 : isWrong ? 0.5 : 1,
-                    transition: "all 0.3s",
-                    position: "relative",
-                    display: "flex", alignItems: "center",
-                    animation: "nqIn 0.22s ease both",
-                    animationDelay: `${140 * (i + 1)}ms`,
-                  }}>
-                    <strong style={{ fontSize: "clamp(26px, 5vh, 54px)", marginRight: 14, flexShrink: 0 }}>{key}</strong>
-                    {isExtra
-                      ? <span style={{ fontSize: "clamp(14px, 2.5vh, 22px)", color: "var(--text3)", fontStyle: "italic" }}>{t("session.noAnswerField")}</span>
-                      : <span style={{ flex: 1, minWidth: 0 }}><Latex>{question.choices[key] || "–"}</Latex></span>}
-                    {!isExtra && question.choice_images?.[key] && <img src={question.choice_images[key]} alt="" style={{ display: "block", marginTop: 8, maxHeight: 100, borderRadius: CONTROL_R }} />}
-                    {revealed && count > 0 && (
-                      <span style={{
-                        position: "absolute", top: 10, right: 14,
-                        fontSize: 16, fontWeight: 700,
-                        color: isCorrect ? C.aufAkzent : "var(--text3)",
-                      }}>
-                        {count} ({total > 0 ? Math.round(count / total * 100) : 0}%)
-                      </span>
-                    )}
-                  </div>
-                );
-              });
-            })()}
-          </div>
-
-          {/* Student sidebar + game leaderboard */}
-          <div style={{ display: "flex", gap: 24 }}>
+          {/* Namen UEBER der Frage (Wunsch 02.10.2026): beim Scannen schaut die
+              Klasse zuerst auf ihren Namen — „bin ich erfasst?" —, und unter
+              den Antworten stand die Liste am unteren Rand, auf manchem Beamer
+              schon ausserhalb des Bildes. Die Bestenliste bleibt daneben. */}
+          <div style={{ display: "flex", gap: 24, marginBottom: "1.5vh" }}>
             {/* Student list */}
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: "clamp(12px, 1.6vh, 15px)", color: "var(--text3)", fontWeight: 600, marginBottom: 6 }}>
@@ -997,6 +931,76 @@ export default function Session() {
               </div>
             )}
           </div>
+
+          {/* Question text — large, full width */}
+          <div key={`q${question.id}`} style={{
+            // Weniger Polster, groessere Schrift: der Kasten war zur Haelfte
+            // leer, waehrend die Frage aus der letzten Reihe klein wirkte. Die
+            // gewonnene Hoehe geht an die Frage selbst, nicht an den Rand.
+            fontSize: "clamp(30px, 6.5vh, 72px)", fontWeight: 600, marginBottom: "1.5vh", padding: "clamp(10px, 1.6vh, 22px) clamp(20px, 2.5vw, 40px)",
+            background: "var(--bg2)", borderRadius: cardStyle.borderRadius, color: "var(--text)", lineHeight: 1.4,
+            animation: "nqIn 0.22s ease both",
+          }}>
+            <Latex>{question.text}</Latex>
+          </div>
+
+          {question.image_url && (
+            <div style={{ marginBottom: 20, textAlign: "center" }}>
+              <img src={question.image_url} alt="" style={{ maxWidth: "100%", maxHeight: 400, borderRadius: CONTROL_R, border: "1px solid var(--border3)" }} />
+            </div>
+          )}
+
+          {/* Answer buttons — NO colored backgrounds, just bordered. Colored on reveal */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "clamp(8px, 1.5vh, 16px)", marginBottom: "2vh", flex: 1 }}>
+            {(() => {
+              const validKeys = ["A", "B", "C", "D"].slice(0, question.num_choices || 4);
+              const extraKeys = revealed ? ["A", "B", "C", "D"].filter((k) => !validKeys.includes(k) && (counts[k] || 0) > 0) : [];
+              return [...validKeys, ...extraKeys].map((key, i) => {
+                const isExtra = !validKeys.includes(key);
+                const isCorrect = revealed && !isExtra && question.correct_answer && question.correct_answer.includes(key);
+                const isWrong = revealed && !isExtra && question.correct_answer && !question.correct_answer.includes(key);
+                const count = counts[key] || 0;
+                return (
+                  <div key={`${question.id}-${key}`} style={{
+                    // Flacher als zuvor: die Antwort ist meistens eine Zeile,
+                    // und die Hoehe fehlte oben bei der Frage.
+                    padding: "clamp(8px, 1.4vh, 18px) clamp(16px, 2vw, 28px)",
+                    background: isExtra ? "var(--bg2)" : isCorrect ? C.success : isWrong ? "var(--bg2)" : "var(--card)",
+                    color: isCorrect ? C.aufAkzent : "var(--text)",
+                    borderRadius: cardStyle.borderRadius,
+                    // Die Antwort fuellt ihr Feld aus: sie steht meistens
+                    // allein darin, und aus der letzten Reihe zaehlt jede
+                    // Stufe. Der Text nimmt die Restbreite (minWidth 0, sonst
+                    // schrumpft ein Flex-Kind nie unter seinen Inhalt).
+                    fontSize: "clamp(22px, 4.8vh, 54px)",
+                    border: isExtra ? "3px dashed var(--border2)" : isCorrect ? `3px solid ${C.success}` : "3px solid var(--border3)",
+                    opacity: isExtra ? 0.45 : isWrong ? 0.5 : 1,
+                    transition: "all 0.3s",
+                    position: "relative",
+                    display: "flex", alignItems: "center",
+                    animation: "nqIn 0.22s ease both",
+                    animationDelay: `${140 * (i + 1)}ms`,
+                  }}>
+                    <strong style={{ fontSize: "clamp(26px, 5vh, 54px)", marginRight: 14, flexShrink: 0 }}>{key}</strong>
+                    {isExtra
+                      ? <span style={{ fontSize: "clamp(14px, 2.5vh, 22px)", color: "var(--text3)", fontStyle: "italic" }}>{t("session.noAnswerField")}</span>
+                      : <span style={{ flex: 1, minWidth: 0 }}><Latex>{question.choices[key] || "–"}</Latex></span>}
+                    {!isExtra && question.choice_images?.[key] && <img src={question.choice_images[key]} alt="" style={{ display: "block", marginTop: 8, maxHeight: 100, borderRadius: CONTROL_R }} />}
+                    {revealed && count > 0 && (
+                      <span style={{
+                        position: "absolute", top: 10, right: 14,
+                        fontSize: 16, fontWeight: 700,
+                        color: isCorrect ? C.aufAkzent : "var(--text3)",
+                      }}>
+                        {count} ({total > 0 ? Math.round(count / total * 100) : 0}%)
+                      </span>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+          </div>
+
 
         </>
       )}
