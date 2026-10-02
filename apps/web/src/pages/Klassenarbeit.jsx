@@ -333,6 +333,11 @@ export default function Klassenarbeit() {
   const andereStufe = eigeneStufe === "E" ? "G" : "E";
   // Zuletzt gewaehltes Blatt — beim Wechsel der Arbeit bleibt man bei E oder G.
   const [blatt, setBlatt] = useState("E");
+  // „Alle": beide Blaetter einer E/G-Arbeit auf einen Blick — jedes Kind mit
+  // Punkten und Note aus SEINEM Blatt, dazu Schnitt und Notenverteilung der
+  // ganzen Lerngruppe. Nur Ansicht: eingetragen wird im E- bzw. G-Blatt,
+  // deren Aufgaben verschieden sind.
+  const [alleSicht, setAlleSicht] = useState(false);
   // In der Auswahl steht ein Paar EINMAL: das G-Blatt faellt heraus, wenn sein
   // E-Blatt daneben steht.
   const auswahl = works.filter((w) => !(w.niveau === "G" && partnerVon(w)));
@@ -354,6 +359,16 @@ export default function Klassenarbeit() {
     if (!neu) return;
     setWorks((ws) => [...ws.map((x) => (x.id === work.id ? { ...x, partner_id: neu.id } : x)), neu]);
     zeigeArbeit(neu);
+  };
+
+  const alleAn = alleSicht && !!(work && work.niveau && partner);
+  // Vor der Gesamtsicht: Offenes speichern und den Stand BEIDER Blaetter neu
+  // holen — das andere Blatt steht in `works` so, wie es beim letzten Laden war.
+  const alleZeigen = async () => {
+    if (entwurf.geaendert && !(await entwurf.speichern())) return;
+    const d = await hol(`${API}/classes/${classId}/works${kq}`);
+    if (Array.isArray(d)) setWorks(d);
+    setAlleSicht(true);
   };
 
   // Eine Arbeit fuer alle nachtraeglich in E- und G-Blatt teilen (Server
@@ -766,16 +781,22 @@ export default function Klassenarbeit() {
           {work && work.niveau && (
             <Segment>
               {["E", "G"].map((n) => {
-                const aktiv = work.niveau === n;
-                const fehlt = !aktiv && !partner;
+                const aktiv = !alleAn && work.niveau === n;
+                const fehlt = work.niveau !== n && !partner;
                 return (
-                  <button key={n} onClick={() => blattWechseln(n)} aria-pressed={aktiv}
+                  <button key={n} onClick={() => { setAlleSicht(false); blattWechseln(n); }} aria-pressed={aktiv}
                     title={fehlt ? t("klassenarbeit.blattAnlegen", { n }) : t("klassenarbeit.blatt", { n })}
                     style={{ ...segmentBtn, fontWeight: aktiv ? 700 : 500, color: aktiv ? "var(--accent)" : "var(--text2)", ...(fehlt ? { fontStyle: "italic", opacity: 0.7 } : {}) }}>
                     {fehlt ? `+ ${n}` : n}
                   </button>
                 );
               })}
+              {partner && (
+                <button onClick={alleZeigen} aria-pressed={alleAn} title={t("klassenarbeit.alleBlaetterHint")}
+                  style={{ ...segmentBtn, fontWeight: alleAn ? 700 : 500, color: alleAn ? "var(--accent)" : "var(--text2)" }}>
+                  {t("klassenarbeit.alleBlaetter")}
+                </button>
+              )}
             </Segment>
           )}
           {work && !work.niveau && (
@@ -789,7 +810,9 @@ export default function Klassenarbeit() {
         </Werkzeugleiste>
       )}
 
-      {hasRoster && work && students.length > 0 && (
+      {alleAn && <AlleBlaetter blaetter={[work, partner]} alleStudents={alleStudents} scale={scale} t={t} />}
+
+      {hasRoster && work && students.length > 0 && !alleAn && (
         <>
           {/* SuS-Ansicht (Präsentation): alles über der Auswertung ausblenden —
               Aufgaben-Editor, Punkte-Raster, Aktionen. Nur die Auswertung bleibt. */}
@@ -1701,6 +1724,80 @@ export function KlassenarbeitVergleich() {
 // Ziel einer Kopie waehlen. Bewusst dieselbe Auswahl wie oben in der Leiste
 // (KursKlasseSelect) — eine Klasse kann in mehreren Kursen liegen, und die
 // Arbeit haengt am Kurs, wenn es einen gibt.
+// Gesamtsicht einer E/G-Arbeit: beide Blaetter, jedes Kind aus seinem Blatt.
+// Gerechnet mit core/arbeitswertung.js (Wahlaufgaben ueber das jeweils andere
+// Blatt eingeschlossen) — dieselbe Note wie im Blatt selbst.
+function AlleBlaetter({ blaetter, alleStudents, scale, t }) {
+  const zeilen = [];
+  blaetter.forEach((b, i) => {
+    if (!b) return;
+    const anderes = blaetter[1 - i];
+    const wk = { ...b, _alt: (anderes && anderes.tasks) || [] };
+    const sc = b.scale && Object.keys(b.scale).length ? b.scale : scale;
+    const absent = new Set((b.absent || []).map(String));
+    alleStudents.filter((s) => (s.niveau || "") === b.niveau).forEach((s) => {
+      const r = (b.results || {})[String(s.id)];
+      const abw = absent.has(String(s.id)) || r === "abwesend";
+      const erfasst = !abw && r && (Array.isArray(r) || Object.values(r).some((v) => v != null && v !== ""));
+      if (!erfasst) { zeilen.push({ id: s.id, name: s.name, stufe: b.niveau, abw }); return; }
+      const w = wertung(wk, s.id, sc);
+      const d = gradeDetailed(w.pct, sc);
+      zeilen.push({ id: s.id, name: s.name, stufe: b.niveau, erreicht: w.erreicht, basis: w.basis, pct: w.pct, note: d.note, wert: d.wert, grade: d.grade });
+    });
+  });
+  zeilen.sort((a, b) => a.name.localeCompare(b.name));
+  const gewertet = zeilen.filter((z) => z.pct != null);
+  const schnitt = gewertet.length ? gewertet.reduce((n, z) => n + z.wert, 0) / gewertet.length : null;
+  const schnittPct = gewertet.length ? Math.round(gewertet.reduce((n, z) => n + z.pct, 0) / gewertet.length) : null;
+  const verteilung = [1, 2, 3, 4, 5, 6].map((g) => gewertet.filter((z) => z.grade === g).length);
+  const hoechst = Math.max(1, ...verteilung);
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <StatCard label={t("klassenarbeit.attendance")} value={`${gewertet.length} / ${zeilen.length}`} />
+        {schnitt != null && <StatCard label={t("klassenarbeit.avgGrade")} value={komma(rund(schnitt, 2))} />}
+        {schnittPct != null && <StatCard label={t("klassenarbeit.avgPct")} value={`${schnittPct}%`} />}
+      </div>
+      {gewertet.length > 0 && (
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: 90, marginBottom: 16, maxWidth: 360 }}>
+          {verteilung.map((n, i) => (
+            <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 12, color: "var(--text3)" }}>
+              <div style={{ fontWeight: 700, color: "var(--text2)" }}>{n || ""}</div>
+              {/* Balken: Radius = halbe Kappe, reine Grafik. */}
+              <div style={{ height: `${(n / hoechst) * 60}px`, minHeight: n ? 4 : 0, background: "var(--accent)", borderRadius: 4, opacity: 0.8 }} />
+              <div style={{ marginTop: 4 }}>{i + 1}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius }}>
+        <table style={{ borderCollapse: "collapse", fontSize: 13, width: "100%" }}>
+          <thead>
+            <tr>
+              <th style={{ ...thBase, textAlign: "left" }}>{t("common.name")}</th>
+              <th style={thBase}>{t("klassenarbeit.blattSpalte")}</th>
+              <th style={thBase}>{t("klassenarbeit.points")}</th>
+              <th style={thBase}>%</th>
+              <th style={thBase}>{t("klassenarbeit.grade")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {zeilen.map((z) => (
+              <tr key={`${z.stufe}-${z.id}`} style={z.pct == null ? { opacity: 0.5 } : undefined}>
+                <td style={{ ...tdBase, textAlign: "left", fontWeight: 500 }}>{z.name}</td>
+                <td style={{ ...tdBase, textAlign: "center" }}><span style={chipStyle}>{z.stufe}</span></td>
+                <td style={{ ...tdBase, textAlign: "center" }}>{z.pct == null ? (z.abw ? t("klassenarbeit.abwesendKurz") : "–") : `${kommaRund(z.erreicht, 2)} / ${komma(z.basis)}`}</td>
+                <td style={{ ...tdBase, textAlign: "center" }}>{z.pct == null ? "" : `${Math.round(z.pct)}%`}</td>
+                <td style={{ ...tdBase, textAlign: "center", fontWeight: 700 }}>{z.note || ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function KopieModal({ work, onClose, onCopy, t }) {
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null);
