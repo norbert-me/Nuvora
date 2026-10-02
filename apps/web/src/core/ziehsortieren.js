@@ -127,11 +127,49 @@ export function useZiehVorschau(liste, uebernehmen, aktiv = true) {
   const arbeitRef = useRef(null);
   const [vorschau, setVorschau] = useState(null);
   const sichtbar = vorschau || liste;
+  // Jede Liste erkennt ihre eigenen Zeilen (beim Touch-Weg sucht der Finger
+  // die Zeile unter sich — eine zweite Liste auf derselben Seite darf das
+  // nicht sein).
+  const listeId = useRef(`z${Math.random().toString(36).slice(2, 8)}`).current;
+  const touch = useRef(null);   // { timer, x, y, zieht, ab }
+  const uebernehmenRef = useRef(uebernehmen);
+  uebernehmenRef.current = uebernehmen;
 
   const ende = () => { setVorschau(null); idxRef.current = null; arbeitRef.current = null; };
 
+  // Dieselbe Verschiebung fuer Maus und Finger.
+  const ueber = (idx) => {
+    const a = arbeitRef.current;
+    if (idxRef.current == null || idx === idxRef.current || !a) return;
+    a.splice(idx, 0, ...a.splice(idxRef.current, 1));
+    idxRef.current = idx;
+    setVorschau([...a]);
+  };
+
+  // ── Touch: lange druecken, dann ziehen ──
+  // Safari auf dem iPhone kennt kein HTML5-Drag-and-Drop fuer Seitenelemente;
+  // `draggable` tut dort schlicht nichts. Deshalb ein eigener Weg ueber
+  // Touch-Ereignisse. Lange druecken (300 ms) statt sofort: ein kurzer Wisch
+  // muss die Seite weiter scrollen. Die Bewegung haengt an einem eigenen,
+  // NICHT passiven Horcher am Dokument — nur dort darf preventDefault das
+  // Scrollen waehrend des Zugs anhalten (Reacts Touch-Horcher sind passiv).
+  const touchEnde = (abbrechen) => {
+    const t = touch.current;
+    if (!t) return;
+    clearTimeout(t.timer);
+    if (t.ab) t.ab();
+    touch.current = null;
+    if (t.zieht && !abbrechen) {
+      const arr = arbeitRef.current || sichtbar;
+      ende();
+      uebernehmenRef.current(arr);
+    } else if (t.zieht) ende();
+  };
+
   const props = (idx) => ({
     draggable: aktiv,
+    "data-zieh-liste": listeId,
+    "data-zieh-idx": idx,
     onDragStart: (e) => {
       if (!aktiv) return;
       if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
@@ -142,11 +180,7 @@ export function useZiehVorschau(liste, uebernehmen, aktiv = true) {
       if (!aktiv || idxRef.current == null) return;
       e.preventDefault();
       if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-      const a = arbeitRef.current;
-      if (idx === idxRef.current || !a) return;
-      a.splice(idx, 0, ...a.splice(idxRef.current, 1));
-      idxRef.current = idx;
-      setVorschau([...a]);
+      ueber(idx);
     },
     onDrop: (e) => {
       if (!aktiv) return;
@@ -156,6 +190,51 @@ export function useZiehVorschau(liste, uebernehmen, aktiv = true) {
       uebernehmen(arr);
     },
     onDragEnd: ende,
+    onTouchStart: (e) => {
+      if (!aktiv || e.touches.length !== 1) return;
+      // In einem Eingabefeld heisst langes Druecken „Schreibmarke setzen"
+      // oder „markieren" — dort wird nicht gezogen.
+      if (e.target.closest && e.target.closest("input, textarea, select, button, a, [contenteditable='true']")) return;
+      touchEnde(true);
+      const { clientX: x, clientY: y } = e.touches[0];
+      const t = { x, y, zieht: false, ab: null };
+      t.timer = setTimeout(() => {
+        t.zieht = true;
+        arbeitRef.current = [...sichtbar];
+        idxRef.current = idx;
+        setVorschau([...sichtbar]);
+        try { navigator.vibrate?.(15); } catch { /* egal */ }
+        // Waehrend des Zugs nichts markieren: sonst zieht der Finger eine
+        // Textauswahl ueber die Liste statt der Zeile.
+        const vorher = document.body.style.webkitUserSelect;
+        document.body.style.webkitUserSelect = "none";
+        const bewegen = (ev) => {
+          ev.preventDefault();
+          const p = ev.touches[0];
+          const el = document.elementFromPoint(p.clientX, p.clientY)?.closest?.(`[data-zieh-liste="${listeId}"]`);
+          if (el) ueber(Number(el.getAttribute("data-zieh-idx")));
+        };
+        const loslassen = () => touchEnde(false);
+        document.addEventListener("touchmove", bewegen, { passive: false });
+        document.addEventListener("touchend", loslassen);
+        document.addEventListener("touchcancel", loslassen);
+        t.ab = () => {
+          document.body.style.webkitUserSelect = vorher;
+          document.removeEventListener("touchmove", bewegen);
+          document.removeEventListener("touchend", loslassen);
+          document.removeEventListener("touchcancel", loslassen);
+        };
+      }, 300);
+      touch.current = t;
+    },
+    // Vor dem Ablauf der Frist bewegt: das war ein Scrollen, kein Zug.
+    onTouchMove: (e) => {
+      const t = touch.current;
+      if (!t || t.zieht) return;
+      const p = e.touches[0];
+      if (Math.abs(p.clientX - t.x) > 8 || Math.abs(p.clientY - t.y) > 8) touchEnde(true);
+    },
+    onTouchEnd: () => { const t = touch.current; if (t && !t.zieht) touchEnde(true); },
   });
 
   return { sichtbar, vorschau, props };
