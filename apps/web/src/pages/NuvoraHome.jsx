@@ -166,8 +166,22 @@ function HeutePanel({ t }) {
       const frm = new Date(heute); frm.setHours(0, 0, 0, 0);
       const to = new Date(heute); to.setHours(23, 59, 59, 0);
       const entries = await fetch(`/api/kalender/entries?frm=${frm.toISOString()}&to=${to.toISOString()}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+      // Termine aus den ABONNIERTEN Kalendern (Konferenz, Elternabend, Arzt):
+      // im Kalender stehen sie neben dem Unterricht, hier fehlten sie ganz —
+      // die Kachel „was ist heute" kannte nur, was in Nuvora selbst angelegt
+      // war. Ausgeblendet wird wie im Kalender: der Schalter fuer alle
+      // fremden Kalender (`kal_ext`) und die einzelnen (`kal_ext_aus`).
+      let fremd = [];
+      let extAn = true;
+      let extAus = new Set();
+      try { extAn = localStorage.getItem("kal_ext") !== "0"; } catch { /* Voreinstellung: an */ }
+      try { extAus = new Set(JSON.parse(localStorage.getItem("kal_ext_aus") || "[]")); } catch { /* keine */ }
+      if (extAn) {
+        const d = await fetch(`/api/kalender/external-events?frm=${ymd(heute)}&to=${ymd(heute)}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+        fremd = (Array.isArray(d) ? d : []).filter((ev) => ev.date === ymd(heute) && !extAus.has(ev.cal || ""));
+      }
       const freiHeute = (Array.isArray(breaks) ? breaks : []).find((b) => ymd(heute) >= b.start_date.slice(0, 10) && ymd(heute) <= b.end_date.slice(0, 10));
-      if (!ab) setData({ slots: (tt?.slots || []), times: (tt?.times || []), zero: (tt?.zero || null), entries: Array.isArray(entries) ? entries : [],
+      if (!ab) setData({ slots: (tt?.slots || []), times: (tt?.times || []), zero: (tt?.zero || null), entries: Array.isArray(entries) ? entries : [], fremd,
                         classes, kurse: Array.isArray(kurse) ? kurse : [], frei: freiHeute,
                         entfallen: (Array.isArray(cancels) ? cancels : [])
                           .filter((c) => (c.date || "").slice(0, 10) === ymd(heute)).map((c) => c.period) });
@@ -203,7 +217,9 @@ function HeutePanel({ t }) {
     .filter(amTag)
     .filter((e) => e.period == null || !alleSlots.some((s) => s.period === e.period))
     .filter((e) => terminStand(e) !== "vorbei");
-  if (slots.length === 0 && extras.length === 0 && !data.frei) return null;
+  const fremdStand = (ev) => tagesStand(hmToMin(ev.time), hmToMin(ev.endtime), jetztMin);
+  const fremde = (data.fremd || []).filter((ev) => fremdStand(ev) !== "vorbei");
+  if (slots.length === 0 && extras.length === 0 && fremde.length === 0 && !data.frei) return null;
   const cname = (id) => data.classes.find((c) => c.id === id)?.name || "";
   // Dieselbe Regel wie im Kalender (`slotName` dort): erst der Kurs, dann die
   // Klasse. core/kurslabel.js ist die eine Quelle dafuer.
@@ -225,6 +241,7 @@ function HeutePanel({ t }) {
   const zeilen = [
     ...slots.map((s) => ({ art: "stunde", s, min: slotStart(s.period) })),
     ...extras.map((e) => ({ art: "termin", e, min: hmToMin(e.start_time) })),
+    ...fremde.map((ev) => ({ art: "fremd", ev, min: hmToMin(ev.time) })),
   ].sort((a, b) => (a.min ?? OHNE_ZEIT) - (b.min ?? OHNE_ZEIT)
                    || (a.art === "stunde" && b.art === "stunde" ? stundenRang(a.s.period) - stundenRang(b.s.period) : 0));
   const dateStr = new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" });
@@ -245,6 +262,17 @@ function HeutePanel({ t }) {
       {!data.frei && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {zeilen.map((z) => {
+            if (z.art === "fremd") {
+              const ev = z.ev;
+              const zeitTxt = ev.time ? (ev.endtime ? `${ev.time}–${ev.endtime}` : ev.time) : "";
+              const laeuft = fremdStand(ev) === "laeuft";
+              return (
+                <Link key={`x${ev.key || ev.title}`} to={`/kalender?view=day&date=${heuteYmd}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: `1px dashed ${laeuft ? "var(--accent)" : "var(--border2)"}`, borderLeft: `4px solid ${ev.color || "var(--border2)"}`, background: laeuft ? "var(--accent-bg, transparent)" : undefined, borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
+                  <div style={{ minWidth: 42, textAlign: "center", color: "var(--text3)", fontSize: 12, whiteSpace: "nowrap" }}>{zeitTxt || "—"}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{ev.title || "—"}</div>
+                </Link>
+              );
+            }
             if (z.art === "termin") {
               const e = z.e;
               const von = e.start_time || "";

@@ -21,6 +21,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Klassenarbeit: die Darstellung hat keinen E/G-Umschalter mehr und steht
   nicht mehr in der Trefferquote je Aufgabe; die Trennschärfe der übrigen
   Aufgaben rechnet ohne sie.
+- **Startseite:** Termine aus abonnierten Kalendern stehen unter „Heute“ mit
+  (wie im Kalender ausblendbar).
 - **Fehler melden: mehrere Anhänge** (bis 5, z. B. „vorher" und „nachher").
 - **Gesamtauswertung zeigt die Klassenarbeiten** als eigene Spalten (mit Modul
   Auswertung); Gesamt und % rechnen weiter nur über die Quizze.
