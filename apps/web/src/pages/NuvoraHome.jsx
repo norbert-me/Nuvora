@@ -174,8 +174,12 @@ function HeutePanel({ t }) {
       let fremd = [];
       let extAn = true;
       let extAus = new Set();
-      try { extAn = localStorage.getItem("kal_ext") !== "0"; } catch { /* Voreinstellung: an */ }
-      try { extAus = new Set(JSON.parse(localStorage.getItem("kal_ext_aus") || "[]")); } catch { /* keine */ }
+      // Am Konto (core/ansichten.js, „kal_ext"), sonst die alten Browser-Schluessel.
+      const extStand = lokal("kal_ext");
+      if (extStand && typeof extStand.an === "boolean") extAn = extStand.an;
+      else { try { extAn = localStorage.getItem("kal_ext") !== "0"; } catch { /* Voreinstellung: an */ } }
+      if (extStand && Array.isArray(extStand.aus)) extAus = new Set(extStand.aus);
+      else { try { extAus = new Set(JSON.parse(localStorage.getItem("kal_ext_aus") || "[]")); } catch { /* keine */ } }
       if (extAn) {
         const d = await fetch(`/api/kalender/external-events?frm=${ymd(heute)}&to=${ymd(heute)}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
         fremd = (Array.isArray(d) ? d : []).filter((ev) => ev.date === ymd(heute) && !extAus.has(ev.cal || ""));

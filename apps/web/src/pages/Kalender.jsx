@@ -116,8 +116,17 @@ export default function Kalender() {
   const [viewMenuOpen, setViewMenuOpen] = useState(false); // „Auge"-Menü (was ein-/ausblenden)
   const [showAllDay, setShowAllDay] = useState(() => { try { return localStorage.getItem("kal_allday") !== "0"; } catch { return true; } });
   const toggleAllDay = () => setShowAllDay((v) => { const n = !v; try { localStorage.setItem("kal_allday", n ? "1" : "0"); } catch { /* egal */ } return n; });
-  const [showExt, setShowExt] = useState(() => { try { return localStorage.getItem("kal_ext") !== "0"; } catch { return true; } });
-  const toggleExt = () => setShowExt((v) => { const n = !v; try { localStorage.setItem("kal_ext", n ? "1" : "0"); } catch { /* egal */ } return n; });
+  // Fremde Kalender an/aus und einzeln aus: am KONTO (core/ansichten.js,
+  // Bereich „kal_ext"), nicht nur im Browser — Feed und CalDAV schicken nur
+  // hinaus, was hier sichtbar ist (`ext_weitergeben` in kalender.py), und das
+  // geht nur, wenn der Server es weiss. Die alten Browser-Schluessel werden
+  // als Startwert weiter gelesen, damit niemandes Auswahl verloren geht.
+  const extStand = lokal("kal_ext");
+  const [showExt, setShowExt] = useState(() => {
+    if (extStand && typeof extStand.an === "boolean") return extStand.an;
+    try { return localStorage.getItem("kal_ext") !== "0"; } catch { return true; }
+  });
+  const toggleExt = () => setShowExt((v) => { const n = !v; sichern("kal_ext", { an: n, aus: [...extAusRef.current] }); return n; });
   // Einzelne externe Kalender ausblenden. Der Schalter darüber blendet ALLE
   // aus; wer drei Feeds abonniert hat (Schule, Verein, Familie), will aber
   // meistens genau einen davon loswerden. Gemerkt wird die URL, nicht die
@@ -125,12 +134,22 @@ export default function Kalender() {
   // ergänzt oder entfernt, und dann wäre plötzlich der falsche unsichtbar.
   // Im Browser und nicht am Konto — es ist eine Ansicht, kein Inhalt.
   const [extAus, setExtAus] = useState(() => {
+    if (extStand && Array.isArray(extStand.aus)) return new Set(extStand.aus);
     try { return new Set(JSON.parse(localStorage.getItem("kal_ext_aus") || "[]")); } catch { return new Set(); }
   });
+  const extAusRef = useRef(extAus);
+  extAusRef.current = extAus;
+  // Einmalig: eine nur im Browser gemerkte Auswahl ans Konto uebernehmen —
+  // sonst schickte der Feed die hier weggeschalteten Kalender weiter, bis
+  // jemand den Schalter einmal anfasst.
+  useEffect(() => {
+    if (extStand) return;
+    if (!showExt || extAus.size) sichern("kal_ext", { an: showExt, aus: [...extAus] });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const toggleExtCal = (url) => setExtAus((v) => {
     const n = new Set(v);
     if (n.has(url)) n.delete(url); else n.add(url);
-    try { localStorage.setItem("kal_ext_aus", JSON.stringify([...n])); } catch { /* egal */ }
+    sichern("kal_ext", { an: showExt, aus: [...n] });
     return n;
   });
   // Mehrere externe Kalender (read-only): je Kalender URL + Farbe. Einzelne

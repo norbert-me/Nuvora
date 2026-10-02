@@ -21,6 +21,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - Klassenarbeit: die Darstellung hat keinen E/G-Umschalter mehr und steht
   nicht mehr in der Trefferquote je Aufgabe; die Trennschärfe der übrigen
   Aufgaben rechnet ohne sie.
+- **Kalender-Abo und CalDAV:** im Kalender ausgeschaltete fremde Kalender
+  gehen nicht mehr ans Handy weiter; die Auswahl hängt jetzt am Konto.
 - **Startseite:** Termine aus abonnierten Kalendern stehen unter „Heute“ mit
   (wie im Kalender ausblendbar).
 - **Fehler melden: mehrere Anhänge** (bis 5, z. B. „vorher" und „nachher").

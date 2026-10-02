@@ -55,7 +55,7 @@ from ..zeit import tagesbeginn
 from .auth import (_DUMMY_PW_HASH, _hash_pw, _verify_pw, client_ip, fehlversuch_merken,
                    fehlversuche_pruefen, rate_limit)
 from .kalender import (_d_iso, _kurs_label, ext_dateiname, ext_uid,
-                       externe_ereignisse, stundenplan_vorkommen,
+                       externe_ereignisse, ext_weitergeben, stundenplan_vorkommen,
                        todo_dateiname, todo_termine, todo_uid)
 from .modules import is_active, modul_pflicht
 
@@ -464,7 +464,7 @@ async def _externe(u: User) -> list:
     """Die SICHTBAREN fremden Termine — leer, solange der Schalter aus ist."""
     if not u.feed_external:
         return []
-    return [e for e in await externe_ereignisse(u) if not e["hidden"]]
+    return [e for e in await externe_ereignisse(u) if ext_weitergeben(u, e)]
 
 
 def _externer_schluessel(name: str, rows) -> str:

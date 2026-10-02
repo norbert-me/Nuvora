@@ -1767,6 +1767,29 @@ def ext_kurz(key: str) -> str:
     return hashlib.md5((key or "").encode("utf-8")).hexdigest()[:20]
 
 
+def ext_weitergeben(user, ev: dict) -> bool:
+    """Geht dieser fremde Termin nach draussen (ICS-Feed, CalDAV)? Nur, was im
+    Kalender SICHTBAR ist.
+
+    Zwei Schalter kommen aus der Kalenderansicht und liegen am Konto
+    (`users.ansichten["kal_ext"]`, core/ansichten.js): alle fremden Kalender
+    an/aus (`an`) und einzelne Kalender aus (`aus`, ihre URLs). Vorher lagen
+    beide nur im Browser — ein in Nuvora weggeschalteter Kalender stand im
+    Handy trotzdem, weil der Server ihn nie kannte. Einzeln ausgeblendete
+    Termine (`hidden`) fallen wie bisher heraus. Fehlt die Einstellung, ist
+    alles sichtbar (so zeigt es auch die Ansicht).
+    """
+    if ev.get("hidden"):
+        return False
+    stand = (getattr(user, "ansichten", None) or {}).get("kal_ext") or {}
+    if not isinstance(stand, dict):
+        return True
+    if stand.get("an") is False:
+        return False
+    aus = stand.get("aus") or []
+    return not (isinstance(aus, list) and (ev.get("cal") or "") in aus)
+
+
 def ext_uid(key: str) -> str:
     return f"nuvora-ext-{ext_kurz(key)}@nuvora"
 
@@ -2082,7 +2105,7 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
     # alten Termine ohnehin aus dem Originalkalender.
     if u.feed_external:
         for ev in await externe_ereignisse(u, db=db):
-            if ev["hidden"]:
+            if not ext_weitergeben(u, ev):
                 continue
             tag = _d_iso(ev["date"])
             if not tag:
