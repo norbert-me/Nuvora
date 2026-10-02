@@ -110,6 +110,258 @@ function StatRow({ row, t, expandable, open, onToggle, small }) {
   );
 }
 
+// „Alle": die Auswertungen beider Blaetter zu EINER zusammenlegen — dieselbe
+// Form, damit dieselbe Anzeige sie zeigt. Themen werden ueber die Punkte
+// zusammengezaehlt (nicht die Prozente gemittelt), Aufgaben stehen getrennt
+// mit „E ·"/„G ·" davor (es sind verschiedene Aufgaben), und die Noten-
+// Kennzahlen entstehen neu aus den Noten und Prozenten aller Kinder.
+export function vereineAnalysen(teile, topicLabel) {
+  const da = teile.filter(([, a]) => a);
+  const themen = new Map();
+  da.forEach(([, a]) => a.topics.forEach((tp) => {
+    const x = themen.get(tp.topic_id) || { topic_id: tp.topic_id, label: tp.label, e: 0, m: 0 };
+    x.e += tp.e || 0; x.m += tp.m || 0; themen.set(tp.topic_id, x);
+  }));
+  const topics = [...themen.values()].map((x) => ({ ...x, pct: x.m ? Math.round((x.e / x.m) * 100) : 0 })).sort((a, b) => a.pct - b.pct);
+  const gradedCount = da.reduce((n, [, a]) => n + a.gradedCount, 0);
+  const schwach = new Map();
+  da.forEach(([, a]) => a.weakGroups.forEach((g) => schwach.set(g.label, [...(schwach.get(g.label) || []), ...g.namen])));
+  const weakGroups = [...schwach.entries()]
+    .map(([label, namen]) => ({ label, namen, anteil: gradedCount ? Math.round(namen.length / gradedCount * 100) : 0 }))
+    .sort((a, b) => b.namen.length - a.namen.length);
+  const vor = (stufe, x) => `${stufe} · ${x}`;
+  // „E · 3. (E)" waere doppelt: das Blatt steht schon vorn. Ein „(G)" am E-Blatt
+  // (Wahlaufgabe, Fassung des anderen Blatts) bleibt dagegen stehen.
+  const ohneEigene = (label, stufe) => (label.endsWith(` (${stufe})`) ? label.slice(0, -(stufe.length + 3)) : label);
+  const perTask = da.flatMap(([stufe, a]) => a.perTask.map((tk) => ({ ...tk, id: vor(stufe, tk.id), label: vor(stufe, ohneEigene(tk.label, stufe)) })));
+  const perUnit = da.flatMap(([stufe, a]) => a.perUnit.map((u) => ({ ...u, id: vor(stufe, u.id), taskId: vor(stufe, u.taskId) })));
+  const notes = da.flatMap(([, a]) => a.noten.notes);
+  const pctArr = da.flatMap(([, a]) => a.noten.pctArr);
+  const total = da.reduce((n, [, a]) => n + a.noten.total, 0);
+  return {
+    topics, weakGroups, gradedCount, perTask, perUnit,
+    students: da.flatMap(([, a]) => a.students),
+    bogen: da.flatMap(([, a]) => a.bogen),
+    fehlerRoh: da.flatMap(([, a]) => a.fehlerRoh),
+    fehlerStat: fehlerStatAus(da.flatMap(([, a]) => a.fehlerRoh), topicLabel),
+    noten: { ...notenStat(notes, pctArr, total), minPts: [], max: null },
+  };
+}
+
+// Noten-Kennzahlen aus Noten und Prozenten — fuer ein Blatt wie fuer „Alle".
+function notenStat(notes, pctArr, total) {
+  const werte = notes.map((x) => x.wert).sort((a, b) => a - b);
+  const dist = [1, 2, 3, 4, 5, 6].map((g) => notes.filter((x) => x.grade === g).length);
+  // Teilnoten-Verteilung (Tendenz: 1+ 1 2+ 2 2- …) — feinere Alternative.
+  // Kein "1+": im Einserband vergibt gradeDetailed keine Tendenz (siehe dort).
+  const FINE = ["1", "2+", "2", "2-", "3+", "3", "3-", "4+", "4", "4-", "5+", "5", "5-", "6"];
+  const distFine = FINE.map((lbl) => ({ label: lbl, grade: parseInt(lbl), count: notes.filter((x) => x.note === lbl).length }));
+  const avg = werte.length ? Math.round((werte.reduce((a, b) => a + b, 0) / werte.length) * 100) / 100 : null;
+  const r2 = (x) => rund(x, 2);
+  const stats = werte.length ? { min: werte[0], q1: r2(quantile(werte, 0.25)), med: r2(quantile(werte, 0.5)), q3: r2(quantile(werte, 0.75)), max: werte[werte.length - 1], sd: r2(stdev(werte)) } : null;
+  // Klassen-Kennzahlen wie CardVote: Ø-Prozent, Median-Prozent, 95%-KI, Anwesend.
+  const avgPct = pctArr.length ? Math.round(mittel(pctArr)) : null;
+  const medPct = pctArr.length ? Math.round(quantile([...pctArr].sort((a, b) => a - b), 0.5)) : null;
+  const sdPct = pctArr.length ? Math.round(streuung(pctArr) * 10) / 10 : null;
+  let ciLow = null, ciHigh = null;
+  if (pctArr.length >= 2) { const half = 1.96 * (streuung(pctArr) / Math.sqrt(pctArr.length)); ciLow = Math.max(0, Math.round(mittel(pctArr) - half)); ciHigh = Math.min(100, Math.round(mittel(pctArr) + half)); }
+  return { avg, dist, distFine, werte, n: notes.length, notes, pctArr, stats, avgPct, medPct, sdPct, ciLow, ciHigh, present: notes.length, total };
+}
+
+// Fehlerarten zusammenzaehlen — je Thema und je Kind.
+function fehlerStatAus(fehlerRoh, topicLabel) {
+  if (!fehlerRoh.length) return null;
+  const zaehl = (arten) => arten.reduce((d, a2) => ({ ...d, [a2]: (d[a2] || 0) + 1 }), {});
+  const proThema = new Map();
+  fehlerRoh.forEach((f) => { if (f.topic) { if (!proThema.has(f.topic)) proThema.set(f.topic, []); proThema.get(f.topic).push(f.art); } });
+  const proKind = new Map();
+  fehlerRoh.forEach((f) => { if (!proKind.has(f.sid)) proKind.set(f.sid, { name: f.name, arten: [] }); proKind.get(f.sid).arten.push(f.art); });
+  return {
+    gesamt: zaehl(fehlerRoh.map((f) => f.art)),
+    n: fehlerRoh.length,
+    topics: [...proThema.entries()]
+      .map(([tid, arten]) => ({ label: topicLabel(Number(tid)), typen: zaehl(arten), n: arten.length }))
+      .sort((a2, b2) => b2.n - a2.n),
+    students: [...proKind.entries()]
+      .map(([sid, v]) => ({ student_id: sid, name: v.name, typen: zaehl(v.arten),
+        haupt: Object.entries(zaehl(v.arten)).sort((a2, b2) => b2[1] - a2[1] || (a2[0] < b2[0] ? -1 : 1))[0][0] }))
+      .sort((a2, b2) => (a2.name < b2.name ? -1 : 1)),
+  };
+}
+
+// Die Auswertung EINES Blatts — aus dem Raster, ohne Server. Als Funktion
+// ausserhalb der Seite, weil „Alle" sie je Blatt rechnet und zusammenlegt
+// (`vereineAnalysen`); vorher stand sie im useMemo der Seite und liess sich
+// nur fuer das gerade offene Blatt aufrufen.
+export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigeneStufe, andereStufe }) {
+  if (!work) return null;
+  const tasks = work.tasks || [];
+  const results = work.results || {};
+  // Alle Einheiten BEIDER Fassungen; je Kind zaehlt nur die geschriebene
+  // (core/arbeitswertung.js — dieselbe Regel wie _profile im Server). Themen
+  // haengen an der Einheit: eine Teilaufgabe kann ein eigenes Thema tragen
+  // und erbt sonst das der Fassung bzw. Aufgabe.
+  const uMax = {}; tasks.forEach((tk) => alleEinheiten(wk, tk).forEach((u) => { uMax[u.id] = u.max; }));
+  const pu = (sid, uid) => punkteIn(results[String(sid)], uid, uMax[uid] ?? 1);
+  // Zeilen ohne jeden Eintrag zählen als 0 (leere/durchgefallene Arbeit) — nur
+  // „krank" (abwesend) bleibt aussen vor. Damit die Auswertung aber nicht schon
+  // vor der ersten Eingabe voller Nullen steht, erst wenn irgendein Wert da ist.
+  const absent = new Set([...((work.absent) || []).map(String), ...Object.entries(results).filter(([, v]) => v === "abwesend").map(([k]) => k)]);
+  // Gewertet wird, wer erfasst IST — nicht die ganze Klasse, sobald das erste
+  // Kind korrigiert ist. Sonst zieht jede noch leere Zeile den Schnitt mit
+  // einer 0 nach unten, und die Notenverteilung zeigt eine Wand aus Sechsen,
+  // waehrend man noch am Korrigieren ist. Eine bewusst eingetragene 0 zaehlt,
+  // ein leeres Feld nicht.
+  const erfasstIst = (s) => {
+    const r = results[String(s.id)];
+    if (absent.has(String(s.id)) || !r || r === "abwesend") return false;
+    if (Array.isArray(r)) return true;                 // Altformat
+    return Object.values(r).some((v) => v != null && v !== "");
+  };
+  const graded = students.filter(erfasstIst);
+  // Je Kind seine Wertung und sein Themenprofil — beides in der Fassung,
+  // die es je Aufgabe geschrieben hat.
+  const wert = new Map(graded.map((s) => [s.id, wertung(wk, s.id, effScale)]));
+  const themenVon = (sid) => {
+    const d = {};
+    tasks.forEach((tk) => einheitenFuer(wk, sid, tk).forEach((u) => {
+      if (!u.topic) return;
+      const x = (d[u.topic] ||= [0, 0]); x[0] += pu(sid, u.id); x[1] += u.max;
+    }));
+    return d;
+  };
+  const profil = new Map(graded.map((s) => [s.id, themenVon(s.id)]));
+  const themenIds = [...new Set([...profil.values()].flatMap((d) => Object.keys(d)))];
+  const mean = mittel;   // aus core/aufgabenstatistik.js
+
+  const topicsOut = themenIds.map((tid) => {
+    let e = 0, m = 0; graded.forEach((s) => { const x = profil.get(s.id)[tid]; if (x) { e += x[0]; m += x[1]; } });
+    return { topic_id: Number(tid), label: topicLabel(Number(tid)), pct: m ? Math.round((e / m) * 100) : 0, e, m };
+  }).sort((a, b) => a.pct - b.pct);
+  const schwachVon = (sid) => Object.entries(profil.get(sid)).filter(([, [e, m]]) => m && e / m < 0.5).map(([tid]) => topicLabel(Number(tid)));
+  // Nach Thema gruppiert: {label, namen[], anteil}. Sortiert nach Anzahl —
+  // das Thema, an dem die halbe Klasse haengt, gehoert nach oben, nicht das
+  // erste im Alphabet.
+  const weakGroups = (() => {
+    const map = new Map();
+    graded.forEach((s) => schwachVon(s.id).forEach((label) => {
+      if (!map.has(label)) map.set(label, []);
+      map.get(label).push(s.name);
+    }));
+    return [...map.entries()]
+      .map(([label, namen]) => ({ label, namen, anteil: graded.length ? Math.round(namen.length / graded.length * 100) : 0 }))
+      .sort((a, b) => b.namen.length - a.namen.length);
+  })();
+
+  const studentsOut = graded.map((s) => {
+    const weak = schwachVon(s.id);
+    return weak.length ? { student_id: s.id, name: s.name, weak } : null;
+  }).filter(Boolean);
+  // je Aufgabe: Ø-Punkte (⌀/Max), Trefferquote, Trennschärfe (Item-Total-
+  // Korrelation) und 95%-Konfidenzintervall der mittleren Trefferquote.
+  // Eine Aufgabe mit E-Fassung steht ZWEIMAL da — je Fassung mit genau den
+  // Kindern, die sie geschrieben haben: es sind zwei verschiedene Aufgaben,
+  // und ein Mittel ueber beide sagte ueber keine etwas.
+  // Die Darstellung steht nicht darin: sie prueft keine Aufgabe, sondern die
+  // Form der ganzen Arbeit, und eine Trefferquote daneben laede zum
+  // Vergleich mit den Sachaufgaben ein. In die Note zaehlt sie weiter.
+  const sachSumme = (sid) => tasks.reduce((n, tk) => n + (tk.form ? 0 : aufgabenPunkte(wk, sid, tk)), 0);
+  const perTask = [];
+  const perUnit = [];
+  tasks.forEach((tk, i) => {
+    if (tk.form) return;
+    const fassungen = [{ stufe: eigeneStufe, anders: false, us: eigeneEinheiten(tk) },
+      ...(andereFassung(wk, tk) ? [{ stufe: andereStufe, anders: true, us: andereEinheiten(wk, tk) }] : [])];
+    fassungen.forEach(({ stufe, anders, us }) => {
+      const kinder = graded.filter((s) => gewechselt(wk, s.id, tk) === anders);
+      if (fassungen.length > 1 && !kinder.length) return;
+      const zid = anders ? `${tk.id}~` : tk.id;
+      const xs = kinder.map((s) => us.reduce((n, u) => n + pu(s.id, u.id), 0));
+      // Gesamtleistung OHNE Darstellung — sie bewertet die Form, nicht den
+      // Stoff, und verschoebe sonst die Trennschaerfe jeder Sachaufgabe.
+      const tot = kinder.map((s) => sachSumme(s.id));
+      const mx = us.reduce((n, u) => n + u.max, 0);
+      const e = xs.reduce((a, b) => a + b, 0);
+      const m = kinder.length * mx;
+      // Trennschärfe und 95%-KI rechnet core/aufgabenstatistik.js — dieselben
+      // vierzehn Zeilen standen hier und gleich noch einmal bei den Teilaufgaben.
+      const disc = trennschaerfe(xs, tot);
+      const { ciLow, ciHigh } = konfidenzProzent(xs, mx);
+      const nullAnteil = xs.length ? Math.round(xs.filter((x) => x === 0).length / xs.length * 100) : null;
+      const vollAnteil = xs.length ? Math.round(xs.filter((x) => x >= mx).length / xs.length * 100) : null;
+      perTask.push({ id: zid, label: `${tk.label || `${i + 1}.`}${fassungen.length > 1 ? ` (${stufe})` : ""}`, pct: m ? Math.round((e / m) * 100) : 0,
+                     avgP: Math.round(mean(xs) * 10) / 10, max: mx, disc, ciLow, ciHigh,
+                     nullAnteil, vollAnteil, form: !!tk.form });
+      // Ø je Teilaufgabe (nur wo eine Fassung echte Teile hat).
+      if (us.length < 2) return;
+      us.forEach((u) => {
+        const ux = kinder.map((s) => pu(s.id, u.id));
+        const avgP = mean(ux);
+        const d2 = trennschaerfe(ux, tot);
+        const ki = konfidenzProzent(ux, u.max);
+        perUnit.push({ id: u.id, taskId: zid, label: u.label || "", avgP: Math.round(avgP * 10) / 10, max: u.max, pct: u.max ? Math.round((avgP / u.max) * 100) : 0, disc: d2, ciLow: ki.ciLow, ciHigh: ki.ciHigh });
+      });
+    });
+  });
+
+  // Endnote je SuS: Wertung (Basis + E-Bonus) → Note mit Tendenz + Notenwert.
+  const tm = basis(tasks);
+  const notes = graded.map((s) => { const d = gradeDetailed(wert.get(s.id).pct, effScale); return { name: s.name, note: d.note, wert: d.wert, grade: d.grade }; });
+  const minPts = [1, 2, 3, 4, 5].map((g) => ({ grade: g, pts: Math.ceil(((effScale[g] || 0) / 100) * tm) }));
+  const pctArr = graded.map((s) => wert.get(s.id).pct);
+  const noten = { ...notenStat(notes, pctArr, students.length), minPts, max: tm };
+  // ── Fehlerarten ──
+  // Dieselben zwei Regeln wie im Server (_fehler_gezaehlt in
+  // klassenarbeit.py): nur gewertete Kinder, und nur Zellen, in denen
+  // wirklich Punkte fehlen. Beide Seiten muessen hier dasselbe rechnen, sonst
+  // zeigt die Seite andere Zahlen als die API.
+  // Und nur in der Fassung, die das Kind geschrieben hat.
+  const meineEinheiten = (sid) => new Map(tasks.flatMap((tk) => einheitenFuer(wk, sid, tk).map((u) => [u.id, u])));
+  const fehlerRoh = [];
+  graded.forEach((s) => {
+    const zeile = (work.fehler || {})[String(s.id)] || {};
+    const meine = meineEinheiten(s.id);
+    Object.entries(zeile).forEach(([uid, art]) => {
+      const u = meine.get(uid);
+      if (!u || pu(s.id, uid) >= u.max) return;
+      fehlerRoh.push({ sid: s.id, name: s.name, uid, art, topic: u.topic || null });
+    });
+  });
+  const zaehl = (arten) => arten.reduce((d, a2) => ({ ...d, [a2]: (d[a2] || 0) + 1 }), {});
+  const fehlerStat = fehlerStatAus(fehlerRoh, topicLabel);
+
+  // ── Rueckmeldebogen: je Kind ALLES, was auf sein Blatt gehoert ──
+  // Bewusst je Kind vollstaendig und ohne einen einzigen Vergleich mit der
+  // Klasse: das Blatt wird ausgedruckt und ausgeteilt, und was ein anderes
+  // Kind geschrieben hat, geht niemanden etwas an. Kein Rang, kein
+  // Klassenschnitt, keine fremden Namen.
+  const bogen = graded.map((s) => {
+    const w = wert.get(s.id);
+    const themen = Object.entries(profil.get(s.id)).map(([tid, [e, m]]) => (
+      { label: topicLabel(Number(tid)), erreicht: e, max: m, pct: m ? Math.round(e / m * 100) : 0 }
+    )).sort((a2, b2) => a2.pct - b2.pct);
+    const eigene = (work.fehler || {})[String(s.id)] || {};
+    const meine = meineEinheiten(s.id);
+    const arten = Object.entries(eigene)
+      .filter(([uid]) => meine.has(uid) && pu(s.id, uid) < meine.get(uid).max)
+      .map(([, art]) => art);
+    const haeufigste = arten.length
+      ? Object.entries(zaehl(arten)).sort((a2, b2) => b2[1] - a2[1] || (a2[0] < b2[0] ? -1 : 1))[0][0]
+      : null;
+    return {
+      student_id: s.id, name: s.name, punkte: rund(w.erreicht, 2), max: tm, pct: Math.round(w.pct),
+      note: tm ? gradeFromPct(w.pct, effScale) : null,
+      // ≥ 75 % sass, < 50 % ist Baustelle. Dazwischen steht bewusst nichts:
+      // ein Blatt, auf dem jedes Thema kommentiert ist, liest niemand.
+      sass: themen.filter((x) => x.pct >= 75),
+      offen: themen.filter((x) => x.pct < 50),
+      haupt: haeufigste,
+    };
+  });
+
+  return { topics: topicsOut, students: studentsOut, weakGroups, fehlerStat, fehlerRoh, bogen, gradedCount: graded.length, perTask, perUnit, noten };
+}
+
 export default function Klassenarbeit() {
   const { t } = useLanguage();
   const aktiv = useAktiv();
@@ -540,205 +792,26 @@ export default function Klassenarbeit() {
 
   // Auswertung LIVE aus dem Raster (kein Button, kein Server-Call): je Thema die
   // Trefferquote der Klasse + je SuS die schwachen Themen (≥ 50 % falsch).
-  const analyse = useMemo(() => {
-    if (!work) return null;
-    const tasks = work.tasks || [];
-    const results = work.results || {};
-    // Alle Einheiten BEIDER Fassungen; je Kind zaehlt nur die geschriebene
-    // (core/arbeitswertung.js — dieselbe Regel wie _profile im Server). Themen
-    // haengen an der Einheit: eine Teilaufgabe kann ein eigenes Thema tragen
-    // und erbt sonst das der Fassung bzw. Aufgabe.
-    const uMax = {}; tasks.forEach((tk) => alleEinheiten(wk, tk).forEach((u) => { uMax[u.id] = u.max; }));
-    const pu = (sid, uid) => punkteIn(results[String(sid)], uid, uMax[uid] ?? 1);
-    // Zeilen ohne jeden Eintrag zählen als 0 (leere/durchgefallene Arbeit) — nur
-    // „krank" (abwesend) bleibt aussen vor. Damit die Auswertung aber nicht schon
-    // vor der ersten Eingabe voller Nullen steht, erst wenn irgendein Wert da ist.
-    const absent = new Set([...((work.absent) || []).map(String), ...Object.entries(results).filter(([, v]) => v === "abwesend").map(([k]) => k)]);
-    // Gewertet wird, wer erfasst IST — nicht die ganze Klasse, sobald das erste
-    // Kind korrigiert ist. Sonst zieht jede noch leere Zeile den Schnitt mit
-    // einer 0 nach unten, und die Notenverteilung zeigt eine Wand aus Sechsen,
-    // waehrend man noch am Korrigieren ist. Eine bewusst eingetragene 0 zaehlt,
-    // ein leeres Feld nicht.
-    const erfasstIst = (s) => {
-      const r = results[String(s.id)];
-      if (absent.has(String(s.id)) || !r || r === "abwesend") return false;
-      if (Array.isArray(r)) return true;                 // Altformat
-      return Object.values(r).some((v) => v != null && v !== "");
-    };
-    const graded = students.filter(erfasstIst);
-    // Je Kind seine Wertung und sein Themenprofil — beides in der Fassung,
-    // die es je Aufgabe geschrieben hat.
-    const wert = new Map(graded.map((s) => [s.id, wertung(wk, s.id, effScale)]));
-    const themenVon = (sid) => {
-      const d = {};
-      tasks.forEach((tk) => einheitenFuer(wk, sid, tk).forEach((u) => {
-        if (!u.topic) return;
-        const x = (d[u.topic] ||= [0, 0]); x[0] += pu(sid, u.id); x[1] += u.max;
-      }));
-      return d;
-    };
-    const profil = new Map(graded.map((s) => [s.id, themenVon(s.id)]));
-    const themenIds = [...new Set([...profil.values()].flatMap((d) => Object.keys(d)))];
-    const mean = mittel, sdOf = streuung;   // beide aus core/aufgabenstatistik.js
-
-    const topicsOut = themenIds.map((tid) => {
-      let e = 0, m = 0; graded.forEach((s) => { const x = profil.get(s.id)[tid]; if (x) { e += x[0]; m += x[1]; } });
-      return { topic_id: Number(tid), label: topicLabel(Number(tid)), pct: m ? Math.round((e / m) * 100) : 0 };
-    }).sort((a, b) => a.pct - b.pct);
-    const schwachVon = (sid) => Object.entries(profil.get(sid)).filter(([, [e, m]]) => m && e / m < 0.5).map(([tid]) => topicLabel(Number(tid)));
-    // Nach Thema gruppiert: {label, namen[], anteil}. Sortiert nach Anzahl —
-    // das Thema, an dem die halbe Klasse haengt, gehoert nach oben, nicht das
-    // erste im Alphabet.
-    const weakGroups = (() => {
-      const map = new Map();
-      graded.forEach((s) => schwachVon(s.id).forEach((label) => {
-        if (!map.has(label)) map.set(label, []);
-        map.get(label).push(s.name);
-      }));
-      return [...map.entries()]
-        .map(([label, namen]) => ({ label, namen, anteil: graded.length ? Math.round(namen.length / graded.length * 100) : 0 }))
-        .sort((a, b) => b.namen.length - a.namen.length);
-    })();
-
-    const studentsOut = graded.map((s) => {
-      const weak = schwachVon(s.id);
-      return weak.length ? { student_id: s.id, name: s.name, weak } : null;
-    }).filter(Boolean);
-    // je Aufgabe: Ø-Punkte (⌀/Max), Trefferquote, Trennschärfe (Item-Total-
-    // Korrelation) und 95%-Konfidenzintervall der mittleren Trefferquote.
-    // Eine Aufgabe mit E-Fassung steht ZWEIMAL da — je Fassung mit genau den
-    // Kindern, die sie geschrieben haben: es sind zwei verschiedene Aufgaben,
-    // und ein Mittel ueber beide sagte ueber keine etwas.
-    // Die Darstellung steht nicht darin: sie prueft keine Aufgabe, sondern die
-    // Form der ganzen Arbeit, und eine Trefferquote daneben laede zum
-    // Vergleich mit den Sachaufgaben ein. In die Note zaehlt sie weiter.
-    const sachSumme = (sid) => tasks.reduce((n, tk) => n + (tk.form ? 0 : aufgabenPunkte(wk, sid, tk)), 0);
-    const perTask = [];
-    const perUnit = [];
-    tasks.forEach((tk, i) => {
-      if (tk.form) return;
-      const fassungen = [{ stufe: eigeneStufe, anders: false, us: eigeneEinheiten(tk) },
-        ...(andereFassung(wk, tk) ? [{ stufe: andereStufe, anders: true, us: andereEinheiten(wk, tk) }] : [])];
-      fassungen.forEach(({ stufe, anders, us }) => {
-        const kinder = graded.filter((s) => gewechselt(wk, s.id, tk) === anders);
-        if (fassungen.length > 1 && !kinder.length) return;
-        const zid = anders ? `${tk.id}~` : tk.id;
-        const xs = kinder.map((s) => us.reduce((n, u) => n + pu(s.id, u.id), 0));
-        // Gesamtleistung OHNE Darstellung — sie bewertet die Form, nicht den
-        // Stoff, und verschoebe sonst die Trennschaerfe jeder Sachaufgabe.
-        const tot = kinder.map((s) => sachSumme(s.id));
-        const mx = us.reduce((n, u) => n + u.max, 0);
-        const e = xs.reduce((a, b) => a + b, 0);
-        const m = kinder.length * mx;
-        // Trennschärfe und 95%-KI rechnet core/aufgabenstatistik.js — dieselben
-        // vierzehn Zeilen standen hier und gleich noch einmal bei den Teilaufgaben.
-        const disc = trennschaerfe(xs, tot);
-        const { ciLow, ciHigh } = konfidenzProzent(xs, mx);
-        const nullAnteil = xs.length ? Math.round(xs.filter((x) => x === 0).length / xs.length * 100) : null;
-        const vollAnteil = xs.length ? Math.round(xs.filter((x) => x >= mx).length / xs.length * 100) : null;
-        perTask.push({ id: zid, label: `${tk.label || `${i + 1}.`}${fassungen.length > 1 ? ` (${stufe})` : ""}`, pct: m ? Math.round((e / m) * 100) : 0,
-                       avgP: Math.round(mean(xs) * 10) / 10, max: mx, disc, ciLow, ciHigh,
-                       nullAnteil, vollAnteil, form: !!tk.form });
-        // Ø je Teilaufgabe (nur wo eine Fassung echte Teile hat).
-        if (us.length < 2) return;
-        us.forEach((u) => {
-          const ux = kinder.map((s) => pu(s.id, u.id));
-          const avgP = mean(ux);
-          const d2 = trennschaerfe(ux, tot);
-          const ki = konfidenzProzent(ux, u.max);
-          perUnit.push({ id: u.id, taskId: zid, label: u.label || "", avgP: Math.round(avgP * 10) / 10, max: u.max, pct: u.max ? Math.round((avgP / u.max) * 100) : 0, disc: d2, ciLow: ki.ciLow, ciHigh: ki.ciHigh });
-        });
-      });
+  const analyse = useMemo(() => rechneAnalyse({ work, wk, students, effScale, topicLabel, eigeneStufe, andereStufe }),
+    [work, wk, students, topics, scale, effScale, eigeneStufe, andereStufe]);
+  // „Alle": je Blatt die eigene Auswertung (mit dem anderen Blatt fuer die
+  // Wahlaufgaben, mit den Kindern seines Niveaus und seinem Notenschluessel)
+  // und daraus die gemeinsame.
+  const alleAnalysen = useMemo(() => {
+    if (!alleAn) return null;
+    const blaetter = [work, partner].filter(Boolean).sort((a, b) => (a.niveau < b.niveau ? -1 : 1));   // E vor G
+    const teile = blaetter.map((b) => {
+      const anderes = blaetter.find((x) => x !== b);
+      const sc = b.scale && Object.keys(b.scale).length ? b.scale : scale;
+      const stufe = b.niveau || "";
+      return [stufe, rechneAnalyse({
+        work: b, wk: { ...b, _alt: (anderes && anderes.tasks) || [] },
+        students: alleStudents.filter((st) => (st.niveau || "") === stufe),
+        effScale: sc, topicLabel, eigeneStufe: stufe, andereStufe: stufe === "E" ? "G" : "E",
+      })];
     });
-
-    // Endnote je SuS: Wertung (Basis + E-Bonus) → Note mit Tendenz + Notenwert.
-    const tm = basis(tasks);
-    const notes = graded.map((s) => { const d = gradeDetailed(wert.get(s.id).pct, effScale); return { name: s.name, note: d.note, wert: d.wert, grade: d.grade }; });
-    const werte = notes.map((x) => x.wert).sort((a, b) => a - b);
-    const dist = [1, 2, 3, 4, 5, 6].map((g) => notes.filter((x) => x.grade === g).length);
-    // Teilnoten-Verteilung (Tendenz: 1+ 1 2+ 2 2- …) — feinere Alternative.
-    // Kein "1+": im Einserband vergibt gradeDetailed keine Tendenz (siehe dort).
-    const FINE = ["1", "2+", "2", "2-", "3+", "3", "3-", "4+", "4", "4-", "5+", "5", "5-", "6"];
-    const distFine = FINE.map((lbl) => ({ label: lbl, grade: parseInt(lbl), count: notes.filter((x) => x.note === lbl).length }));
-    const avg = werte.length ? Math.round((werte.reduce((a, b) => a + b, 0) / werte.length) * 100) / 100 : null;
-    const r2 = (x) => rund(x, 2);
-    const stats = werte.length ? { min: werte[0], q1: r2(quantile(werte, 0.25)), med: r2(quantile(werte, 0.5)), q3: r2(quantile(werte, 0.75)), max: werte[werte.length - 1], sd: r2(stdev(werte)) } : null;
-    const minPts = [1, 2, 3, 4, 5].map((g) => ({ grade: g, pts: Math.ceil(((effScale[g] || 0) / 100) * tm) }));
-    // Klassen-Kennzahlen wie CardVote: Ø-Prozent, Median-Prozent, 95%-KI, Anwesend.
-    const pctArr = graded.map((s) => wert.get(s.id).pct);
-    const avgPct = pctArr.length ? Math.round(mean(pctArr)) : null;
-    const medPct = pctArr.length ? Math.round(quantile([...pctArr].sort((a, b) => a - b), 0.5)) : null;
-    const sdPct = pctArr.length ? Math.round(sdOf(pctArr) * 10) / 10 : null;
-    let ciLow = null, ciHigh = null;
-    if (pctArr.length >= 2) { const half = 1.96 * (sdOf(pctArr) / Math.sqrt(pctArr.length)); ciLow = Math.max(0, Math.round(mean(pctArr) - half)); ciHigh = Math.min(100, Math.round(mean(pctArr) + half)); }
-    const present = graded.length, total = students.length;
-    // ── Fehlerarten ──
-    // Dieselben zwei Regeln wie im Server (_fehler_gezaehlt in
-    // klassenarbeit.py): nur gewertete Kinder, und nur Zellen, in denen
-    // wirklich Punkte fehlen. Beide Seiten muessen hier dasselbe rechnen, sonst
-    // zeigt die Seite andere Zahlen als die API.
-    // Und nur in der Fassung, die das Kind geschrieben hat.
-    const meineEinheiten = (sid) => new Map(tasks.flatMap((tk) => einheitenFuer(wk, sid, tk).map((u) => [u.id, u])));
-    const fehlerRoh = [];
-    graded.forEach((s) => {
-      const zeile = (work.fehler || {})[String(s.id)] || {};
-      const meine = meineEinheiten(s.id);
-      Object.entries(zeile).forEach(([uid, art]) => {
-        const u = meine.get(uid);
-        if (!u || pu(s.id, uid) >= u.max) return;
-        fehlerRoh.push({ sid: s.id, name: s.name, uid, art, topic: u.topic || null });
-      });
-    });
-    const zaehl = (arten) => arten.reduce((d, a2) => ({ ...d, [a2]: (d[a2] || 0) + 1 }), {});
-    const fehlerStat = fehlerRoh.length ? (() => {
-      const proThema = new Map();
-      fehlerRoh.forEach((f) => { if (f.topic) { if (!proThema.has(f.topic)) proThema.set(f.topic, []); proThema.get(f.topic).push(f.art); } });
-      const proKind = new Map();
-      fehlerRoh.forEach((f) => { if (!proKind.has(f.sid)) proKind.set(f.sid, { name: f.name, arten: [] }); proKind.get(f.sid).arten.push(f.art); });
-      return {
-        gesamt: zaehl(fehlerRoh.map((f) => f.art)),
-        n: fehlerRoh.length,
-        topics: [...proThema.entries()]
-          .map(([tid, arten]) => ({ label: topicLabel(Number(tid)), typen: zaehl(arten), n: arten.length }))
-          .sort((a2, b2) => b2.n - a2.n),
-        students: [...proKind.entries()]
-          .map(([sid, v]) => ({ student_id: sid, name: v.name, typen: zaehl(v.arten),
-            haupt: Object.entries(zaehl(v.arten)).sort((a2, b2) => b2[1] - a2[1] || (a2[0] < b2[0] ? -1 : 1))[0][0] }))
-          .sort((a2, b2) => (a2.name < b2.name ? -1 : 1)),
-      };
-    })() : null;
-
-    // ── Rueckmeldebogen: je Kind ALLES, was auf sein Blatt gehoert ──
-    // Bewusst je Kind vollstaendig und ohne einen einzigen Vergleich mit der
-    // Klasse: das Blatt wird ausgedruckt und ausgeteilt, und was ein anderes
-    // Kind geschrieben hat, geht niemanden etwas an. Kein Rang, kein
-    // Klassenschnitt, keine fremden Namen.
-    const bogen = graded.map((s) => {
-      const w = wert.get(s.id);
-      const themen = Object.entries(profil.get(s.id)).map(([tid, [e, m]]) => (
-        { label: topicLabel(Number(tid)), erreicht: e, max: m, pct: m ? Math.round(e / m * 100) : 0 }
-      )).sort((a2, b2) => a2.pct - b2.pct);
-      const eigene = (work.fehler || {})[String(s.id)] || {};
-      const meine = meineEinheiten(s.id);
-      const arten = Object.entries(eigene)
-        .filter(([uid]) => meine.has(uid) && pu(s.id, uid) < meine.get(uid).max)
-        .map(([, art]) => art);
-      const haeufigste = arten.length
-        ? Object.entries(zaehl(arten)).sort((a2, b2) => b2[1] - a2[1] || (a2[0] < b2[0] ? -1 : 1))[0][0]
-        : null;
-      return {
-        student_id: s.id, name: s.name, punkte: rund(w.erreicht, 2), max: tm, pct: Math.round(w.pct),
-        note: tm ? gradeFromPct(w.pct, effScale) : null,
-        // ≥ 75 % sass, < 50 % ist Baustelle. Dazwischen steht bewusst nichts:
-        // ein Blatt, auf dem jedes Thema kommentiert ist, liest niemand.
-        sass: themen.filter((x) => x.pct >= 75),
-        offen: themen.filter((x) => x.pct < 50),
-        haupt: haeufigste,
-      };
-    });
-
-    return { topics: topicsOut, students: studentsOut, weakGroups, fehlerStat, bogen, gradedCount: graded.length, perTask, perUnit, noten: { avg, dist, distFine, werte, n: notes.length, notes, stats, minPts, max: tm, avgPct, medPct, sdPct, ciLow, ciHigh, present, total } };
-  }, [work, wk, students, topics, scale, effScale, eigeneStufe, andereStufe]);
+    return { gesamt: vereineAnalysen(teile, topicLabel), teile };
+  }, [alleAn, work, partner, alleStudents, scale, topics]);
   const wiederholen = async () => {
     if (!work) return;
     setBusy(true);
@@ -765,6 +838,231 @@ export default function Klassenarbeit() {
     if (!andere.length) return eigen.length > 1 ? [...e, { art: "summe" }] : e;
     return [{ art: "wahl" }, ...e, ...andere.map((u) => ({ art: "einheit", anders: true, u, mitStufe: true })), { art: "summe" }];
   };
+
+  // Der Auswertungsblock — fuer ein Blatt, und unter „Alle" dreimal: gesamt,
+  // E und G. Dieselbe Anzeige fuer alle drei, damit sie sich nicht
+  // auseinanderentwickeln (die erste „Alle"-Ansicht war ein eigener Nachbau
+  // und sah deshalb anders aus).
+  const zeigeAuswertung = (A, titel = null, schluessel = "blatt") => (
+    <Fragment key={schluessel}>{
+      (A && (A.topics.length > 0 || A.students.length > 0 || A.perUnit.length > 0 || A.noten.n > 0)) ? (
+            <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, padding: 16, background: "var(--card)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, borderBottom: "1px solid var(--border)", paddingBottom: 10 }}>
+                <span style={{ fontSize: 16, fontWeight: 800 }}>{titel || t("klassenarbeit.analysisTitle")}</span>
+                <button onClick={() => setHideIndividual((v) => !v)} title={t("klassenarbeit.presentHint")}
+                  style={{ ...toolbarBtn, background: hideIndividual ? "var(--accent)" : "transparent", color: hideIndividual ? C.aufAkzent : "var(--text2)" }}>
+                  <Icon d={ICONS.eye} size={15} color={hideIndividual ? C.aufAkzent : "var(--text2)"} /> {t("klassenarbeit.presentMode")}
+                </button>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("klassenarbeit.byTopic")}</div>
+              {A.topics.length === 0 ? <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("klassenarbeit.noTopics")}</p> : A.topics.map((tp) => (
+                <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{tp.label}</span>
+                  {/* Balken: Radius = halbe Hoehe (Balken-Kappe), reine Grafik. */}
+                  <span style={{ width: 120, height: 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tp.pct}%`, height: "100%", background: tp.pct < 50 ? C.danger : tp.pct < 75 ? C.warning : C.success }} /></span>
+                  <span style={{ fontSize: 13, fontWeight: 700, minWidth: 38, textAlign: "right" }}>{tp.pct}%</span>
+                </div>
+              ))}
+              {/* Frueher stand hier je Kind eine Zeile mit allen Themen als
+                  Fliesstext — bei 28 Kindern und langen Themennamen eine Wand,
+                  aus der niemand etwas ableitet. Jetzt andersherum: nach THEMA
+                  gruppiert, das mit den meisten Betroffenen oben. So steht da,
+                  was man am Montag tut — und wen man dazuholt. */}
+              {!hideIndividual && A.weakGroups.length > 0 && (<>
+                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 4px" }}>{t("klassenarbeit.weakStudents")}</div>
+                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>{t("klassenarbeit.weakHint")}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {A.weakGroups.map((g) => (
+                    <div key={g.label} style={{ border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: "8px 10px" }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0 }}>{g.label}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: g.anteil >= 50 ? C.danger : C.warning }}>
+                          {t("klassenarbeit.weakCount", { n: g.namen.length, all: A.gradedCount })}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {g.namen.map((n) => (
+                          <span key={n} style={{ ...chipStyle, fontWeight: 500, background: "var(--bg2)" }}>{n}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>)}
+
+              {/* Fehlerarten: die Themenquote sagt WO es klemmt, die Fehlerart
+                  WORAN — und daraus folgt Verschiedenes. Nur da, wo jemand
+                  wirklich etwas erfasst hat; sonst stuende hier eine Tabelle
+                  aus lauter Nullen und behauptete, die Klasse mache keine
+                  Fehler. */}
+              {A.fehlerStat && (<>
+                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 4px" }}>{t("klassenarbeit.fehlerTitle")}</div>
+                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>
+                  {t("klassenarbeit.fehlerTitleHint", { n: A.fehlerStat.n })}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                  {FEHLER.filter((f) => A.fehlerStat.gesamt[f.key]).map((f) => (
+                    <span key={f.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: "6px 10px" }}>
+                      <span style={{ ...fehlerChip, background: f.color, color: C.aufAkzent }}>{f.ab}</span>
+                      <span style={{ fontSize: 13 }}>{t(`klassenarbeit.fehler.${f.key}`)}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>{A.fehlerStat.gesamt[f.key]}×</span>
+                    </span>
+                  ))}
+                </div>
+                {/* Je Thema: „an Bruchrechnung scheitert der Ansatz, an Termen
+                    nur die Rechnung" — dieselbe Quote, zwei verschiedene
+                    Konsequenzen. */}
+                {A.fehlerStat.topics.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
+                    {A.fehlerStat.topics.map((r) => (
+                      <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "6px 10px", borderRadius: panelStyle.borderRadius, background: "var(--bg2)" }}>
+                        <span style={{ flex: 1, minWidth: 120, fontSize: 13, fontWeight: 600 }}>{r.label}</span>
+                        {FEHLER.filter((f) => r.typen[f.key]).map((f) => (
+                          <span key={f.key} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text2)" }}>
+                            <span style={{ ...fehlerChip, background: f.color, color: C.aufAkzent }}>{f.ab}</span>
+                            {r.typen[f.key]}
+                          </span>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!hideIndividual && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {A.fehlerStat.students.map((st) => {
+                      const f = FEHLER.find((x) => x.key === st.haupt);
+                      return (
+                        <span key={st.student_id} style={{ ...chipStyle, fontWeight: 500, background: "var(--bg2)", display: "inline-flex", alignItems: "center", gap: 5 }}
+                          title={FEHLER.filter((x) => st.typen[x.key]).map((x) => `${t(`klassenarbeit.fehler.${x.key}`)}: ${st.typen[x.key]}`).join("\n")}>
+                          <span style={{ ...fehlerChip, background: f ? f.color : "var(--bg3)", color: C.aufAkzent }}>{f ? f.ab : "?"}</span>
+                          {st.name}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </>)}
+
+              {/* je Aufgabe: Ø, Trefferquote + Trennschärfe/95%-KI. Hat eine Aufgabe
+                  Teilaufgaben, lässt sich deren Auswertung darunter ausklappen. */}
+              {A.perTask.length > 0 && (<>
+                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.byTask")}</div>
+                {A.perTask.map((tk) => {
+                  const parts = A.perUnit.filter((u) => u.taskId === tk.id);
+                  const open = expandedTasks.has(tk.id);
+                  const toggle = () => setExpandedTasks((prev) => { const n = new Set(prev); n.has(tk.id) ? n.delete(tk.id) : n.add(tk.id); return n; });
+                  return (
+                    <div key={tk.id}>
+                      <StatRow row={tk} t={t} expandable={parts.length > 0} open={open} onToggle={toggle} />
+                      {open && parts.length > 0 && (
+                        <div style={{ marginLeft: 16, marginBottom: 4 }}>
+                          {parts.map((u) => <StatRow key={u.id} row={u} t={t} small />)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </>)}
+
+              {/* Noten-Auswertung im CardVote-Design: Kennzahl-Kacheln + Panel mit
+                  Notenverteilung/Boxplot-Umschalter. */}
+              {A.noten.n > 0 && (<>
+                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.gradeResult")}</div>
+                {/* Statistik-Kacheln (Anwesend … 95%-KI) — wie CardVote. */}
+                <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+                  <StatCard label={t("klassenarbeit.attendance")} value={`${A.noten.present} / ${A.noten.total}`} />
+                  <StatCard label={t("klassenarbeit.avgGrade")} value={komma(A.noten.avg)} />
+                  {A.noten.avgPct != null && <StatCard label={t("klassenarbeit.avgPct")} value={`${A.noten.avgPct}%`} />}
+                  {A.noten.medPct != null && <StatCard label={t("klassenarbeit.median")} value={`${A.noten.medPct}%`} />}
+                  {A.noten.sdPct != null && <StatCard label={t("klassenarbeit.stdev")} value={`${komma(A.noten.sdPct)}%`} />}
+                  {A.noten.ciLow != null && <StatCard label={t("klassenarbeit.ci")} value={`${A.noten.ciLow}–${A.noten.ciHigh}%`} />}
+                </div>
+                {/* „Auswertung verstehen": Kennzahlen erklärt + konkrete Handlungshinweise. */}
+                <button onClick={() => setInfoOpen((v) => !v)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13, marginBottom: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ display: "inline-flex", transform: infoOpen ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}><Icon d={ICONS.open} size={12} /></span>
+                  {t("klassenarbeit.explain")}
+                </button>
+                {infoOpen && (() => {
+                  const sd = A.noten.sdPct;
+                  const sdLevel = sd == null ? null : sd < 10 ? "low" : sd <= 25 ? "mid" : "high";
+                  const weak = A.topics.filter((tp) => tp.pct < 50).map((tp) => tp.label);
+                  const lowDisc = A.perTask.filter((tk) => tk.disc != null && tk.disc < 0.2);
+                  const Item = ({ term, children }) => (
+                    <li style={{ marginBottom: 8 }}><b style={{ color: "var(--text)" }}>{term}:</b> <span style={{ color: "var(--text2)" }}>{children}</span></li>
+                  );
+                  return (
+                    <div style={{ padding: 16, background: "var(--bg3)", borderRadius: cardStyle.borderRadius, border: "1px solid var(--border)", marginBottom: 12, fontSize: 13, lineHeight: 1.55 }}>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        <Item term={t("klassenarbeit.avgGrade") + " / " + t("klassenarbeit.median")}>{t("klassenarbeit.explainAvg")}</Item>
+                        {sd != null && (
+                          <Item term={`${t("klassenarbeit.stdev")} (${komma(sd)}%)`}>
+                            {t("klassenarbeit.explainSd")} {" "}
+                            <b style={{ color: sdLevel === "low" ? C.warning : sdLevel === "mid" ? C.success : C.danger }}>
+                              {t(`klassenarbeit.explainSd_${sdLevel}`)}
+                            </b>
+                          </Item>
+                        )}
+                        {A.noten.ciLow != null && <Item term={t("klassenarbeit.ci")}>{t("klassenarbeit.explainCi")}</Item>}
+                        <Item term={t("klassenarbeit.disc")}>{t("klassenarbeit.explainDisc")}</Item>
+                      </ul>
+                      {(weak.length > 0 || lowDisc.length > 0) && (
+                        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                          <div style={{ fontWeight: 700, marginBottom: 4 }}>{t("klassenarbeit.explainActions")}</div>
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {weak.length > 0 && <li style={{ marginBottom: 4, color: "var(--text2)" }}>{t("klassenarbeit.explainWeak", { topics: weak.join(", ") })}</li>}
+                            {lowDisc.length > 0 && <li style={{ color: "var(--text2)" }}>{t("klassenarbeit.explainLowDisc", { n: lowDisc.length })}</li>}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+                {/* Verteilung / Boxplot — Panel + Pillen-Umschalter wie CardVote. */}
+                <div style={{ padding: 16, background: "var(--bg3)", borderRadius: cardStyle.borderRadius, border: "1px solid var(--border)" }}>
+                  {/* Zweimal dieselbe Frage („welche Ansicht?"), also zweimal
+                      dieselbe Form. Links standen vorher zwei Einzelpillen
+                      (r980), rechts eine Gruppe mit r8 — nebeneinander sah das
+                      aus wie zwei verschiedene Bedienarten. */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                    <Tabs value={distMode} onChange={setDistMode}
+                      options={[["bar", t("klassenarbeit.distGrades")], ["box", t("klassenarbeit.distBox")]]} />
+                    {/* Sekundär-Umschalter: Balken = Noten/Teilnoten, Boxplot = %/Noten. */}
+                    <Tabs style={{ marginLeft: "auto" }}
+                      value={distMode === "bar" ? barMode : boxMode}
+                      onChange={distMode === "bar" ? setBarMode : setBoxMode}
+                      options={distMode === "bar"
+                        ? [["whole", t("klassenarbeit.distWhole")], ["fine", t("klassenarbeit.distFine")]]
+                        : [["pct", "%"], ["note", t("klassenarbeit.grade")]]} />
+                  </div>
+                  {distMode === "bar" ? (() => {
+                    const data = barMode === "fine"
+                      ? A.noten.distFine.map((d) => ({ count: d.count, label: d.label, grade: d.grade }))
+                      : A.noten.dist.map((c, i) => ({ count: c, label: String(i + 1), grade: i + 1 }));
+                    const mxc = Math.max(...data.map((d) => d.count), 1);
+                    return (
+                      <div style={{ display: "flex", alignItems: "flex-end", gap: barMode === "fine" ? 3 : 6, height: 105 }}>
+                        {data.map((d, i) => (
+                          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                            {/* Saeule: Radius rundet nur die Kappe der Grafik. */}
+                            <div style={{ width: barMode === "fine" ? "80%" : "60%", height: `${Math.max(3, (d.count / mxc) * 75)}px`, background: d.grade <= 2 ? C.success : d.grade <= 4 ? C.warning : C.danger, borderRadius: 3 }} title={`${d.count}`} />
+                            <span style={{ fontSize: 11, color: "var(--text3)" }}>{d.count}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700 }}>{d.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })() : (
+                    boxMode === "note"
+                      ? <Boxplot values={A.noten.werte} max={6} />
+                      : <Boxplot values={A.noten.pctArr} max={100} unit="%" />
+                  )}
+                </div>
+                {/* Min-Punkte je Note entfernt — steht im Notenschlüssel. */}
+              </>)}
+            </div>
+          ) : null
+    }</Fragment>
+  );
 
   const hasRoster = classId != null;
   return (
@@ -825,13 +1123,11 @@ export default function Klassenarbeit() {
         </Werkzeugleiste>
       )}
 
-      {alleAn && <AlleBlaetter blaetter={[work, partner]} alleStudents={alleStudents} scale={scale} t={t} />}
-
-      {hasRoster && work && students.length > 0 && !alleAn && (
+      {hasRoster && work && students.length > 0 && (
         <>
           {/* SuS-Ansicht (Präsentation): alles über der Auswertung ausblenden —
               Aufgaben-Editor, Punkte-Raster, Aktionen. Nur die Auswertung bleibt. */}
-          {!hideIndividual && (<>
+          {!hideIndividual && !alleAn && (<>
           {/* Name sofort auch im Auswahl-Dropdown zeigen (nicht erst nach Reload). */}
           {/* Der Name geht in den Entwurf; im Auswahlfeld oben steht er nach dem
               Speichern (vorher wäre dort ein Name, den es serverseitig nicht gibt). */}
@@ -1131,222 +1427,11 @@ export default function Klassenarbeit() {
           })()}
           </>)}
 
-          {analyse && (analyse.topics.length > 0 || analyse.students.length > 0 || analyse.perUnit.length > 0 || analyse.noten.n > 0) && (
-            <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, padding: 16, background: "var(--card)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, borderBottom: "1px solid var(--border)", paddingBottom: 10 }}>
-                <span style={{ fontSize: 16, fontWeight: 800 }}>{t("klassenarbeit.analysisTitle")}</span>
-                <button onClick={() => setHideIndividual((v) => !v)} title={t("klassenarbeit.presentHint")}
-                  style={{ ...toolbarBtn, background: hideIndividual ? "var(--accent)" : "transparent", color: hideIndividual ? C.aufAkzent : "var(--text2)" }}>
-                  <Icon d={ICONS.eye} size={15} color={hideIndividual ? C.aufAkzent : "var(--text2)"} /> {t("klassenarbeit.presentMode")}
-                </button>
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("klassenarbeit.byTopic")}</div>
-              {analyse.topics.length === 0 ? <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("klassenarbeit.noTopics")}</p> : analyse.topics.map((tp) => (
-                <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{tp.label}</span>
-                  {/* Balken: Radius = halbe Hoehe (Balken-Kappe), reine Grafik. */}
-                  <span style={{ width: 120, height: 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tp.pct}%`, height: "100%", background: tp.pct < 50 ? C.danger : tp.pct < 75 ? C.warning : C.success }} /></span>
-                  <span style={{ fontSize: 13, fontWeight: 700, minWidth: 38, textAlign: "right" }}>{tp.pct}%</span>
-                </div>
-              ))}
-              {/* Frueher stand hier je Kind eine Zeile mit allen Themen als
-                  Fliesstext — bei 28 Kindern und langen Themennamen eine Wand,
-                  aus der niemand etwas ableitet. Jetzt andersherum: nach THEMA
-                  gruppiert, das mit den meisten Betroffenen oben. So steht da,
-                  was man am Montag tut — und wen man dazuholt. */}
-              {!hideIndividual && analyse.weakGroups.length > 0 && (<>
-                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 4px" }}>{t("klassenarbeit.weakStudents")}</div>
-                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>{t("klassenarbeit.weakHint")}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {analyse.weakGroups.map((g) => (
-                    <div key={g.label} style={{ border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: "8px 10px" }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0 }}>{g.label}</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: g.anteil >= 50 ? C.danger : C.warning }}>
-                          {t("klassenarbeit.weakCount", { n: g.namen.length, all: analyse.gradedCount })}
-                        </span>
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                        {g.namen.map((n) => (
-                          <span key={n} style={{ ...chipStyle, fontWeight: 500, background: "var(--bg2)" }}>{n}</span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>)}
-
-              {/* Fehlerarten: die Themenquote sagt WO es klemmt, die Fehlerart
-                  WORAN — und daraus folgt Verschiedenes. Nur da, wo jemand
-                  wirklich etwas erfasst hat; sonst stuende hier eine Tabelle
-                  aus lauter Nullen und behauptete, die Klasse mache keine
-                  Fehler. */}
-              {analyse.fehlerStat && (<>
-                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 4px" }}>{t("klassenarbeit.fehlerTitle")}</div>
-                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>
-                  {t("klassenarbeit.fehlerTitleHint", { n: analyse.fehlerStat.n })}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                  {FEHLER.filter((f) => analyse.fehlerStat.gesamt[f.key]).map((f) => (
-                    <span key={f.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: "6px 10px" }}>
-                      <span style={{ ...fehlerChip, background: f.color, color: C.aufAkzent }}>{f.ab}</span>
-                      <span style={{ fontSize: 13 }}>{t(`klassenarbeit.fehler.${f.key}`)}</span>
-                      <span style={{ fontSize: 13, fontWeight: 700 }}>{analyse.fehlerStat.gesamt[f.key]}×</span>
-                    </span>
-                  ))}
-                </div>
-                {/* Je Thema: „an Bruchrechnung scheitert der Ansatz, an Termen
-                    nur die Rechnung" — dieselbe Quote, zwei verschiedene
-                    Konsequenzen. */}
-                {analyse.fehlerStat.topics.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
-                    {analyse.fehlerStat.topics.map((r) => (
-                      <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "6px 10px", borderRadius: panelStyle.borderRadius, background: "var(--bg2)" }}>
-                        <span style={{ flex: 1, minWidth: 120, fontSize: 13, fontWeight: 600 }}>{r.label}</span>
-                        {FEHLER.filter((f) => r.typen[f.key]).map((f) => (
-                          <span key={f.key} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text2)" }}>
-                            <span style={{ ...fehlerChip, background: f.color, color: C.aufAkzent }}>{f.ab}</span>
-                            {r.typen[f.key]}
-                          </span>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {!hideIndividual && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {analyse.fehlerStat.students.map((st) => {
-                      const f = FEHLER.find((x) => x.key === st.haupt);
-                      return (
-                        <span key={st.student_id} style={{ ...chipStyle, fontWeight: 500, background: "var(--bg2)", display: "inline-flex", alignItems: "center", gap: 5 }}
-                          title={FEHLER.filter((x) => st.typen[x.key]).map((x) => `${t(`klassenarbeit.fehler.${x.key}`)}: ${st.typen[x.key]}`).join("\n")}>
-                          <span style={{ ...fehlerChip, background: f ? f.color : "var(--bg3)", color: C.aufAkzent }}>{f ? f.ab : "?"}</span>
-                          {st.name}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-              </>)}
-
-              {/* je Aufgabe: Ø, Trefferquote + Trennschärfe/95%-KI. Hat eine Aufgabe
-                  Teilaufgaben, lässt sich deren Auswertung darunter ausklappen. */}
-              {analyse.perTask.length > 0 && (<>
-                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.byTask")}</div>
-                {analyse.perTask.map((tk) => {
-                  const parts = analyse.perUnit.filter((u) => u.taskId === tk.id);
-                  const open = expandedTasks.has(tk.id);
-                  const toggle = () => setExpandedTasks((prev) => { const n = new Set(prev); n.has(tk.id) ? n.delete(tk.id) : n.add(tk.id); return n; });
-                  return (
-                    <div key={tk.id}>
-                      <StatRow row={tk} t={t} expandable={parts.length > 0} open={open} onToggle={toggle} />
-                      {open && parts.length > 0 && (
-                        <div style={{ marginLeft: 16, marginBottom: 4 }}>
-                          {parts.map((u) => <StatRow key={u.id} row={u} t={t} small />)}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </>)}
-
-              {/* Noten-Auswertung im CardVote-Design: Kennzahl-Kacheln + Panel mit
-                  Notenverteilung/Boxplot-Umschalter. */}
-              {analyse.noten.n > 0 && (<>
-                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.gradeResult")}</div>
-                {/* Statistik-Kacheln (Anwesend … 95%-KI) — wie CardVote. */}
-                <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
-                  <StatCard label={t("klassenarbeit.attendance")} value={`${analyse.noten.present} / ${analyse.noten.total}`} />
-                  <StatCard label={t("klassenarbeit.avgGrade")} value={komma(analyse.noten.avg)} />
-                  {analyse.noten.avgPct != null && <StatCard label={t("klassenarbeit.avgPct")} value={`${analyse.noten.avgPct}%`} />}
-                  {analyse.noten.medPct != null && <StatCard label={t("klassenarbeit.median")} value={`${analyse.noten.medPct}%`} />}
-                  {analyse.noten.sdPct != null && <StatCard label={t("klassenarbeit.stdev")} value={`${komma(analyse.noten.sdPct)}%`} />}
-                  {analyse.noten.ciLow != null && <StatCard label={t("klassenarbeit.ci")} value={`${analyse.noten.ciLow}–${analyse.noten.ciHigh}%`} />}
-                </div>
-                {/* „Auswertung verstehen": Kennzahlen erklärt + konkrete Handlungshinweise. */}
-                <button onClick={() => setInfoOpen((v) => !v)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13, marginBottom: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ display: "inline-flex", transform: infoOpen ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}><Icon d={ICONS.open} size={12} /></span>
-                  {t("klassenarbeit.explain")}
-                </button>
-                {infoOpen && (() => {
-                  const sd = analyse.noten.sdPct;
-                  const sdLevel = sd == null ? null : sd < 10 ? "low" : sd <= 25 ? "mid" : "high";
-                  const weak = analyse.topics.filter((tp) => tp.pct < 50).map((tp) => tp.label);
-                  const lowDisc = analyse.perTask.filter((tk) => tk.disc != null && tk.disc < 0.2);
-                  const Item = ({ term, children }) => (
-                    <li style={{ marginBottom: 8 }}><b style={{ color: "var(--text)" }}>{term}:</b> <span style={{ color: "var(--text2)" }}>{children}</span></li>
-                  );
-                  return (
-                    <div style={{ padding: 16, background: "var(--bg3)", borderRadius: cardStyle.borderRadius, border: "1px solid var(--border)", marginBottom: 12, fontSize: 13, lineHeight: 1.55 }}>
-                      <ul style={{ margin: 0, paddingLeft: 18 }}>
-                        <Item term={t("klassenarbeit.avgGrade") + " / " + t("klassenarbeit.median")}>{t("klassenarbeit.explainAvg")}</Item>
-                        {sd != null && (
-                          <Item term={`${t("klassenarbeit.stdev")} (${komma(sd)}%)`}>
-                            {t("klassenarbeit.explainSd")} {" "}
-                            <b style={{ color: sdLevel === "low" ? C.warning : sdLevel === "mid" ? C.success : C.danger }}>
-                              {t(`klassenarbeit.explainSd_${sdLevel}`)}
-                            </b>
-                          </Item>
-                        )}
-                        {analyse.noten.ciLow != null && <Item term={t("klassenarbeit.ci")}>{t("klassenarbeit.explainCi")}</Item>}
-                        <Item term={t("klassenarbeit.disc")}>{t("klassenarbeit.explainDisc")}</Item>
-                      </ul>
-                      {(weak.length > 0 || lowDisc.length > 0) && (
-                        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
-                          <div style={{ fontWeight: 700, marginBottom: 4 }}>{t("klassenarbeit.explainActions")}</div>
-                          <ul style={{ margin: 0, paddingLeft: 18 }}>
-                            {weak.length > 0 && <li style={{ marginBottom: 4, color: "var(--text2)" }}>{t("klassenarbeit.explainWeak", { topics: weak.join(", ") })}</li>}
-                            {lowDisc.length > 0 && <li style={{ color: "var(--text2)" }}>{t("klassenarbeit.explainLowDisc", { n: lowDisc.length })}</li>}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-                {/* Verteilung / Boxplot — Panel + Pillen-Umschalter wie CardVote. */}
-                <div style={{ padding: 16, background: "var(--bg3)", borderRadius: cardStyle.borderRadius, border: "1px solid var(--border)" }}>
-                  {/* Zweimal dieselbe Frage („welche Ansicht?"), also zweimal
-                      dieselbe Form. Links standen vorher zwei Einzelpillen
-                      (r980), rechts eine Gruppe mit r8 — nebeneinander sah das
-                      aus wie zwei verschiedene Bedienarten. */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                    <Tabs value={distMode} onChange={setDistMode}
-                      options={[["bar", t("klassenarbeit.distGrades")], ["box", t("klassenarbeit.distBox")]]} />
-                    {/* Sekundär-Umschalter: Balken = Noten/Teilnoten, Boxplot = %/Noten. */}
-                    <Tabs style={{ marginLeft: "auto" }}
-                      value={distMode === "bar" ? barMode : boxMode}
-                      onChange={distMode === "bar" ? setBarMode : setBoxMode}
-                      options={distMode === "bar"
-                        ? [["whole", t("klassenarbeit.distWhole")], ["fine", t("klassenarbeit.distFine")]]
-                        : [["pct", "%"], ["note", t("klassenarbeit.grade")]]} />
-                  </div>
-                  {distMode === "bar" ? (() => {
-                    const data = barMode === "fine"
-                      ? analyse.noten.distFine.map((d) => ({ count: d.count, label: d.label, grade: d.grade }))
-                      : analyse.noten.dist.map((c, i) => ({ count: c, label: String(i + 1), grade: i + 1 }));
-                    const mxc = Math.max(...data.map((d) => d.count), 1);
-                    return (
-                      <div style={{ display: "flex", alignItems: "flex-end", gap: barMode === "fine" ? 3 : 6, height: 105 }}>
-                        {data.map((d, i) => (
-                          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                            {/* Saeule: Radius rundet nur die Kappe der Grafik. */}
-                            <div style={{ width: barMode === "fine" ? "80%" : "60%", height: `${Math.max(3, (d.count / mxc) * 75)}px`, background: d.grade <= 2 ? C.success : d.grade <= 4 ? C.warning : C.danger, borderRadius: 3 }} title={`${d.count}`} />
-                            <span style={{ fontSize: 11, color: "var(--text3)" }}>{d.count}</span>
-                            <span style={{ fontSize: 11, fontWeight: 700 }}>{d.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })() : (
-                    boxMode === "note"
-                      ? <Boxplot values={analyse.noten.werte} max={6} />
-                      : <Boxplot values={pctList(wk)} max={100} unit="%" />
-                  )}
-                </div>
-                {/* Min-Punkte je Note entfernt — steht im Notenschlüssel. */}
-              </>)}
-            </div>
-          )}
+          {alleAn ? (<>
+            <AlleBlaetter blaetter={[work, partner]} alleStudents={alleStudents} scale={scale} t={t} />
+            {alleAnalysen && zeigeAuswertung(alleAnalysen.gesamt, t("klassenarbeit.auswertungGesamt"), "gesamt")}
+            {alleAnalysen && alleAnalysen.teile.map(([stufe, a]) => zeigeAuswertung(a, t("klassenarbeit.auswertungBlatt", { n: stufe }), stufe))}
+          </>) : zeigeAuswertung(analyse)}
         </>
       )}
       {neuOffen && <NeueArbeitModal t={t} onClose={() => setNeuOffen(false)} onAnlegen={anlegen}
@@ -1739,7 +1824,7 @@ export function KlassenarbeitVergleich() {
 // Ziel einer Kopie waehlen. Bewusst dieselbe Auswahl wie oben in der Leiste
 // (KursKlasseSelect) — eine Klasse kann in mehreren Kursen liegen, und die
 // Arbeit haengt am Kurs, wenn es einen gibt.
-// Gesamtsicht einer E/G-Arbeit: beide Blaetter, jedes Kind aus seinem Blatt.
+// Gesamtsicht einer E/G-Arbeit: die Liste aller Kinder, jedes aus seinem Blatt.
 // Gerechnet mit core/arbeitswertung.js (Wahlaufgaben ueber das jeweils andere
 // Blatt eingeschlossen) — dieselbe Note wie im Blatt selbst.
 function AlleBlaetter({ blaetter, alleStudents, scale, t }) {
@@ -1761,30 +1846,10 @@ function AlleBlaetter({ blaetter, alleStudents, scale, t }) {
     });
   });
   zeilen.sort((a, b) => a.name.localeCompare(b.name));
-  const gewertet = zeilen.filter((z) => z.pct != null);
-  const schnitt = gewertet.length ? gewertet.reduce((n, z) => n + z.wert, 0) / gewertet.length : null;
-  const schnittPct = gewertet.length ? Math.round(gewertet.reduce((n, z) => n + z.pct, 0) / gewertet.length) : null;
-  const verteilung = [1, 2, 3, 4, 5, 6].map((g) => gewertet.filter((z) => z.grade === g).length);
-  const hoechst = Math.max(1, ...verteilung);
+  // Kennzahlen und Notenverteilung stehen darunter in der Auswertung „Gesamt"
+  // (derselbe Block wie im einzelnen Blatt) — hier nur die Liste der Kinder.
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-        <StatCard label={t("klassenarbeit.attendance")} value={`${gewertet.length} / ${zeilen.length}`} />
-        {schnitt != null && <StatCard label={t("klassenarbeit.avgGrade")} value={komma(rund(schnitt, 2))} />}
-        {schnittPct != null && <StatCard label={t("klassenarbeit.avgPct")} value={`${schnittPct}%`} />}
-      </div>
-      {gewertet.length > 0 && (
-        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: 90, marginBottom: 16, maxWidth: 360 }}>
-          {verteilung.map((n, i) => (
-            <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 12, color: "var(--text3)" }}>
-              <div style={{ fontWeight: 700, color: "var(--text2)" }}>{n || ""}</div>
-              {/* Balken: Radius = halbe Kappe, reine Grafik. */}
-              <div style={{ height: `${(n / hoechst) * 60}px`, minHeight: n ? 4 : 0, background: "var(--accent)", borderRadius: 4, opacity: 0.8 }} />
-              <div style={{ marginTop: 4 }}>{i + 1}</div>
-            </div>
-          ))}
-        </div>
-      )}
       <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius }}>
         <table style={{ borderCollapse: "collapse", fontSize: 13, width: "100%" }}>
           <thead>

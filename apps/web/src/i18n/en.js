@@ -1628,6 +1628,8 @@ export default {
   "klassenarbeit.tasksHeading": "Tasks (with topic and max points)",
   "klassenarbeit.alleBlaetter": "All",
   "klassenarbeit.alleBlaetterHint": "Both sheets together: each student graded on their own sheet",
+  "klassenarbeit.auswertungGesamt": "Evaluation overall (E and G)",
+  "klassenarbeit.auswertungBlatt": "Evaluation sheet {{n}}",
   "klassenarbeit.blattSpalte": "Sheet",
   "klassenarbeit.abwesendKurz": "absent",
   "klassenarbeit.tasksSumme": "{{n}} tasks · {{p}} points",

@@ -1611,6 +1611,8 @@ export default {
   "klassenarbeit.tasksHeading": "Aufgaben (mit Thema und Maximalpunkten)",
   "klassenarbeit.alleBlaetter": "Alle",
   "klassenarbeit.alleBlaetterHint": "Beide Blätter zusammen: jedes Kind mit Note aus seinem Blatt",
+  "klassenarbeit.auswertungGesamt": "Auswertung gesamt (E und G)",
+  "klassenarbeit.auswertungBlatt": "Auswertung Blatt {{n}}",
   "klassenarbeit.blattSpalte": "Blatt",
   "klassenarbeit.abwesendKurz": "abwesend",
   "klassenarbeit.tasksSumme": "{{n}} Aufgaben · {{p}} Punkte",

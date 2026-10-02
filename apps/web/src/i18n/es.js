@@ -1629,6 +1629,8 @@ export default {
   "klassenarbeit.tasksHeading": "Tareas (con tema y puntos máximos)",
   "klassenarbeit.alleBlaetter": "Todos",
   "klassenarbeit.alleBlaetterHint": "Ambas hojas juntas: cada alumno con la nota de su hoja",
+  "klassenarbeit.auswertungGesamt": "Evaluación total (E y G)",
+  "klassenarbeit.auswertungBlatt": "Evaluación hoja {{n}}",
   "klassenarbeit.blattSpalte": "Hoja",
   "klassenarbeit.abwesendKurz": "ausente",
   "klassenarbeit.tasksSumme": "{{n}} tareas · {{p}} puntos",
