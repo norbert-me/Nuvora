@@ -30,6 +30,7 @@ import { addDays, hmToMin, minToHm, isoDay, isoWeek, mondayOf, parseYmd, startOf
 import { stundenZeit, stundenListe, slotGiltAm, PAUSE_BASIS, stundenRang, stundeLabel } from "../core/stunden";
 import { useZielFilter } from "../core/modules.js";
 import { TextMitTabellen, TextMitTabellenFeld } from "../components/TextMitTabellen.jsx";
+import AutoTextarea from "../components/AutoTextarea.jsx";
 
 // Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
 const BUNDESLAENDER = [
@@ -2812,7 +2813,10 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
           <input value={ort} onChange={(e) => setOrt(e.target.value)} placeholder={t("kalender.placePlaceholder")} style={fld} />
         </>)}
         <div style={lbl}>{t("kalender.notes")}</div>
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
+        {/* Waechst mit dem Text: auf dem iPhone gibt es keinen Ziehgriff an
+            Textfeldern (iOS bietet `resize` nicht an) — ein festes Feld mit
+            drei Zeilen liess sich dort nicht vergroessern. */}
+        <AutoTextarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
 
         {/* Alles Weitere liegt unter „Erweitert". Der Dialog hatte vierzehn
             Felder untereinander — die vier, die man bei einem normalen Termin
