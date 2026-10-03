@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Klassenarbeit, Auswertung: **Anteil jedes Themas an der Note** je
+  E- und G-Arbeit (Punkte und Prozent, Darstellung als eigene Zeile);
+  unter „Alle“ beide nebeneinander.
 - Klassenarbeit, Auswertung: **E-Kurs/G-Kurs zeigen die Aufgaben dieser
   Arbeit** (weiter über alle, die sie schrieben), „Alle“ beide. Die
   **Trennschärfe steht in jeder Zeile** neben der Quote; aus weniger als

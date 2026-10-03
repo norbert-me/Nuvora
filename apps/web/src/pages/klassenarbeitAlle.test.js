@@ -93,3 +93,10 @@ describe("Klassenarbeit: Auswertung je Blatt", () => {
     expect(aufgabenDerArbeit(a, "alle")).toBe(a);
   });
 });
+
+describe("Klassenarbeit: Anteil an der Note", () => {
+  it("mit Darstellung bezieht sich der Anteil auf alle Punkte", () => {
+    const gw = themenGewichte([{ id: "a", max: 6, topic_id: 1 }, { id: "b", max: 2, topic_id: 2 }, { id: "d", max: 2, form: true }], { mitDarstellung: true });
+    expect(gw.map((x) => [x.topic, Math.round(x.anteil)])).toEqual([[1, 60], [2, 20], ["form", 20]]);
+  });
+});
