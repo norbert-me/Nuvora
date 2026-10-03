@@ -1710,6 +1710,7 @@ export default {
   "klassenarbeit.tasksHeading": "Tasks (with topic and max points)",
   "klassenarbeit.gewichtTitel": "Topic weighting",
   "klassenarbeit.gewichtHint": "Points per topic and their share of the test (excluding presentation). Rule of thumb: roughly equal points per subtopic.",
+  "klassenarbeit.gewichtDirekt": "(no subtopic)",
   "klassenarbeit.gewichtNote": "Topics in the {{n}} test (share of the grade)",
   "klassenarbeit.gewichtNoteHint": "Points per topic and their share of all points in the test, presentation included.",
   "klassenarbeit.gewicht_wenig": "Clearly fewer points than an equal share — the result says little about this topic.",

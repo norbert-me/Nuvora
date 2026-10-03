@@ -1711,6 +1711,7 @@ export default {
   "klassenarbeit.tasksHeading": "Tareas (con tema y puntos máximos)",
   "klassenarbeit.gewichtTitel": "Peso de los temas",
   "klassenarbeit.gewichtHint": "Puntos por tema y su parte del examen (sin presentación). Regla: aproximadamente los mismos puntos por subtema.",
+  "klassenarbeit.gewichtDirekt": "(sin subtema)",
   "klassenarbeit.gewichtNote": "Temas en el examen {{n}} (parte de la nota)",
   "klassenarbeit.gewichtNoteHint": "Puntos por tema y su parte de todos los puntos del examen, presentación incluida.",
   "klassenarbeit.gewicht_wenig": "Claramente menos puntos que una parte igual: el resultado dice poco sobre este tema.",

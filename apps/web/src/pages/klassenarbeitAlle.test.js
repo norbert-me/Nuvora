@@ -100,3 +100,15 @@ describe("Klassenarbeit: Anteil an der Note", () => {
     expect(gw.map((x) => [x.topic, Math.round(x.anteil)])).toEqual([[1, 60], [2, 20], ["form", 20]]);
   });
 });
+
+import { gewichtGruppen } from "./Klassenarbeit.jsx";
+
+describe("Klassenarbeit: Gewichtung nach Ober- und Unterthema", () => {
+  it("Oberthema mit Summe, Unterthemen eingerueckt", () => {
+    const byId = new Map([[1, { id: 1 }], [11, { id: 11, parent_id: 1 }], [12, { id: 12, parent_id: 1 }], [2, { id: 2 }]]);
+    const gw = themenGewichte([{ id: "a", max: 4, topic_id: 11 }, { id: "b", max: 2, topic_id: 12 }, { id: "c", max: 4, topic_id: 2 }]);
+    const z = gewichtGruppen(gw, byId);
+    expect(z.map((x) => [x.topic, x.ebene, x.punkte])).toEqual([[1, 0, 6], [11, 1, 4], [12, 1, 2], [2, 0, 4]]);
+    expect(Math.round(z[0].anteil)).toBe(60);
+  });
+});

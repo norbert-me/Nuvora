@@ -1693,6 +1693,7 @@ export default {
   "klassenarbeit.tasksHeading": "Aufgaben (mit Thema und Maximalpunkten)",
   "klassenarbeit.gewichtTitel": "Gewichtung der Themen",
   "klassenarbeit.gewichtHint": "Punkte je Thema und ihr Anteil an der Arbeit (ohne Darstellung). Faustregel: jedes Unterthema etwa gleich viele Punkte.",
+  "klassenarbeit.gewichtDirekt": "(ohne Unterthema)",
   "klassenarbeit.gewichtNote": "Themen in der {{n}}-Arbeit (Anteil an der Note)",
   "klassenarbeit.gewichtNoteHint": "Punkte je Thema und ihr Anteil an allen Punkten der Arbeit, Darstellung eingeschlossen.",
   "klassenarbeit.gewicht_wenig": "Deutlich weniger Punkte als ein gleicher Anteil — das Ergebnis sagt über dieses Thema wenig.",

@@ -11,7 +11,7 @@ import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
-import { themenIndex, useThemen } from "../core/topics.js";
+import { mitNummer, themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -505,25 +505,63 @@ export function aufgabenUeberAlle(blaetter, alleStudents) {
 
 // Gewichtung der Themen als Balkenliste — unter den Aufgaben (Anteil an den
 // Sachpunkten) und in der Auswertung (Anteil an der Note, mit Darstellung).
-function ThemenGewichte({ gw, titel, hint, topicLabel, t, rand = 16 }) {
-  if (gw.filter((x) => x.topic != null && x.topic !== "form").length < 2) return null;
+// Gegliedert nach Oberthema: hängen Punkte an Unterthemen, steht das
+// Oberthema mit der Summe darüber und die Unterthemen eingerückt darunter —
+// beide Ebenen sind eine Frage der Gewichtung („wie viel Bruchrechnung?" und
+// „wie viel davon Kürzen?").
+export function gewichtGruppen(gw, byId) {
+  const wurzel = (tid) => { const tp = byId.get(tid); return tp && tp.parent_id && byId.has(tp.parent_id) ? tp.parent_id : tid; };
+  const gruppen = new Map();
+  const rest = [];
+  gw.forEach((x) => {
+    if (x.topic == null || x.topic === "form") { rest.push({ ...x, ebene: 0 }); return; }
+    const w = wurzel(x.topic);
+    if (!gruppen.has(w)) gruppen.set(w, { eigen: null, kinder: [] });
+    const g = gruppen.get(w);
+    if (w === x.topic) g.eigen = x; else g.kinder.push(x);
+  });
+  const zeilen = [];
+  [...gruppen.entries()].map(([w, g]) => {
+    const alle = [g.eigen, ...g.kinder].filter(Boolean);
+    return { w, g, punkte: alle.reduce((n, x) => n + x.punkte, 0), anteil: alle.reduce((n, x) => n + x.anteil, 0) };
+  }).sort((a, b) => b.punkte - a.punkte).forEach(({ w, g, punkte, anteil }) => {
+    if (!g.kinder.length) { zeilen.push({ ...g.eigen, ebene: 0 }); return; }
+    zeilen.push({ topic: w, punkte, anteil, abweichung: null, ebene: 0, summe: true });
+    // Punkte direkt am Oberthema (ohne Unterthema) stehen als eigene Zeile drunter.
+    if (g.eigen) zeilen.push({ ...g.eigen, ebene: 1, direkt: true });
+    g.kinder.sort((a, b) => b.punkte - a.punkte).forEach((x) => zeilen.push({ ...x, ebene: 1 }));
+  });
+  return [...zeilen, ...rest];
+}
+
+function ThemenGewichte({ gw, titel, hint, themen, t, rand = 16 }) {
+  if (!gw.some((x) => x.topic != null && x.topic !== "form")) return null;
+  const zeilen = gewichtGruppen(gw, themen.byId);
+  const name = (x) => {
+    if (x.topic == null) return t("klassenarbeit.topicNone");
+    if (x.topic === "form") return t("klassenarbeit.form");
+    const tp = themen.byId.get(x.topic);
+    if (x.direkt) return t("klassenarbeit.gewichtDirekt");
+    return x.ebene ? mitNummer(tp) : (tp ? themen.label(tp) : "?");
+  };
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, padding: "10px 12px", marginBottom: rand, background: "var(--card)" }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text2)", marginBottom: 8 }} title={hint}>{titel}</div>
-      {gw.map((x) => {
+      {zeilen.map((x) => {
         const farbe = x.topic === "form" ? "var(--text3)" : x.abweichung ? C.warning : "var(--accent)";
         return (
-          <div key={x.topic ?? "ohne"} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 4 }}>
-            <span style={{ flex: "0 1 40%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: x.topic == null || x.topic === "form" ? "var(--text3)" : "var(--text)" }}>
-              {x.topic == null ? t("klassenarbeit.topicNone") : x.topic === "form" ? t("klassenarbeit.form") : topicLabel(x.topic)}
+          <div key={`${x.topic ?? "ohne"}-${x.ebene}-${x.direkt ? "d" : ""}`} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: x.ebene ? 12 : 13, marginBottom: 4, paddingLeft: x.ebene ? 16 : 0 }}>
+            <span style={{ flex: "0 1 40%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: x.summe ? 700 : 400,
+              color: x.topic == null || x.topic === "form" || x.direkt ? "var(--text3)" : x.ebene ? "var(--text2)" : "var(--text)" }}>
+              {name(x)}
             </span>
             {/* Balken: Radius = halbe Hoehe (Balken-Kappe), reine Grafik;
                 die Schiene schneidet den Balken ab (overflow), er
                 braucht keinen eigenen. */}
-            <span style={{ flex: 1, height: 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}>
-              <span style={{ display: "block", width: `${x.anteil}%`, height: "100%", background: farbe }} />
+            <span style={{ flex: 1, height: x.ebene ? 6 : 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}>
+              <span style={{ display: "block", width: `${x.anteil}%`, height: "100%", background: farbe, opacity: x.ebene ? 0.75 : 1 }} />
             </span>
-            <span style={{ width: 92, textAlign: "right", whiteSpace: "nowrap", color: x.abweichung ? C.warning : "var(--text2)", fontWeight: x.abweichung ? 700 : 400 }}
+            <span style={{ width: 92, textAlign: "right", whiteSpace: "nowrap", color: x.abweichung ? C.warning : "var(--text2)", fontWeight: x.abweichung || x.summe ? 700 : 400 }}
               title={x.abweichung ? t(`klassenarbeit.gewicht_${x.abweichung}`) : undefined}>
               {komma(rund(x.punkte, 1))} P. · {Math.round(x.anteil)} %
             </span>
@@ -1407,7 +1445,7 @@ export default function Klassenarbeit() {
           {/* Gewichtung der Themen: wie viele Punkte entfallen auf jedes Thema?
               Beim Erstellen der Arbeit die Frage, ob ein Unterthema mit zwei
               Punkten ueberhaupt etwas aussagen kann. */}
-          <ThemenGewichte gw={themenGewichte(work.tasks)} titel={t("klassenarbeit.gewichtTitel")} hint={t("klassenarbeit.gewichtHint")} topicLabel={topicLabel} t={t} />
+          <ThemenGewichte gw={themenGewichte(work.tasks)} titel={t("klassenarbeit.gewichtTitel")} hint={t("klassenarbeit.gewichtHint")} themen={themen} t={t} />
           </>)}
 
           {/* 2) Punkte-Raster: Zeilen = Schüler, Spalten = Aufgaben (0..max). */}
@@ -1630,7 +1668,7 @@ export default function Klassenarbeit() {
                     .sort((x, y) => (x.niveau < y.niveau ? -1 : 1))
                     .map((b) => (
                       <ThemenGewichte key={b.id} rand={0} gw={themenGewichte(b.tasks, { mitDarstellung: true })}
-                        titel={t("klassenarbeit.gewichtNote", { n: b.niveau })} hint={t("klassenarbeit.gewichtNoteHint")} topicLabel={topicLabel} t={t} />
+                        titel={t("klassenarbeit.gewichtNote", { n: b.niveau })} hint={t("klassenarbeit.gewichtNoteHint")} themen={themen} t={t} />
                     ))}
                 </div>
                 {zeigeAuswertung(A, alleTeil === "alle" ? t("klassenarbeit.auswertungGesamt") : t("klassenarbeit.auswertungBlatt", { n: alleTeil }), alleTeil,
