@@ -69,41 +69,55 @@ function schluss(row, t) {
   return null;
 }
 
-function StatRow({ row, t, expandable, open, onToggle, small }) {
+// EINE Zeile je Aufgabe: Name, Balken, Prozent, Ø-Punkte — und nur dann ein
+// kurzes Etikett, wenn daraus etwas folgt („Aufgabe prüfen", „Wiederholen").
+// Vorher standen je Aufgabe vier Kennzahlen und oft ein ganzer Absatz darunter;
+// bei zwanzig Aufgaben (und unter „Alle" dreimal) war daraus nichts mehr zu
+// lesen. Kennzahlen, Begruendung und Teilaufgaben klappen per Klick auf.
+const RAT_FARBE = { aufgabe: C.danger, stoff: C.warning, leicht: "var(--text3)" };
+function StatRow({ row, t, open, onToggle, small, kinder = null }) {
   const col = row.pct < 50 ? C.danger : row.pct < 75 ? C.warning : C.success;
   const dc = row.disc == null ? "var(--text3)" : row.disc >= 0.4 ? C.success : row.disc >= 0.2 ? C.warning : C.danger;
   const rat = small ? null : schluss(row, t);
+  const details = row.disc != null || row.ciLow != null || row.nullAnteil != null || row.vollAnteil != null;
+  const klickbar = !small && (details || rat || kinder);
   return (
-    <div onClick={expandable ? onToggle : undefined} style={{ padding: small ? "6px 9px" : "8px 10px", borderRadius: panelStyle.borderRadius, background: small ? "var(--bg3)" : "var(--bg2)", marginBottom: 4, cursor: expandable ? "pointer" : "default" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {expandable && <span style={{ display: "inline-flex", color: "var(--text3)", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}><Icon d={ICONS.open} size={12} /></span>}
-        <span style={{ flex: 1, fontSize: small ? 12 : 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: small ? "var(--text2)" : "var(--text)" }}>{small ? `${t("klassenarbeit.part")} ${row.label}` : row.label}</span>
-        <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>⌀ {komma(row.avgP)}/{row.max}</span>
+    <div style={{ padding: small ? "4px 9px" : "6px 10px", borderRadius: panelStyle.borderRadius, background: small ? "var(--bg3)" : open ? "var(--bg2)" : "transparent", marginBottom: 2 }}>
+      <div onClick={klickbar ? onToggle : undefined} style={{ display: "flex", alignItems: "center", gap: 10, cursor: klickbar ? "pointer" : "default", minHeight: 28 }}>
+        {!small && <span style={{ display: "inline-flex", color: "var(--text3)", width: 12, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s", visibility: klickbar ? "visible" : "hidden" }}><Icon d={ICONS.open} size={12} /></span>}
+        <span style={{ width: small ? 70 : 90, flexShrink: 0, fontSize: small ? 12 : 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: small ? "var(--text2)" : "var(--text)" }}>{small ? `${t("klassenarbeit.part")} ${row.label}` : row.label}</span>
+        {/* Balken: Radius = halbe Hoehe (Balken-Kappe), reine Grafik. */}
+        <span style={{ flex: 1, minWidth: 40, height: 8, background: "var(--card)", borderRadius: 4, overflow: "hidden", border: "1px solid var(--border)" }}>
+          <span style={{ display: "block", width: `${row.pct}%`, height: "100%", background: col }} />
+        </span>
         <span style={{ fontSize: 13, fontWeight: 800, color: col, minWidth: 40, textAlign: "right" }}>{row.pct}%</span>
+        <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 64, textAlign: "right" }}>⌀ {komma(row.avgP)}/{komma(row.max)}</span>
+        {/* Das Etikett sagt, WAS zu tun ist; der ganze Satz steht im Titel und aufgeklappt. */}
+        {!small && (
+          <span title={rat ? rat.text : undefined} style={{ ...chipStyle, fontSize: 11, minWidth: 96, textAlign: "center", visibility: rat ? "visible" : "hidden",
+            color: rat ? RAT_FARBE[rat.art] : undefined, background: rat ? `color-mix(in srgb, ${RAT_FARBE[rat.art]} 12%, transparent)` : undefined, fontWeight: 700 }}>
+            {rat ? t(`klassenarbeit.ratKurz.${rat.art}`) : "–"}
+          </span>
+        )}
       </div>
-      {/* Balken: Radius = halbe Hoehe (Balken-Kappe), reine Grafik. */}
-      <div style={{ marginTop: 4, height: 8, background: "var(--card)", borderRadius: 4, overflow: "hidden" }}>
-        <span style={{ display: "block", width: `${row.pct}%`, height: "100%", background: col, borderRadius: 4 }} />
-      </div>
-      {(row.disc != null || row.ciLow != null || row.nullAnteil != null) && (
-        <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--text3)", marginTop: 4, flexWrap: "wrap" }}>
-          {row.disc != null && <span title={t("klassenarbeit.discHint")}>{t("klassenarbeit.disc")}: <b style={{ color: dc }}>{kommaRund(row.disc, 2)}</b></span>}
-          {row.ciLow != null && <span title={t("klassenarbeit.ciHint")}>{t("klassenarbeit.ci")}: <b style={{ color: "var(--text2)" }}>{row.ciLow}–{row.ciHigh}%</b></span>}
-          {row.nullAnteil != null && <span title={t("klassenarbeit.cmpEmptyHint")}>{t("klassenarbeit.cmpEmpty")}: <b style={{ color: row.nullAnteil >= 40 ? C.danger : "var(--text2)" }}>{row.nullAnteil}%</b></span>}
-          {row.vollAnteil != null && <span title={t("klassenarbeit.cmpFullHint")}>{t("klassenarbeit.cmpFull")}: <b style={{ color: "var(--text2)" }}>{row.vollAnteil}%</b></span>}
-        </div>
-      )}
-      {/* Der Schluss aus den Zahlen — nicht nur die Zahlen. */}
-      {rat && (
-        <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.45, padding: "6px 8px", borderRadius: panelStyle.borderRadius,
-          background: rat.art === "aufgabe" ? C.danger + "14" : rat.art === "stoff" ? C.warning + "1a" : "var(--card)",
-          color: rat.art === "leicht" ? "var(--text3)" : "var(--text2)" }}>
-          {rat.text}
+      {open && !small && (
+        <div style={{ margin: "6px 0 4px 22px" }}>
+          {details && (
+            <div style={{ display: "flex", gap: 14, fontSize: 12, color: "var(--text3)", flexWrap: "wrap" }}>
+              {row.disc != null && <span title={t("klassenarbeit.discHint")}>{t("klassenarbeit.disc")}: <b style={{ color: dc }}>{kommaRund(row.disc, 2)}</b></span>}
+              {row.ciLow != null && <span title={t("klassenarbeit.ciHint")}>{t("klassenarbeit.ci")}: <b style={{ color: "var(--text2)" }}>{row.ciLow}–{row.ciHigh}%</b></span>}
+              {row.nullAnteil != null && <span title={t("klassenarbeit.cmpEmptyHint")}>{t("klassenarbeit.cmpEmpty")}: <b style={{ color: row.nullAnteil >= 40 ? C.danger : "var(--text2)" }}>{row.nullAnteil}%</b></span>}
+              {row.vollAnteil != null && <span title={t("klassenarbeit.cmpFullHint")}>{t("klassenarbeit.cmpFull")}: <b style={{ color: "var(--text2)" }}>{row.vollAnteil}%</b></span>}
+            </div>
+          )}
+          {rat && <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.45, color: "var(--text2)" }}>{rat.text}</div>}
+          {kinder && <div style={{ marginTop: 6 }}>{kinder}</div>}
         </div>
       )}
     </div>
   );
 }
+
 
 // Wie stark ist jedes Thema in der Arbeit gewichtet? Punkte je Thema (aus den
 // Einheiten, also bis auf die Teilaufgabe) und ihr Anteil an den Sachpunkten.
@@ -862,7 +876,7 @@ export default function Klassenarbeit() {
   // E und G. Dieselbe Anzeige fuer alle drei, damit sie sich nicht
   // auseinanderentwickeln (die erste „Alle"-Ansicht war ein eigener Nachbau
   // und sah deshalb anders aus).
-  const zeigeAuswertung = (A, titel = null, schluessel = "blatt") => (
+  const zeigeAuswertung = (A, titel = null, schluessel = "blatt", ohneAufgaben = false) => (
     <Fragment key={schluessel}>{
       (A && (A.topics.length > 0 || A.students.length > 0 || A.perUnit.length > 0 || A.noten.n > 0)) ? (
             <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, padding: 16, background: "var(--card)" }}>
@@ -964,21 +978,18 @@ export default function Klassenarbeit() {
 
               {/* je Aufgabe: Ø, Trefferquote + Trennschärfe/95%-KI. Hat eine Aufgabe
                   Teilaufgaben, lässt sich deren Auswertung darunter ausklappen. */}
-              {A.perTask.length > 0 && (<>
+              {/* Unter „Alle" steht die Aufgabenliste nur je Blatt: E- und
+                  G-Aufgaben sind verschiedene Aufgaben, gemischt sagte die Liste
+                  nichts und stand dreimal da. */}
+              {!ohneAufgaben && A.perTask.length > 0 && (<>
                 <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.byTask")}</div>
                 {A.perTask.map((tk) => {
                   const parts = A.perUnit.filter((u) => u.taskId === tk.id);
                   const open = expandedTasks.has(tk.id);
                   const toggle = () => setExpandedTasks((prev) => { const n = new Set(prev); n.has(tk.id) ? n.delete(tk.id) : n.add(tk.id); return n; });
                   return (
-                    <div key={tk.id}>
-                      <StatRow row={tk} t={t} expandable={parts.length > 0} open={open} onToggle={toggle} />
-                      {open && parts.length > 0 && (
-                        <div style={{ marginLeft: 16, marginBottom: 4 }}>
-                          {parts.map((u) => <StatRow key={u.id} row={u} t={t} small />)}
-                        </div>
-                      )}
-                    </div>
+                    <StatRow key={tk.id} row={tk} t={t} open={open} onToggle={toggle}
+                      kinder={parts.length > 0 ? parts.map((u) => <StatRow key={u.id} row={u} t={t} small />) : null} />
                   );
                 })}
               </>)}
@@ -1480,7 +1491,7 @@ export default function Klassenarbeit() {
 
           {alleAn ? (<>
             <AlleBlaetter blaetter={[work, partner]} alleStudents={alleStudents} scale={scale} t={t} />
-            {alleAnalysen && zeigeAuswertung(alleAnalysen.gesamt, t("klassenarbeit.auswertungGesamt"), "gesamt")}
+            {alleAnalysen && zeigeAuswertung(alleAnalysen.gesamt, t("klassenarbeit.auswertungGesamt"), "gesamt", true)}
             {alleAnalysen && alleAnalysen.teile.map(([stufe, a]) => zeigeAuswertung(a, t("klassenarbeit.auswertungBlatt", { n: stufe }), stufe))}
           </>) : zeigeAuswertung(analyse)}
         </>

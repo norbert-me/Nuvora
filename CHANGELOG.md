@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Klassenarbeit: **Trefferquote je Aufgabe aufgeräumt** — eine Zeile je
+  Aufgabe mit kurzem Hinweis („Aufgabe prüfen“, „Wiederholen“); Kennzahlen,
+  Begründung und Teilaufgaben per Klick. Unter „Alle“ steht die Liste nur
+  noch je Blatt.
 - Klassenarbeit: **Prozent-Boxplots laufen von 100 % links nach 0 % rechts** —
   wie bei den Noten steht das Bessere links.
 - **Notenbuch-Statistik:** auch in **Teilnoten** (2+, 2, 2−) und wahlweise als
