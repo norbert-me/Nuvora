@@ -135,6 +135,7 @@
         return {
             _id: String(ex.id),
             id: ex.id,
+            topicId: ex.topic_id || null,
             code: ex.code || '',
             thema: tp.thema,
             unterthema: tp.unterthema,
@@ -2190,8 +2191,8 @@
         const search = document.getElementById('aufgaben-suche').value.trim().toLowerCase();
 
         let filtered = aufgaben;
-        if (filterThema) filtered = filtered.filter(a => a.thema === filterThema);
-        if (filterUnterthema) filtered = filtered.filter(a => a.unterthema === filterUnterthema);
+        if (filterThema) filtered = filtered.filter(a => passtThema(a, filterThema));
+        if (filterUnterthema) filtered = filtered.filter(a => passtUnterthema(a, filterUnterthema));
         if (filterKat) filtered = filtered.filter(a => getKategorie(a) === filterKat);
         if (search) {
             // Auch nach der ANGEZEIGTEN ID (#000043) suchbar, nicht nur nach der
@@ -2274,27 +2275,72 @@
     // Neue Abfrage (Filter/Suche geaendert): wieder bei den ersten 50 anfangen.
     function renderAufgabenReset() { aufgabenLimit = AUFGABEN_PAGE; renderAufgaben(); }
 
+    // Themenfilter nach ID, nicht nach Namen: „Rechnen mit Brüchen" gibt es
+    // in Klasse 6 und in Klasse 7 — nach Namen gefiltert fielen beide in einen
+    // Eintrag, und die Liste sagte nicht, welches gemeint ist. Werte:
+    // "<id>" fuer ein Kern-Thema, "t:<Name>" fuer Text ohne Kern-Thema (Altbestand).
+    const zahlVon = (t) => { const n = parseFloat(String(t.nummer || '').replace(',', '.')); return isNaN(n) ? Infinity : n; };
+    function themenVergleich(a, b) {
+        return (a.fach || '').localeCompare(b.fach || '', 'de') || (String(a.jahrgang || '')).localeCompare(String(b.jahrgang || ''), 'de', { numeric: true })
+            || zahlVon(a) - zahlVon(b) || (a.name || '').localeCompare(b.name || '', 'de', { numeric: true });
+    }
+    // „Mathematik · Kl. 7 · 1 Rechnen mit Brüchen" — Fach und Stufe nur am
+    // Oberthema (Unterthemen erben sie, in der zweiten Liste waeren sie doppelt).
+    function themaLabel(t, mitKopf) {
+        const name = t.nummer ? `${t.nummer} ${t.name}` : t.name;
+        if (!mitKopf) return name;
+        const kopf = [t.fach, t.jahrgang ? `Kl. ${t.jahrgang}` : ''].filter(Boolean).join(' · ');
+        return kopf ? `${kopf} · ${name}` : name;
+    }
+    function oberId(a) {
+        const t = a.topicId ? topics.find(x => x.id === a.topicId) : null;
+        return t ? (t.parent_id || t.id) : null;
+    }
+    function passtThema(a, wert) {
+        if (wert.startsWith('t:')) return a.thema === wert.slice(2);
+        const id = Number(wert);
+        const o = oberId(a);
+        if (o != null) return o === id;
+        const t = topics.find(x => x.id === id);
+        return !!t && a.thema === t.name;
+    }
+    function passtUnterthema(a, wert) {
+        if (wert.startsWith('t:')) return a.unterthema === wert.slice(2);
+        const id = Number(wert);
+        if (a.topicId) return a.topicId === id;
+        const t = topics.find(x => x.id === id);
+        return !!t && a.unterthema === t.name;
+    }
+
     function updateFilters() {
-        // Themen: aus vorhandenen Aufgaben UND aus der Kern-Taxonomie (topics),
-        // damit man Kern-Themen auch ohne bestehende Aufgabe auswaehlen kann.
-        const kernOber = topics.filter(t => !t.parent_id).map(t => t.name);
-        const themen = [...new Set([...aufgaben.map(a => a.thema).filter(Boolean), ...kernOber])].sort();
+        // Themen: Kern-Taxonomie plus Texte aus Aufgaben, die (noch) kein
+        // Kern-Thema haben — damit man Kern-Themen auch ohne Aufgabe waehlt.
+        const ober = topics.filter(t => !t.parent_id).slice().sort(themenVergleich);
+        const bekannt = new Set(ober.map(t => t.name));
+        const lose = [...new Set(aufgaben.filter(a => !a.topicId && a.thema && !bekannt.has(a.thema)).map(a => a.thema))].sort();
+        const themen = [...new Set([...aufgaben.map(a => a.thema).filter(Boolean), ...ober.map(t => t.name)])].sort();
         const sel = document.getElementById('filter-thema');
         const cur = sel.value;
-        sel.innerHTML = '<option value="">Alle Themen</option>' + themen.map(t => `<option value="${escAttr(t)}">${esc(t)}</option>`).join('');
+        sel.innerHTML = '<option value="">Alle Themen</option>'
+            + ober.map(t => `<option value="${t.id}">${esc(themaLabel(t, true))}</option>`).join('')
+            + lose.map(n => `<option value="t:${escAttr(n)}">${esc(n)}</option>`).join('');
         sel.value = cur;
+        if (sel.value !== cur) sel.value = '';
 
-        const selectedThema = document.getElementById('filter-thema').value;
-        const unterthemen = [...new Set(
-            aufgaben
-                .filter(a => !selectedThema || a.thema === selectedThema)
-                .map(a => a.unterthema)
-                .filter(Boolean)
-        )].sort();
+        const selectedThema = sel.value;
         const selU = document.getElementById('filter-unterthema');
         const curU = selU.value;
-        selU.innerHTML = '<option value="">Alle Unterthemen</option>' + unterthemen.map(t => `<option value="${escAttr(t)}">${esc(t)}</option>`).join('');
+        let optU = '';
+        if (selectedThema && !selectedThema.startsWith('t:')) {
+            const kinder = topics.filter(t => t.parent_id === Number(selectedThema)).slice().sort(themenVergleich);
+            optU = kinder.map(t => `<option value="${t.id}">${esc(themaLabel(t, false))}</option>`).join('');
+        } else {
+            const namen = [...new Set(aufgaben.filter(a => !selectedThema || passtThema(a, selectedThema)).map(a => a.unterthema).filter(Boolean))].sort();
+            optU = namen.map(n => `<option value="t:${escAttr(n)}">${esc(n)}</option>`).join('');
+        }
+        selU.innerHTML = '<option value="">Alle Unterthemen</option>' + optU;
         selU.value = curU;
+        if (selU.value !== curU) selU.value = '';
 
         const dl = document.getElementById('themen-list');
         dl.innerHTML = themen.map(t => `<option value="${escAttr(t)}">`).join('');

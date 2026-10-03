@@ -466,16 +466,25 @@ export function wdhAnzahl(pct) {
 }
 
 export function wdhZuteilen(bogen, pool, byId) {
-  const brauchbar = (pool || []).filter((x) => (x.aufgabentext || "").trim() && !/^Wiederholung: /.test(x.aufgabentext));
+  // Brauchbar ist, was das Kind finden kann: ein Aufgabentext, eine Formel
+  // ODER ein Verweis („Schulbuch S.11 Nr.8") — viele Aufgabenlisten bestehen
+  // nur aus Verweisen, und die fielen vorher alle heraus. Die leeren
+  // Platzhalter des alten Knopfs („Wiederholung: …") zaehlen nicht.
+  const brauchbar = (pool || []).filter((x) => ((x.aufgabentext || "").trim() || (x.latex || "").trim() || (x.quelle_detail || "").trim())
+    && !/^Wiederholung: /.test(x.aufgabentext || ""));
   const jeThema = new Map();
   brauchbar.forEach((x) => { if (x.topic_id != null) jeThema.set(x.topic_id, [...(jeThema.get(x.topic_id) || []), x]); });
   const alle = byId ? [...byId.values()] : [];
-  const nameVon = (tid) => ((byId && byId.get(tid)) ? (byId.get(tid).name || "").trim().toLowerCase() : "");
+  // Namen ohne fuehrende Nummer vergleichen: „1 Vervielfachen und Teilen"
+  // (Nummer im Namen, aus einem Import) ist dasselbe Thema wie „Vervielfachen
+  // und Teilen" mit Nummer im eigenen Feld.
+  const ohneNummer = (n) => (n || "").trim().toLowerCase().replace(/^\d+(?:[.,]\d+)*\.?\s+/, "");
+  const nameVon = (tid) => ((byId && byId.get(tid)) ? ohneNummer(byId.get(tid).name) : "");
   const aus = (ids) => ids.flatMap((i) => jeThema.get(i) || []);
   const kandidaten = (tid) => {
     if (jeThema.has(tid)) return jeThema.get(tid);
     const name = nameVon(tid);
-    const gleichNamig = name ? aus(alle.filter((x) => x.id !== tid && (x.name || "").trim().toLowerCase() === name).map((x) => x.id)) : [];
+    const gleichNamig = name ? aus(alle.filter((x) => x.id !== tid && ohneNummer(x.name) === name).map((x) => x.id)) : [];
     if (gleichNamig.length) return gleichNamig;
     const kinder = aus(alle.filter((x) => x.parent_id === tid).map((x) => x.id));
     if (kinder.length) return kinder;
@@ -501,7 +510,11 @@ export function wdhZuteilen(bogen, pool, byId) {
       const n = Math.min(wdhAnzahl(pct), liste.length);
       for (let i = 0; i < n; i++) {
         const ex = liste[(k * 3 + i) % liste.length];
-        wdhAufgaben.push({ thema: g.thema, ex: { id: ex.id, code: ex.code, text: ex.aufgabentext } });
+        wdhAufgaben.push({ thema: g.thema, ex: {
+          id: ex.id, code: ex.code, text: (ex.aufgabentext || "").trim() || (ex.latex || "").trim(),
+          quelle: (ex.quelle_detail || "").trim() ? `${ex.quelle_typ === "schulbuch" ? "Schulbuch" : ex.quelle_typ === "klassenarbeit" ? "Klassenarbeit" : (ex.quelle_typ || "")} ${ex.quelle_detail}`.trim() : "",
+          operator: ex.operator || "",
+        } });
       }
       if (!n) fehlend.add(g.thema || "–");
     });

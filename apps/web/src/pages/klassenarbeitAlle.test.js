@@ -147,3 +147,15 @@ describe("Klassenarbeit: Wiederholung aus dem Lernpfad", () => {
     expect([wdhAnzahl(10), wdhAnzahl(30), wdhAnzahl(60)]).toEqual([3, 2, 1]);
   });
 });
+
+describe("Klassenarbeit: Wiederholung aus Schulbuch-Verweisen", () => {
+  it("nimmt Aufgaben ohne Text, aber mit Verweis, und vergleicht Namen ohne Nummer", () => {
+    const w = { id: 9, tasks: [{ id: "a", max: 4, topic_id: 347 }], results: { 1: { a: 0 } } };
+    const A = rechne2({ work: w, wk: w, students: [{ id: 1, name: "A" }], effScale: DEFAULT_SCALE, topicLabel: label, eigeneStufe: "", andereStufe: "" });
+    const byId = new Map([[347, { id: 347, name: "1 Teiler und Vielfache" }], [58, { id: 58, name: "Teiler und Vielfache", nummer: "1" }]]);
+    const pool = [{ id: 1, topic_id: 58, aufgabentext: "", quelle_typ: "schulbuch", quelle_detail: "S.11 Nr.8", operator: "Berechne" }];
+    const b = wdhZuteilen(A.bogen, pool, byId);
+    expect(b.fehlend).toEqual([]);
+    expect(b[0].wdhAufgaben[0].ex).toMatchObject({ text: "", quelle: "Schulbuch S.11 Nr.8", operator: "Berechne" });
+  });
+});

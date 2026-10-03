@@ -28,6 +28,7 @@ import { createPortal } from "react-dom";
 import { COLORS as C, CONTROL_R, Icon, ICONS, Modal, Segment, Toggle, btnPrimary, btnSecondary, segmentBtn } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "./Latex.jsx";
+import { lokal, sichern } from "../core/ansichten.js";
 
 // Feste Papierfarben statt Theme-Variablen: das Blatt geht auf Papier, und im
 // dunklen Design wäre es am Bildschirm richtig und im Drucker unlesbar.
@@ -47,8 +48,12 @@ export const BOGEN_VORLAGEN = {
 const ALTE_TEILE = BOGEN_VORLAGEN.rueckmeldung;
 const SPEICHER = "nuvora_bogen_teile";
 
-// Die zuletzt gewählten Bausteine — eine Bequemlichkeit dieses Geräts.
+// Die zuletzt gewählten Bausteine — am KONTO (core/ansichten.js), damit die
+// Wahl am Rechner im Lehrerzimmer auch am Tablet gilt. Der alte Schlüssel im
+// Browser zählt nur noch als Startwert.
 export function gemerkteTeile() {
+  const amKonto = lokal("rueckmeldebogen");
+  if (amKonto && Array.isArray(amKonto.teile)) return amKonto.teile.filter((k) => BOGEN_TEILE.includes(k));
   try {
     const x = JSON.parse(localStorage.getItem(SPEICHER) || "null");
     if (Array.isArray(x)) return x.filter((k) => BOGEN_TEILE.includes(k));
@@ -65,7 +70,7 @@ export function BogenWahl({ onDrucken, onClose, mitWdh = true }) {
     return a.length === teile.length && a.every((k) => teile.includes(k));
   });
   const drucken = () => {
-    try { localStorage.setItem(SPEICHER, JSON.stringify(teile)); } catch { /* egal */ }
+    sichern("rueckmeldebogen", { teile });
     onDrucken(teile);
   };
   return (
@@ -173,7 +178,11 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
                       <div style={{ ...klein, marginBottom: 2 }}>
                         {x.thema}{x.ex && x.ex.code ? ` · ${x.ex.code}` : ""}
                       </div>
-                      <div style={{ whiteSpace: "pre-wrap" }}><Latex>{x.ex.text}</Latex></div>
+                      {/* Text, wenn es einen gibt; sonst der Verweis („Schulbuch S.11 Nr.8, Berechne") — so findet das Kind die Aufgabe im Buch. */}
+                      {x.ex.text
+                        ? <div style={{ whiteSpace: "pre-wrap" }}><Latex>{x.ex.text}</Latex></div>
+                        : <div style={{ fontWeight: 600 }}>{x.ex.quelle}{x.ex.operator ? <span style={{ fontWeight: 400 }}> · {x.ex.operator}</span> : null}</div>}
+                      {x.ex.text && x.ex.quelle && <div style={klein}>{x.ex.quelle}</div>}
                     </li>
                   ))}
                 </ol>

@@ -16,6 +16,15 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Lernpfad: **Themenfilter zeigt Fach, Klasse und Nummer** („Mathematik ·
+  Kl. 7 · 1 Rechnen mit Brüchen“), Unterthemen mit Nummer, sortiert nach
+  Nummer. Gefiltert wird nach dem Thema selbst, nicht nach dem Namen —
+  gleichnamige Themen verschiedener Klassen fielen vorher in einen Eintrag.
+- Rückmeldebogen: **Wiederholungsaufgaben finden auch Schulbuch-Verweise**
+  (Aufgaben ohne Text, mit „S.11 Nr.8“ — sie fielen vorher alle heraus, und
+  der Druck meldete fälschlich „keine Aufgabe“); Themennamen werden ohne
+  führende Nummer verglichen. Die **Auswahl der Bausteine merkt sich das
+  Konto**, nicht nur der Browser.
 - Körper: **Drehen geht leichter** — der Körper bleibt beim Drehen gleich groß
   (vorher passte sich die Größe jedem Drehschritt an). Darunter liegt ein
   **Bodenraster**, das mitdreht und auf dem die Grundfläche steht (ein
