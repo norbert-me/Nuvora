@@ -1758,6 +1758,7 @@ export default {
   "klassenarbeit.distWhole": "Notas",
   "klassenarbeit.distFine": "Notas finas",
   "klassenarbeit.byTask": "Aciertos por tarea",
+  "klassenarbeit.byTaskAlle": "Aciertos por tarea (todos los que la escribieron)",
   "klassenarbeit.addPart": "Subtarea",
   "klassenarbeit.addPartHint": "Dividir en subtareas (a, b, c …) con puntos propios",
   "klassenarbeit.wahlHint": "¿Escribió el alumno aquí la tarea de la hoja {{n}}? Un clic alterna.",

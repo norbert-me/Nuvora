@@ -54,3 +54,31 @@ describe("Klassenarbeit: Gewichtung der Themen", () => {
     expect(Object.fromEntries(gw.map((x) => [x.topic, x.abweichung]))).toEqual({ 1: "viel", 2: null, 3: "wenig" });
   });
 });
+
+import { aufgabenUeberAlle } from "./Klassenarbeit.jsx";
+
+describe("Klassenarbeit: Aufgaben ueber beide Kurse", () => {
+  // E-Blatt: 1. (10 P), 2. (4 P). G-Blatt: 1. (6 P), Darstellung, 2. (2 P).
+  // Cem (G) schreibt bei 1. die E-Fassung — seine Punkte liegen im G-Blatt unter "~e1".
+  const E = { id: 1, niveau: "E", tasks: [{ id: "e1", max: 10 }, { id: "e2", max: 4 }],
+    results: { 1: { e1: 8, e2: 4 }, 2: { e1: 2, e2: 0 } } };
+  const G = { id: 2, niveau: "G", tasks: [{ id: "g1", max: 6 }, { id: "d", max: 2, form: true }, { id: "g2", max: 2 }],
+    wechsel: { 3: ["g1"] }, results: { 3: { "~e1": 5, d: 2, g2: 2 }, 4: { g1: 6, d: 1, g2: 1 } } };
+  const kinder = [{ id: 1, name: "A", niveau: "E" }, { id: 2, name: "B", niveau: "E" }, { id: 3, name: "C", niveau: "G" }, { id: 4, name: "D", niveau: "G" }];
+  const { perTask } = aufgabenUeberAlle([E, G], kinder);
+  const z = Object.fromEntries(perTask.map((x) => [x.id, x]));
+
+  it("die E-Aufgabe zaehlt den G-Wechsler mit", () => {
+    expect(z["E · e1"].n).toBe(3);
+    expect(z["E · e1"].pct).toBe(50);   // (8 + 2 + 5) / 30
+  });
+
+  it("die G-Aufgabe nur, wer sie schrieb", () => {
+    expect(z["G · g1"].n).toBe(1);
+    expect(z["G · g1"].pct).toBe(100);
+  });
+
+  it("Darstellung fehlt, Reihenfolge nach Position", () => {
+    expect(perTask.map((x) => x.id)).toEqual(["E · e1", "G · g1", "E · e2", "G · g2"]);
+  });
+});

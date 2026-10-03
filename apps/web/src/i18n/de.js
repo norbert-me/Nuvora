@@ -1740,6 +1740,7 @@ export default {
   "klassenarbeit.distWhole": "Noten",
   "klassenarbeit.distFine": "Teilnoten",
   "klassenarbeit.byTask": "Trefferquote je Aufgabe",
+  "klassenarbeit.byTaskAlle": "Trefferquote je Aufgabe (alle, die sie geschrieben haben)",
   "klassenarbeit.addPart": "Teilaufgabe",
   "klassenarbeit.addPartHint": "In Teilaufgaben (a, b, c …) mit eigenen Punkten aufteilen",
   "klassenarbeit.wahlHint": "Hat das Kind hier die Aufgabe des {{n}}-Blatts geschrieben? Klick wechselt.",

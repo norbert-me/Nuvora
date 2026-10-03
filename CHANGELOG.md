@@ -16,6 +16,12 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Klassenarbeit, **Auswertung einer E/G-Arbeit prüft die Arbeit**: jede
+  Aufgabe wird über alle Kinder ausgewertet, die genau diese Fassung
+  geschrieben haben — die E-Aufgabe also mit dem E-Kurs und den G-Kindern,
+  die sie gewählt haben (und umgekehrt), nach Position nebeneinander
+  (E · 1., G · 1., …). Themen-Trefferquote, schwache Gruppen und Fehlerarten
+  stehen dort nicht mehr; sie bleiben im einzelnen Blatt.
 - Klassenarbeit: **Trefferquote je Aufgabe aufgeräumt** — eine Zeile je
   Aufgabe mit kurzem Hinweis („Aufgabe prüfen“, „Wiederholen“); Kennzahlen,
   Begründung und Teilaufgaben per Klick. Unter „Alle“ steht die Liste nur

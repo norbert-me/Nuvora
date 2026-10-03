@@ -395,6 +395,80 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
   return { topics: topicsOut, students: studentsOut, weakGroups, fehlerStat, fehlerRoh, bogen, gradedCount: graded.length, perTask, perUnit, noten };
 }
 
+// „Auswertung" einer E/G-Arbeit prueft die ARBEIT, nicht die Kurse: jede
+// Aufgabe wird ueber alle Kinder ausgewertet, die genau diese Fassung
+// geschrieben haben — die E-Aufgabe 3 also mit dem E-Kurs UND den G-Kindern,
+// die sie gewaehlt haben (deren Punkte liegen im G-Blatt unter "~"). Die
+// Trennschaerfe misst gegen den ANTEIL der Sachpunkte, weil die Kinder
+// verschiedene Blaetter mit verschiedenen Hoechstpunkten schrieben.
+// Reihenfolge nach Position: E · 1., G · 1., E · 2., … — so steht nebeneinander,
+// was einander entspricht.
+export function aufgabenUeberAlle(blaetter, alleStudents) {
+  const da = blaetter.filter(Boolean);
+  const proKind = [];   // { b, wk, sid } je gewertetes Kind
+  da.forEach((b) => {
+    const anderes = da.find((x) => x !== b);
+    const wk = { ...b, _alt: (anderes && anderes.tasks) || [] };
+    const results = b.results || {};
+    const absent = new Set([...(b.absent || []).map(String), ...Object.entries(results).filter(([, v]) => v === "abwesend").map(([k]) => k)]);
+    alleStudents.filter((st) => (st.niveau || "") === (b.niveau || "")).forEach((st) => {
+      const r = results[String(st.id)];
+      if (absent.has(String(st.id)) || !r || r === "abwesend") return;
+      if (!Array.isArray(r) && !Object.values(r).some((v) => v != null && v !== "")) return;
+      proKind.push({ b, wk, sid: st.id });
+    });
+  });
+  const pu = (k, u) => punkteIn((k.b.results || {})[String(k.sid)], u.id, u.max);
+  const sachAnteil = (k) => {
+    let e = 0, m = 0;
+    (k.b.tasks || []).forEach((tk) => {
+      if (tk.form) return;
+      einheitenFuer(k.wk, k.sid, tk).forEach((u) => { e += pu(k, u); m += u.max; });
+    });
+    return m ? e / m : 0;
+  };
+  const anteil = new Map(proKind.map((k) => [k, sachAnteil(k)]));
+  const zeilen = [];
+  const perUnit = [];
+  da.forEach((b) => {
+    const sach = (b.tasks || []).filter((tk) => !tk.form);
+    sach.forEach((tk, pos) => {
+      const eigene = eigeneEinheiten(tk);
+      // Wer schrieb diese Fassung? Kinder des Blatts ohne Wechsel und Kinder
+      // des anderen Blatts, die an derselben Stelle gewechselt haben.
+      const schreiber = proKind.flatMap((k) => {
+        if (k.b === b) return gewechselt(k.wk, k.sid, tk) ? [] : [{ k, us: eigene }];
+        const ihre = (k.b.tasks || []).filter((x) => !x.form)[pos];
+        return ihre && gewechselt(k.wk, k.sid, ihre) ? [{ k, us: andereEinheiten(k.wk, ihre) }] : [];
+      });
+      if (!schreiber.length) return;
+      const id = `${b.niveau} · ${tk.id}`;
+      const mx = eigene.reduce((n, u) => n + u.max, 0);
+      const xs = schreiber.map(({ k, us }) => us.reduce((n, u) => n + pu(k, u), 0));
+      const tot = schreiber.map(({ k }) => anteil.get(k));
+      const e = xs.reduce((a, c) => a + c, 0);
+      const { ciLow, ciHigh } = konfidenzProzent(xs, mx);
+      zeilen.push({ pos, stufe: b.niveau, row: {
+        id, label: `${b.niveau} · ${tk.label || `${(b.tasks || []).indexOf(tk) + 1}.`}`, n: xs.length,
+        pct: mx ? Math.round((e / (xs.length * mx)) * 100) : 0, avgP: Math.round(mittel(xs) * 10) / 10, max: mx,
+        disc: trennschaerfe(xs, tot), ciLow, ciHigh,
+        nullAnteil: Math.round(xs.filter((x) => x === 0).length / xs.length * 100),
+        vollAnteil: Math.round(xs.filter((x) => x >= mx).length / xs.length * 100),
+      } });
+      if (eigene.length < 2) return;
+      eigene.forEach((u, j) => {
+        const ux = schreiber.map(({ k, us }) => pu(k, us[j]));
+        const avgP = mittel(ux);
+        const ki = konfidenzProzent(ux, u.max);
+        perUnit.push({ id: `${id}·${u.id}`, taskId: id, label: u.label || "", avgP: Math.round(avgP * 10) / 10, max: u.max,
+          pct: u.max ? Math.round((avgP / u.max) * 100) : 0, disc: trennschaerfe(ux, tot), ciLow: ki.ciLow, ciHigh: ki.ciHigh });
+      });
+    });
+  });
+  zeilen.sort((a, c) => a.pos - c.pos || (a.stufe < c.stufe ? -1 : 1));
+  return { perTask: zeilen.map((z) => z.row), perUnit };
+}
+
 export default function Klassenarbeit() {
   const { t } = useLanguage();
   const aktiv = useAktiv();
@@ -844,7 +918,7 @@ export default function Klassenarbeit() {
         effScale: sc, topicLabel, eigeneStufe: stufe, andereStufe: stufe === "E" ? "G" : "E",
       })];
     });
-    return { gesamt: vereineAnalysen(teile, topicLabel), teile };
+    return { gesamt: vereineAnalysen(teile, topicLabel), teile, aufgaben: aufgabenUeberAlle(blaetter, alleStudents) };
   }, [alleAn, work, partner, alleStudents, scale, topics]);
   const wiederholen = async () => {
     if (!work) return;
@@ -877,7 +951,12 @@ export default function Klassenarbeit() {
   // E und G. Dieselbe Anzeige fuer alle drei, damit sie sich nicht
   // auseinanderentwickeln (die erste „Alle"-Ansicht war ein eigener Nachbau
   // und sah deshalb anders aus).
-  const zeigeAuswertung = (A, titel = null, schluessel = "blatt", ohneAufgaben = false) => (
+  // `nurArbeit`: die Auswertung einer E/G-Arbeit prueft die Arbeit — ohne
+  // Themen, schwache Gruppen und Fehlerarten (die gehoeren zum einzelnen
+  // Kurs). `aufgaben` ersetzt die Aufgabenliste (ueber alle Kinder gepoolt).
+  const zeigeAuswertung = (A, titel = null, schluessel = "blatt", { nurArbeit = false, aufgaben = null } = {}) => {
+    const AT = aufgaben || { perTask: A ? A.perTask : [], perUnit: A ? A.perUnit : [] };
+    return (
     <Fragment key={schluessel}>{
       (A && (A.topics.length > 0 || A.students.length > 0 || A.perUnit.length > 0 || A.noten.n > 0)) ? (
             <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, padding: 16, background: "var(--card)" }}>
@@ -888,6 +967,7 @@ export default function Klassenarbeit() {
                   <Icon d={ICONS.eye} size={15} color={hideIndividual ? C.aufAkzent : "var(--text2)"} /> {t("klassenarbeit.presentMode")}
                 </button>
               </div>
+              {!nurArbeit && (<>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("klassenarbeit.byTopic")}</div>
               {A.topics.length === 0 ? <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("klassenarbeit.noTopics")}</p> : A.topics.map((tp) => (
                 <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
@@ -923,13 +1003,14 @@ export default function Klassenarbeit() {
                   ))}
                 </div>
               </>)}
+              </>)}
 
               {/* Fehlerarten: die Themenquote sagt WO es klemmt, die Fehlerart
                   WORAN — und daraus folgt Verschiedenes. Nur da, wo jemand
                   wirklich etwas erfasst hat; sonst stuende hier eine Tabelle
                   aus lauter Nullen und behauptete, die Klasse mache keine
                   Fehler. */}
-              {A.fehlerStat && (<>
+              {!nurArbeit && A.fehlerStat && (<>
                 <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 4px" }}>{t("klassenarbeit.fehlerTitle")}</div>
                 <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>
                   {t("klassenarbeit.fehlerTitleHint", { n: A.fehlerStat.n })}
@@ -979,13 +1060,10 @@ export default function Klassenarbeit() {
 
               {/* je Aufgabe: Ø, Trefferquote + Trennschärfe/95%-KI. Hat eine Aufgabe
                   Teilaufgaben, lässt sich deren Auswertung darunter ausklappen. */}
-              {/* Unter „Alle" steht die Aufgabenliste nur je Blatt: E- und
-                  G-Aufgaben sind verschiedene Aufgaben, gemischt sagte die Liste
-                  nichts und stand dreimal da. */}
-              {!ohneAufgaben && A.perTask.length > 0 && (<>
-                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.byTask")}</div>
-                {A.perTask.map((tk) => {
-                  const parts = A.perUnit.filter((u) => u.taskId === tk.id);
+              {AT.perTask.length > 0 && (<>
+                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t(aufgaben ? "klassenarbeit.byTaskAlle" : "klassenarbeit.byTask")}</div>
+                {AT.perTask.map((tk) => {
+                  const parts = AT.perUnit.filter((u) => u.taskId === tk.id);
                   const open = expandedTasks.has(tk.id);
                   const toggle = () => setExpandedTasks((prev) => { const n = new Set(prev); n.has(tk.id) ? n.delete(tk.id) : n.add(tk.id); return n; });
                   return (
@@ -1016,8 +1094,8 @@ export default function Klassenarbeit() {
                 {infoOpen && (() => {
                   const sd = A.noten.sdPct;
                   const sdLevel = sd == null ? null : sd < 10 ? "low" : sd <= 25 ? "mid" : "high";
-                  const weak = A.topics.filter((tp) => tp.pct < 50).map((tp) => tp.label);
-                  const lowDisc = A.perTask.filter((tk) => tk.disc != null && tk.disc < 0.2);
+                  const weak = nurArbeit ? [] : A.topics.filter((tp) => tp.pct < 50).map((tp) => tp.label);
+                  const lowDisc = AT.perTask.filter((tk) => tk.disc != null && tk.disc < 0.2);
                   const Item = ({ term, children }) => (
                     <li style={{ marginBottom: 8 }}><b style={{ color: "var(--text)" }}>{term}:</b> <span style={{ color: "var(--text2)" }}>{children}</span></li>
                   );
@@ -1093,7 +1171,8 @@ export default function Klassenarbeit() {
             </div>
           ) : null
     }</Fragment>
-  );
+    );
+  };
 
   const hasRoster = classId != null;
   return (
@@ -1507,7 +1586,8 @@ export default function Klassenarbeit() {
                     ))}
                   </Segment>
                 </div>
-                {zeigeAuswertung(A, alleTeil === "alle" ? t("klassenarbeit.auswertungGesamt") : t("klassenarbeit.auswertungBlatt", { n: alleTeil }), alleTeil, alleTeil === "alle")}
+                {zeigeAuswertung(A, alleTeil === "alle" ? t("klassenarbeit.auswertungGesamt") : t("klassenarbeit.auswertungBlatt", { n: alleTeil }), alleTeil,
+                  { nurArbeit: true, aufgaben: alleAnalysen.aufgaben })}
               </>);
             })()}
             <div style={{ fontSize: 14, fontWeight: 700, margin: "20px 0 8px" }}>{t("klassenarbeit.notenAller")}</div>

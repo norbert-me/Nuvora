@@ -1757,6 +1757,7 @@ export default {
   "klassenarbeit.distWhole": "Grades",
   "klassenarbeit.distFine": "Fine grades",
   "klassenarbeit.byTask": "Hit rate per task",
+  "klassenarbeit.byTaskAlle": "Hit rate per task (everyone who wrote it)",
   "klassenarbeit.addPart": "Sub-task",
   "klassenarbeit.addPartHint": "Split into sub-tasks (a, b, c …) with own points",
   "klassenarbeit.wahlHint": "Did the student write the {{n}} sheet's task here? Click switches.",
