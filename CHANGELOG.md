@@ -14,7 +14,7 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.4.6 — 03.10.2026
 
 - Klassenarbeit: **Gewichtung der Themen** unter den Aufgaben — Punkte und
   Anteil je Thema, deutliche Abweichungen vom gleichen Anteil markiert.
