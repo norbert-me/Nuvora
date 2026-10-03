@@ -764,7 +764,10 @@ export function StatCard({ label, value, color, sub }) {
 // `core/statistik.js` (dieselbe Formel stand als `quantile` noch einmal in
 // `core/grades.js`). Der Name bleibt, damit die Aufrufer sich nicht ändern.
 export const quantileOf = (sorted, p) => quantil(sorted, p, 0);
-export function Boxplot({ values, max = 100, label, unit = "", compact = false }) {
+// `umgekehrt`: hoher Wert links. Fuer Prozente neben Noten — bei Noten steht die
+// 1 (besser) links; ohne Umkehr stuende das Bessere bei Prozenten rechts, und
+// zwei Grafiken nebeneinander lasen sich gegenlaeufig.
+export function Boxplot({ values, max = 100, label, unit = "", compact = false, umgekehrt = false }) {
   if (!values || values.length < 3) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const q1 = quantileOf(sorted, 0.25), med = quantileOf(sorted, 0.5), q3 = quantileOf(sorted, 0.75);
@@ -773,7 +776,10 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false }
   const lo = inliers.length ? inliers[0] : sorted[0];
   const hi = inliers.length ? inliers[inliers.length - 1] : sorted[sorted.length - 1];
   const outliers = sorted.filter((v) => v < loBound || v > hiBound);
-  const pct = (v) => (max > 0 ? (v / max) * 100 : 0);
+  const roh = (v) => (max > 0 ? (v / max) * 100 : 0);
+  const pct = (v) => (umgekehrt ? 100 - roh(v) : roh(v));
+  // Ein Abschnitt von a bis b: links ist das kleinere Ende in BILDkoordinaten.
+  const spanne = (a, b) => ({ left: `${Math.min(pct(a), pct(b))}%`, width: `${Math.abs(pct(b) - pct(a))}%` });
   // Eine Nachkommastelle, ganze Zahlen ohne Komma, deutsch geschrieben —
   // dieselbe Regel wie im Notenbuch, deshalb aus `core/zahl.js`.
   const fmt = (n) => kommaRund(n, 1);
@@ -790,10 +796,10 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false }
           <div key={g} style={{ position: "absolute", top: 3, left: `${g}%`, width: 1, height: 20,
             background: g === 50 ? "var(--border2)" : "var(--border)" }} />
         ))}
-        <div style={{ position: "absolute", top: 12, left: `${pct(lo)}%`, width: `${pct(hi - lo)}%`, height: 3, background: "var(--border3)" }} />
+        <div style={{ position: "absolute", top: 12, ...spanne(lo, hi), height: 3, background: "var(--border3)" }} />
         <div style={{ position: "absolute", top: 7, left: `${pct(lo)}%`, width: 2, height: 12, background: "var(--text3)" }} />
         <div style={{ position: "absolute", top: 7, left: `${pct(hi)}%`, width: 2, height: 12, background: "var(--text3)" }} />
-        <div style={{ position: "absolute", top: 4, left: `${pct(q1)}%`, width: `${pct(q3 - q1)}%`, height: 18, background: "rgba(10,132,255,0.15)", border: "2px solid var(--accent)", borderRadius: 4 }} />
+        <div style={{ position: "absolute", top: 4, ...spanne(q1, q3), height: 18, background: "rgba(10,132,255,0.15)", border: "2px solid var(--accent)", borderRadius: 4 }} />
         <div style={{ position: "absolute", top: 2, left: `${pct(med)}%`, width: 3, height: 22, background: "var(--accent)", borderRadius: 2, transform: "translateX(-1.5px)" }} />
         {outliers.map((v, i) => (
           <div key={i} style={{ position: "absolute", top: 9, left: `${pct(v)}%`, width: 8, height: 8, borderRadius: 4, background: COLORS.danger, transform: "translateX(-4px)" }} />
@@ -811,10 +817,10 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false }
     <div style={{ padding: 16 }}>
       {label && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>}
       <div style={{ position: "relative", height: 48, margin: "0 20px" }}>
-        <div style={{ position: "absolute", top: 22, left: `${pct(lo)}%`, width: `${pct(hi - lo)}%`, height: 4, background: "var(--border3)" }} />
+        <div style={{ position: "absolute", top: 22, ...spanne(lo, hi), height: 4, background: "var(--border3)" }} />
         <div style={{ position: "absolute", top: 14, left: `${pct(lo)}%`, width: 2, height: 20, background: "var(--text3)" }} />
         <div style={{ position: "absolute", top: 14, left: `${pct(hi)}%`, width: 2, height: 20, background: "var(--text3)" }} />
-        <div style={{ position: "absolute", top: 8, left: `${pct(q1)}%`, width: `${pct(q3 - q1)}%`, height: 32, background: "rgba(10,132,255,0.15)", border: "2px solid var(--accent)", borderRadius: 6 }} />
+        <div style={{ position: "absolute", top: 8, ...spanne(q1, q3), height: 32, background: "rgba(10,132,255,0.15)", border: "2px solid var(--accent)", borderRadius: 6 }} />
         <div style={{ position: "absolute", top: 6, left: `${pct(med)}%`, width: 3, height: 36, background: "var(--accent)", borderRadius: 2, transform: "translateX(-1.5px)" }} />
         {outliers.map((v, i) => (
           <div key={i} style={{ position: "absolute", top: 19, left: `${pct(v)}%`, width: 10, height: 10, borderRadius: 5, background: COLORS.danger, transform: "translateX(-5px)" }} />
@@ -825,7 +831,9 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false }
         // MINGAP hinter der letzten liegt — sonst neue Zeile. So überlagert nichts,
         // auch auf schmalen Handy-Displays (dort werden einfach mehr Zeilen genutzt).
         const MINGAP = 18; const rows = [];
-        const items = [["Min", sorted[0]], ["Q1", q1], ["Median", med], ["Q3", q3], ["Max", sorted[sorted.length - 1]]].map(([lbl, v]) => {
+        // Von links nach rechts IM BILD verteilen — umgekehrt steht Max links.
+        const items = [["Min", sorted[0]], ["Q1", q1], ["Median", med], ["Q3", q3], ["Max", sorted[sorted.length - 1]]]
+          .sort((a, b) => pct(a[1]) - pct(b[1])).map(([lbl, v]) => {
           const x = pct(v);
           let row = rows.findIndex((lastX) => x - lastX >= MINGAP);
           if (row === -1) row = rows.length;

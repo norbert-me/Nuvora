@@ -1073,7 +1073,7 @@ export default function Klassenarbeit() {
                   })() : (
                     boxMode === "note"
                       ? <Boxplot values={A.noten.werte} max={6} />
-                      : <Boxplot values={A.noten.pctArr} max={100} unit="%" />
+                      : <Boxplot values={A.noten.pctArr} max={100} unit="%" umgekehrt />
                   )}
                 </div>
                 {/* Min-Punkte je Note entfernt — steht im Notenschlüssel. */}
@@ -1712,7 +1712,7 @@ export function KlassenarbeitVergleich() {
               <thead>
                 <tr>
                   <th style={{ ...kopf, textAlign: "left" }}>{t("klassenarbeit.cmpClass")}</th>
-                  <th style={{ ...kopf, textAlign: "left", width: "45%" }}>0 % – 100 %</th>
+                  <th style={{ ...kopf, textAlign: "left", width: "45%" }}>100 % – 0 %</th>
                   <th style={kopf}>n</th>
                   <th style={kopf}>⌀ %</th>
                   <th style={kopf}>⌀ {t("klassenarbeit.grade")}</th>
@@ -1724,7 +1724,7 @@ export function KlassenarbeitVergleich() {
                   return (
                     <tr key={a.id} style={a.eigene ? { background: "var(--bg2)" } : undefined}>
                       <td style={{ ...zelle, textAlign: "left", fontWeight: 600 }} title={a.name}>{a.class_name || a.name}</td>
-                      <td style={{ ...zelle, textAlign: "left" }}><Boxplot values={a.pct_liste} max={100} compact /></td>
+                      <td style={{ ...zelle, textAlign: "left" }}><Boxplot values={a.pct_liste} max={100} compact umgekehrt /></td>
                       <td style={{ ...zelle, color: "var(--text3)" }}>{a.n}</td>
                       <td style={{ ...zelle, fontWeight: 600 }}>{fmt(a.schnitt)}</td>
                       <td style={{ ...zelle, fontWeight: 700, color: q ? boxColor(q.med) : "var(--text)" }}>{nt(noteVon(a.pct_liste))}</td>
@@ -1846,7 +1846,7 @@ export function KlassenarbeitVergleich() {
               <thead>
                 <tr>
                   <th style={{ ...kopf, textAlign: "left" }}>{t("klassenarbeit.compareWork")}</th>
-                  <th style={{ ...kopf, textAlign: "left", width: "45%" }}>0 % – 100 %</th>
+                  <th style={{ ...kopf, textAlign: "left", width: "45%" }}>100 % – 0 %</th>
                   <th style={kopf}>n</th>
                   <th style={kopf}>⌀ %</th>
                   <th style={kopf}>⌀ {t("klassenarbeit.grade")}</th>
@@ -1856,7 +1856,7 @@ export function KlassenarbeitVergleich() {
                 {verlauf.map((r) => (
                   <tr key={r.id}>
                     <td style={{ ...zelle, textAlign: "left", fontWeight: 600, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis" }} title={r.name}>{r.name}</td>
-                    <td style={{ ...zelle, textAlign: "left" }}><Boxplot values={r.pl} max={100} compact /></td>
+                    <td style={{ ...zelle, textAlign: "left" }}><Boxplot values={r.pl} max={100} compact umgekehrt /></td>
                     <td style={{ ...zelle, color: "var(--text3)" }}>{r.q.n}</td>
                     <td style={{ ...zelle, fontWeight: 600 }}>{fmt(r.q.avg)}</td>
                     <td style={{ ...zelle, fontWeight: 700, color: boxColor(r.q.med) }}>{nt(r.avgNote)}</td>
