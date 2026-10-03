@@ -275,9 +275,6 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
 
       {bedienbar && (
         <>
-          {arbeit && !zug && (
-            <div style={{ fontSize: 14, color: C.warning, textAlign: "center", fontWeight: 600, margin: "4px 0 8px" }}>{t("waage.kippt")}</div>
-          )}
           {fehler && <div style={{ fontSize: 13, color: C.danger, textAlign: "center", marginBottom: 8 }}>{fehler}</div>}
           <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 8 }}>
             <button onClick={zurueck} disabled={!arbeit && !schritte.length} style={{ ...btnSecondary, ...btnSmall }}>{t("waage.zurueck")}</button>

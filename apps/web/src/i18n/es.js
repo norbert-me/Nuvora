@@ -1548,7 +1548,6 @@ export default {
   "waage.fehler.teilen": "No todo se puede dividir entre {{n}}.",
   "waage.fehler.zuGross": "Es demasiado para la balanza.",
   "waage.fehler.art": "Esa transformación no existe.",
-  "waage.kippt": "La balanza se inclina: haz lo mismo en el otro lado.",
   "waage.fertig": "¡Resuelto! Comprobación: {{probe}}",
   "waage.zahl": "Número",
   "waage.zurueck": "Deshacer",

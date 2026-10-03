@@ -1530,7 +1530,6 @@ export default {
   "waage.fehler.teilen": "Nicht alles lässt sich durch {{n}} teilen.",
   "waage.fehler.zuGross": "Das wird zu viel für die Waage.",
   "waage.fehler.art": "Diese Umformung gibt es nicht.",
-  "waage.kippt": "Die Waage kippt — tu auf der anderen Seite dasselbe.",
   "waage.fertig": "Gelöst! Probe: {{probe}}",
   "waage.zahl": "Zahl",
   "waage.zurueck": "Rückgängig",

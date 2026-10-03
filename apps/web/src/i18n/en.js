@@ -1547,7 +1547,6 @@ export default {
   "waage.fehler.teilen": "Not everything can be divided by {{n}}.",
   "waage.fehler.zuGross": "That's too much for the scale.",
   "waage.fehler.art": "That step doesn't exist.",
-  "waage.kippt": "The scale tips — do the same on the other side.",
   "waage.fertig": "Solved! Check: {{probe}}",
   "waage.zahl": "Number",
   "waage.zurueck": "Undo",
