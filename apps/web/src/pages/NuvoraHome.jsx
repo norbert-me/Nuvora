@@ -184,11 +184,14 @@ function HeutePanel({ t }) {
         const d = await fetch(`/api/kalender/external-events?frm=${ymd(heute)}&to=${ymd(heute)}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
         fremd = (Array.isArray(d) ? d : []).filter((ev) => ev.date === ymd(heute) && !extAus.has(ev.cal || ""));
       }
-      const freiHeute = (Array.isArray(breaks) ? breaks : []).find((b) => ymd(heute) >= b.start_date.slice(0, 10) && ymd(heute) <= b.end_date.slice(0, 10));
+      // Den Tag in ORTSZEIT nehmen, nicht die ersten zehn Zeichen des
+      // UTC-Zeitstempels: Mitternacht in Berlin ist 22:00 UTC am Vortag, und so
+      // stand der Tag der Deutschen Einheit hier am 2. Oktober.
+      const freiHeute = (Array.isArray(breaks) ? breaks : []).find((b) => ymd(heute) >= ymd(new Date(b.start_date)) && ymd(heute) <= ymd(new Date(b.end_date)));
       if (!ab) setData({ slots: (tt?.slots || []), times: (tt?.times || []), zero: (tt?.zero || null), entries: Array.isArray(entries) ? entries : [], fremd,
                         classes, kurse: Array.isArray(kurse) ? kurse : [], frei: freiHeute,
                         entfallen: (Array.isArray(cancels) ? cancels : [])
-                          .filter((c) => (c.date || "").slice(0, 10) === ymd(heute)).map((c) => c.period) });
+                          .filter((c) => c.date && ymd(new Date(c.date)) === ymd(heute)).map((c) => c.period) });
     })();
     return () => { ab = true; };
   }, []);

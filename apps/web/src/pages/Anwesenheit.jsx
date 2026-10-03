@@ -67,7 +67,9 @@ export default function Anwesenheit() {
   }, [kalenderAktiv]);
   const [breaks, setBreaks] = useState([]);
   // Ist der gewählte Tag unterrichtsfrei (Ferien/Feiertag)?
-  const istFrei = useMemo(() => breaks.find((b) => datum >= b.start_date.slice(0, 10) && datum <= b.end_date.slice(0, 10)), [breaks, datum]);
+  // Tag in Ortszeit, nicht aus dem UTC-Zeitstempel geschnitten (Mitternacht in
+  // Berlin ist 22:00 UTC am Vortag) — dieselbe Regel wie im Kalender.
+  const istFrei = useMemo(() => breaks.find((b) => datum >= ymd(new Date(b.start_date)) && datum <= ymd(new Date(b.end_date))), [breaks, datum]);
 
   // Klassen, die am gewählten Wochentag im Stundenplan stehen.
   const weekday = wochentagMo0(datum + "T00:00:00");

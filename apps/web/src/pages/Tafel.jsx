@@ -623,7 +623,8 @@ function TafelVerlauf({ t }) {
   };
   const heuteStr = ymd(new Date());
   const laufend = !data ? null : (data.entries || [])
-    .filter((e) => String(e.date || "").slice(0, 10) === heuteStr)
+    // Tag in Ortszeit, nicht aus dem UTC-Zeitstempel geschnitten.
+    .filter((e) => e.date && ymd(new Date(e.date)) === heuteStr)
     .map((e) => ({ e, ...fenster(e) }))
     .filter((x) => x.von != null && x.bis != null && jetzt >= x.von && jetzt < x.bis)
     .sort((a, b) => a.von - b.von)[0];

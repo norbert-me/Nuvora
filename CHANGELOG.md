@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Feiertage und Ferien auf dem richtigen Tag:** ein freier Tag, der auf
+  Mitternacht lag, stand im Handy-Kalender, auf der Startseite und bei der
+  Anwesenheit einen Tag zu früh (z. B. Tag der Deutschen Einheit am 2.10.).
 - **Klassenarbeit:** beim Eintragen sind Zeile und Spalte des Feldes
   hervorgehoben; „abwesend" steht nicht mehr zusätzlich hinter der Punktzahl.
 - Klassenarbeit: die Darstellung hat keinen E/G-Umschalter mehr und steht

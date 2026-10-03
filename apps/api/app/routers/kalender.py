@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, model_validator, field_validator
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..zeit import tagesbeginn
+from ..zeit import schul_datum, tagesbeginn
 # RRULE ist ICS-Grammatik; die Uebersetzung liegt in app/caldav.py (ohne
 # FastAPI, ohne Datenbank, testbar ohne Server). Eine zweite Fassung hier waere
 # die, in der eine Pruefung fehlt.
@@ -1075,7 +1075,15 @@ async def delete_exam(exam_id: int, user: User = Depends(require_module), db: As
 
 
 def _tag(x):
-    """Auf reines Datum reduzieren (aus datetime oder date)."""
+    """Auf den Kalendertag reduzieren — den Tag AN DER SCHULE, nicht den in UTC.
+
+    Ein Zeitpunkt um Mitternacht Ortszeit liegt in UTC auf 22:00 des Vortags;
+    `x.date()` machte daraus den Vortag. So stand der Tag der Deutschen Einheit
+    am 2. Oktober — im Feed fuers Handy, auf der Startseite und bei der
+    Anwesenheit. `schul_datum` (app/zeit.py) ist die eine Umrechnung dafuer.
+    """
+    if isinstance(x, datetime):
+        return schul_datum(x)
     return x.date() if hasattr(x, "date") else x
 
 
@@ -2011,8 +2019,7 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
             lines.append(f"DESCRIPTION:{_ics_escape(beschreibung)}")
         lines.append("END:VEVENT")
     for b in breaks:
-        s = b.start_date.date() if hasattr(b.start_date, "date") else b.start_date
-        en = b.end_date.date() if hasattr(b.end_date, "date") else b.end_date
+        s, en = _tag(b.start_date), _tag(b.end_date)
         # Ein verdrehter Zeitraum (Ende vor Anfang, z.B. aus einer alten Datei)
         # ergaebe DTEND <= DTSTART — der Client zeigt so ein Ereignis gar nicht
         # oder an einem einzelnen Tag. Lieber auf den Anfangstag klemmen.
@@ -2965,7 +2972,7 @@ async def untis_uebernehmen(body: UntisUebernahmeIn, user: User = Depends(requir
             entfallen += 1
 
     frei = 0
-    vorhanden = {(b.start_date.date(), b.end_date.date()) for b in (await db.execute(
+    vorhanden = {(_tag(b.start_date), _tag(b.end_date)) for b in (await db.execute(
         select(CalendarBreak).where(CalendarBreak.owner_id == user.id))).scalars().all()}
     for f in body.ferien[:100]:
         von, bis = _datum(f.von), _datum(f.bis)
