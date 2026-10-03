@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Konto löschen** scheiterte, wenn das Konto CardVote-Sitzungen hatte
+  (Datenbank-Fehler „sessions_class_id_fkey“).
 - **Scrollbalken immer sichtbar** (Notenbuch und überall sonst) — in Chrome
   blendete der Mac sie wieder aus.
 - **Ablage ohne Grenze:** je Konto gibt es keine Obergrenze mehr für Anhänge

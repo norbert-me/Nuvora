@@ -22,7 +22,7 @@ from ..netz import client_ip as _client_ip
 from ..seed import seed_new_account
 from ..rollen import ist_admin
 from ..database import get_db
-from ..models import BugReport, BugReportAnhang, CaldavToken, User, Question, MarketplaceQuiz
+from ..models import BugReport, BugReportAnhang, CaldavToken, SchoolClass, Session as CvSession, User, Question, MarketplaceQuiz
 from .. import mailer
 
 # Im Container /app/uploads (Volume). Ueberschreibbar, damit Tests und die
@@ -57,6 +57,17 @@ async def _purge_user_content(db: AsyncSession, user_id: int):
         email="", anhang=None, anhang_name="", anhang_typ="", log=""))
     await db.execute(delete(BugReportAnhang).where(BugReportAnhang.report_id.in_(
         select(BugReport.id).where(BugReport.user_id == user_id))))
+    # 2c) CardVote-Sitzungen VOR dem Konto loeschen. Sie haengen doppelt am
+    #     Konto — ueber owner_id (CASCADE) und ueber ihre Klasse (class_id, ohne
+    #     eigene Loeschregel). Laufen beide Ketten beim Loeschen des Kontos
+    #     gleichzeitig, prueft Postgres den Klassen-Schluessel, sobald die
+    #     Klasse weg ist — und ob die Sitzung dann schon geloescht ist, haengt
+    #     von der Reihenfolge ab. So scheiterte die Kontoloeschung (gesehen beim
+    #     Aufraeumen eines Wegwerf-Kontos: „sessions_class_id_fkey"). Scans
+    #     kaskadieren an der Sitzung, Notenspalten verlieren nur ihren Verweis.
+    await db.execute(delete(CvSession).where(or_(
+        CvSession.owner_id == user_id,
+        CvSession.class_id.in_(select(SchoolClass.id).where(SchoolClass.owner_id == user_id)))))
     # 3) Dateien löschen — aber nur, wenn sie AUSSCHLIESSLICH diesem Konto
     #    gehoeren. Uebernommene Kopien referenzieren dieselbe URL — als
     #    Fragebild, als Antwortbild (choice_images) und in besitzlosen
