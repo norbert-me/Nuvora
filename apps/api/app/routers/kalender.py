@@ -1798,6 +1798,24 @@ def ext_weitergeben(user, ev: dict) -> bool:
     return not (isinstance(aus, list) and (ev.get("cal") or "") in aus)
 
 
+def ganztaegig_weitergeben(user) -> bool:
+    """Gehen GANZTAEGIGE Termine nach draussen (ICS-Feed, CalDAV)?
+
+    Der Kalender kann sie ausblenden (Auge-Menue „Ganztaegig"); was dort nicht
+    zu sehen ist, soll auch nicht im Handy stehen. Der Schalter liegt am Konto
+    (`users.ansichten["kal_allday"] = {"an": bool}`, core/ansichten.js),
+    sonst kennte ihn nur der Browser. Fehlt er, gilt an — wie in der Ansicht.
+    """
+    stand = (getattr(user, "ansichten", None) or {}).get("kal_allday")
+    return not (isinstance(stand, dict) and stand.get("an") is False)
+
+
+def ist_ganztaegig(e) -> bool:
+    """Ein eigener Eintrag ohne Stunde und ohne Uhrzeit — dieselbe Regel wie
+    `isAllDayEntry` in Kalender.jsx."""
+    return getattr(e, "period", None) is None and not (getattr(e, "start_time", "") or "").strip()
+
+
 def ext_uid(key: str) -> str:
     return f"nuvora-ext-{ext_kurz(key)}@nuvora"
 
@@ -1956,7 +1974,10 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Nuvora//Kalender//DE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
              "X-WR-CALNAME:Nuvora", "REFRESH-INTERVAL;VALUE=DURATION:PT15M", "X-PUBLISHED-TTL:PT15M"]
     seq = int(u.calendar_rev or 0)
+    ganztag = ganztaegig_weitergeben(u)
     for e in entries:
+        if not ganztag and ist_ganztaegig(e):
+            continue          # im Kalender ausgeblendet — dann auch nicht im Handy
         day = e.date.date() if hasattr(e.date, "date") else e.date
         # Der Titel im fremden Kalender ist IMMER „Fach · Kursname", wenn ein
         # Kurs am Eintrag haengt. Im Handy steht der Termin zwischen
@@ -2113,6 +2134,8 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
     if u.feed_external:
         for ev in await externe_ereignisse(u, db=db):
             if not ext_weitergeben(u, ev):
+                continue
+            if not ev.get("time") and not ganztaegig_weitergeben(u):
                 continue
             tag = _d_iso(ev["date"])
             if not tag:

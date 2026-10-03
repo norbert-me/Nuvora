@@ -55,7 +55,7 @@ from ..zeit import tagesbeginn
 from .auth import (_DUMMY_PW_HASH, _hash_pw, _verify_pw, client_ip, fehlversuch_merken,
                    fehlversuche_pruefen, rate_limit)
 from .kalender import (_d_iso, _kurs_label, ext_dateiname, ext_uid,
-                       externe_ereignisse, ext_weitergeben, stundenplan_vorkommen,
+                       externe_ereignisse, ext_weitergeben, ganztaegig_weitergeben, ist_ganztaegig, stundenplan_vorkommen,
                        todo_dateiname, todo_termine, todo_uid)
 from .modules import is_active, modul_pflicht
 
@@ -401,6 +401,11 @@ async def _ressourcen(db: AsyncSession, u: User, fenster=None) -> list:
     `stundenplan_vorkommen` in kalender.py — dieselbe Funktion wie im ICS-Feed.
     """
     eintraege = await _alle(db, u, fenster)
+    # Im Kalender ausgeblendete ganztaegige Eintraege gehen nicht ans Geraet
+    # (nur die LISTE wird gefiltert — Aendern und Loeschen finden sie weiter).
+    ganztag = ganztaegig_weitergeben(u)
+    if not ganztag:
+        eintraege = [e for e in eintraege if not ist_ganztaegig(e)]
     texte = await _texte(db, u, eintraege)
     out = [{"name": _dateiname(e), "text": texte[e.id]} for e in eintraege]
 
@@ -448,6 +453,8 @@ async def _ressourcen(db: AsyncSession, u: User, fenster=None) -> list:
     for ev in await _externe(u):
         tag = _d_iso(ev["date"])
         if not tag or (von and tag < von) or (bis and tag > bis):
+            continue
+        if not ganztag and not ev.get("time"):
             continue
         out.append({"name": ext_dateiname(ev["key"]), "text": X.baue_vevent(
             uid=ext_uid(ev["key"]), tag=tag, titel=ev.get("title") or "Termin",

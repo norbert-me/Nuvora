@@ -115,8 +115,17 @@ export default function Kalender() {
   const [cursor, setCursor] = useState(() => parseYmd(params.get("date")) || startOfDay(new Date()));
   const [abo, setAbo] = useState(null); // Abo-URLs { url, webcal }
   const [viewMenuOpen, setViewMenuOpen] = useState(false); // „Auge"-Menü (was ein-/ausblenden)
-  const [showAllDay, setShowAllDay] = useState(() => { try { return localStorage.getItem("kal_allday") !== "0"; } catch { return true; } });
-  const toggleAllDay = () => setShowAllDay((v) => { const n = !v; try { localStorage.setItem("kal_allday", n ? "1" : "0"); } catch { /* egal */ } return n; });
+  // Ganztaegiges ein/aus — am KONTO (Bereich „kal_allday"), weil Feed und
+  // CalDAV nur weitergeben, was hier sichtbar ist (`ganztaegig_weitergeben` in
+  // kalender.py). Der alte Browser-Schluessel gilt als Startwert und wird
+  // einmalig uebernommen (Effekt unten).
+  const allDayStand = lokal("kal_allday");
+  const [showAllDay, setShowAllDay] = useState(() => {
+    if (allDayStand && typeof allDayStand.an === "boolean") return allDayStand.an;
+    try { return localStorage.getItem("kal_allday") !== "0"; } catch { return true; }
+  });
+  const toggleAllDay = () => setShowAllDay((v) => { const n = !v; sichern("kal_allday", { an: n }); return n; });
+  useEffect(() => { if (!allDayStand && !showAllDay) sichern("kal_allday", { an: false }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Fremde Kalender an/aus und einzeln aus: am KONTO (core/ansichten.js,
   // Bereich „kal_ext"), nicht nur im Browser — Feed und CalDAV schicken nur
   // hinaus, was hier sichtbar ist (`ext_weitergeben` in kalender.py), und das

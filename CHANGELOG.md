@@ -33,8 +33,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   dann ziehen); die Notiz im Termin-Dialog wächst mit dem Text.
 - **CardVote-Sitzung:** die Namen stehen über der Frage.
 - Fehler melden: kein „Knopf ausblenden“ mehr im Dialog (weiter im Profil).
-- **Kalender-Abo und CalDAV:** im Kalender ausgeschaltete fremde Kalender
-  gehen nicht mehr ans Handy weiter; die Auswahl hängt jetzt am Konto.
+- **Kalender-Abo und CalDAV:** was im Kalender ausgeblendet ist (fremde
+  Kalender, ganztägige Termine), geht nicht mehr ans Handy; die Auswahl hängt
+  jetzt am Konto.
 - **Startseite:** Termine aus abonnierten Kalendern stehen unter „Heute“ mit
   (wie im Kalender ausblendbar).
 - **Fehler melden: mehrere Anhänge** (bis 5, z. B. „vorher" und „nachher").
