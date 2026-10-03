@@ -61,7 +61,7 @@ export function gemerkteTeile() {
   return BOGEN_VORLAGEN.alles;
 }
 
-export function BogenWahl({ onDrucken, onClose, mitWdh = true }) {
+export function BogenWahl({ onDrucken, onClose, mitWdh = true, wdhFehlt = [] }) {
   const { t } = useLanguage();
   const verfuegbar = BOGEN_TEILE.filter((k) => mitWdh || k !== "wdh");
   const [teile, setTeile] = useState(() => gemerkteTeile().filter((k) => verfuegbar.includes(k)));
@@ -87,8 +87,16 @@ export function BogenWahl({ onDrucken, onClose, mitWdh = true }) {
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {verfuegbar.map((k) => (
-          <Toggle key={k} checked={teile.includes(k)} label={t(`bogen.teil.${k}`)}
-            onChange={(an) => setTeile((l) => (an ? BOGEN_TEILE.filter((x) => x === k || l.includes(x)) : l.filter((x) => x !== k)))} />
+          <div key={k}>
+            <Toggle checked={teile.includes(k)} label={t(`bogen.teil.${k}`)}
+              onChange={(an) => setTeile((l) => (an ? BOGEN_TEILE.filter((x) => x === k || l.includes(x)) : l.filter((x) => x !== k)))} />
+            {/* Ein Hinweis, keine Rueckfrage: zu diesen Themen bleibt der Abschnitt leer. */}
+            {k === "wdh" && teile.includes("wdh") && wdhFehlt.length > 0 && (
+              <div style={{ fontSize: 12, color: "var(--text3)", margin: "4px 0 0 46px", lineHeight: 1.4 }}>
+                {t("bogen.wdhFehlt", { themen: wdhFehlt.join(", ") })}
+              </div>
+            )}
+          </div>
         ))}
       </div>
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>

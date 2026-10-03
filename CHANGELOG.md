@@ -16,6 +16,13 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Waage: **Umformen per Drag and Drop** — ein Teil von der Schale wegziehen
+  nimmt es weg (die Waage kippt schon beim Ziehen als Vorschau), Teiler-Chips
+  (: 2 … : 10) zieht man auf die Waage. Kein Eingabefeld mehr.
+- Körper: **die Drehrichtung folgt dem Finger** — nach links ziehen dreht die
+  Vorderseite nach links (vorher gespiegelt, auch bei den Pfeilen).
+- Rückmeldebogen: Themen ohne Lernpfad-Aufgabe stehen als **Hinweis im
+  Dialog**, statt den Druck mit einer Rückfrage aufzuhalten.
 - Lernpfad: **Themenfilter zeigt Fach, Klasse und Nummer** („Mathematik ·
   Kl. 7 · 1 Rechnen mit Brüchen“), Unterthemen mit Nummer, sortiert nach
   Nummer. Gefiltert wird nach dem Thema selbst, nicht nach dem Namen —

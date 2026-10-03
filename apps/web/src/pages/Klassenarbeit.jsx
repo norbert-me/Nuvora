@@ -1125,25 +1125,29 @@ export default function Klassenarbeit() {
   const [bogenWahl, setBogenWahl] = useState(false);
   const [bogenTeile, setBogenTeile] = useState(undefined);
   const [wdhPool, setWdhPool] = useState(null);
+  // Der Pool wird beim OEFFNEN des Dialogs geholt: dann steht dort schon,
+  // zu welchen Themen der Lernpfad nichts hat — als Hinweis, nicht als
+  // Rueckfrage beim Drucken (die hielt nur auf und aenderte nichts).
+  const [poolVorab, setPoolVorab] = useState(null);
+  // Rueckmeldebogen: unter „Auswertung" fuer alle Kinder beider Blaetter.
+  const druckBogenRoh = alleAn && alleAnalysen ? alleAnalysen.gesamt.bogen : analyse ? analyse.bogen : [];
+  const bogenOeffnen = async () => {
+    setBogenWahl(true);
+    if (!lernpfadAktiv) return;
+    const res = await fetch("/api/lernpfad/exercises").catch(() => null);
+    setPoolVorab(res && res.ok ? await res.json() : []);
+  };
+  const wdhFehlt = useMemo(() => (poolVorab ? wdhZuteilen(druckBogenRoh, poolVorab, themen.byId).fehlend : []),
+    [poolVorab, druckBogenRoh, topics]);
   const bogenDrucken = async (teile) => {
     setBogenWahl(false);
-    let pool = null;
-    if (teile.includes("wdh") && lernpfadAktiv) {
-      const res = await fetch("/api/lernpfad/exercises").catch(() => null);
-      pool = res && res.ok ? await res.json() : [];
-    }
-    if (pool) {
-      const probe = wdhZuteilen(druckBogenRoh, pool, themen.byId);
-      if (probe.fehlend.length && !(await askConfirm(t("bogen.wdhFehlt", { themen: probe.fehlend.join(", ") })))) return;
-    }
+    const pool = teile.includes("wdh") && lernpfadAktiv ? (poolVorab || []) : null;
     setWdhPool(pool);
     setBogenTeile(teile);
     // KaTeX zeichnet die Aufgabentexte nachgeladen — kurz warten, sonst steht
     // im Ausdruck der Quelltext.
     setTimeout(() => window.print(), pool ? 900 : 100);
   };
-  // Rueckmeldebogen: unter „Auswertung" fuer alle Kinder beider Blaetter.
-  const druckBogenRoh = alleAn && alleAnalysen ? alleAnalysen.gesamt.bogen : analyse ? analyse.bogen : [];
   const druckBogen = useMemo(() => (wdhPool ? wdhZuteilen(druckBogenRoh, wdhPool, themen.byId) : druckBogenRoh), [druckBogenRoh, wdhPool, topics]);
 
   // Aus den zentralen Tabellenstilen abgeleitet, nicht daneben neu gebaut: nur
@@ -1716,7 +1720,7 @@ export default function Klassenarbeit() {
                 in index.html: `.nur-drucken` gewinnt), deshalb reicht hier
                 window.print() ohne eigenes Fenster. */}
             {analyse && analyse.bogen.length > 0 && (
-              <button onClick={() => setBogenWahl(true)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
+              <button onClick={bogenOeffnen} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
                 title={t("bogen.printHint")}><Icon d={ICONS.print} size={15} /> {t("bogen.print")}</button>
             )}
             {(work.tasks || []).length > 0 && (
@@ -1788,7 +1792,7 @@ export default function Klassenarbeit() {
                   { nurArbeit: true, aufgaben: aufgabenDerArbeit(alleAnalysen.aufgaben, alleTeil) })}
                 <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
                   {druckBogen.length > 0 && (
-                    <button onClick={() => setBogenWahl(true)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
+                    <button onClick={bogenOeffnen} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
                       title={t("bogen.printHint")}><Icon d={ICONS.print} size={15} /> {t("bogen.print")}</button>
                   )}
                 </div>
@@ -1828,7 +1832,7 @@ export default function Klassenarbeit() {
         <Rueckmeldebogen titel={work.name} bogen={druckBogen} teile={bogenTeile}
           fehlerLabel={(k) => t(`klassenarbeit.fehler.${k}`)} />
       )}
-      {bogenWahl && <BogenWahl mitWdh={lernpfadAktiv} onClose={() => setBogenWahl(false)} onDrucken={bogenDrucken} />}
+      {bogenWahl && <BogenWahl mitWdh={lernpfadAktiv} wdhFehlt={wdhFehlt} onClose={() => setBogenWahl(false)} onDrucken={bogenDrucken} />}
 
       {hasRoster && work && students.length === 0 && <Empty title={t("klassenarbeit.noStudents")} />}
 

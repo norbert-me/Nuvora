@@ -128,7 +128,11 @@ export default function Koerper() {
     if (!z.bewegt && Math.abs(dx) + Math.abs(dy) > 4) { z.bewegt = true; try { z.ziel.setPointerCapture?.(z.id); } catch { /* egal */ } }
     if (!z.bewegt) return;
     setZiel(null); setKreisel(false);
-    setSicht({ gier: z.gier - dx * 0.01, nick: Math.max(-1.3, Math.min(Math.PI / 2, z.nick + dy * 0.01)) });
+    // Die vordere Flaeche geht mit dem Finger mit: nach links ziehen dreht die
+    // Vorderseite nach links. Vorher war das Vorzeichen andersherum, und wer
+    // den Koerper „auf den Kopf" gedreht hatte, bekam beim Linksziehen eine
+    // Drehung nach rechts.
+    setSicht({ gier: z.gier + dx * 0.01, nick: Math.max(-1.3, Math.min(Math.PI / 2, z.nick + dy * 0.01)) });
   };
   const los = (e) => {
     finger.current.delete(e.pointerId);
@@ -239,10 +243,10 @@ export default function Koerper() {
           </svg>
           {/* Drehen per Knopf — fuer alle, die nicht ziehen moegen (Beamer mit Fernbedienung). */}
           <div style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4, background: "var(--card)", borderRadius: CONTROL_R, padding: 4, border: "1px solid var(--border)" }}>
-            <button onClick={() => dreh(0.26, 0)} className="icon-btn" style={toolbarIconBtn} aria-label={t("koerper.links")} title={t("koerper.links")}>←</button>
+            <button onClick={() => dreh(-0.26, 0)} className="icon-btn" style={toolbarIconBtn} aria-label={t("koerper.links")} title={t("koerper.links")}>←</button>
             <button onClick={() => dreh(0, -0.2)} className="icon-btn" style={toolbarIconBtn} aria-label={t("koerper.hoch")} title={t("koerper.hoch")}>↑</button>
             <button onClick={() => dreh(0, 0.2)} className="icon-btn" style={toolbarIconBtn} aria-label={t("koerper.runter")} title={t("koerper.runter")}>↓</button>
-            <button onClick={() => dreh(-0.26, 0)} className="icon-btn" style={toolbarIconBtn} aria-label={t("koerper.rechts")} title={t("koerper.rechts")}>→</button>
+            <button onClick={() => dreh(0.26, 0)} className="icon-btn" style={toolbarIconBtn} aria-label={t("koerper.rechts")} title={t("koerper.rechts")}>→</button>
             <button onClick={() => setKreisel((v) => !v)} className="icon-btn" aria-pressed={kreisel}
               style={{ ...toolbarIconBtn, ...(kreisel ? { background: "var(--accent)", color: "#fff" } : {}) }}
               aria-label={t("koerper.kreisel")} title={t("koerper.kreisel")}>
