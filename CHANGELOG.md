@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Notenbuch-Statistik:** auch in **Teilnoten** (2+, 2, 2−) und wahlweise als
+  **Boxplot** — in der Spalten- und in der Halbjahres-Statistik.
 - **Neues Modul „Körper“** (Beta): Quader, Würfel, Prisma, Pyramide, Zylinder,
   Kegel und Kugel drehen, mit einem Regler zum Netz auffalten, Flächen
   einfärben, gegenüberliegende Flächen entdecken; Oberfläche und Volumen

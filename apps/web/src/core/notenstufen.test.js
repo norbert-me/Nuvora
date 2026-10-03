@@ -25,3 +25,20 @@ describe("notenstufen", () => {
     expect(d.reduce((s, x) => s + x.n, 0)).toBe(4);
   });
 });
+
+describe("notenstufen: Teilnoten", () => {
+  it("Tendenz um die ganze Note", () => {
+    expect(stufeVon(1.7, "teil")).toBe("2+");
+    expect(stufeVon(2.0, "teil")).toBe("2");
+    expect(stufeVon(2.3, "teil")).toBe("2−");
+    expect(stufeVon(1.0, "teil")).toBe("1");
+    expect(stufeVon(1.3, "teil")).toBe("1−");
+    expect(stufeVon(5.7, "teil")).toBe("6+");
+    expect(stufeVon(6, "teil")).toBe("6");
+  });
+  it("verteilt auf 16 Stufen und verliert nichts", () => {
+    const d = verteilung([1, 1.3, 1.7, 2, 2.3, 2.7, 4.4, 6], "teil");
+    expect(d).toHaveLength(16);
+    expect(d.reduce((s, x) => s + x.n, 0)).toBe(8);
+  });
+});

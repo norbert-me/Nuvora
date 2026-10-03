@@ -11,7 +11,7 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
-import { COLORS as C, CONTROL_R, DialogKopf, Empty, FOKUS_TON, FOKUS_TON_DECKEND, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { Boxplot, COLORS as C, CONTROL_R, DialogKopf, Empty, FOKUS_TON, FOKUS_TON_DECKEND, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
@@ -240,10 +240,10 @@ export default function Noten() {
   };
   useEffect(() => { if (classId) load(classId); }, [classId, kursId, classes, term, agg]);
   const setAggPersist = (m) => { setAgg(m); try { localStorage.setItem("noten_agg", m); } catch { /* egal */ } };
-  // Statistik auf ganze oder halbe Noten — eine Ansicht wie Mittel/Median,
+  // Statistik auf ganze, halbe oder Teilnoten — eine Ansicht wie Mittel/Median,
   // deshalb derselbe Ort (localStorage je Gerät) und sofort wirksam.
-  const [halb, setHalb] = useState(() => { try { return localStorage.getItem("noten_stufen") === "halb"; } catch { return false; } });
-  const setHalbPersist = (h) => { setHalb(h); try { localStorage.setItem("noten_stufen", h ? "halb" : "ganz"); } catch { /* egal */ } };
+  const [stufung, setStufung] = useState(() => { try { const v = localStorage.getItem("noten_stufen"); return v === "halb" || v === "teil" ? v : "ganz"; } catch { return "ganz"; } });
+  const setStufungPersist = (v) => { setStufung(v); try { localStorage.setItem("noten_stufen", v); } catch { /* egal */ } };
 
   const doExport = async () => {
     if (!classId) return;
@@ -486,9 +486,7 @@ export default function Noten() {
     if (!vals.length) return null;
     const n = vals.length;
     const median = n % 2 ? vals[(n - 1) / 2] : (vals[n / 2 - 1] + vals[n / 2]) / 2;
-    // Verteilung auf ganze oder halbe Stufen (Ansicht, core/notenstufen.js).
-    const dist = verteilung(vals, halb);
-    return { n, avg: rund(mittel(vals), 2), median: rund(median, 2), min: vals[0], max: vals[n - 1], dist };
+    return { n, avg: rund(mittel(vals), 2), median: rund(median, 2), min: vals[0], max: vals[n - 1], werte: vals };
   };
   const sumOf = (studentId) => summary.find((s) => s.student_id === studentId);
 
@@ -539,9 +537,9 @@ export default function Noten() {
           }, {
             key: "stufen", art: "wahl",
             label: t("noten.stufen"),
-            value: halb ? "halb" : "",
-            onChange: (v) => setHalbPersist(v === "halb"),
-            optionen: [{ wert: "", label: t("noten.stufenGanz") }, { wert: "halb", label: t("noten.stufenHalb") }],
+            value: stufung === "ganz" ? "" : stufung,
+            onChange: (v) => setStufungPersist(v || "ganz"),
+            optionen: [{ wert: "", label: t("noten.stufenGanz") }, { wert: "halb", label: t("noten.stufenHalb") }, { wert: "teil", label: t("noten.stufenTeil") }],
           }]} />
         }
         mehr={term !== "year" && classId ? [
@@ -583,7 +581,6 @@ export default function Noten() {
       {statsCol && (() => {
         const st = colStats(statsCol.id);
         const de1 = (n) => kommaRund(n, 2);
-        const maxN = st ? Math.max(...st.dist.map((d) => d.n), 1) : 1;
         return (
           <Modal title={t("noten.colStatsTitle", { name: statsCol.name })} onClose={() => setStatsCol(null)}>
             {!st ? <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("noten.colNoGrades")}</p> : (
@@ -598,16 +595,7 @@ export default function Noten() {
                   ))}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colDist")}</div>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 100 }}>
-                  {st.dist.map((d) => (
-                    <div key={d.g} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                      <div style={{ fontSize: 11, color: "var(--text3)" }}>{d.n || ""}</div>
-                      {/* Saeule: Radius rundet nur die Kappe der Grafik. */}
-                      <div style={{ width: "100%", height: `${(d.n / maxN) * 70}px`, minHeight: d.n ? 3 : 0, background: "var(--accent)", borderRadius: 4 }} />
-                      <div style={{ fontSize: 12, fontWeight: 700 }}>{komma(d.g)}</div>
-                    </div>
-                  ))}
-                </div>
+                <NotenVerteilung werte={st.werte} stufung={stufung} hoehe={100} t={t} />
               </div>
             )}
           </Modal>
@@ -629,8 +617,8 @@ export default function Noten() {
       })()}
 
       {term === "year"
-        ? (yearData.rows || []).length > 0 && <NotenStatistik noten={(yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))} halb={halb} t={t} />
-        : sections.length > 0 && <NotenStatistik noten={(summary || []).map((s) => endNoteVon(s))} halb={halb} t={t} />}
+        ? (yearData.rows || []).length > 0 && <NotenStatistik noten={(yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))} stufung={stufung} t={t} />
+        : sections.length > 0 && <NotenStatistik noten={(summary || []).map((s) => endNoteVon(s))} stufung={stufung} t={t} />}
 
       {loading && !loadedOnce.current && term !== "year" ? (
         <Skeleton rows={6} height={38} />
@@ -1103,10 +1091,44 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
   );
 }
 
+// Notenverteilung als Balken oder Boxplot — eine Anzeige fuer beide
+// Statistiken (Spalte und Halbjahr). Die Stufung (ganz/halb/Teilnoten) kommt
+// aus dem Zahnrad; Balken oder Boxplot ist ein Umschalter direkt daran, weil
+// man beim Lesen wechselt, nicht beim Einrichten.
+function NotenVerteilung({ werte, stufung, hoehe = 90, t }) {
+  const [box, setBox] = useState(false);
+  const dist = verteilung(werte, stufung);
+  const maxD = Math.max(...dist.map((d) => d.n), 1);
+  const zahlen = (werte || []).filter((v) => v != null && Number.isFinite(Number(v))).map(Number);
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <Tabs value={box ? "box" : "balken"} onChange={(v) => setBox(v === "box")}
+          options={[["balken", t("noten.distBalken")], ["box", t("noten.distBox")]]} />
+      </div>
+      {box ? (
+        zahlen.length >= 3 ? <Boxplot values={zahlen} max={6} />
+          : <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("noten.distZuWenig")}</p>
+      ) : (
+        <div style={{ display: "flex", alignItems: "flex-end", gap: stufung === "teil" ? 3 : 8, height: hoehe }}>
+          {dist.map(({ g, n: c }) => (
+            <div key={g} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: "var(--text3)" }}>{c || ""}</div>
+              {/* Saeule: Radius rundet nur die Kappe der Grafik. */}
+              <div style={{ width: "100%", maxWidth: 44, height: `${(c / maxD) * (hoehe - 30)}px`, minHeight: c ? 3 : 0, background: "var(--accent)", borderRadius: "5px 5px 0 0", opacity: c ? 0.85 : 0.15 }} />
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)", whiteSpace: "nowrap" }}>{typeof g === "number" ? komma(g) : g}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Statistische Auswertung der Halbjahresnoten — analog CardVote: Kennzahlen und
 // Notenverteilung ueber die effektiven Endnoten (manuell gesetzt schlaegt
 // Schnitt). Rein deskriptiv, keine Zeugnisnote.
-function NotenStatistik({ noten, halb, t }) {
+function NotenStatistik({ noten, stufung, t }) {
   const [open, setOpen] = useState(false);
   noten = (noten || []).filter((v) => v != null);
   if (noten.length < 2) return null;
@@ -1117,8 +1139,6 @@ function NotenStatistik({ noten, halb, t }) {
   // schied). Eine Klasse ist eine Stichprobe des Koennens, nicht die ganze Welt.
   const median = medianVon(noten);
   const sd = streuung(noten);
-  const dist = verteilung(noten, halb);
-  const maxD = Math.max(...dist.map((d) => d.n), 1);
   // Kachel kommt aus Icons.jsx (StatCard) — hier stand eine vierte Fassung
   // derselben Sache (Wert gross, Beschriftung klein, getoente Flaeche). Der
   // Umschlag traegt nur die Breitenverteilung der Zeile.
@@ -1138,15 +1158,7 @@ function NotenStatistik({ noten, halb, t }) {
             {tile(t("noten.statMedian"), kommaRund(median, 2))}
             {tile(t("noten.statSd"), `±${kommaRund(sd, 2)}`)}
           </div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 90 }}>
-            {dist.map(({ g, n: c }) => (
-              <div key={g} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                <div style={{ fontSize: 11, color: "var(--text3)" }}>{c || ""}</div>
-                <div style={{ width: "100%", maxWidth: 44, height: `${(c / maxD) * 60}px`, minHeight: c ? 3 : 0, background: "var(--accent)", borderRadius: "5px 5px 0 0", opacity: c ? 0.85 : 0.15 }} />
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>{komma(g)}</div>
-              </div>
-            ))}
-          </div>
+          <NotenVerteilung werte={noten} stufung={stufung} hoehe={90} t={t} />
         </div>
       )}
     </div>
