@@ -190,7 +190,16 @@
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 8px; border: 3px solid transparent; background-clip: padding-box; }
       ::-webkit-scrollbar-thumb:hover { background: var(--text3); border: 3px solid transparent; background-clip: padding-box; }
-      * { scrollbar-width: auto; scrollbar-color: var(--border2) transparent; }
+      /* NUR fuer Firefox: Chrome (ab 121) nimmt bei gesetztem `scrollbar-color`
+         die Standard-Balken und ignoriert die ::-webkit-Regeln darueber — auf
+         dem Mac sind das wieder die Overlay-Balken, die sich ausblenden. Genau
+         das sah man im Notenbuch: kein Balken, bis man scrollte. */
+      @supports (-moz-appearance: none) {
+        * { scrollbar-width: auto; scrollbar-color: var(--border2) transparent; }
+      }
+      /* Grosse Tabellen (Notenbuch): die Schiene sichtbar, damit man sieht,
+         DASS es rechts und unten weitergeht. */
+      .schiene-sichtbar::-webkit-scrollbar-track { background: var(--bg2); }
       /* Nav-Leiste bleibt ohne Balken. */
       nav > div { scrollbar-width: none; }
       nav > div::-webkit-scrollbar { display: none; }

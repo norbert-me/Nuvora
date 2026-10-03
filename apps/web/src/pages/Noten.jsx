@@ -671,7 +671,7 @@ export default function Noten() {
         // --tabellenkopf-top: 0 heisst „kleb am Rahmen, nicht unter der Navbar";
         // --kopf2 ist die gemessene Hoehe der ersten Kopfzeile, damit die zweite
         // darunter einrastet statt darauf.
-        <div ref={rahmenRef} style={{ overflow: "auto", maxHeight: "calc(100vh - 210px)", border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, WebkitOverflowScrolling: "touch",
+        <div ref={rahmenRef} className="schiene-sichtbar" style={{ overflow: "auto", maxHeight: "calc(100vh - 210px)", border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, WebkitOverflowScrolling: "touch",
           "--tabellenkopf-top": "0px" }}>
           {/* borderCollapse: separate — mit „collapse" gehoeren die Rahmen der
               Tabelle, nicht den Zellen, und ein `position: sticky` an einer
@@ -1829,7 +1829,7 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
     <th key={s.id} style={{ ...th2, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 56, fontWeight: 500 }}>{s.name}</th>
   ));
   return (
-    <div ref={rahmenRef} style={{ overflow: "auto", maxHeight: "calc(100vh - 210px)", border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, WebkitOverflowScrolling: "touch", "--tabellenkopf-top": "0px" }}>
+    <div ref={rahmenRef} className="schiene-sichtbar" style={{ overflow: "auto", maxHeight: "calc(100vh - 210px)", border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, WebkitOverflowScrolling: "touch", "--tabellenkopf-top": "0px" }}>
       <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 14, minWidth: "100%" }}>
         <thead>
           <tr ref={kopf1Ref}>

@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Scrollbalken immer sichtbar** (Notenbuch und überall sonst) — in Chrome
+  blendete der Mac sie wieder aus.
 - **Ablage ohne Grenze:** je Konto gibt es keine Obergrenze mehr für Anhänge
   (vorher 200 MB); wer Nuvora öffentlich anbietet, setzt `MATERIAL_QUOTA_MB`.
 
