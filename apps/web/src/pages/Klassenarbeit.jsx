@@ -548,18 +548,11 @@ function ThemenGewichte({ gw, titel, hint, themen, t, rand = 16 }) {
     <div style={{ border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, padding: "10px 12px", marginBottom: rand, background: "var(--card)" }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text2)", marginBottom: 8 }} title={hint}>{titel}</div>
       {zeilen.map((x) => {
-        const farbe = x.topic === "form" ? "var(--text3)" : x.abweichung ? C.warning : "var(--accent)";
         return (
           <div key={`${x.topic ?? "ohne"}-${x.ebene}-${x.direkt ? "d" : ""}`} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: x.ebene ? 12 : 13, marginBottom: 4, paddingLeft: x.ebene ? 16 : 0 }}>
-            <span style={{ flex: "0 1 40%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: x.summe ? 700 : 400,
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: x.summe ? 700 : 400,
               color: x.topic == null || x.topic === "form" || x.direkt ? "var(--text3)" : x.ebene ? "var(--text2)" : "var(--text)" }}>
               {name(x)}
-            </span>
-            {/* Balken: Radius = halbe Hoehe (Balken-Kappe), reine Grafik;
-                die Schiene schneidet den Balken ab (overflow), er
-                braucht keinen eigenen. */}
-            <span style={{ flex: 1, height: x.ebene ? 6 : 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}>
-              <span style={{ display: "block", width: `${x.anteil}%`, height: "100%", background: farbe, opacity: x.ebene ? 0.75 : 1 }} />
             </span>
             <span style={{ width: 92, textAlign: "right", whiteSpace: "nowrap", color: x.abweichung ? C.warning : "var(--text2)", fontWeight: x.abweichung || x.summe ? 700 : 400 }}
               title={x.abweichung ? t(`klassenarbeit.gewicht_${x.abweichung}`) : undefined}>
