@@ -2454,6 +2454,7 @@ export default {
   "kalender.examTopics": "Temas",
   "kalender.examTopicsN": "{{n}} temas",
   "kalender.examTopicsEmpty": "Aún no hay temas creados.",
+  "kalender.examTopicsAlle": "Mostrar temas de todas las materias",
   "karten.moveFolder": "Mover carpeta",
   "karten.moveDeck": "Mover mazo",
   "lernen.invalid": "El enlace no es válido o ha caducado.",

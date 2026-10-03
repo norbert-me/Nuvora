@@ -16,6 +16,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Klassenarbeitstermin (Kalender): **Themen nur aus dem Fach des Kurses**
+  (ein Informatikkurs sieht keine Bruchrechnung; „Themen aller Fächer zeigen“
+  holt den Rest), **mit Nummer** und Klasse. **Stunde nach Stundenplan**: hat
+  der Kurs an dem Tag Unterricht, stehen nur seine Stunden zur Wahl, und eine
+  einzige ist gleich vorgewählt.
 - Waage: **ein gezogenes Teil hängt dort am Zeiger, wo man es gegriffen hat**,
   und abgelegt wird nach der Lage des Teils — vorher sprang es mit seiner
   Mitte unter den Zeiger, und der Zeiger stand auf dem Mülleimer, das Teil

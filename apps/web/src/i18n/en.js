@@ -2453,6 +2453,7 @@ export default {
   "kalender.examTopics": "Topics",
   "kalender.examTopicsN": "{{n}} topics",
   "kalender.examTopicsEmpty": "No topics created yet.",
+  "kalender.examTopicsAlle": "Show topics of all subjects",
   "karten.moveFolder": "Move folder",
   "karten.moveDeck": "Move deck",
   "lernen.invalid": "This link is invalid or has expired.",

@@ -12,14 +12,29 @@
 import { useState } from "react";
 
 import { Icon, ICONS, Popover, CONTROL_H, toolbarBtn } from "./Icons.jsx";
-import { themenIndex } from "../core/topics.js";
+import { mitNummer, themenIndex } from "../core/topics.js";
 import { useLanguage } from "../i18n/index.jsx";
 
-export default function ThemenWahl({ topics, value = [], onChange, style }) {
+// Gleiches Fach? Klein geschrieben, und „Info" passt zu „Informatik" — das
+// Fach ist Freitext, an Kurs und Thema verschieden abgekuerzt.
+export function fachPasst(a, b) {
+  const x = (a || "").trim().toLowerCase(), y = (b || "").trim().toLowerCase();
+  if (!x || !y) return true;
+  return x === y || x.startsWith(y) || y.startsWith(x);
+}
+
+export default function ThemenWahl({ topics, value = [], onChange, style, fach = "" }) {
   const { t } = useLanguage();
   const [offen, setOffen] = useState(false);
+  const [alle, setAlle] = useState(false);
   const idx = themenIndex(topics);
   const gewaehlt = new Set(value || []);
+  // Nur die Themen des Kurs-Fachs (ein Informatikkurs braucht keine
+  // Bruchrechnung). Fach steht am Oberthema; Unterthemen erben es. Was schon
+  // gewaehlt ist, bleibt immer sichtbar — sonst verschwaende es unbemerkt.
+  const fachVon = (tp) => tp.fach || (tp.parent_id ? idx.byId.get(tp.parent_id)?.fach : "") || "";
+  const gefiltert = !fach || alle ? idx.geordnet : idx.geordnet.filter((tp) => gewaehlt.has(tp.id) || fachPasst(fachVon(tp), fach) && !!fachVon(tp));
+  const liste = gefiltert.length ? gefiltert : idx.geordnet;
 
   const um = (id) => {
     const naechste = new Set(gewaehlt);
@@ -41,10 +56,10 @@ export default function ThemenWahl({ topics, value = [], onChange, style }) {
         <>
           <span onClick={() => setOffen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
           <Popover style={{ zIndex: 41, top: CONTROL_H + 2, minWidth: 240, maxHeight: 300, overflowY: "auto", padding: 8 }}>
-            {idx.geordnet.length === 0 && (
+            {liste.length === 0 && (
               <div style={{ fontSize: 13, color: "var(--text3)", padding: 4 }}>{t("kalender.examTopicsEmpty")}</div>
             )}
-            {idx.geordnet.map((tp) => (
+            {liste.map((tp) => (
               <label key={tp.id} style={{
                 display: "flex", alignItems: "center", gap: 8, padding: "5px 4px", cursor: "pointer",
                 fontSize: 13, color: "var(--text)",
@@ -54,9 +69,16 @@ export default function ThemenWahl({ topics, value = [], onChange, style }) {
                 fontWeight: tp.parent_id ? 400 : 600,
               }}>
                 <input type="checkbox" checked={gewaehlt.has(tp.id)} onChange={() => um(tp.id)} />
-                {tp.name}
+                <span style={{ flex: 1 }}>{mitNummer(tp)}</span>
+                {!tp.parent_id && tp.jahrgang && <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)" }}>Kl. {tp.jahrgang}</span>}
               </label>
             ))}
+            {fach && liste !== idx.geordnet && (
+              <button type="button" onClick={() => setAlle(true)}
+                style={{ border: "none", background: "none", color: "var(--accent)", fontSize: 13, cursor: "pointer", padding: "6px 4px" }}>
+                {t("kalender.examTopicsAlle")}
+              </button>
+            )}
           </Popover>
         </>
       )}

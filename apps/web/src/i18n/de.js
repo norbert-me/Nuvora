@@ -2443,6 +2443,7 @@ export default {
   "kalender.examTopics": "Themen",
   "kalender.examTopicsN": "{{n}} Themen",
   "kalender.examTopicsEmpty": "Noch keine Themen angelegt.",
+  "kalender.examTopicsAlle": "Themen aller Fächer zeigen",
   "karten.moveFolder": "Ordner verschieben",
   "karten.moveDeck": "Stapel verschieben",
   "lernen.invalid": "Der Link ist ungültig oder abgelaufen.",

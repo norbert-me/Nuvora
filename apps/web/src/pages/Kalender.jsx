@@ -659,6 +659,15 @@ export default function Kalender() {
   const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || C.info; // Fallback (Einträge ohne Kurs)
   const kursColor = (id) => (kurse.find((k) => k.id === id) || {}).color || "";
   const slotColor = (s) => (s && s.kurs_id && kursColor(s.kurs_id)) || (s && s.class_id ? classColor(s.class_id) : C.info);
+  // Die Stunden eines Kurses (sonst der Klasse) an einem Tag „JJJJ-MM-TT" — fuer
+  // den Klassenarbeitstermin.
+  const stundenAm = (tag, kid, cid) => {
+    const d = parseYmd(tag);
+    if (!d) return [];
+    return [...new Set(tt.slots.filter((s) => s.weekday === wochentagMo0(d) && slotActiveOn(s, d)
+      && (kid != null ? s.kurs_id === kid : cid != null && s.class_id === cid)).map((s) => s.period))]
+      .sort((a, b) => stundenRang(a) - stundenRang(b));
+  };
   const slotsFor = (d) => tt.slots.filter((s) => s.weekday === wochentagMo0(d) && slotActiveOn(s, d) && !isCancelled(d, s.period)).sort((a, b) => stundenRang(a.period) - stundenRang(b.period));
   // Klick auf eine Stundenplan-Vorlage: gibt es an dem Tag schon einen Eintrag
   // dieser Klasse, wird der bearbeitet; sonst ein neuer aus der Vorlage.
@@ -969,7 +978,7 @@ export default function Kalender() {
         const d = parseYmd(p.date);
         if (d) { setCursor(d); setView("day"); }
       }} />}
-      {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} hatNull={!!tt.zero} aktiv={aktiv} topics={topics} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
+      {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} hatNull={!!tt.zero} aktiv={aktiv} topics={topics} kurse={kurse} stundenAm={stundenAm} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
 
       {/* Was im ANGEZEIGTEN Zeitraum ausgeblendet ist — eine Fläche über dem
           Kalender, kein eigener Reiter: die Frage „was sehe ich hier gerade
@@ -2004,7 +2013,7 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
 
 // Klassenarbeiten planen + Übersicht: je kommender Klassenarbeit die bis dahin
 // verbleibenden Stundenplan-Stunden (freie Tage/Ausfälle bereits abgezogen).
-function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics = [], onAdd, onUpd, onDel, t }) {
+function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics = [], kurse = [], stundenAm = () => [], onAdd, onUpd, onDel, t }) {
   const [classId, setClassId] = useState("");
   const [kursId, setKursId] = useState(null);
   const [date, setDate] = useState("");
@@ -2021,6 +2030,24 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
   const [eKursId, setEKursId] = useState(null);
   const [ePeriod, setEPeriod] = useState("");
   const pOpts = stundenListe(Math.max(1, periods), hatNull);
+  // Hat der Kurs an dem Tag Unterricht, stehen nur SEINE Stunden zur Wahl (und
+  // ganztaegig); eine einzige wird gleich vorgewaehlt. Ohne Stunde im Plan
+  // bleibt die volle Liste.
+  const stundenFuer = (d, kid, cid) => {
+    const eigene = d ? stundenAm(d, kid, cid) : [];
+    return eigene.length ? eigene : pOpts;
+  };
+  const fachVon = (kid) => (kurse.find((k) => k.id === kid) || {}).fach || "";
+  useEffect(() => {
+    if (period !== "" || !date) return;
+    const eigene = stundenAm(date, kursId, classId === "" ? null : Number(classId));
+    if (eigene.length === 1) setPeriod(String(eigene[0]));
+  }, [date, kursId, classId]);   // nur beim Wechsel von Tag oder Kurs, nicht bei jeder Auswahl
+  useEffect(() => {
+    if (editId == null || ePeriod !== "" || !eDate) return;
+    const eigene = stundenAm(eDate, eKursId, eClassId === "" ? null : Number(eClassId));
+    if (eigene.length === 1) setEPeriod(String(eigene[0]));
+  }, [eDate, eKursId, eClassId]);
   // Suche und Kurs-Filter. Die Liste waechst mit jedem Halbjahr, und die Frage
   // ist fast immer „was steht in DIESEM Kurs an?" oder „wo war noch mal die
   // Arbeit ueber Dreiecke?". Gesucht wird in Titel, Kurs/Klasse und den Themen
@@ -2080,13 +2107,13 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={toolbarInput} />
         <select value={period} onChange={(e) => setPeriod(e.target.value)} title={t("kalender.examPeriodHint")} style={pSel}>
           <option value="">{t("kalender.examAllDay")}</option>
-          {pOpts.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
+          {stundenFuer(date, kursId, classId === "" ? null : Number(classId)).map((p) => <option key={p} value={p}>{stundeLabel(p, t)}</option>)}
         </select>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("kalender.examTitle")} style={{ ...toolbarInput, flex: 1, minWidth: 140 }} />
         {/* Worüber wird geschrieben? Die Themen kommen aus dem Kern (Regel 3:
             der Kalender zeigt auf sie, besitzt sie nicht). Freiwillig — ein
             Termin ohne Themen ist ein vollständiger Termin. */}
-        <ThemenWahl topics={topics} value={themen} onChange={setThemen} />
+        <ThemenWahl topics={topics} value={themen} onChange={setThemen} fach={fachVon(kursId)} />
         {period && (
           <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}
             title={t("kalender.examErsetztHint")}>
@@ -2125,10 +2152,10 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
                 <input type="date" value={eDate} onChange={(ev) => setEDate(ev.target.value)} style={toolbarInput} />
                 <select value={ePeriod} onChange={(ev) => setEPeriod(ev.target.value)} title={t("kalender.examPeriodHint")} style={pSel}>
                   <option value="">{t("kalender.examAllDay")}</option>
-                  {pOpts.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
+                  {stundenFuer(eDate, eKursId, eClassId === "" ? null : Number(eClassId)).map((p) => <option key={p} value={p}>{stundeLabel(p, t)}</option>)}
                 </select>
                 <input value={eTitle} onChange={(ev) => setETitle(ev.target.value)} placeholder={t("kalender.examTitle")} style={{ ...toolbarInput, flex: 1, minWidth: 120 }} />
-                <ThemenWahl topics={topics} value={eThemen} onChange={setEThemen} />
+                <ThemenWahl topics={topics} value={eThemen} onChange={setEThemen} fach={fachVon(eKursId)} />
                 {/* Die Notiz steht in der Bearbeiten-Zeile und nicht in der
                     Anlegen-Leiste: beim Anlegen kennt man meist nur Datum und
                     Bezeichnung, das Merkenswerte kommt spaeter dazu. */}
