@@ -16,6 +16,14 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Klassenarbeit, Auswertung: **E-Kurs/G-Kurs zeigen die Aufgaben dieser
+  Arbeit** (weiter über alle, die sie schrieben), „Alle“ beide. Die
+  **Trennschärfe steht in jeder Zeile** neben der Quote; aus weniger als
+  acht Kindern ist sie blass und löst kein „Aufgabe prüfen“ mehr aus.
+  Die **SuS-Ansicht blendet die Notenliste** aus.
+- Kalender teilen: **„Auf diesem Mac einrichten“** — dasselbe
+  Konfigurationsprofil wie fürs iPhone, mit dem Weg über die
+  Systemeinstellungen.
 - Klassenarbeit, **Auswertung einer E/G-Arbeit prüft die Arbeit**: jede
   Aufgabe wird über alle Kinder ausgewertet, die genau diese Fassung
   geschrieben haben — die E-Aufgabe also mit dem E-Kurs und den G-Kindern,

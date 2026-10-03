@@ -20,6 +20,8 @@ import { hol, alsJson, pruefeAntwort, sende } from "../core/melden.js";
 import { askConfirm } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
+const AUF_MAC = typeof navigator !== "undefined" && /Mac/.test(navigator.platform || "") && !(navigator.maxTouchPoints > 1);
+
 export default function CaldavZugaenge() {
   const { t } = useLanguage();
   const [daten, setDaten] = useState(null);
@@ -125,10 +127,13 @@ export default function CaldavZugaenge() {
               bricht an der Stelle jeder ab. */}
           {frisch.profil && (
             <div style={{ marginTop: 8 }}>
+              {/* Dasselbe Profil richtet auch den Mac ein (Systemeinstellungen
+                  → Profile); nur der Weg dorthin ist ein anderer. Ein iPad
+                  meldet sich als „MacIntel", hat aber Touch. */}
               <a href={frisch.profil} style={{ ...btnSecondary, ...btnSmall, display: "inline-block", textDecoration: "none" }}>
-                {t("caldav.profil")}
+                {t(AUF_MAC ? "caldav.profilMac" : "caldav.profil")}
               </a>
-              <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6, lineHeight: 1.4 }}>{t("caldav.profilHinweis")}</div>
+              <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6, lineHeight: 1.4 }}>{t(AUF_MAC ? "caldav.profilHinweisMac" : "caldav.profilHinweis")}</div>
             </div>
           )}
           <button onClick={() => setFrisch(null)} style={{ ...btnSecondary, ...btnSmall, marginTop: 8 }}>

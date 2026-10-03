@@ -82,3 +82,14 @@ describe("Klassenarbeit: Aufgaben ueber beide Kurse", () => {
     expect(perTask.map((x) => x.id)).toEqual(["E · e1", "G · g1", "E · e2", "G · g2"]);
   });
 });
+
+import { aufgabenDerArbeit } from "./Klassenarbeit.jsx";
+
+describe("Klassenarbeit: Auswertung je Blatt", () => {
+  it("E zeigt nur die Aufgaben des E-Blatts, alle zeigt beide", () => {
+    const a = { perTask: [{ id: "E · 1" }, { id: "G · 1" }], perUnit: [{ id: "x", taskId: "G · 1" }] };
+    expect(aufgabenDerArbeit(a, "E").perTask.map((x) => x.id)).toEqual(["E · 1"]);
+    expect(aufgabenDerArbeit(a, "G").perUnit).toHaveLength(1);
+    expect(aufgabenDerArbeit(a, "alle")).toBe(a);
+  });
+});

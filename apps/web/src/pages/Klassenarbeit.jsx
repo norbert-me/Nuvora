@@ -59,9 +59,17 @@ const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).s
 // zusammen mit der Trennschaerfe wird daraus eine Handlung — trennt die Aufgabe
 // gut, kann die Klasse den Stoff nicht (also: wiederholen); trennt sie nicht,
 // liegt es an der Aufgabe (also: Formulierung und Erwartungshorizont ansehen).
+// Unter MINDEST_TS Kindern ist eine Trennschärfe Rauschen: eine Korrelation
+// über sechs Werte kippt mit einem einzigen Kind. Dann gibt es aus ihr kein
+// „Aufgabe prüfen" — sonst stünde es bei einem kleinen G-Kurs an jeder
+// zweiten Aufgabe. Eine schwache Gruppe drückt dagegen nur die Quote, nicht
+// die Trennschärfe: die misst, ob innerhalb DERER, die die Aufgabe schrieben,
+// die Stärkeren besser abschneiden.
+const MINDEST_TS = 8;
+const tsBelastbar = (row) => row.disc != null && (row.n == null || row.n >= MINDEST_TS);
 function schluss(row, t) {
   if (row.form) return null;                       // Darstellung: keine Sachaussage
-  const d = row.disc, p = row.pct, n = row.nullAnteil;
+  const d = tsBelastbar(row) ? row.disc : null, p = row.pct, n = row.nullAnteil;
   if (d != null && d < 0.1 && p < 75) return { art: "aufgabe", text: t("klassenarbeit.tipTask", { d: kommaRund(d, 2) }) };
   if (n != null && n >= 40 && p < 60) return { art: "aufgabe", text: t("klassenarbeit.tipEmpty", { n }) };
   if (p < 50 && (d == null || d >= 0.3)) return { art: "stoff", text: t("klassenarbeit.tipRepeat", { p }) };
@@ -92,6 +100,14 @@ function StatRow({ row, t, open, onToggle, small, kinder = null }) {
         </span>
         <span style={{ fontSize: 13, fontWeight: 800, color: col, minWidth: 40, textAlign: "right" }}>{row.pct}%</span>
         <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap", minWidth: 64, textAlign: "right" }}>⌀ {komma(row.avgP)}/{komma(row.max)}</span>
+        {/* Trennschärfe gleich neben der Quote: eine niedrige Quote heißt bei
+            einer schwächeren Gruppe wenig, die Trennschärfe sagt, ob die
+            Aufgabe trotzdem sauber unterscheidet. Blass, wenn zu wenige
+            Kinder sie geschrieben haben. */}
+        <span title={tsBelastbar(row) ? t("klassenarbeit.discHint") : t("klassenarbeit.discWenig", { n: row.n ?? 0 })}
+          style={{ fontSize: 12, whiteSpace: "nowrap", minWidth: 52, textAlign: "right", color: tsBelastbar(row) ? dc : "var(--text3)", fontWeight: tsBelastbar(row) ? 700 : 400 }}>
+          {row.disc != null ? `${t("klassenarbeit.discKurz")} ${kommaRund(row.disc, 2)}` : ""}
+        </span>
         {/* Das Etikett sagt, WAS zu tun ist; der ganze Satz steht im Titel und aufgeklappt. */}
         {!small && (
           <span title={rat ? rat.text : undefined} style={{ ...chipStyle, fontSize: 11, minWidth: 96, textAlign: "center", visibility: rat ? "visible" : "hidden",
@@ -322,7 +338,7 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
       const { ciLow, ciHigh } = konfidenzProzent(xs, mx);
       const nullAnteil = xs.length ? Math.round(xs.filter((x) => x === 0).length / xs.length * 100) : null;
       const vollAnteil = xs.length ? Math.round(xs.filter((x) => x >= mx).length / xs.length * 100) : null;
-      perTask.push({ id: zid, label: `${tk.label || `${i + 1}.`}${fassungen.length > 1 ? ` (${stufe})` : ""}`, pct: m ? Math.round((e / m) * 100) : 0,
+      perTask.push({ id: zid, n: kinder.length, label: `${tk.label || `${i + 1}.`}${fassungen.length > 1 ? ` (${stufe})` : ""}`, pct: m ? Math.round((e / m) * 100) : 0,
                      avgP: Math.round(mean(xs) * 10) / 10, max: mx, disc, ciLow, ciHigh,
                      nullAnteil, vollAnteil, form: !!tk.form });
       // Ø je Teilaufgabe (nur wo eine Fassung echte Teile hat).
@@ -332,7 +348,7 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
         const avgP = mean(ux);
         const d2 = trennschaerfe(ux, tot);
         const ki = konfidenzProzent(ux, u.max);
-        perUnit.push({ id: u.id, taskId: zid, label: u.label || "", avgP: Math.round(avgP * 10) / 10, max: u.max, pct: u.max ? Math.round((avgP / u.max) * 100) : 0, disc: d2, ciLow: ki.ciLow, ciHigh: ki.ciHigh });
+        perUnit.push({ id: u.id, n: kinder.length, taskId: zid, label: u.label || "", avgP: Math.round(avgP * 10) / 10, max: u.max, pct: u.max ? Math.round((avgP / u.max) * 100) : 0, disc: d2, ciLow: ki.ciLow, ciHigh: ki.ciHigh });
       });
     });
   });
@@ -403,6 +419,15 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
 // verschiedene Blaetter mit verschiedenen Hoechstpunkten schrieben.
 // Reihenfolge nach Position: E · 1., G · 1., E · 2., … — so steht nebeneinander,
 // was einander entspricht.
+// „E-Kurs"/„G-Kurs" unter „Auswertung": die Aufgaben DIESER Arbeit (des
+// E- bzw. G-Blatts) — weiter über alle, die sie geschrieben haben, aber ohne
+// die Aufgaben des anderen Blatts.
+export function aufgabenDerArbeit(aufgaben, stufe) {
+  if (!aufgaben || stufe === "alle") return aufgaben;
+  const vor = `${stufe} · `;
+  return { perTask: aufgaben.perTask.filter((x) => x.id.startsWith(vor)), perUnit: aufgaben.perUnit.filter((u) => u.taskId.startsWith(vor)) };
+}
+
 export function aufgabenUeberAlle(blaetter, alleStudents) {
   const da = blaetter.filter(Boolean);
   const proKind = [];   // { b, wk, sid } je gewertetes Kind
@@ -460,7 +485,7 @@ export function aufgabenUeberAlle(blaetter, alleStudents) {
         const ux = schreiber.map(({ k, us }) => pu(k, us[j]));
         const avgP = mittel(ux);
         const ki = konfidenzProzent(ux, u.max);
-        perUnit.push({ id: `${id}·${u.id}`, taskId: id, label: u.label || "", avgP: Math.round(avgP * 10) / 10, max: u.max,
+        perUnit.push({ id: `${id}·${u.id}`, n: ux.length, taskId: id, label: u.label || "", avgP: Math.round(avgP * 10) / 10, max: u.max,
           pct: u.max ? Math.round((avgP / u.max) * 100) : 0, disc: trennschaerfe(ux, tot), ciLow: ki.ciLow, ciHigh: ki.ciHigh });
       });
     });
@@ -1095,7 +1120,7 @@ export default function Klassenarbeit() {
                   const sd = A.noten.sdPct;
                   const sdLevel = sd == null ? null : sd < 10 ? "low" : sd <= 25 ? "mid" : "high";
                   const weak = nurArbeit ? [] : A.topics.filter((tp) => tp.pct < 50).map((tp) => tp.label);
-                  const lowDisc = AT.perTask.filter((tk) => tk.disc != null && tk.disc < 0.2);
+                  const lowDisc = AT.perTask.filter((tk) => tsBelastbar(tk) && tk.disc < 0.2);
                   const Item = ({ term, children }) => (
                     <li style={{ marginBottom: 8 }}><b style={{ color: "var(--text)" }}>{term}:</b> <span style={{ color: "var(--text2)" }}>{children}</span></li>
                   );
@@ -1587,11 +1612,14 @@ export default function Klassenarbeit() {
                   </Segment>
                 </div>
                 {zeigeAuswertung(A, alleTeil === "alle" ? t("klassenarbeit.auswertungGesamt") : t("klassenarbeit.auswertungBlatt", { n: alleTeil }), alleTeil,
-                  { nurArbeit: true, aufgaben: alleAnalysen.aufgaben })}
+                  { nurArbeit: true, aufgaben: aufgabenDerArbeit(alleAnalysen.aufgaben, alleTeil) })}
               </>);
             })()}
-            <div style={{ fontSize: 14, fontWeight: 700, margin: "20px 0 8px" }}>{t("klassenarbeit.notenAller")}</div>
-            <AlleBlaetter blaetter={[work, partner]} alleStudents={alleStudents} scale={scale} t={t} />
+            {/* SuS-Ansicht (am Beamer): keine Namen mit Noten. */}
+            {!hideIndividual && (<>
+              <div style={{ fontSize: 14, fontWeight: 700, margin: "20px 0 8px" }}>{t("klassenarbeit.notenAller")}</div>
+              <AlleBlaetter blaetter={[work, partner]} alleStudents={alleStudents} scale={scale} t={t} />
+            </>)}
           </>) : zeigeAuswertung(analyse)}
         </>
       )}
