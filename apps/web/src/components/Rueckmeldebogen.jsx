@@ -130,6 +130,8 @@ export function BogenWahl({ onDrucken, onClose, mitWdh = true, wdhFehlt = [] }) 
   );
 }
 
+// Schrift eine Stufe groesser als am Bildschirm ueblich: die Boegen werden
+// oft zu zweit auf ein A4 gedruckt (verkleinert auf etwa 70 %).
 export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv, lernpfadAktiv, teile = ALTE_TEILE }) {
   const an = (k) => teile.includes(k);
   const { t } = useLanguage();
@@ -143,13 +145,13 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
         <div key={b.student_id} className="druck-seite" style={{ ...PAPIER, padding: "24px 28px", maxWidth: 720 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, borderBottom: "2px solid #111", paddingBottom: 8, marginBottom: 16 }}>
             <span style={{ fontSize: 22, fontWeight: 800 }}>{b.name}</span>
-            <span style={{ fontSize: 13, color: "#444" }}>{titel || t("klassenarbeit.title")}</span>
+            <span style={{ fontSize: 14, color: "#444" }}>{titel || t("klassenarbeit.title")}</span>
           </div>
 
           {/* Die Zahl steht oben und klein: sie ist das, was ohnehin jeder
               zuerst sucht — und das Unwichtigste auf diesem Blatt. */}
           {an("note") && (
-          <div style={{ fontSize: 14, marginBottom: 20 }}>
+          <div style={{ fontSize: 16, marginBottom: 20 }}>
             {t("bogen.punkte", { p: b.punkte, max: b.max })}
             {b.note ? <> · <strong>{t("bogen.note", { n: b.note })}</strong></> : null}
           </div>
@@ -171,7 +173,7 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
               ))}
             </Abschnitt>
           ) : (
-            <p style={{ fontSize: 14, marginBottom: 20 }}>{t("bogen.nichtsOffen")}</p>
+            <p style={{ fontSize: 16, marginBottom: 20 }}>{t("bogen.nichtsOffen")}</p>
           )}
           </>)}
 
@@ -179,13 +181,13 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
               folgt etwas anderes als aus „Flüchtigkeit", und genau dieser
               Unterschied ist der Grund, warum sie überhaupt erfasst wird. */}
           {an("rat") && b.haupt && fehlerLabel && (
-            <p style={{ fontSize: 14, background: "#f2f2f2", borderRadius: CONTROL_R, padding: "10px 12px", marginBottom: 20 }}>
+            <p style={{ fontSize: 16, background: "#f2f2f2", borderRadius: CONTROL_R, padding: "10px 12px", marginBottom: 20 }}>
               <strong>{fehlerLabel(b.haupt)}:</strong> {t(`bogen.rat.${b.haupt}`)}
             </p>
           )}
 
           {an("rat") && b.offen.length > 0 && (kartenAktiv || lernpfadAktiv) && (
-            <p style={{ fontSize: 14, marginBottom: 20 }}>
+            <p style={{ fontSize: 16, marginBottom: 20 }}>
               {kartenAktiv ? t("bogen.naechstesKarten") : t("bogen.naechstesLernpfad")}
             </p>
           )}
@@ -198,12 +200,12 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
           {an("wdh") && b.wdhAufgaben && (
             b.wdhAufgaben.length ? (
               <div style={{ marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
                   <Icon d={ICONS.restore} size={15} color={C.warning} /> {t("bogen.wdh")}
                 </div>
                 <ol style={{ margin: 0, paddingLeft: 22 }}>
                   {b.wdhAufgaben.map((x, i) => (
-                    <li key={i} style={{ fontSize: 14, marginBottom: 12, breakInside: "avoid" }}>
+                    <li key={i} style={{ fontSize: 16, marginBottom: 12, breakInside: "avoid" }}>
                       <div style={{ ...klein, marginBottom: 2 }}>
                         {x.thema}
                       </div>
@@ -215,19 +217,19 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
                     </li>
                   ))}
                 </ol>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginTop: 14, fontSize: 13 }}>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginTop: 14, fontSize: 14 }}>
                   {t("bogen.wdhBis")} <span style={{ borderBottom: "1px solid #999", width: 140, height: 18 }} />
                 </div>
               </div>
             ) : (an("themen") && b.offen.length === 0) ? null   // „Weiter so" steht schon da — nicht zweimal dasselbe
-              : <p style={{ fontSize: 14, marginBottom: 20 }}>{t("bogen.wdhKeine")}</p>
+              : <p style={{ fontSize: 16, marginBottom: 20 }}>{t("bogen.wdhKeine")}</p>
           )}
 
           {/* Zwei Zeilen für die Hand: eine Rückmeldung ohne Platz für den
               einen Satz, den nur diese Lehrkraft schreiben kann, ist ein
               Serienbrief. */}
           {an("notiz") && <div style={{ marginTop: 24 }}>
-            <div style={{ fontSize: 12, color: "#444", marginBottom: 10 }}>{t("bogen.notiz")}</div>
+            <div style={{ fontSize: 14, color: "#444", marginBottom: 10 }}>{t("bogen.notiz")}</div>
             <div style={{ borderBottom: "1px solid #999", height: 22 }} />
             <div style={{ borderBottom: "1px solid #999", height: 22 }} />
           </div>}
@@ -239,11 +241,11 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
           {an("unterschrift") && <div style={{ marginTop: 28, display: "flex", gap: 24, alignItems: "flex-end" }}>
             <div style={{ width: 120 }}>
               <div style={{ borderBottom: "1px solid #999", height: 22 }} />
-              <div style={{ fontSize: 11, color: "#444", marginTop: 4 }}>{t("bogen.datum")}</div>
+              <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>{t("bogen.datum")}</div>
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ borderBottom: "1px solid #999", height: 22 }} />
-              <div style={{ fontSize: 11, color: "#444", marginTop: 4 }}>{t("bogen.unterschrift")}</div>
+              <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>{t("bogen.unterschrift")}</div>
             </div>
           </div>}
         </div>
@@ -256,7 +258,7 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
 function Abschnitt({ titel, farbe, icon, children }) {
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, marginBottom: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
         <Icon d={icon} size={15} color={farbe} /> {titel}
       </div>
       <ul style={{ margin: 0, paddingLeft: 22 }}>{children}</ul>
@@ -264,5 +266,5 @@ function Abschnitt({ titel, farbe, icon, children }) {
   );
 }
 
-const zeile = { fontSize: 14, marginBottom: 4 };
-const klein = { fontSize: 12, color: "#555" };
+const zeile = { fontSize: 16, marginBottom: 4 };
+const klein = { fontSize: 14, color: "#555" };
