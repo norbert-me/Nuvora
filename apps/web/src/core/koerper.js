@@ -94,28 +94,31 @@ function quader(a, b, c, name = "quader") {
   };
 }
 
-function prisma(a, l) {
-  // Gleichseitiges Dreieck (Kante a) als Grundflaeche, Laenge l entlang y.
-  const h = (Math.sqrt(3) / 2) * a;
-  const T = (y) => [[0, y, 0], [a, y, 0], [a / 2, y, h]];
-  const [v0, v1, v2] = T(0), [w0, w1, w2] = T(l);
+function prisma(a, hoehe) {
+  // Gleichseitiges Dreieck (Kante a) als Grundflaeche, aufrecht stehend, Hoehe
+  // nach oben — wie die anderen Koerper steht es auf seiner Grundflaeche (sie
+  // liegt auf dem Bodenraster). Vorher lag es auf einer Rechteckseite, und die
+  // Grundflaeche war die Stirnseite.
+  const d = (Math.sqrt(3) / 2) * a;
+  const v = [[0, 0, 0], [a, 0, 0], [a / 2, d, 0]];
+  const w = v.map(([x, y]) => [x, y, hoehe]);
   const fl = [
-    { id: "boden", pts: [v0, w0, w1, v1] },
-    { id: "seite1", pts: [v1, w1, w2, v2] },
-    { id: "seite2", pts: [v2, w2, w0, v0] },
-    { id: "dreieck1", pts: [v0, v1, v2] },
-    { id: "dreieck2", pts: [w0, w2, w1] },
+    { id: "boden", pts: [v[0], v[2], v[1]] },
+    { id: "deckel", pts: [w[0], w[1], w[2]] },
+    { id: "seite1", pts: [v[0], v[1], w[1], w[0]] },
+    { id: "seite2", pts: [v[1], v[2], w[2], w[1]] },
+    { id: "seite3", pts: [v[2], v[0], w[0], w[2]] },
   ].map((f) => ({ ...f, gruppe: f.id }));
   const dreieck = (Math.sqrt(3) / 4) * a * a;
   return {
     art: "prisma", flaechen: fl,
-    eltern: { seite1: "boden", seite2: "boden", dreieck1: "boden", dreieck2: "boden" },
+    eltern: { seite1: "boden", seite2: "boden", seite3: "boden", deckel: "seite1" },
     gruppen: [
-      { id: "boden", inhalt: a * l }, { id: "seite1", inhalt: a * l }, { id: "seite2", inhalt: a * l },
-      { id: "dreieck1", inhalt: dreieck }, { id: "dreieck2", inhalt: dreieck },
+      { id: "boden", inhalt: dreieck }, { id: "deckel", inhalt: dreieck },
+      { id: "seite1", inhalt: a * hoehe }, { id: "seite2", inhalt: a * hoehe }, { id: "seite3", inhalt: a * hoehe },
     ],
-    gegenueber: [["dreieck1", "dreieck2"]],
-    oberflaeche: 2 * dreieck + 3 * a * l, volumen: dreieck * l, faltbar: true,
+    gegenueber: [["boden", "deckel"]],
+    oberflaeche: 2 * dreieck + 3 * a * hoehe, volumen: dreieck * hoehe, faltbar: true,
   };
 }
 
@@ -192,7 +195,7 @@ function kugel(r) {
 export const KOERPER = {
   quader: { masse: [["a", 6], ["b", 4], ["c", 3]], bau: (m) => quader(m.a, m.b, m.c) },
   wuerfel: { masse: [["a", 4]], bau: (m) => quader(m.a, m.a, m.a, "wuerfel") },
-  prisma: { masse: [["a", 4], ["l", 6]], bau: (m) => prisma(m.a, m.l) },
+  prisma: { masse: [["a", 4], ["h", 6]], bau: (m) => prisma(m.a, m.h) },
   pyramide: { masse: [["a", 5], ["h", 4]], bau: (m) => pyramide(m.a, m.h) },
   zylinder: { masse: [["r", 2], ["h", 5]], bau: (m) => zylinder(m.r, m.h) },
   kegel: { masse: [["r", 2.5], ["h", 5]], bau: (m) => kegel(m.r, m.h) },
@@ -253,7 +256,7 @@ export function gefaltet(k, t) {
  * Bildpunkte, eine Tiefe zum Sortieren (hinten zuerst zeichnen) und die
  * Helligkeit. Mittig um den Schwerpunkt, auf `groesse` eingepasst.
  */
-export function projiziere(flaechen, { gier, nick, breite, hoehe, rand = 70 }) {
+export function projiziere(flaechen, { gier, nick, breite, hoehe, rand = 70, zoom = 1 }) {
   const alle = flaechen.flatMap((f) => f.pts);
   const c = mitte(alle);
   const cg = Math.cos(gier), sg = Math.sin(gier), cn = Math.cos(nick), sn = Math.sin(nick);
@@ -263,20 +266,52 @@ export function projiziere(flaechen, { gier, nick, breite, hoehe, rand = 70 }) {
     const y2 = y1 * cn - z1 * sn, z2 = y1 * sn + z1 * cn;
     return [x1, -z2, y2];   // Bild-x, Bild-y, Tiefe (groesser = weiter weg)
   };
-  const roh = flaechen.map((f) => ({ ...f, s: f.pts.map(sicht) }));
-  const xs = roh.flatMap((f) => f.s.map((p) => p[0])), ys = roh.flatMap((f) => f.s.map((p) => p[1]));
-  const w = Math.max(1e-6, Math.max(...xs) - Math.min(...xs)), h = Math.max(1e-6, Math.max(...ys) - Math.min(...ys));
-  const k = Math.min((breite - 2 * rand) / w, (hoehe - 2 * rand) / h);
-  const mx = (Math.max(...xs) + Math.min(...xs)) / 2, my = (Math.max(...ys) + Math.min(...ys)) / 2;
+  // Massstab aus der Kugel um den Koerper, NICHT aus dem gedrehten Umriss:
+  // eingepasst auf den Umriss pumpte die Groesse bei jedem Drehschritt (ein
+  // Wuerfel uebers Eck ist breiter als von vorn), und Drehen fuehlte sich an
+  // wie Ringen. So bleibt der Koerper beim Drehen gleich gross.
+  const R = Math.max(1e-6, ...alle.map((p) => V.laenge(V.minus(p, c))));
+  const k = ((Math.min(breite, hoehe) / 2 - rand) / R) * zoom;
+  const abbild = (p) => { const [x, y] = sicht(p); return [breite / 2 + x * k, hoehe / 2 + y * k]; };
   const licht = V.einheit([0.4, -0.7, 0.6]);
-  return roh.map((f) => {
-    const bild = f.s.map(([x, y]) => [breite / 2 + (x - mx) * k, hoehe / 2 + (y - my) * k]);
-    const tiefe = f.s.reduce((s, p) => s + p[2], 0) / f.s.length;
+  const out = flaechen.map((f) => {
+    const s2 = f.pts.map(sicht);
+    const bild = s2.map(([x, y]) => [breite / 2 + x * k, hoehe / 2 + y * k]);
+    const tiefe = s2.reduce((t, p) => t + p[2], 0) / s2.length;
     const nb = sicht(V.plus(c, f.n)), n0 = sicht(c);
     const nSicht = V.einheit(V.minus(nb, n0));
     const hell = 0.55 + 0.45 * Math.abs(V.dot(f.n, licht));
     return { ...f, bild, tiefe, hell, zugewandt: nSicht[2] < 0 };
   }).sort((a, b) => b.tiefe - a.tiefe);
+  // Dieselbe Abbildung fuer alles, was mit dem Koerper dreht (Bodenraster).
+  out.abbild = abbild;
+  out.mitte = c;
+  out.radius = R;
+  out.boden = Math.min(...alle.map((p) => p[2]));
+  return out;
+}
+
+/**
+ * Das Bodenraster: Linien im Abstand einer Masseinheit auf der Ebene, auf der
+ * der Koerper steht (tiefster Punkt). Es dreht mit — daran sieht man, wie der
+ * Koerper gerade liegt, und es zeigt nebenbei die Groesse (ein Kaestchen =
+ * eine Einheit). Liefert Linien als [[x1,y1],[x2,y2]] plus eine Markierung
+ * „vorne".
+ */
+export function bodenRaster(bild) {
+  const c = bild.mitte, R = bild.radius, z = bild.boden;
+  const schritt = R > 12 ? 2 : 1;
+  const halb = Math.max(schritt, Math.round((R * 0.9) / schritt) * schritt);
+  const x0 = Math.round(c[0] / schritt) * schritt, y0 = Math.round(c[1] / schritt) * schritt;
+  const linien = [];
+  for (let d = -halb; d <= halb + 1e-9; d += schritt) {
+    linien.push([bild.abbild([x0 + d, y0 - halb, z]), bild.abbild([x0 + d, y0 + halb, z])]);
+    linien.push([bild.abbild([x0 - halb, y0 + d, z]), bild.abbild([x0 + halb, y0 + d, z])]);
+  }
+  const rahmen = [[-halb, -halb], [halb, -halb], [halb, halb], [-halb, halb]].map(([dx, dy]) => bild.abbild([x0 + dx, y0 + dy, z]));
+  // „vorne" = Richtung −y (dort liegt die Vorderseite des Quaders).
+  const vorne = [bild.abbild([x0, y0 - halb * 0.75, z]), bild.abbild([x0, y0 - halb * 1.1, z])];
+  return { linien, rahmen, vorne };
 }
 
 /** Die gegenueberliegende Gruppe — oder null, wenn es keine gibt. */

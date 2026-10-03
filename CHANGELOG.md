@@ -16,6 +16,15 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Körper: **Drehen geht leichter** — der Körper bleibt beim Drehen gleich groß
+  (vorher passte sich die Größe jedem Drehschritt an). Darunter liegt ein
+  **Bodenraster**, das mitdreht und auf dem die Grundfläche steht (ein
+  Kästchen = eine Einheit). Dazu **Zoom** (Knöpfe, zwei Finger, Strg+Rad) und
+  ein Knopf, der den Körper **langsam ohne Pause rundherum dreht**. Das
+  **Prisma steht jetzt auf seinem Dreieck**. Die Auswahl zeigt **Bilder statt
+  Namen**; Flächen heißen Grundfläche, Deckfläche, Seitenfläche, Mantelfläche
+  statt „vorne/links“. **Radierer und „Gegenüber“ sind entfallen** (dieselbe
+  Farbe noch einmal nimmt sie weg).
 - **Neues Modul Waage (Beta): Äquivalenzumformungen an der Balkenwaage.**
   Eine Gleichung liegt als Päckchen x und Gewichte auf zwei Schalen — die
   Gleichung selbst steht nicht da, die Kinder lesen sie von der Waage ab.
