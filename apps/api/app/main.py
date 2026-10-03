@@ -14,7 +14,7 @@ from .models import AppSetting, Base, Kurs, Session as SessionModel, User
 # den frueheren Ring main -> routers.backup -> main aufloest. Hier nur noch
 # hereingeholt, damit die Routen weiter unten `_require_admin` benutzen koennen.
 from .admin import _require_admin, APP_VERSION  # noqa: F401 — Routen unten
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, caldav, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, pap, personen, tafel, trash, selftest, backup
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, caldav, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, pap, waage, personen, tafel, trash, selftest, backup
 from . import websocket as ws
 from .routers.auth import _hash_pw, _token_teile, get_current_user, rate_limit, token_gueltig_bis
 from .routers.karten import uebernahme_deck_kurse
@@ -210,6 +210,8 @@ app.include_router(notizblock.router)
 app.include_router(tafel.router)
 app.include_router(pap.router)
 app.include_router(pap.lern_router)
+app.include_router(waage.router)
+app.include_router(waage.lern_router)
 app.include_router(personen.router)
 app.include_router(trash.router)
 app.include_router(selftest.router)
@@ -838,7 +840,7 @@ async def startup():
             for tbl in ("grade_sections", "grade_overrides", "grade_entries",
                         "seating_plans", "orga_items", "card_decks", "card_folders",
                         "work_analyses", "exam_dates", "calendar_entries",
-                        "segel_status", "timetable_slots", "pap_aufgaben",
+                        "segel_status", "timetable_slots", "pap_aufgaben", "waage_aufgaben",
                         "attendance", "sessions", "zufall_draws",
                         "quartal_dividers", "plan_weeks", "learning_ladders"):
                 await db.execute(text(f"""
@@ -1186,6 +1188,7 @@ PAPIERKORB_TABELLEN = (
     # bliebe sie fuer den Rest des Laufs auf eine geloeschte ID zeigen.
     ("questions", "Frage(n)"), ("topics", "Thema/Themen"),
     ("pap_aufgaben", "PAP-Aufgabe(n)"),
+    ("waage_aufgaben", "Waage-Aufgabe(n)"),
     ("persons", "Person(en)"),
 )
 

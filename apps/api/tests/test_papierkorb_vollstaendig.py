@@ -21,6 +21,7 @@ TABELLE_ZU_ART = {
     "questions": "question",
     "topics": "topic",
     "pap_aufgaben": "pap",
+    "waage_aufgaben": "waage",
     "persons": "person",
 }
 

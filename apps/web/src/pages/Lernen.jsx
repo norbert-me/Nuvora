@@ -13,6 +13,7 @@ import RechtsFuss from "../components/RechtsFuss.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { alsJson } from "../core/melden.js";
 import PapEditor from "../components/PapEditor.jsx";
+import WaageEditor from "../components/WaageEditor.jsx";
 
 const API = "/api/karten";
 
@@ -29,6 +30,12 @@ export default function Lernen() {
   // PAP-Aufgaben dieses Kindes. Leer, wenn das Modul aus ist oder es keine
   // gibt — dann erscheint der Reiter gar nicht erst.
   const [papListe, setPapListe] = useState([]);
+  // Waage-Blätter — dieselbe Regel: ohne Modul oder ohne Blatt kein Reiter.
+  const [waageListe, setWaageListe] = useState([]);
+  useEffect(() => {
+    fetch(`/api/lernen/${token}/waage`).then((r) => (r.ok ? r.json() : []))
+      .then((d) => setWaageListe(Array.isArray(d) ? d : [])).catch(() => setWaageListe([]));
+  }, [token]);
 
   useEffect(() => {
     fetch(`/api/lernen/${token}/pap`).then((r) => (r.ok ? r.json() : []))
@@ -86,12 +93,24 @@ export default function Lernen() {
     ...(hatKarten ? [["karten", t("karten.tabCards")]] : []),
     ["ergebnisse", t("lernen.tabResults")],
     ...(papListe.length ? [["pap", t("pap.titel")]] : []),
+    ...(waageListe.length ? [["waage", t("waage.titel")]] : []),
   ];
   const tabBar = tabOpts.length > 1 ? (
     <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
       <Tabs value={aktiverTab} onChange={setTab} options={tabOpts} />
     </div>
   ) : null;
+
+  if (aktiverTab === "waage") {
+    return (
+      <Center hinweis={t("lernen.footerHint")}>
+        <div style={{ width: "100%", maxWidth: 900 }}>
+          {tabBar}
+          <WaageAufgaben token={token} liste={waageListe} t={t} />
+        </div>
+      </Center>
+    );
+  }
 
   if (aktiverTab === "pap") {
     return (
@@ -318,6 +337,60 @@ function PapAufgaben({ token, liste, t }) {
       <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{a.title}</h2>
       {a.beschreibung && <p style={{ fontSize: 13, color: "var(--text2)", marginTop: 0 }}>{a.beschreibung}</p>}
       <PapEditor wert={stand[a.id]} onChange={(d) => setStand((v) => ({ ...v, [a.id]: d }))} />
+      <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <button onClick={() => sende(false)} style={btnSecondary}>{t("common.save")}</button>
+        <button onClick={() => sende(true)} style={btnPrimary}>{t("pap.abgeben")}</button>
+        {meldung && <span style={{ fontSize: 13, color: "var(--text3)" }}>{meldung}</span>}
+      </div>
+    </div>
+  );
+}
+
+
+// Ein Waage-Blatt: Gleichungen nacheinander, je eine Waage. Speichern und
+// Abgeben wie beim PAP — „gelöst" rechnet der Server nach und meldet es zurück.
+function WaageAufgaben({ token, liste, t }) {
+  const [gewaehlt, setGewaehlt] = useState(liste[0]?.id ?? null);
+  const [daten, setDaten] = useState(() => Object.fromEntries(liste.map((a) => [a.id, a.daten || {}])));
+  const [nr, setNr] = useState(0);
+  const [meldung, setMeldung] = useState("");
+  const a = liste.find((x) => x.id === gewaehlt);
+  if (!a) return null;
+  const meine = daten[a.id] || {};
+  const g = a.gleichungen[nr] || a.gleichungen[0];
+
+  const sende = async (abgegeben) => {
+    const r = await fetch(`/api/lernen/${token}/waage/${a.id}`, alsJson("PUT", { daten: meine, abgegeben })).catch(() => null);
+    if (r && r.ok) {
+      const j = await r.json();
+      setDaten((v) => ({ ...v, [a.id]: j.daten || meine }));
+      setMeldung(abgegeben ? t("pap.abgegeben") : t("waage.gespeichert", { n: j.geloest, gesamt: a.gleichungen.length }));
+    } else setMeldung(t("lernen.offline"));
+  };
+
+  return (
+    <div style={{ ...cardStyle, padding: 16 }}>
+      {liste.length > 1 && (
+        <select value={gewaehlt} onChange={(e) => { setGewaehlt(Number(e.target.value)); setNr(0); }} style={{ marginBottom: 12, padding: 6 }}>
+          {liste.map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}
+        </select>
+      )}
+      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{a.title}</h2>
+      {a.beschreibung && <p style={{ fontSize: 13, color: "var(--text2)", marginTop: 0 }}>{a.beschreibung}</p>}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+        {a.gleichungen.map((_, i) => {
+          const d = meine[String(i)];
+          return (
+            <button key={i} onClick={() => setNr(i)}
+              style={{ ...btnSecondary, padding: "4px 12px", fontWeight: i === nr ? 700 : 500,
+                borderColor: i === nr ? "var(--accent)" : undefined, color: d && d.geloest ? C.success : undefined }}>
+              {i + 1}{d && d.geloest ? " ✓" : ""}
+            </button>
+          );
+        })}
+      </div>
+      <WaageEditor key={`${a.id}-${nr}`} start={g} wert={meine[String(nr)] || { schritte: [] }}
+        onChange={(weg) => setDaten((v) => ({ ...v, [a.id]: { ...(v[a.id] || {}), [String(nr)]: weg } }))} />
       <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
         <button onClick={() => sende(false)} style={btnSecondary}>{t("common.save")}</button>
         <button onClick={() => sende(true)} style={btnPrimary}>{t("pap.abgeben")}</button>

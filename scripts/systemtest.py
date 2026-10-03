@@ -212,6 +212,9 @@ def endpunkte(u):
         ],
         "mathespiele": [],
         "koerper": [],
+        "waage": [
+            ("GET", "/api/waage/aufgaben"),
+        ],
     }
 
 
@@ -243,6 +246,7 @@ def tore(u):
         "tafel": [("GET", "/api/tafel")],
         "mathespiele": [],
         "koerper": [],
+        "waage": [("GET", "/api/waage/aufgaben")],
     }
 
 
@@ -1319,6 +1323,55 @@ def inhalt_pap(api, u, spuren):
 
 
 
+def inhalt_waage(api, u, spuren):
+    """Waage: Blatt anlegen, das Kind loest ueber seinen Zugang, die Lehrkraft
+    findet den Weg wieder — und „geloest" rechnet der SERVER nach: ein Weg,
+    der die Waage aus dem Gleichgewicht bringt, zaehlt nicht, auch wenn er bei
+    „x = …" endet."""
+    anonym = Api(api.basis, debug=api.debug)
+    a = api.call("POST", "/api/waage/aufgaben", {
+        "title": f"{PRAEFIX} Waage", "class_id": u.class_id,
+        "gleichungen": [{"l": {"x": 3, "e": 2}, "r": {"x": 0, "e": 14}},
+                        {"l": {"x": 2, "e": 0}, "r": {"x": 0, "e": 10}}],
+    }, erwartet=(201,))
+    spuren.append(("Waage-Aufgabe", lambda: api.call(
+        "DELETE", f"/api/waage/aufgaben/{a['id']}", erwartet=(200, 404))))
+
+    zugaenge = api.call("POST", f"/api/karten/classes/{u.class_id}/tokens", erwartet=(200, 201))
+    eintrag = _finde(zugaenge, student_id=u.students[0])
+    if not eintrag:
+        raise AssertionError("kein Zugang fuer das erste Kind erzeugt")
+    token = eintrag["token"]
+    offen = anonym.call("GET", f"/api/lernen/{token}/waage", erwartet=(200,))
+    if not _finde(offen, id=a["id"]):
+        raise AssertionError("das Blatt erreicht das Kind nicht")
+
+    st = lambda lx, le, rx, re, op: {"l": {"x": lx, "e": le}, "r": {"x": rx, "e": re}, "op": op}
+    daten = {
+        # 3x + 2 = 14 | −2 → 3x = 12 | :3 → x = 4  (richtig)
+        "0": {"schritte": [st(3, 0, 0, 12, "| − 2"), st(1, 0, 0, 4, "| : 3")]},
+        # 2x = 10 → behauptet x = 6: endet bei „x = …", ist aber falsch
+        "1": {"schritte": [st(1, 0, 0, 6, "| : 2")]},
+        # Gleichung, die es im Blatt nicht gibt: muss herausfallen
+        "7": {"schritte": [st(1, 0, 0, 1, "")]},
+    }
+    antwort = anonym.call("PUT", f"/api/lernen/{token}/waage/{a['id']}",
+                          {"daten": daten, "abgegeben": True}, erwartet=(200,))
+    if antwort.get("geloest") != 1:
+        raise AssertionError(f"Server zaehlt {antwort.get('geloest')} statt 1 geloeste Gleichung")
+
+    abgaben = api.call("GET", f"/api/waage/aufgaben/{a['id']}/abgaben", erwartet=(200,))
+    meins = _finde(abgaben, student_id=u.students[0])
+    if not meins or not meins.get("abgegeben") or meins.get("geloest") != 1 or meins.get("gesamt") != 2:
+        raise AssertionError(f"Abgabe falsch bei der Lehrkraft: {meins}")
+    d = meins.get("daten") or {}
+    if "7" in d or len(d.get("0", {}).get("schritte", [])) != 2:
+        raise AssertionError(f"Server hat die Wege nicht bereinigt: {list(d)}")
+    if len(abgaben) < len(u.students):
+        raise AssertionError(f"Abgabenliste zeigt nur {len(abgaben)} von {len(u.students)} Kindern")
+    return "Blatt, Loesung ueber den Zugang, falscher Weg nicht als geloest gezaehlt"
+
+
 INHALT = {
     "cardvote": inhalt_cardvote,
     "lernpfad": inhalt_lernpfad,
@@ -1334,6 +1387,7 @@ INHALT = {
     "tafel": inhalt_tafel,
     "mathespiele": None,
     "koerper": None,
+    "waage": inhalt_waage,
 }
 
 

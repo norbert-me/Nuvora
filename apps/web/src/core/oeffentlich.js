@@ -6,7 +6,7 @@
 // Lehrkraft aus ihrem eigenen Konto ab, sobald sie den Link ihres Kindes
 // oeffnete (gemeldet am 18.09.2026).
 const WEGE = /\/lernen\/|\/cd\/|\/codedetektiv\/sessions\//;
-const SEITEN = /^\/(lernen|cd|pap-frei)(\/|$)/;
+const SEITEN = /^\/(lernen|cd|pap-frei|waage-frei)(\/|$)/;
 
 export function istOeffentlich(url = "", pfad = "") {
   return WEGE.test(String(url)) || SEITEN.test(String(pfad));

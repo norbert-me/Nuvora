@@ -31,7 +31,7 @@ const SCHLUESSEL = [
   // Code-Detektiv: `sessions[].players[].name` samt Spielstaenden.
   "code-detektiv-state",
   // PAP: gezeichnete Abgaben/Entwuerfe.
-  "nuvora_pap_entwurf", "nuvora_pap_frei",
+  "nuvora_pap_entwurf", "nuvora_pap_frei", "nuvora_waage_frei", "nuvora_waage_lehrkraft",
   // Outbox-Nebenablagen: die Fehlerliste zeigt rohe URLs mit IDs, die
   // Behelfs-ID-Abbildung gehoert zur Warteschlange des vorigen Kontos.
   "nuvora_outbox_fehler", "nuvora_idmap",

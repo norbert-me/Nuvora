@@ -172,6 +172,8 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
         # Die Zeichnungen der Kinder haengen an der Aufgabe, nicht am Konto —
         # ueber die Schueler-IDs, wie der Karten-Fortschritt.
         "pap_abgaben": await _rows(db, m.PapAbgabe, in_(m.PapAbgabe, "student_id", student_ids)),
+        "waage_aufgaben": await _rows(db, m.WaageAufgabe, m.WaageAufgabe.owner_id == uid),
+        "waage_abgaben": await _rows(db, m.WaageAbgabe, in_(m.WaageAbgabe, "student_id", student_ids)),
         "zufall_ziehungen": await _rows(db, m.ZufallDraw, m.ZufallDraw.owner_id == uid),
         "code_sessions": await _rows(db, m.CodeSession, m.CodeSession.owner_id == uid),
         # Materialablage: Metadaten (Name, Typ, Groesse, Zuordnung). Die Datei

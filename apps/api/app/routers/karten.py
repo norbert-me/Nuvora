@@ -1087,7 +1087,7 @@ class StudentTokenOut(BaseModel):
 # fuehrt je nach aktivem Modul zu den Karten, zu den Testergebnissen oder zu
 # einer PAP-Aufgabe. Am Karten-Router hingen sie nur historisch — mit
 # abgeschalteten Karteikarten liess sich dann fuer PAP kein Zugang erzeugen.
-ZUGANG_MODULE = ("karten", "cardvote", "pap")
+ZUGANG_MODULE = ("karten", "cardvote", "pap", "waage")
 
 
 async def _zugang_moeglich(db: AsyncSession, user: User) -> None:

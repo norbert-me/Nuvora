@@ -360,6 +360,8 @@ const Tafel = React.lazy(() => import("./pages/Tafel.jsx"));
 const Pap = React.lazy(() => import("./pages/Pap.jsx"));
 const Personen = React.lazy(() => import("./pages/Personen.jsx"));
 const PapFrei = React.lazy(() => import("./pages/PapFrei.jsx"));
+const Waage = React.lazy(() => import("./pages/Waage.jsx"));
+const WaageFrei = React.lazy(() => import("./pages/WaageFrei.jsx"));
 const NichtGefunden = React.lazy(() => import("./pages/NichtGefunden.jsx"));
 
 // Ladezustand fuer nachgeladene Seiten: dieselben pulsierenden Balken wie beim
@@ -424,6 +426,8 @@ function helpArea(pathname) {
   if (pathname === "/pap" || pathname.startsWith("/pap/")) return "pap";
   if (pathname.startsWith("/mathespiele")) return "mathespiele";
   if (pathname.startsWith("/koerper")) return "koerper";
+  // Nicht startsWith("/waage") — das faengt auch /waage-frei (oeffentlich).
+  if (pathname === "/waage" || pathname.startsWith("/waage/")) return "waage";
   return "core";
 }
 const LP = "/lernpfad";
@@ -438,6 +442,7 @@ const NOTIZBRETT = "/notizbrett";
 const PAP = "/pap";
 const MATHEF = "/mathespiele";
 const KOERPER = "/koerper";
+const WAAGE = "/waage";
 const TAFEL = "/tafel";
 
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
@@ -457,6 +462,7 @@ const getModuleNavItems = (t, location, user) => {
     : pathname.startsWith(NOTIZBRETT) ? "notizbrett"
     : pathname.startsWith(MATHEF) ? "mathespiele"
     : pathname.startsWith(KOERPER) ? "koerper"
+    : (pathname === WAAGE || pathname.startsWith(`${WAAGE}/`)) ? "waage"
     : pathname.startsWith(TAFEL) ? "tafel"
     // Nicht startsWith("/pap") — das faengt auch /papierkorb (Kern).
     : (pathname === PAP || pathname.startsWith(`${PAP}?`) || pathname.startsWith(`${PAP}/`)) ? "pap"
@@ -529,6 +535,13 @@ const getModuleNavItems = (t, location, user) => {
   }
   if (area === "mathespiele") return [{ to: MATHEF, label: t("mathefussball.title") }];
   if (area === "koerper") return [{ to: KOERPER, label: t("koerper.title") }];
+  if (area === "waage") {
+    const cur = params.get("tab");
+    return [
+      { to: WAAGE, label: t("waage.tabUeben"), active: cur !== "aufgaben" },
+      { to: `${WAAGE}?tab=aufgaben`, label: t("waage.tabAufgaben"), active: cur === "aufgaben" },
+    ];
+  }
   if (area === "tafel") return [{ to: TAFEL, label: t("tafel.title") }];
   if (area === "pap") {
     const cur = params.get("tab");
@@ -1194,6 +1207,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={NOTIZBRETT} element={user ? <ModuleGate moduleKey="notizbrett"><Notizbrett /></ModuleGate> : <Landing />} />
           <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathespiele"><Mathefussball /></ModuleGate> : <Landing />} />
           <Route path={KOERPER} element={user ? <ModuleGate moduleKey="koerper"><Koerper /></ModuleGate> : <Landing />} />
+          <Route path={WAAGE} element={user ? <ModuleGate moduleKey="waage"><Waage /></ModuleGate> : <Landing />} />
           <Route path={TAFEL} element={user ? <ModuleGate moduleKey="tafel"><Tafel /></ModuleGate> : <Landing />} />
           <Route path={PAP} element={user ? <ModuleGate moduleKey="pap"><Pap /></ModuleGate> : <Landing />} />
           <Route path={`${AUSW}/vergleich`} element={user ? <ModuleGate moduleKey="auswertung"><KlassenarbeitVergleich /></ModuleGate> : <Landing />} />
@@ -1500,6 +1514,8 @@ function Wurzel() {
               {/* PAP-Editor ohne Login: der unueberwachte Weg. Nichts wird
                   zugeordnet, gespeichert wird im Browser des Kindes. */}
               <Route path="/pap-frei" element={<PapFrei />} />
+              {/* Waage ohne Login: freies Üben, gespeichert im Browser. */}
+              <Route path="/waage-frei" element={<WaageFrei />} />
               {/* Code-Detektiv: öffentliches Beitreten der Schüler ohne Login. */}
               <Route path="/cd/:code/*" element={<PublicCd />} />
               <Route path="/*" element={<AppRoutes user={user} setUser={setUser} logout={logout} />} />

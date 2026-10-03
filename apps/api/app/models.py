@@ -1748,6 +1748,46 @@ class PapAbgabe(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class WaageAufgabe(Base):
+    """Modul Waage: ein Aufgabenblatt mit Gleichungen (a·x + b = c·x + d).
+
+    Derselbe Weg wie beim PAP-Editor: die Aufgabe haengt an Kurs oder Klasse,
+    das Kind oeffnet sie ueber seinen QR-Zugang, loest an der Waage und gibt
+    ab. Die Gleichungen stehen als JSON-Liste am Blatt — es gibt keine Frage,
+    die eine einzelne Gleichung sucht.
+    """
+    __tablename__ = "waage_aufgaben"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    beschreibung: Mapped[str] = mapped_column(Text, default="", server_default="")
+    class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True)
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True)
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True)
+    # [{"l": {"x": a, "e": b}, "r": {"x": c, "e": d}}, ...]
+    gleichungen: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class WaageAbgabe(Base):
+    """Die Loesungswege eines Kindes zu einem Blatt — eine Zeile je Kind und
+    Blatt, gemergt statt neu angelegt. `geloest` rechnet der Server nach
+    (app/waage.py), es steht nicht im Belieben des Browsers."""
+    __tablename__ = "waage_abgaben"
+    __table_args__ = (UniqueConstraint("aufgabe_id", "student_id", name="uq_waage_abgabe"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    aufgabe_id: Mapped[int] = mapped_column(ForeignKey("waage_aufgaben.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
+    # {"<index>": {"schritte": [...]}}
+    daten: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    geloest: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    abgegeben: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class TafelBoard(Base):
     """Modul Tafel: eine gespeicherte Tafel (Name + ihre Elemente).
 

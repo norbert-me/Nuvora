@@ -25,13 +25,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_db
 from ..models import (Card, CardDeck, Exercise, Kurs, LearningLadder, LearningPath, Person,
                       Question, QuestionSet, QuestionSetItem, PapAufgabe, SchoolClass, Student,
-                      Topic, User)
+                      Topic, User, WaageAufgabe)
 from .auth import get_current_user, rate_limit
 from . import classes as classes_router
 from . import karten as karten_router
 from . import kurse as kurse_router
 from . import lernpfad as lernpfad_router
 from . import pap as pap_router
+from . import waage as waage_router
 from . import personen as personen_router
 from . import questions as questions_router
 from . import topics as topics_router
@@ -121,6 +122,12 @@ async def list_trash(user: User = Depends(get_current_user), db: AsyncSession = 
     for a in pap:
         add("pap", a.id, a.title, "PAP-Aufgabe", "pap", a.deleted_at)
 
+    # ── Waage ──
+    waage = (await db.execute(select(WaageAufgabe).where(
+        WaageAufgabe.owner_id == user.id, WaageAufgabe.deleted_at.is_not(None)))).scalars().all()
+    for a in waage:
+        add("waage", a.id, a.title, "Waage-Aufgabe", "waage", a.deleted_at)
+
     # ── Karten ──
     decks = (await db.execute(
         select(CardDeck, SchoolClass.name)
@@ -198,6 +205,7 @@ _AKTIONEN = {
     "question": (questions_router.restore_question, questions_router.purge_question),
     "topic": (topics_router.restore_topic, topics_router.purge_topic),
     "pap": (pap_router.restore_aufgabe, pap_router.purge_aufgabe),
+    "waage": (waage_router.restore_aufgabe, waage_router.purge_aufgabe),
     "person": (personen_router.restore_person, personen_router.purge_person),
 }
 

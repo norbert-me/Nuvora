@@ -87,6 +87,7 @@ MODUL_PREFIX = {
     "notizbrett": "/api/notizblock",
     "code-detektiv": "/api/codedetektiv",
     "pap": "/api/pap",
+    "waage": "/api/waage",
     "tafel": "/api/tafel",
     "mathespiele": None,
     "koerper": None,

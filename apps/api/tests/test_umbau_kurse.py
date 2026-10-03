@@ -14,7 +14,7 @@ from app.models import Base
 ERWARTET = {
     "grade_sections", "grade_overrides", "grade_entries", "seating_plans",
     "orga_items", "card_decks", "card_folders", "work_analyses", "exam_dates",
-    "calendar_entries", "segel_status", "timetable_slots", "pap_aufgaben",
+    "calendar_entries", "segel_status", "timetable_slots", "pap_aufgaben", "waage_aufgaben",
     "attendance", "sessions", "zufall_draws", "quartal_dividers",
     "plan_weeks", "learning_ladders",
 }

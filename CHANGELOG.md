@@ -16,6 +16,15 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Neues Modul Waage (Beta): Äquivalenzumformungen an der Balkenwaage.**
+  Eine Gleichung liegt als Päckchen x und Gewichte auf zwei Schalen. Nimmt
+  man nur auf einer Seite etwas weg, kippt die Waage; „auf beiden Seiten“
+  (− 2, − x, : 3 …) formt in einem Schritt um. Jeder Schritt steht als Zeile
+  darunter, am „=“ ausgerichtet, am Ende mit Probe. Frei üben ohne Konto
+  (`/waage-frei`, vier Stufen oder eigene Gleichung) oder Aufgabenblätter mit
+  mehreren Gleichungen, die die Kinder über ihren QR-Zugang lösen und
+  abgeben — je Kind „3 / 5 gelöst“ und jeder Weg; ob gelöst, rechnet der
+  Server nach.
 - Tafel (Lautstärke, Stille-Safari): **die Mikrofon-Meldung nennt den
   Grund** — kein Gerät angeschlossen, Zugriff verweigert, von einem anderen
   Programm belegt oder kein https — statt alle drei in einem Satz.

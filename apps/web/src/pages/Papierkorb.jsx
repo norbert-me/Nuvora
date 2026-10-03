@@ -17,7 +17,7 @@ const API = "/api";
 // hundert Aufgaben geloescht hatte, fand einen leeren Papierkorb und hielt sie
 // fuer endgueltig weg. Alles, was nicht hier steht, haengt sich jetzt hinten an.
 const ARTEN = ["kurs", "class", "topic", "person", "deck", "card", "path", "ladder",
-               "exercise", "question", "pap"];
+               "exercise", "question", "pap", "waage"];
 
 export default function Papierkorb() {
   const { t } = useLanguage();

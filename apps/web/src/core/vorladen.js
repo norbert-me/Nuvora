@@ -32,6 +32,7 @@ const JE_MODUL = {
   notizbrett: ["/api/notizblock"],
   "code-detektiv": ["/api/codedetektiv/puzzles"],
   pap: ["/api/pap/aufgaben"],
+  waage: ["/api/waage/aufgaben"],
   tafel: ["/api/tafel"],
 };
 

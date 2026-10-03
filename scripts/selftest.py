@@ -1323,6 +1323,29 @@ def probe_pap(api, u):
     return f"Aufgabe anlegen, {len(liste)} Kinder in der Abgabenliste, aendern, loeschen"
 
 
+def probe_waage(api, u):
+    # Das freie Ueben braucht keinen Server. Geprueft wird das Blatt: anlegen
+    # (eine Gleichung, die nicht auf die Waage passt, muss abgelehnt werden),
+    # Abgabenliste lesen, aendern, loeschen.
+    api.call("POST", "/api/waage/aufgaben", {
+        "title": f"{PRAEFIX} Waage kaputt", "class_id": u.class_id,
+        "gleichungen": [{"l": {"x": 2, "e": 1}, "r": {"x": 0, "e": 6}}],   # x = 2,5
+    }, erwartet=(400,))
+    a = api.call("POST", "/api/waage/aufgaben", {
+        "title": f"{PRAEFIX} Waage", "class_id": u.class_id,
+        "gleichungen": [{"l": {"x": 3, "e": 2}, "r": {"x": 0, "e": 14}}],
+    }, erwartet=(201,))
+    liste = api.call("GET", f"/api/waage/aufgaben/{a['id']}/abgaben", erwartet=(200,))
+    if not isinstance(liste, list):
+        raise AssertionError("Abgabenliste ist keine Liste")
+    api.call("PUT", f"/api/waage/aufgaben/{a['id']}", {
+        "title": f"{PRAEFIX} Waage 2", "class_id": u.class_id,
+        "gleichungen": [{"l": {"x": 1, "e": 5}, "r": {"x": 0, "e": 9}}],
+    }, erwartet=(200,))
+    api.call("DELETE", f"/api/waage/aufgaben/{a['id']}", erwartet=(200,))
+    return f"Blatt anlegen (falsche Gleichung abgelehnt), {len(liste)} Kinder in der Liste, aendern, loeschen"
+
+
 def probe_unterrichtsplanung(api, u):
     # Das Modul ist die Einstiegs-/Methodensammlung. Die frueher hier gepruefte
     # Wochenplanung (/api/planung) gibt es nicht mehr: die Jahresplanung liegt
@@ -1391,6 +1414,7 @@ PROBEN = {
     "tafel": probe_tafel,
     "mathespiele": None,
     "koerper": None,
+    "waage": probe_waage,
 }
 
 

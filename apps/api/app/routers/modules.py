@@ -387,6 +387,24 @@ REGISTRY: List[ModuleDef] = [
         path="/koerper",
         stage="beta",
     ),
+    ModuleDef(
+        key="waage",
+        group="unterricht",
+        name="Waage",
+        description=(
+            "Äquivalenzumformungen an der Balkenwaage: eine Gleichung wie "
+            "3x + 2 = 14 liegt als Päckchen und Gewichte auf zwei Schalen. "
+            "Nimmt man nur auf einer Seite etwas weg, kippt die Waage — auf "
+            "beiden Seiten dasselbe tun hält sie im Gleichgewicht, bis x allein "
+            "steht. Jeder Schritt steht als Zeile mit Umformung darunter. "
+            "Zwei Wege: frei üben über einen Link, ohne Konto, mit eigenen oder "
+            "zufälligen Gleichungen; oder ein Aufgabenblatt anlegen, das die "
+            "Kinder über ihren QR-Zugang lösen und abgeben — du siehst je Kind, "
+            "wie viele Gleichungen gelöst sind, und jeden Lösungsweg."
+        ),
+        path="/waage",
+        stage="beta",
+    ),
 ]
 
 _BY_KEY = {m.key: m for m in REGISTRY}

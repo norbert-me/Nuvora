@@ -244,6 +244,7 @@ class Sammler:
         self._unterrichtsplanung()
         self._notizbrett()
         self._tafel()
+        self._waage()
         self._code_detektiv()
         self._kern(klassen)
         self._papierkorb()
@@ -367,6 +368,11 @@ class Sammler:
         # Gespeicherte Tafeln (Modul Tafel) — der Browser-Selbsttest legt eine an.
         self.nimm("Tafel", "Tafel", self._get("/api/tafel"),
                   lambda o: [f"/api/tafel/{o['id']}"])
+
+    def _waage(self):
+        # Waage-Blaetter (Modul Waage) — die Proben legen je eines an.
+        self.nimm("Waage", "Waage-Aufgabe", self._get("/api/waage/aufgaben"),
+                  lambda o: [f"/api/waage/aufgaben/{o['id']}"])
 
     def _code_detektiv(self):
         # Geloescht wird ueber die client_id, nicht ueber die Datenbank-ID.

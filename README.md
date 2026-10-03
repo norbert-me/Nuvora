@@ -333,6 +333,7 @@ abgeschaltet ist die Anzeige:
 | Tafel | `/tafel` | Classroom-Screen für den Beamer: frei platzierbare Textfelder, Timer, Lautstärke-Anzeige, **Stille-Safari** (Tiere kommen, solange es leise ist), mit dem Kalender der Verlaufsplan der laufenden Stunde. Mehrere Tafeln, am Konto gespeichert |
 | Mathespiele | `/mathespiele` | Aktuell Mathefußball: Kopfrechen-Duell für zwei Teams am Beamer |
 | Körper | `/koerper` | Geometrische Körper (Quader, Würfel, Prisma, Pyramide, Zylinder, Kegel, Kugel): drehen, mit einem Regler zum Netz auffalten, Flächen einfärben, gegenüberliegende Flächen entdecken; Oberfläche und Volumen mit Formel laufen mit den Maßen mit. Reines Werkzeug, ohne Daten |
+| Waage | `/waage`, `/waage-frei` | Äquivalenzumformungen an der Balkenwaage: Päckchen x und Gewichte auf zwei Schalen, einseitig Wegnehmen lässt die Waage kippen, „auf beiden Seiten“ formt um; jeder Schritt steht als Zeile darunter. Frei üben ohne Konto (zufällige Gleichungen in vier Stufen oder eigene) oder Aufgabenblätter mit Abgabe über den QR-Zugang; ob gelöst, rechnet der Server nach |
 | PAP-Editor | `/pap` | Programmablaufpläne nach DIN 66001: frei zeichnen (ohne Zuordnung, im Browser gespeichert) oder als Aufgabe stellen — Lernende geben über ihren QR-Zugang ab |
 
 Ein **Reifegrad** steht an jedem Modul (`stable` / `beta`); die Shell zeigt ihn
