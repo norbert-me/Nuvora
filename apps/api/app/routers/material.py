@@ -5,6 +5,7 @@ Kalender-Eintrag (Stunde). Reine private Ablage — nichts wird geteilt, nichts
 geht in den Marktplatz oder einen Export an Dritte. Inhalt liegt in der DB und
 faellt mit dem Konto weg (owner_id CASCADE).
 """
+import os
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
@@ -30,7 +31,19 @@ router = APIRouter(prefix="/api/material", tags=["material"])
 # auf einer Schulleitung sind 50 MB schon ein langer Balken. Gleiche Zahl in
 # nginx.conf (client_max_body_size) und MaterialPanel.jsx (MAX_MB).
 MAX_BYTES = 50 * 1024 * 1024
-QUOTA_BYTES = 200 * 1024 * 1024       # 200 MB je Konto — gegen unbegrenztes Vollladen (Public-Betrieb)
+# Ablage je Konto. Ohne Angabe gibt es KEINE Grenze (Wunsch des Nutzers,
+# 03.10.2026): auf der eigenen Installation sollen Scans nicht nach vier
+# Dateien an „Speicher voll" scheitern. Wer Nuvora oeffentlich anbietet,
+# setzt MATERIAL_QUOTA_MB in der .env (z. B. 200), damit ein einzelnes Konto
+# den Server nicht vollladen kann. 0 oder leer = keine Grenze.
+def _quota_bytes() -> int:
+    try:
+        return max(0, int(os.environ.get("MATERIAL_QUOTA_MB", "0") or 0)) * 1024 * 1024
+    except ValueError:
+        return 0
+
+
+QUOTA_BYTES = _quota_bytes()
 
 
 class MaterialOut(BaseModel):
@@ -142,11 +155,11 @@ async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] 
     # Speicherzaehler nur ueber die Bytes-tragenden Zeilen: ein zweiter Upload
     # desselben Bildes kostet keinen Platz und darf das Konto nicht naeher an
     # die Grenze bringen.
-    if quelle is None:
+    if quelle is None and QUOTA_BYTES:
         used = (await db.execute(select(func.coalesce(func.sum(Material.size), 0)).where(
             Material.owner_id == user.id, Material.quelle_id.is_(None)))).scalar_one()
         if used + len(data) > QUOTA_BYTES:
-            raise HTTPException(413, "Speicher voll (max. 200 MB je Konto). Bitte alte Dateien löschen.")
+            raise HTTPException(413, f"Speicher voll (max. {QUOTA_BYTES // 1024 // 1024} MB je Konto). Bitte alte Dateien löschen.")
     m = Material(owner_id=user.id, topic_id=topic_id, entry_id=entry_id, method_id=method_id,
                  work_id=work_id, rolle=rolle if rolle in ROLLEN else "",
                  filename=name, mime=mime,

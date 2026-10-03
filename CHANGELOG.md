@@ -14,6 +14,11 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- **Ablage ohne Grenze:** je Konto gibt es keine Obergrenze mehr für Anhänge
+  (vorher 200 MB); wer Nuvora öffentlich anbietet, setzt `MATERIAL_QUOTA_MB`.
+
 ## 4.4.6 — 03.10.2026
 
 - Klassenarbeit: **Gewichtung der Themen** unter den Aufgaben — Punkte und

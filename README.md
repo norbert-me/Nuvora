@@ -451,7 +451,7 @@ Auch eine gelöschte oder archivierte Klasse schaltet ihre Zugänge ab.
 ### Dateien ansehen statt herunterladen
 
 An Themen, Stunden, Einstiegen und Klassenarbeiten hängt eine private
-Dateiablage (200 MB je Konto). Ein Klick zeigt die Datei im Fenster: PDF und
+Dateiablage (bis 50 MB je Datei; je Konto ohne Grenze, einstellbar mit `MATERIAL_QUOTA_MB` in der `.env`). Ein Klick zeigt die Datei im Fenster: PDF und
 Bilder direkt, Word/Excel/PowerPoint wandelt der Server beim ersten Ansehen
 einmalig nach PDF (LibreOffice) und behält das Ergebnis. Die Datei verlässt den
 Server dabei nicht.

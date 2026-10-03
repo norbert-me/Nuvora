@@ -69,6 +69,8 @@ services:
       # die Einrichtungs-Pruefungen kommt (Schema, Konfiguration, E-Mail) —
       # ohne dafuer das Administrationskonto benutzen zu muessen.
       SELFTEST_TOKEN: ${SELFTEST_TOKEN:-}
+      # Ablage je Konto in MB; leer oder 0 = keine Grenze (siehe material.py).
+      MATERIAL_QUOTA_MB: ${MATERIAL_QUOTA_MB:-0}
     volumes:
       - uploads:/app/uploads
       # Sicherungen (Administration -> Sicherung). Eigenes Volume, NICHT unter
