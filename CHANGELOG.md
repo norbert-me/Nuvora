@@ -69,9 +69,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   Auswertung); Gesamt und % rechnen weiter nur über die Quizze.
 - Klassenarbeit: nach dem Wechsel E → G → E stand wieder der alte Stand da
   (z. B. ein geändertes Thema), obwohl gespeichert war.
-- Klassenarbeit: Umschalter **E | G | Alle** — „Alle“ zeigt alle Kinder mit
-  Note aus ihrem Blatt und darunter die Auswertung gesamt, für E und für G,
-  jeweils im selben Aufbau wie im einzelnen Blatt.
+- Klassenarbeit: Umschalter **E | G | Auswertung** — oben eine Auswertung,
+  umschaltbar Alle / E-Kurs / G-Kurs (im selben Aufbau wie im einzelnen Blatt),
+  darunter die Noten aller Kinder mit ihrem Kurs.
 - Klassenarbeit: **Aufgaben zuklappbar** — zu, sobald es welche gibt; die Zeile
   nennt Anzahl und Punkte.
 - **Hochladen abbrechen:** × neben dem Fortschrittsbalken (Anhänge an

@@ -629,6 +629,7 @@ export default function Klassenarbeit() {
   // ganzen Lerngruppe. Nur Ansicht: eingetragen wird im E- bzw. G-Blatt,
   // deren Aufgaben verschieden sind.
   const [alleSicht, setAlleSicht] = useState(false);
+  const [alleTeil, setAlleTeil] = useState("alle");   // welche Auswertung oben steht
   // In der Auswahl steht ein Paar EINMAL: das G-Blatt faellt heraus, wenn sein
   // E-Blatt daneben steht.
   const auswahl = works.filter((w) => !(w.niveau === "G" && partnerVon(w)));
@@ -1490,9 +1491,27 @@ export default function Klassenarbeit() {
           </>)}
 
           {alleAn ? (<>
+            {/* EINE Auswertung oben, umschaltbar Alle | E | G — drei
+                untereinander waren zu viel. Darunter die Noten aller Kinder. */}
+            {alleAnalysen && (() => {
+              const teil = alleAnalysen.teile.find(([st]) => st === alleTeil);
+              const A = alleTeil !== "alle" && teil ? teil[1] : alleAnalysen.gesamt;
+              return (<>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+                  <Segment>
+                    {["alle", "E", "G"].map((x) => (
+                      <button key={x} onClick={() => setAlleTeil(x)} aria-pressed={alleTeil === x}
+                        style={{ ...segmentBtn, fontWeight: alleTeil === x ? 700 : 500, color: alleTeil === x ? "var(--accent)" : "var(--text2)" }}>
+                        {x === "alle" ? t("klassenarbeit.alleKurse") : t("klassenarbeit.kursNiveau", { n: x })}
+                      </button>
+                    ))}
+                  </Segment>
+                </div>
+                {zeigeAuswertung(A, alleTeil === "alle" ? t("klassenarbeit.auswertungGesamt") : t("klassenarbeit.auswertungBlatt", { n: alleTeil }), alleTeil, alleTeil === "alle")}
+              </>);
+            })()}
+            <div style={{ fontSize: 14, fontWeight: 700, margin: "20px 0 8px" }}>{t("klassenarbeit.notenAller")}</div>
             <AlleBlaetter blaetter={[work, partner]} alleStudents={alleStudents} scale={scale} t={t} />
-            {alleAnalysen && zeigeAuswertung(alleAnalysen.gesamt, t("klassenarbeit.auswertungGesamt"), "gesamt", true)}
-            {alleAnalysen && alleAnalysen.teile.map(([stufe, a]) => zeigeAuswertung(a, t("klassenarbeit.auswertungBlatt", { n: stufe }), stufe))}
           </>) : zeigeAuswertung(analyse)}
         </>
       )}
@@ -1919,7 +1938,6 @@ function AlleBlaetter({ blaetter, alleStudents, scale, t }) {
               <th style={{ ...thBase, textAlign: "left" }}>{t("common.name")}</th>
               <th style={thBase}>{t("klassenarbeit.blattSpalte")}</th>
               <th style={thBase}>{t("klassenarbeit.points")}</th>
-              <th style={thBase}>%</th>
               <th style={thBase}>{t("klassenarbeit.grade")}</th>
             </tr>
           </thead>
@@ -1927,9 +1945,8 @@ function AlleBlaetter({ blaetter, alleStudents, scale, t }) {
             {zeilen.map((z) => (
               <tr key={`${z.stufe}-${z.id}`} style={z.pct == null ? { opacity: 0.5 } : undefined}>
                 <td style={{ ...tdBase, textAlign: "left", fontWeight: 500 }}>{z.name}</td>
-                <td style={{ ...tdBase, textAlign: "center" }}><span style={chipStyle}>{z.stufe}</span></td>
+                <td style={{ ...tdBase, textAlign: "center" }}><span style={chipStyle}>{t("klassenarbeit.kursNiveau", { n: z.stufe })}</span></td>
                 <td style={{ ...tdBase, textAlign: "center" }}>{z.pct == null ? (z.abw ? t("klassenarbeit.abwesendKurz") : "–") : `${kommaRund(z.erreicht, 2)} / ${komma(z.basis)}`}</td>
-                <td style={{ ...tdBase, textAlign: "center" }}>{z.pct == null ? "" : `${Math.round(z.pct)}%`}</td>
                 <td style={{ ...tdBase, textAlign: "center", fontWeight: 700 }}>{z.note || ""}</td>
               </tr>
             ))}
