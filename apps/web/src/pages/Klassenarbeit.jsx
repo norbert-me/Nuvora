@@ -495,7 +495,7 @@ export function wdhZuteilen(bogen, pool, byId) {
     }
     return [];
   };
-  const fehlend = new Set();
+  const fehlend = new Map();   // topic (oder Label) -> { topic, thema }
   const out = bogen.map((b, k) => {
     const themen = new Map();
     (b.wdh || []).forEach((x) => {
@@ -516,11 +516,11 @@ export function wdhZuteilen(bogen, pool, byId) {
           operator: ex.operator || "",
         } });
       }
-      if (!n) fehlend.add(g.thema || "–");
+      if (!n) fehlend.set(g.topic ?? g.thema, { topic: g.topic, thema: g.thema || "–" });
     });
     return { ...b, wdhAufgaben };
   });
-  out.fehlend = [...fehlend];
+  out.fehlend = [...fehlend.values()];
   return out;
 }
 
@@ -1137,8 +1137,14 @@ export default function Klassenarbeit() {
     const res = await fetch("/api/lernpfad/exercises").catch(() => null);
     setPoolVorab(res && res.ok ? await res.json() : []);
   };
-  const wdhFehlt = useMemo(() => (poolVorab ? wdhZuteilen(druckBogenRoh, poolVorab, themen.byId).fehlend : []),
-    [poolVorab, druckBogenRoh, topics]);
+  // Je fehlendem Thema: Klasse/Fach und der Pfad Ober- › Unterthema — als
+  // Fliesstext liess sich „Kl. 6" nicht von „Kl. 7" unterscheiden.
+  const wdhFehlt = useMemo(() => (poolVorab ? wdhZuteilen(druckBogenRoh, poolVorab, themen.byId).fehlend : []).map((f) => {
+    const tp = f.topic != null ? themen.byId.get(f.topic) : null;
+    const ober = tp && tp.parent_id ? themen.byId.get(tp.parent_id) : null;
+    const kopf = tp ? [tp.fach || ober?.fach, (tp.jahrgang || ober?.jahrgang) ? `Kl. ${tp.jahrgang || ober?.jahrgang}` : ""].filter(Boolean).join(" · ") : "";
+    return { kopf, pfad: tp ? (ober ? `${mitNummer(ober)} › ${mitNummer(tp)}` : mitNummer(tp)) : f.thema };
+  }), [poolVorab, druckBogenRoh, topics]);
   const bogenDrucken = async (teile) => {
     setBogenWahl(false);
     const pool = teile.includes("wdh") && lernpfadAktiv ? (poolVorab || []) : null;

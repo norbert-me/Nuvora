@@ -16,13 +16,16 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
-- Waage: **Umformen per Drag and Drop** — ein Teil von der Schale wegziehen
-  nimmt es weg (die Waage kippt schon beim Ziehen als Vorschau), Teiler-Chips
-  (: 2 … : 10) zieht man auf die Waage. Kein Eingabefeld mehr.
+- Waage: **Umformen per Drag and Drop** — ein Teil auf den Mülleimer ziehen
+  (er erscheint beim Ziehen) löscht es, auf die andere Schale legt es hinüber,
+  anderswo kehrt es zurück; die Waage zeigt schon beim Ziehen, was passiert.
+  **Teilen ist dasselbe Wegnehmen**: von 3x = 12 zwei x und acht Einer weg
+  ergibt „| : 3“ im Lösungsweg. Keine Eingabefelder, keine Knöpfe.
 - Körper: **die Drehrichtung folgt dem Finger** — nach links ziehen dreht die
   Vorderseite nach links (vorher gespiegelt, auch bei den Pfeilen).
-- Rückmeldebogen: Themen ohne Lernpfad-Aufgabe stehen als **Hinweis im
-  Dialog**, statt den Druck mit einer Rückfrage aufzuhalten.
+- Rückmeldebogen: Themen ohne Lernpfad-Aufgabe stehen als **hervorgehobener
+  Kasten im Dialog** — je Thema eine Zeile mit Fach und Klasse vorn und dem
+  Pfad Ober- › Unterthema —, statt den Druck mit einer Rückfrage aufzuhalten.
 - Lernpfad: **Themenfilter zeigt Fach, Klasse und Nummer** („Mathematik ·
   Kl. 7 · 1 Rechnen mit Brüchen“), Unterthemen mit Nummer, sortiert nach
   Nummer. Gefiltert wird nach dem Thema selbst, nicht nach dem Namen —

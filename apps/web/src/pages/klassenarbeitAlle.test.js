@@ -136,7 +136,7 @@ describe("Klassenarbeit: Wiederholung aus dem Lernpfad", () => {
     // Kind A: Thema 11 bei 25 % → 2 Aufgaben; Kind B: 0 % → 3
     expect(b[0].wdhAufgaben).toHaveLength(2);
     expect(b[1].wdhAufgaben.filter((x) => x.ex)).toHaveLength(3);
-    expect(b.fehlend).toEqual(["Thema 12"]);   // zu Thema 12 nichts — kein Original
+    expect(b.fehlend.map((f) => f.thema)).toEqual(["Thema 12"]);   // zu Thema 12 nichts — kein Original
     const nachName = wdhZuteilen(A.bogen, [{ id: 300, topic_id: 99, aufgabentext: "z" }], byId);
     expect(nachName[0].wdhAufgaben[0].ex.id).toBe(300);
     const mitEltern = wdhZuteilen(A.bogen, [{ id: 200, topic_id: 2, aufgabentext: "y" }], byId);

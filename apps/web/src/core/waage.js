@@ -94,6 +94,15 @@ export function ablesen(vorher, nachher) {
     if (dlx === 0 && dle !== 0) return { art: dle > 0 ? "+e" : "-e", n: Math.abs(dle) };
     if (dle === 0 && dlx !== 0) return { art: dlx > 0 ? "+x" : "-x", n: Math.abs(dlx) };
   }
+  // Geteilt: jede Sorte ist genau der k-te Teil von vorher. Per Ziehen heisst
+  // das: von 3x = 12 zwei x und acht Einer wegnehmen — es bleibt ein Drittel.
+  const v = [vorher.l.x, vorher.l.e, vorher.r.x, vorher.r.e];
+  const w = [nachher.l.x, nachher.l.e, nachher.r.x, nachher.r.e];
+  const basis = v.findIndex((z, i) => w[i] > 0);
+  if (basis >= 0 && v[basis] % w[basis] === 0) {
+    const k = v[basis] / w[basis];
+    if (k >= 2 && v.every((z, i) => z === w[i] * k)) return { art: ":", n: k };
+  }
   return { art: "frei" };
 }
 

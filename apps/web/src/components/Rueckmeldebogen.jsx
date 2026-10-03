@@ -92,8 +92,15 @@ export function BogenWahl({ onDrucken, onClose, mitWdh = true, wdhFehlt = [] }) 
               onChange={(an) => setTeile((l) => (an ? BOGEN_TEILE.filter((x) => x === k || l.includes(x)) : l.filter((x) => x !== k)))} />
             {/* Ein Hinweis, keine Rueckfrage: zu diesen Themen bleibt der Abschnitt leer. */}
             {k === "wdh" && teile.includes("wdh") && wdhFehlt.length > 0 && (
-              <div style={{ fontSize: 12, color: "var(--text3)", margin: "4px 0 0 46px", lineHeight: 1.4 }}>
-                {t("bogen.wdhFehlt", { themen: wdhFehlt.join(", ") })}
+              <div style={{ margin: "8px 0 4px", padding: "8px 12px", borderRadius: CONTROL_R, fontSize: 13, lineHeight: 1.4,
+                background: `color-mix(in srgb, ${C.warning} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${C.warning} 45%, transparent)` }}>
+                <div style={{ fontWeight: 700, marginBottom: 4, color: C.warning }}>{t("bogen.wdhFehltTitel")}</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {wdhFehlt.map((f, i) => (
+                    <li key={i}>{f.kopf && <b>{f.kopf}: </b>}{f.pfad}</li>
+                  ))}
+                </ul>
+                <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("bogen.wdhFehltFolge")}</div>
               </div>
             )}
           </div>

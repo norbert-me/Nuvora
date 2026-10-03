@@ -42,6 +42,8 @@ describe("Waage: Rechenkern", () => {
   it("liest Handgriffe ab", () => {
     expect(ablesen(s, stand(3, 0, 0, 12))).toEqual({ art: "-e", n: 2 });
     expect(ablesen(s, stand(2, 2, 0, 10))).toEqual({ art: "frei" });
+    expect(ablesen(stand(3, 0, 0, 12), stand(1, 0, 0, 4))).toEqual({ art: ":", n: 3 });
+    expect(ablesen(stand(4, 2, 0, 18), stand(2, 1, 0, 9))).toEqual({ art: ":", n: 2 });
   });
 
   it("Zufall liefert lösbare Gleichungen auf jeder Stufe", () => {

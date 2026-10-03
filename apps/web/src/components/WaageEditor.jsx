@@ -1,12 +1,13 @@
 // Die Waage — eine Gleichung zum Anfassen, umgeformt per Drag and Drop.
 //
-//   • Ein Teil von EINER Schale wegziehen: die Waage kippt — schon beim Ziehen
-//     als Vorschau. Erst wenn auf der anderen Seite dasselbe passiert, steht
-//     sie wieder gerade. Genau das ist der Gedanke hinter „auf beiden Seiten
-//     dasselbe tun“, und man sieht ihn, statt ihn zu lesen.
-//   • Teilen laesst sich nicht wegziehen: dafuer liegen Teiler-Chips (: 2,
-//     : 3 …) bereit, die man auf die Waage zieht. Auch hier zeigt die Waage
-//     beim Darueberziehen, wie es aussaehe.
+//   • Ein Teil ziehen: auf den Muelleimer (er erscheint nur waehrend des
+//     Ziehens) loescht es, auf die andere Schale legt es hinueber, anderswo
+//     losgelassen kehrt es zurueck. Die Waage zeigt schon beim Ziehen, was das
+//     Loslassen taete. Nimmt man nur auf einer Seite etwas, kippt sie — erst
+//     wenn auf der anderen Seite dasselbe passiert, steht sie wieder gerade.
+//   • Teilen ist dasselbe Wegnehmen: wer bei 3x = 12 zwei x und acht Einer
+//     wegnimmt, hat gedrittelt; steht die Waage dann gerade, steht „| : 3“ im
+//     Weg (core/waage.js: ablesen).
 // Keine Eingabefelder, keine Rechenknoepfe (Wunsch des Nutzers): die Kinder
 // lesen die Gleichung von der Waage ab und handeln an ihr.
 // Ein Schritt zaehlt erst, wenn die Waage wieder im Gleichgewicht ist; der Weg
@@ -16,19 +17,19 @@
 // bewegt ueber SVG-Attribute statt CSS-Transforms (Safari verrechnete sonst
 // die Trefferflaechen).
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { COLORS as C, CONTROL_R, btnSecondary, btnSmall, panelStyle } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { ablesen, geloest, gleich, gleichungText, kopie, loesung, neigung, opText, probeText, term, umformen, MAX_SCHRITTE } from "../core/waage.js";
+import { ablesen, geloest, gleich, gleichungText, kopie, loesung, neigung, opText, probeText, term, MAX_SCHRITTE } from "../core/waage.js";
 
 export const leererWeg = () => ({ schritte: [] });
 
 const FARBE_X = "#3b82f6";
 const FARBE_E = "#9ca3af";
 const FARBE_10 = "#f59e0b";
-const TEILER = [2, 3, 4, 5, 6, 7, 8, 9, 10];
-// Wie weit ein Teil von seiner Schale weg muss, damit es als weggenommen gilt.
-const WEG_ABSTAND = 115;
+// Ablageziele beim Ziehen: Muelleimer unter dem Drehpunkt, die Schalen.
+const MUELL = [300, 215];
+const MUELL_R = 46;
+const SCHALE_R = 105;
 
 // Was auf einer Schale liegt, als Teile: Päckchen, Zehner-Stangen, Einer.
 // Zehner nur ab 20 Einern — bei 14 will man die Einzelnen sehen und zählen.
@@ -105,25 +106,20 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
   const basis = arbeit || festerStand;
   const fertig = geloest(festerStand) && !arbeit;
 
-  // Geometrie: Drehpunkt in der Mitte, Balken ± 220, Schalen 150 darunter.
-  // Die Schalenmitten fuer den Abstand werden aus dem GERADEN Balken genommen
-  // — beim Kippen wanderten sie sonst unter dem Finger weg.
-  const schaleMitte = { l: [80, 170], r: [520, 170] };
 
-  // Vorschau: was waere, wenn jetzt losgelassen wuerde?
-  let vorschau = null, vorschauFehler = "";
-  if (zug && zug.typ === "teil") {
-    const neu = kopie(basis);
-    if (neu[zug.seite][zug.art] > 0) neu[zug.seite][zug.art] -= 1;
-    vorschau = neu;
-  } else if (zug && zug.typ === "teiler" && zug.ueber) {
-    const r = umformen(basis, ":", zug.n);
-    if (r.fehler) vorschauFehler = t(`waage.fehler.${r.fehler}`, { n: zug.n }); else vorschau = r.stand;
-  }
-  // Angezeigt wird beim Ziehen eines Teils immer der Stand OHNE es (es hängt
-  // ja am Finger); kippen tut die Waage aber erst, wenn es weit genug weg ist.
-  const anzeige = vorschau || basis;
-  const kippStand = zug && zug.typ === "teil" && !zug.weg ? basis : anzeige;
+  // Vorschau: was waere, wenn jetzt losgelassen wuerde? `ziel` ist "muell",
+  // die andere Schale ("l"/"r") oder null (zurueck an den Platz).
+  const ohne = (st) => { const neu = kopie(st); if (zug && neu[zug.seite][zug.art] > 0) neu[zug.seite][zug.art] -= 1; return neu; };
+  const ergebnis = (z) => {
+    if (!z) return basis;
+    if (z.ziel === "muell") return ohne(basis);
+    if (z.ziel === "l" || z.ziel === "r") { const neu = ohne(basis); neu[z.ziel][z.art] += 1; return neu; }
+    return basis;
+  };
+  // Angezeigt wird beim Ziehen der Stand OHNE das Teil (es hängt am Finger),
+  // auf der Zielschale schon mit ihm; gekippt wird nach dem Ergebnis.
+  const anzeige = zug ? (zug.ziel === "l" || zug.ziel === "r" ? ergebnis(zug) : ohne(basis)) : basis;
+  const kippStand = ergebnis(zug);
   const kipp = xWahr == null ? 0 : neigung(kippStand, xWahr);
 
   const festhalten = (neu, op, hand = false) => {
@@ -133,10 +129,7 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
     setFehler("");
   };
 
-  const nehmen = (seite, art) => {
-    const neu = kopie(basis);
-    neu[seite][art] -= 1;
-    if (neu[seite][art] < 0) return;
+  const aendern = (neu) => {
     setFehler("");
     // Wieder im Gleichgewicht und anders als vorher: das ist ein Schritt.
     if (xWahr != null && neigung(neu, xWahr) === 0 && !gleich(neu, festerStand)) {
@@ -147,7 +140,10 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
         const davor = schritte.length > 1 ? schritte[schritte.length - 2] : start;
         const zusammen = ablesen(davor, neu);
         const einzeln = ablesen(festerStand, neu);
-        if (zusammen.art !== "frei" && zusammen.art === einzeln.art) {
+        // Zusammenlegen, wenn beide Griffe zusammen eine Umformung ergeben:
+        // gleiche Art (− 1, − 1 → − 2), ein Teilen (über einen Zwischenstand
+        // „2x = 8" bis „x = 4" → : 3) oder der vorige Griff war unbestimmt.
+        if (zusammen.art !== "frei" && (zusammen.art === einzeln.art || zusammen.art === ":" || letzter.op === "frei")) {
           onChange({ schritte: [...schritte.slice(0, -1), { l: neu.l, r: neu.r, op: opText(zusammen.art, zusammen.n), hand: true }] });
           setArbeit(null);
           return;
@@ -160,13 +156,6 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
     setArbeit(gleich(neu, festerStand) ? null : neu);
   };
 
-  const teilen = (n) => {
-    if (arbeit) { setFehler(t("waage.erstGerade")); return; }
-    const r = umformen(festerStand, ":", n);
-    if (r.fehler) { setFehler(t(`waage.fehler.${r.fehler}`, { n })); return; }
-    festhalten(r.stand, opText(":", n));
-  };
-
   // ── Ziehen: ein Zeiger, verfolgt am Dokument (der Finger verlaesst das Teil) ──
   const svgPunkt = (cx, cy) => {
     const svg = svgRef.current;
@@ -175,39 +164,32 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
     const q = p.matrixTransform(svg.getScreenCTM().inverse());
     return [q.x, q.y];
   };
-  const ueberWaage = (cx, cy) => {
-    const r = svgRef.current?.getBoundingClientRect();
-    return !!r && cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
-  };
   const zugRef = useRef(null);
   zugRef.current = zug;
   // Was der Zug beim Bewegen und Loslassen braucht, steht in einem Ref: der
   // Effekt haengt nur daran, OB gezogen wird, nicht an jedem Render.
   const helfer = useRef(null);
-  helfer.current = { svgPunkt, ueberWaage, nehmen, teilen, schaleMitte };
+  helfer.current = { svgPunkt, aendern, ergebnis, schaleMitte: () => schaleMitteJetzt };
   const aktiv = zug ? zug.id : null;
   useEffect(() => {
     if (aktiv == null) return undefined;
-    const { svgPunkt: punkt, ueberWaage: ueber } = helfer.current;
+    const punkt = (x, y) => helfer.current.svgPunkt(x, y);
     const bewegen = (e) => {
       const z = zugRef.current; if (!z || e.pointerId !== z.id) return;
       e.preventDefault();
       const [sx, sy] = punkt(e.clientX, e.clientY);
       const neu = { ...z, cx: e.clientX, cy: e.clientY, sx, sy };
-      if (z.typ === "teil") {
-        const [mx, my] = helfer.current.schaleMitte[z.seite];
-        neu.weg = Math.hypot(sx - mx, sy - my) > WEG_ABSTAND;
-      } else {
-        neu.ueber = ueber(e.clientX, e.clientY);
-      }
+      const mitten = helfer.current.schaleMitte();
+      const anders = z.seite === "l" ? "r" : "l";
+      neu.ziel = Math.hypot(sx - MUELL[0], sy - MUELL[1]) < MUELL_R ? "muell"
+        : Math.hypot(sx - mitten[anders][0], sy - mitten[anders][1]) < SCHALE_R ? anders : null;
       setZug(neu);
     };
     const loslassen = (e) => {
       const z = zugRef.current; if (!z || e.pointerId !== z.id) return;
       setZug(null);
       if (e.type === "pointercancel") return;   // iOS nimmt den Finger: nichts tun
-      if (z.typ === "teil" && z.weg) helfer.current.nehmen(z.seite, z.art);
-      if (z.typ === "teiler" && z.ueber) helfer.current.teilen(z.n);
+      if (z.ziel) helfer.current.aendern(helfer.current.ergebnis(z));
     };
     window.addEventListener("pointermove", bewegen, { passive: false });
     window.addEventListener("pointerup", loslassen);
@@ -223,12 +205,7 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
     e.preventDefault();
     const [sx, sy] = svgPunkt(e.clientX, e.clientY);
     setFehler("");
-    setZug({ typ: "teil", seite, art, g, id: e.pointerId, cx: e.clientX, cy: e.clientY, sx, sy, weg: false });
-  };
-  const greifenTeiler = (n) => (e) => {
-    e.preventDefault();
-    setFehler("");
-    setZug({ typ: "teiler", n, id: e.pointerId, cx: e.clientX, cy: e.clientY, ueber: false });
+    setZug({ typ: "teil", seite, art, g, id: e.pointerId, cx: e.clientX, cy: e.clientY, sx, sy, ziel: null });
   };
 
   const zurueck = () => {
@@ -242,6 +219,9 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
   const ende = (dx) => [300 + dx * Math.cos(winkel), 60 + dx * Math.sin(winkel)];
   const [lx, ly] = ende(-220);
   const [rx, ry] = ende(220);
+  // Mitten der Schalen fuer die Ablage — aus der gezeichneten Lage, damit das
+  // Ziel dort ist, wo man es sieht.
+  const schaleMitteJetzt = { l: [lx, ly + 110], r: [rx, ry + 110] };
   const protokoll = protokollZeilen(start, schritte);
   const bedienbar = !lesen && !fertig;
 
@@ -256,8 +236,7 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
         </div>
       )}
       <svg ref={svgRef} viewBox="0 0 600 300" role="img" aria-label={t("waage.titel")}
-        style={{ width: "100%", maxHeight: 340, display: "block", touchAction: "none", overflow: "visible",
-          outline: zug && zug.typ === "teiler" && zug.ueber ? `3px dashed ${vorschauFehler ? C.danger : C.success}` : "none", borderRadius: CONTROL_R }}>
+        style={{ width: "100%", maxHeight: 340, display: "block", touchAction: "none", overflow: "visible" }}>
         <path d="M 300 60 L 270 290 L 330 290 Z" fill="#9ca3af" />
         <rect x={230} y={286} width={140} height={8} rx={4} fill="#6b7280" />
         <g transform={`rotate(${grad} 300 60)`}>
@@ -268,8 +247,27 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
         <Schale seite={anzeige.r} cx={rx} cy={ry + 150} lesen={!bedienbar} onGreifen={greifenTeil("r")} t={t} />
         {/* Das gezogene Teil unter dem Finger — blass, solange es noch über
             seiner Schale ist (Loslassen legt es zurück). */}
-        {zug && zug.typ === "teil" && (
-          <g transform={`translate(${zug.sx} ${zug.sy})`} opacity={zug.weg ? 1 : 0.55} pointerEvents="none">
+        {/* Waehrend des Ziehens: die andere Schale leuchtet als Ziel, darunter
+            der Muelleimer. Ausserhalb eines Zugs gibt es beides nicht. */}
+        {zug && (() => {
+          const anders = zug.seite === "l" ? "r" : "l";
+          const [ax, ay] = schaleMitteJetzt[anders];
+          return (
+            <g pointerEvents="none">
+              <ellipse cx={ax} cy={ay + 25} rx={108} ry={70} fill={zug.ziel === anders ? "rgba(46,134,171,0.15)" : "none"}
+                stroke="rgba(46,134,171,0.7)" strokeWidth={2} strokeDasharray="6 5" />
+              <g transform={`translate(${MUELL[0]} ${MUELL[1]})`}>
+                <circle r={MUELL_R - 8} fill={zug.ziel === "muell" ? C.danger : "#fff"} stroke={C.danger} strokeWidth={2.5} />
+                <g stroke={zug.ziel === "muell" ? "#fff" : C.danger} strokeWidth={2.2} fill="none" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M -13 -9 H 13" /><path d="M -5 -9 V -13 H 5 V -9" />
+                  <path d="M -10 -9 L -8 14 H 8 L 10 -9" /><path d="M -3 -3 V 9 M 3 -3 V 9" />
+                </g>
+              </g>
+            </g>
+          );
+        })()}
+        {zug && (
+          <g transform={`translate(${zug.sx} ${zug.sy})`} opacity={zug.ziel ? 1 : 0.6} pointerEvents="none">
             <TeilBild art={zug.art} n={1} g={zug.g} />
           </g>
         )}
@@ -280,18 +278,6 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
           {arbeit && !zug && (
             <div style={{ fontSize: 14, color: C.warning, textAlign: "center", fontWeight: 600, margin: "4px 0 8px" }}>{t("waage.kippt")}</div>
           )}
-          {vorschauFehler && (
-            <div style={{ fontSize: 14, color: C.danger, textAlign: "center", fontWeight: 600, margin: "4px 0 8px" }}>{vorschauFehler}</div>
-          )}
-          {/* Teiler zum Ziehen — die Zahl steht auf dem Chip, keine Eingabe. */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", justifyContent: "center", margin: "8px 0" }}>
-            <span style={{ fontSize: 13, color: "var(--text2)" }}>{t("waage.teilen")}</span>
-            {TEILER.map((k) => (
-              <span key={k} onPointerDown={greifenTeiler(k)} title={t("waage.teilerZiehen")}
-                style={{ ...btnSecondary, ...btnSmall, minWidth: 44, textAlign: "center", cursor: "grab", touchAction: "none",
-                  fontVariantNumeric: "tabular-nums", opacity: zug && zug.typ === "teiler" && zug.n === k ? 0.35 : 1 }}>: {k}</span>
-            ))}
-          </div>
           {fehler && <div style={{ fontSize: 13, color: C.danger, textAlign: "center", marginBottom: 8 }}>{fehler}</div>}
           <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 8 }}>
             <button onClick={zurueck} disabled={!arbeit && !schritte.length} style={{ ...btnSecondary, ...btnSmall }}>{t("waage.zurueck")}</button>
@@ -307,14 +293,6 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
           <button onClick={zurueck} style={{ ...btnSecondary, ...btnSmall }}>{t("waage.zurueck")}</button>
         </div>
-      )}
-
-      {/* Der Teiler-Chip unter dem Finger (am body, sonst sperrt ein
-          transform/overflow weiter oben das position: fixed ein). */}
-      {zug && zug.typ === "teiler" && typeof document !== "undefined" && createPortal(
-        <div style={{ position: "fixed", left: zug.cx, top: zug.cy, transform: "translate(-50%, -50%)", pointerEvents: "none", zIndex: 2000,
-          ...btnSecondary, ...btnSmall, background: "var(--card)", boxShadow: "0 4px 14px rgba(0,0,0,0.25)" }}>: {zug.n}</div>,
-        document.body,
       )}
 
       {/* Der Lösungsweg — erst nach dem Lösen; vorher wäre er die Lösung zum Abschreiben. */}
