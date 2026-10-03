@@ -322,11 +322,13 @@ class Kurs(Versioniert, Base):
     # Fach des Kurses — das Gegenstueck zu `topics.fach`. Erst dadurch ist
     # „die Themen dieses Kurses" eine Abfrage und kein Namensraten (der Name
     # ist frei, „Mathe 7.5" genauso wie „M7b" oder „Mathe Gruppe rot").
-    # Einen JAHRGANG traegt der Kurs NICHT mehr (10.09.2026): das Schuljahr
-    # sagt bereits, um welchen es geht, und zwei Angaben ueber dieselbe Sache
-    # laufen auseinander. Die Spalte bleibt in der Datenbank stehen — geloescht
-    # wird hier nichts —, das Modell kennt sie nur nicht mehr.
     fach: Mapped[str] = mapped_column(String(60), default="", server_default="")
+    # Die STUFE des Kurses („7", „9", „7/8"), Gegenstueck zu `topics.jahrgang`.
+    # Am 10.09.2026 entfernt („das Schuljahr sagt es"), am 03.10.2026 auf
+    # Wunsch zurueck: das Schuljahr sagt WANN, nicht welche Stufe — und erst mit
+    # Fach UND Stufe zeigt eine Themenauswahl die Themen dieses Kurses statt
+    # aller Mathe-Themen von 5 bis 10. Text wie am Thema (Kombistufen).
+    jahrgang: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default="")
     # Farbe des Kurses (Stundenplan/Kalender). Die Fach-Klassen teilen sie sich —
     # darum am Kurs, nicht je Klasse.
     color: Mapped[str] = mapped_column(String(9), default="", server_default="")

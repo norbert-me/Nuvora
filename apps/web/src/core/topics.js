@@ -106,3 +106,37 @@ export function useThemen() {
   useEffect(() => { hol("/api/topics").then((d) => setTopics(Array.isArray(d) ? d : [])); }, []);
   return topics;
 }
+
+
+// Die Themen EINES Kurses — nach Fach und Stufe des Kurses. Eine Quelle fuer
+// alle Auswahllisten, die einen Kurs kennen (Klassenarbeitstermin, Kalender-
+// eintrag, Notenspalte, Aufgabe der Klassenarbeit): ein Informatikkurs der 9
+// soll Informatik 9 sehen, nicht 60 Themen aus allen Faechern und Stufen.
+//   • Fach: muss passen (Freitext, „Info" passt zu „Informatik"); ein Thema
+//     ohne Fach faellt heraus, sobald der Kurs eines hat.
+//   • Stufe: passt, wenn sie sich ueberschneidet („7/8" passt zu 7 und 8);
+//     ein Thema OHNE Stufe bleibt stehen — es gilt fuer alle.
+// Fach und Stufe stehen am Oberthema, Unterthemen erben sie. Was schon
+// gewaehlt ist, bleibt immer drin; kommt gar nichts heraus, gilt die volle
+// Liste (ein Kurs ohne passende Themen soll nicht vor einer leeren Wahl stehen).
+export function fachPasst(a, b) {
+  const x = (a || "").trim().toLowerCase(), y = (b || "").trim().toLowerCase();
+  if (!x || !y) return true;
+  return x === y || x.startsWith(y) || y.startsWith(x);
+}
+const stufen = (v) => new Set(String(v || "").split(/[^0-9]+/).filter(Boolean));
+export function stufePasst(a, b) {
+  const x = stufen(a), y = stufen(b);
+  if (!x.size || !y.size) return true;
+  return [...x].some((s) => y.has(s));
+}
+export function themenFuerKurs(idx, kurs, gewaehlt = []) {
+  const fach = (kurs && kurs.fach) || "", stufe = (kurs && kurs.jahrgang) || "";
+  if (!fach && !stufe) return idx.geordnet;
+  const behalten = new Set((gewaehlt || []).map(Number));
+  const eff = (tp, feld) => tp[feld] || (tp.parent_id ? (idx.byId.get(tp.parent_id) || {})[feld] : "") || "";
+  const raus = idx.geordnet.filter((tp) => behalten.has(tp.id) || (
+    (!fach || (eff(tp, "fach") && fachPasst(eff(tp, "fach"), fach)))
+    && (!stufe || stufePasst(eff(tp, "jahrgang"), stufe))));
+  return raus.length ? raus : idx.geordnet;
+}

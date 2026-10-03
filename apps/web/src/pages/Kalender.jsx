@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "rea
 import { askChoice, askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, Segment, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, pageApp, Popover } from "../components/Icons.jsx";
-import { themenIndex } from "../core/topics.js";
+import { themenFuerKurs, themenIndex } from "../core/topics.js";
 import ThemenWahl from "../components/ThemenWahl.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
 import Zeitleiste from "../components/Zeitleiste.jsx";
@@ -1025,7 +1025,7 @@ export default function Kalender() {
       )}
       {view === "timetable" && <TimetableView tt={tt} bearbeiten={bearbeiten} entwurfRef={ttEntwurf} onOffen={setTtOffen} stichtag={stichtag} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
-      {editing && <EntryModal entry={editing} zeiten={tt.times || []} zeroZeit={tt.zero || null} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
+      {editing && <EntryModal entry={editing} zeiten={tt.times || []} zeroZeit={tt.zero || null} classes={classes} kurse={kurse} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
         <Modal onClose={() => setAbo(null)} width={500} label={t("kalender.subscribeTitle")}>
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>{t("kalender.subscribeTitle")}</h3>
@@ -2037,7 +2037,7 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
     const eigene = d ? stundenAm(d, kid, cid) : [];
     return eigene.length ? eigene : pOpts;
   };
-  const fachVon = (kid) => (kurse.find((k) => k.id === kid) || {}).fach || "";
+  const kursVon = (kid) => kurse.find((k) => k.id === kid) || null;
   useEffect(() => {
     if (period !== "" || !date) return;
     const eigene = stundenAm(date, kursId, classId === "" ? null : Number(classId));
@@ -2113,7 +2113,7 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
         {/* Worüber wird geschrieben? Die Themen kommen aus dem Kern (Regel 3:
             der Kalender zeigt auf sie, besitzt sie nicht). Freiwillig — ein
             Termin ohne Themen ist ein vollständiger Termin. */}
-        <ThemenWahl topics={topics} value={themen} onChange={setThemen} fach={fachVon(kursId)} />
+        <ThemenWahl topics={topics} value={themen} onChange={setThemen} kurs={kursVon(kursId)} />
         {period && (
           <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}
             title={t("kalender.examErsetztHint")}>
@@ -2155,7 +2155,7 @@ function ExamPanel({ overview, periods = 6, hatNull = false, aktiv = {}, topics 
                   {stundenFuer(eDate, eKursId, eClassId === "" ? null : Number(eClassId)).map((p) => <option key={p} value={p}>{stundeLabel(p, t)}</option>)}
                 </select>
                 <input value={eTitle} onChange={(ev) => setETitle(ev.target.value)} placeholder={t("kalender.examTitle")} style={{ ...toolbarInput, flex: 1, minWidth: 120 }} />
-                <ThemenWahl topics={topics} value={eThemen} onChange={setEThemen} fach={fachVon(eKursId)} />
+                <ThemenWahl topics={topics} value={eThemen} onChange={setEThemen} kurs={kursVon(eKursId)} />
                 {/* Die Notiz steht in der Bearbeiten-Zeile und nicht in der
                     Anlegen-Leiste: beim Anlegen kennt man meist nur Datum und
                     Bezeichnung, das Merkenswerte kommt spaeter dazu. */}
@@ -2438,7 +2438,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onRau
   );
 }
 
-function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, topicName = () => "", kursName = () => "", onSave, onDelete, onClose, t }) {
+function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, topicName = () => "", kursName = () => "", onSave, onDelete, onClose, t }) {
   const [title, setTitle] = useState(entry.title || "");
   const [notes, setNotes] = useState(entry.notes || "");
   const [verlauf, setVerlauf] = useState(Array.isArray(entry.verlaufsplan) ? entry.verlaufsplan : []);
@@ -2908,7 +2908,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, topics, meth
             Auswahl mehr — wer sein Thema kennt, tippt es. */}
         <SuchSelect value={topicId} onChange={setTopicId} style={{ width: "100%" }}
           leerLabel={`– ${t("kalender.noTopic")} –`}
-          optionen={themen.geordnet.map((tp) => ({ wert: tp.id, label: themen.auswahlLabel(tp) }))} />
+          optionen={themenFuerKurs(themen, kurse.find((k) => k.id === kursId), topicId ? [topicId] : []).map((tp) => ({ wert: tp.id, label: themen.auswahlLabel(tp) }))} />
         {aktiv.unterrichtsplanung && (
           <>
             <div style={lbl}>{t("kalender.method")}</div>

@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Kurse: **die Stufe ist zurück** (neben dem Fach, auch „7/8“). Mit Fach und
+  Stufe zeigen die Themenauswahlen nur noch die Themen dieses Kurses —
+  Klassenarbeitstermin, Kalendereintrag, Notenspalte und die Aufgaben der
+  Klassenarbeit. Themen ohne Stufe gelten für alle; schon Gewähltes bleibt.
 - Klassenarbeitstermin (Kalender): **Themen nur aus dem Fach des Kurses**
   (ein Informatikkurs sieht keine Bruchrechnung; „Themen aller Fächer zeigen“
   holt den Rest), **mit Nummer** und Klasse. **Stunde nach Stundenplan**: hat

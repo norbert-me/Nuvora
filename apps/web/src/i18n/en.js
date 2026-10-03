@@ -2429,6 +2429,7 @@ export default {
   "kurse.loadError": "Courses could not be loaded.",
   "kurse.editFach": "Subject",
   "kurse.raum": "Room",
+  "kurse.stufe": "Grade",
   "kurse.andere": "other …",
   "kurse.fachHint": "Links the course to topics of the same subject — the basis for the syllabus plan.",
   "trash.loadError": "The trash could not be loaded.",

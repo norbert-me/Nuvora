@@ -2430,6 +2430,7 @@ export default {
   "kurse.loadError": "No se pudieron cargar los cursos.",
   "kurse.editFach": "Asignatura",
   "kurse.raum": "Aula",
+  "kurse.stufe": "Curso",
   "kurse.andere": "otro …",
   "kurse.fachHint": "Conecta el curso con los temas de la misma asignatura — base del plan de contenidos.",
   "trash.loadError": "No se pudo cargar la papelera.",

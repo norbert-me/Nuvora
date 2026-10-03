@@ -12,29 +12,18 @@
 import { useState } from "react";
 
 import { Icon, ICONS, Popover, CONTROL_H, toolbarBtn } from "./Icons.jsx";
-import { mitNummer, themenIndex } from "../core/topics.js";
+import { mitNummer, themenFuerKurs, themenIndex } from "../core/topics.js";
 import { useLanguage } from "../i18n/index.jsx";
 
-// Gleiches Fach? Klein geschrieben, und „Info" passt zu „Informatik" — das
-// Fach ist Freitext, an Kurs und Thema verschieden abgekuerzt.
-export function fachPasst(a, b) {
-  const x = (a || "").trim().toLowerCase(), y = (b || "").trim().toLowerCase();
-  if (!x || !y) return true;
-  return x === y || x.startsWith(y) || y.startsWith(x);
-}
-
-export default function ThemenWahl({ topics, value = [], onChange, style, fach = "" }) {
+export default function ThemenWahl({ topics, value = [], onChange, style, kurs = null }) {
   const { t } = useLanguage();
   const [offen, setOffen] = useState(false);
   const [alle, setAlle] = useState(false);
   const idx = themenIndex(topics);
   const gewaehlt = new Set(value || []);
-  // Nur die Themen des Kurs-Fachs (ein Informatikkurs braucht keine
-  // Bruchrechnung). Fach steht am Oberthema; Unterthemen erben es. Was schon
-  // gewaehlt ist, bleibt immer sichtbar — sonst verschwaende es unbemerkt.
-  const fachVon = (tp) => tp.fach || (tp.parent_id ? idx.byId.get(tp.parent_id)?.fach : "") || "";
-  const gefiltert = !fach || alle ? idx.geordnet : idx.geordnet.filter((tp) => gewaehlt.has(tp.id) || fachPasst(fachVon(tp), fach) && !!fachVon(tp));
-  const liste = gefiltert.length ? gefiltert : idx.geordnet;
+  // Nur die Themen des Kurses (Fach und Stufe, core/topics.js) — „Themen aller
+  // Faecher zeigen" holt den Rest.
+  const liste = alle ? idx.geordnet : themenFuerKurs(idx, kurs, value);
 
   const um = (id) => {
     const naechste = new Set(gewaehlt);
@@ -73,7 +62,7 @@ export default function ThemenWahl({ topics, value = [], onChange, style, fach =
                 {!tp.parent_id && tp.jahrgang && <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)" }}>Kl. {tp.jahrgang}</span>}
               </label>
             ))}
-            {fach && liste !== idx.geordnet && (
+            {liste !== idx.geordnet && (
               <button type="button" onClick={() => setAlle(true)}
                 style={{ border: "none", background: "none", color: "var(--accent)", fontSize: 13, cursor: "pointer", padding: "6px 4px" }}>
                 {t("kalender.examTopicsAlle")}

@@ -2419,6 +2419,7 @@ export default {
   "kurse.loadError": "Die Kurse konnten nicht geladen werden.",
   "kurse.editFach": "Fach",
   "kurse.raum": "Raum",
+  "kurse.stufe": "Stufe",
   "kurse.andere": "andere …",
   "kurse.fachHint": "Verbindet den Kurs mit den Themen desselben Fachs — Grundlage für den Stoffverteilungsplan.",
   "trash.loadError": "Der Papierkorb konnte nicht geladen werden.",

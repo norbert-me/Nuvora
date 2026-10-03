@@ -12,7 +12,8 @@ import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { Boxplot, COLORS as C, CONTROL_R, DialogKopf, Empty, FOKUS_TON, FOKUS_TON_DECKEND, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
-import { themenIndex, useThemen } from "../core/topics.js";
+import { themenFuerKurs, themenIndex, useThemen } from "../core/topics.js";
+import { useKurs } from "../core/kurs.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
@@ -1322,6 +1323,7 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
   // Siehe core/topics.js: Beschriftung und Reihenfolge kommen von dort, damit
   // dieselbe Auswahl ueberall gleich heisst und gleich sortiert ist.
   const themen = themenIndex(topics);
+  const kursObj = useKurs(kursId);
   // Leerer Name ist erlaubt, WENN ein Datum dasteht: dann ist das Datum der
   // Name („09.02.26"). Vorher tat der Knopf in dem Fall gar nichts — man loescht
   // den Titel, tippt ein Datum und nichts passiert.
@@ -1369,7 +1371,7 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
             <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>{t("noten.colTopic")}</div>
             <SuchSelect value={topicId} onChange={setTopicId} leerLabel={t("noten.colTopicNone")}
               style={{ width: "100%" }}
-              optionen={themen.geordnet.map((tp) => ({ wert: String(tp.id), label: themen.label(tp) }))} />
+              optionen={themenFuerKurs(themen, kursObj, topicId ? [Number(topicId)] : []).map((tp) => ({ wert: String(tp.id), label: themen.label(tp) }))} />
           </div>
         )}
         {cat.topic_id && kartenAktiv && (

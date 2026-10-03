@@ -47,7 +47,7 @@ export default function Kurse() {
   // Jahresfolge: Schuljahr und der Kurs des Vorjahres. Die Daten bleiben
   // getrennt (Zeugnisnoten gelten je Schuljahr) — verbunden wird nur die Kette,
   // damit „6.5 Mathe" und „7.5 Mathe" nicht als zwei fremde Gruppen dastehen.
-  const LEER = { name: "", jahr: "", fach: "", raum: "", vorgaenger: "", niveauAktiv: false, archiviert: false, klassen: [] };
+  const LEER = { name: "", jahr: "", fach: "", stufe: "", raum: "", vorgaenger: "", niveauAktiv: false, archiviert: false, klassen: [] };
   const [kursBasis, setKursBasis] = useState(LEER);
   const kurs = useEntwurf(kursBasis, (w) => kursSpeichern(w));
   const kursUebernehmen = (stand) => { setKursBasis(stand); kurs.setz(stand); };
@@ -91,7 +91,7 @@ export default function Kurse() {
     if (kurs.geaendert && !window.confirm(t("speichern.verlassen"))) return;
     setEditKurs(k.id);
     kursUebernehmen({
-      name: k.name, jahr: k.schuljahr || "", fach: k.fach || "", raum: k.raum || "",
+      name: k.name, jahr: k.schuljahr || "", fach: k.fach || "", stufe: k.jahrgang || "", raum: k.raum || "",
       vorgaenger: k.vorgaenger_id ? String(k.vorgaenger_id) : "",
       niveauAktiv: !!k.niveau_aktiv, archiviert: archiv, klassen: k.classes.map((c) => c.id),
     });
@@ -112,7 +112,7 @@ export default function Kurse() {
     const name = w.name.trim();
     if (!name) return false;
     const koerper = { name, schuljahr: w.jahr === NEU ? "" : w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv,
-                      fach: (w.fach || "").trim(),
+                      fach: (w.fach || "").trim(), jahrgang: (w.stufe || "").trim(),
                       raum: (w.raum || "").trim() };
     if (!(await sende(`${API}/kurse/${k.id}`, alsJson("PUT", koerper), t("kurse.editName")))) return false;
     setKursBasis(w);
@@ -241,6 +241,15 @@ export default function Kurse() {
                       style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
                     <datalist id="nuvora-faecher-kurs">
                       {FACH_VORSCHLAEGE.map((f) => <option key={f} value={f} />)}
+                    </datalist>
+                    {/* Die Stufe — mit dem Fach zusammen „die Themen dieses
+                        Kurses": eine Themenwahl zeigt dann Informatik 9 statt
+                        aller Themen aller Stufen. Text wegen Kombistufen (7/8). */}
+                    <input list="nuvora-stufen-kurs" value={kurs.wert.stufe} maxLength={20}
+                      onChange={(e) => kurs.setz({ stufe: e.target.value })} placeholder={t("kurse.stufe")}
+                      title={t("kurse.stufe")} style={{ ...inputStyle, width: 90 }} />
+                    <datalist id="nuvora-stufen-kurs">
+                      {["5", "6", "7", "8", "9", "10", "11", "12", "13"].map((f) => <option key={f} value={f} />)}
                     </datalist>
                     {/* Der Stammraum. Am Kurs und nicht je Stundenplan-Stunde:
                         derselbe Kurs hat vier Stunden in der Woche und meist

@@ -298,7 +298,8 @@ def _ensure_columns(sync_conn):
         ("topics", "fach", "VARCHAR(60) DEFAULT '' NOT NULL"),   # Fach und Jahrgang am Thema …
         ("topics", "jahrgang", "VARCHAR(20)"),
         ("topics", "nummer", "VARCHAR(20) DEFAULT '' NOT NULL"),  # Nummer im Lehrplan
-        ("kurse", "fach", "VARCHAR(60) DEFAULT '' NOT NULL"),    # … und ihr Gegenstueck am Kurs
+        ("kurse", "fach", "VARCHAR(60) DEFAULT '' NOT NULL"),
+        ("kurse", "jahrgang", "VARCHAR(20)"),                     # Stufe des Kurses (zurueck seit 03.10.2026)    # … und ihr Gegenstueck am Kurs
         ("users", "is_admin", "BOOLEAN DEFAULT FALSE NOT NULL"),
         ("users", "hj1_start", "DATE"),        # Schuljahr: Halbjahre + Jahresende
         ("users", "hj2_start", "DATE"),
@@ -497,7 +498,7 @@ def _ensure_columns(sync_conn):
     # Ausführen ist ein No-op, weil die Spalte dann schon Text ist. Nur
     # Postgres — SQLite baut die Tabelle ohnehin frisch aus dem Modell.
     if sync_conn.dialect.name == "postgresql":
-        for table in ("topics",):
+        for table in ("topics", "kurse"):
             if table not in existing_tables:
                 continue
             typ = next((c["type"] for c in inspector.get_columns(table) if c["name"] == "jahrgang"), None)

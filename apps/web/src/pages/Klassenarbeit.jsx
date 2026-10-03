@@ -11,7 +11,8 @@ import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import Rueckmeldebogen, { BogenWahl } from "../components/Rueckmeldebogen.jsx";
-import { mitNummer, themenIndex, useThemen } from "../core/topics.js";
+import { mitNummer, themenFuerKurs, themenIndex, useThemen } from "../core/topics.js";
+import { useKurs } from "../core/kurs.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -764,8 +765,11 @@ export default function Klassenarbeit() {
   // dann in der Reihenfolge des Servers (position, name), also alphabetisch
   // nach dem UNTERthema: „… / 1 Kreis" landete zwischen fremden Oberthemen.
   const themen = themenIndex(topics);
+  const kursObj = useKurs(kursId);
   // Einmal je Render fuer alle Themen-Auswahlen (Aufgabe und Teilaufgabe).
-  const themenOptionen = themen.geordnet.map((tp) => ({ wert: String(tp.id), label: themen.label(tp) }));
+  // Nur die Themen dieses Kurses (Fach und Stufe); bereits vergebene bleiben.
+  const vergeben = (work?.tasks || []).flatMap((tk) => [tk.topic_id, ...((tk.parts || []).map((p) => p.topic_id))]).filter(Boolean);
+  const themenOptionen = themenFuerKurs(themen, kursObj, vergeben).map((tp) => ({ wert: String(tp.id), label: themen.label(tp) }));
   const topicLabel = (id) => themen.labelFuerId(id);
 
   // ── Ein Entwurf für die ganze Arbeit ──
