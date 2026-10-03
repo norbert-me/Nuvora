@@ -1534,8 +1534,6 @@ export default {
   "waage.zahl": "Zahl",
   "waage.zurueck": "Rückgängig",
   "waage.freiHinweis": "Hier wurde auf den Seiten Verschiedenes weggenommen — die Waage stimmt, aber es war nicht „auf beiden Seiten dasselbe“.",
-  "waage.legX": "Päckchen x",
-  "waage.legE": "Gewicht 1",
   "waage.stufe": "Stufe {{n}}",
   "waage.stufe1": "Stufe 1: x + b = d",
   "waage.stufe2": "Stufe 2: a·x = d",

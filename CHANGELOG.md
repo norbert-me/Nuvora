@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Waage: **ein gezogenes Teil hängt dort am Zeiger, wo man es gegriffen hat**,
+  und abgelegt wird nach der Lage des Teils — vorher sprang es mit seiner
+  Mitte unter den Zeiger, und der Zeiger stand auf dem Mülleimer, das Teil
+  daneben. Die Legende unter der Waage ist entfallen.
 - Rückmeldebogen: **Anzahl der Wiederholungsaufgaben anteilig** — je Thema
   so viele, wie fehlen (0 % ergibt das Maximum, mindestens eine), das
   Maximum wählt man im Dialog (1–5, am Konto gemerkt). Ohne Aufgabennummer,

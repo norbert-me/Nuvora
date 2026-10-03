@@ -79,7 +79,7 @@ function Schale({ seite, cx, cy, lesen, onGreifen, t }) {
         // nur Zehner liegen, und die Waage kaeme nie ins Lot.
         return (
           <g key={i} transform={`translate(${x} ${y})`} style={{ cursor: lesen ? "default" : "grab", touchAction: "none" }}
-            onPointerDown={lesen ? undefined : (e) => onGreifen(e, it.art, g)}>
+            onPointerDown={lesen ? undefined : (e) => onGreifen(e, it.art, g, [cx + x, cy + y])}>
             <title>{it.art === "x" ? t("waage.nimmX") : t("waage.nimmE", { n: 1 })}</title>
             <rect x={-zelle / 2} y={-zelle / 2} width={zelle} height={zelle} fill="transparent" />
             <TeilBild art={it.art} n={it.n} g={g} />
@@ -177,7 +177,8 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
     const bewegen = (e) => {
       const z = zugRef.current; if (!z || e.pointerId !== z.id) return;
       e.preventDefault();
-      const [sx, sy] = punkt(e.clientX, e.clientY);
+      const [px, py] = punkt(e.clientX, e.clientY);
+      const sx = px + z.dx, sy = py + z.dy;   // Mitte des Teils, nicht der Zeiger
       const neu = { ...z, cx: e.clientX, cy: e.clientY, sx, sy };
       const mitten = helfer.current.schaleMitte();
       const anders = z.seite === "l" ? "r" : "l";
@@ -201,11 +202,17 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
     };
   }, [aktiv]);
 
-  const greifenTeil = (seite) => (e, art, g) => {
+  const greifenTeil = (seite) => (e, art, g, [mx, my]) => {
     e.preventDefault();
     const [sx, sy] = svgPunkt(e.clientX, e.clientY);
+    // Wo im Teil gegriffen wurde: das Teil haengt an DIESER Stelle am Zeiger
+    // (nicht mit seiner Mitte), und abgelegt wird nach der Lage des TEILS —
+    // sonst stand der Zeiger auf dem Muelleimer, das Teil daneben, und es
+    // passierte nichts.
+    // Die Mitte kommt aus der Geometrie der Schale (SVG-Koordinaten), nicht
+    // aus getBoundingClientRect — das lag unter WebKit gut 40 px daneben.
     setFehler("");
-    setZug({ typ: "teil", seite, art, g, id: e.pointerId, cx: e.clientX, cy: e.clientY, sx, sy, ziel: null });
+    setZug({ typ: "teil", seite, art, g, id: e.pointerId, cx: e.clientX, cy: e.clientY, dx: mx - sx, dy: my - sy, sx: mx, sy: my, ziel: null });
   };
 
   const zurueck = () => {
@@ -298,10 +305,6 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
           <Protokoll zeilen={protokoll} t={t} />
         </div>
       )}
-      <div style={{ display: "flex", gap: 16, justifyContent: "center", fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, background: FARBE_X, marginRight: 4 }} />{t("waage.legX")}</span>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, background: FARBE_E, borderRadius: CONTROL_R, marginRight: 4 }} />{t("waage.legE")}</span>
-      </div>
     </div>
   );
 }

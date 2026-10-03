@@ -1552,8 +1552,6 @@ export default {
   "waage.zahl": "Número",
   "waage.zurueck": "Deshacer",
   "waage.freiHinweis": "Se quitaron cosas distintas en cada lado: la balanza está equilibrada, pero no fue «lo mismo en ambos lados».",
-  "waage.legX": "Caja x",
-  "waage.legE": "Pesa 1",
   "waage.stufe": "Nivel {{n}}",
   "waage.stufe1": "Nivel 1: x + b = d",
   "waage.stufe2": "Nivel 2: a·x = d",

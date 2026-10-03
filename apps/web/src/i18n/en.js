@@ -1551,8 +1551,6 @@ export default {
   "waage.zahl": "Number",
   "waage.zurueck": "Undo",
   "waage.freiHinweis": "Different things were removed on each side — the scale balances, but it wasn't “the same on both sides”.",
-  "waage.legX": "Box x",
-  "waage.legE": "Weight 1",
   "waage.stufe": "Level {{n}}",
   "waage.stufe1": "Level 1: x + b = d",
   "waage.stufe2": "Level 2: a·x = d",
