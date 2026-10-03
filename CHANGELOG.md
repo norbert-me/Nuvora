@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Klassenarbeit: **Gewichtung der Themen** unter den Aufgaben — Punkte und
+  Anteil je Thema, deutliche Abweichungen vom gleichen Anteil markiert.
 - **Notenbuch:** beim Eintragen sind Zeile und Spalte der offenen Zelle
   hervorgehoben (wie bei den Punkten der Klassenarbeit).
 - **Kalender:** ein abonnierter Termin über mehrere Tage wird beim Ausblenden

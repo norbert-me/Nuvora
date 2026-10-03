@@ -35,3 +35,22 @@ describe("Klassenarbeit: Auswertung Alle", () => {
     expect(a.noten.avgPct).toBe(63);   // (90 + 40 + 60) / 3
   });
 });
+
+import { themenGewichte } from "./Klassenarbeit.jsx";
+
+describe("Klassenarbeit: Gewichtung der Themen", () => {
+  it("Punkte je Thema aus den Teilaufgaben, ohne Darstellung", () => {
+    const gw = themenGewichte([
+      { id: "a", topic_id: 1, parts: [{ id: "a1", max: 4 }, { id: "a2", max: 4, topic_id: 2 }] },
+      { id: "b", max: 2, topic_id: 3 },
+      { id: "d", max: 5, form: true },
+    ]);
+    expect(gw.map((x) => [x.topic, x.punkte, Math.round(x.anteil)])).toEqual([[1, 4, 40], [2, 4, 40], [3, 2, 20]]);
+  });
+
+  it("markiert deutliche Abweichung vom gleichen Anteil", () => {
+    // drei Themen, gleich wären 33 %: 2 von 20 = 10 % ist zu wenig, 12 von 20 = 60 % zu viel
+    const gw = themenGewichte([{ id: "a", max: 12, topic_id: 1 }, { id: "b", max: 6, topic_id: 2 }, { id: "c", max: 2, topic_id: 3 }]);
+    expect(Object.fromEntries(gw.map((x) => [x.topic, x.abweichung]))).toEqual({ 1: "viel", 2: null, 3: "wenig" });
+  });
+});
