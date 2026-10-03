@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Einstiege** und **Tafel** sind keine Beta mehr.
 - **Feiertage und Ferien auf dem richtigen Tag:** ein freier Tag, der auf
   Mitternacht lag, stand im Handy-Kalender, auf der Startseite und bei der
   Anwesenheit einen Tag zu früh (z. B. Tag der Deutschen Einheit am 2.10.).

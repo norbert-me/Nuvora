@@ -296,7 +296,7 @@ REGISTRY: List[ModuleDef] = [
             "E/G-Anforderungen), nicht hier."
         ),
         path="/unterrichtsplanung",
-        stage="beta",
+        stage="stable",
     ),
     ModuleDef(
         key="notizbrett",
@@ -358,7 +358,7 @@ REGISTRY: List[ModuleDef] = [
             "Konto gespeichert und stehen damit auch am Rechner im Klassenraum."
         ),
         path="/tafel",
-        stage="beta",
+        stage="stable",
     ),
     ModuleDef(
         key="mathespiele",
