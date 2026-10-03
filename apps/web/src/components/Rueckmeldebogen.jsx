@@ -131,7 +131,9 @@ export function BogenWahl({ onDrucken, onClose, mitWdh = true, wdhFehlt = [] }) 
 }
 
 // Schrift eine Stufe groesser als am Bildschirm ueblich: die Boegen werden
-// oft zu zweit auf ein A4 gedruckt (verkleinert auf etwa 70 %).
+// oft zu zweit auf ein A4 gedruckt (verkleinert auf etwa 70 %). Und jedes
+// Blatt steht MITTIG auf seiner Seite (margin: auto): linksbuendig lag es auf
+// dem verkleinerten Doppelblatt einmal am Rand und einmal an der Mitte.
 export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv, lernpfadAktiv, teile = ALTE_TEILE }) {
   const an = (k) => teile.includes(k);
   const { t } = useLanguage();
@@ -142,7 +144,7 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
   return createPortal(
     <div className="druck-huelle" style={PAPIER}>
       {bogen.map((b) => (
-        <div key={b.student_id} className="druck-seite" style={{ ...PAPIER, padding: "24px 28px", maxWidth: 720 }}>
+        <div key={b.student_id} className="druck-seite" style={{ ...PAPIER, padding: "24px 28px", maxWidth: 720, margin: "0 auto", boxSizing: "border-box" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, borderBottom: "2px solid #111", paddingBottom: 8, marginBottom: 16 }}>
             <span style={{ fontSize: 22, fontWeight: 800 }}>{b.name}</span>
             <span style={{ fontSize: 14, color: "#444" }}>{titel || t("klassenarbeit.title")}</span>
