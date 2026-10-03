@@ -200,11 +200,22 @@ export default function Kalender() {
     await fetch(`${API}/external`, alsJson("PUT", { calendars: clean, mitschicken })).catch(() => {});
     setExtCals(clean); loadExt(true);
   };
-  // Ein externes Ereignis aus-/wieder einblenden (Schlüssel uid|Datum).
-  const hideExtEvent = async (key) => {
-    if (!key) return;
-    setExtEvents((evs) => evs.filter((e) => e.key !== key));  // sofort raus
-    await fetch(`${API}/external/hide`, alsJson("POST", { key })).catch(() => {});
+  // Ein externes Ereignis aus-/wieder einblenden (Schlüssel uid|Datum). Ein
+  // Termin ueber mehrere Tage hat je Tag einen eigenen Schluessel — er wird
+  // trotzdem als EINER geschaltet, sonst stand er nach dem Ausblenden an allen
+  // uebrigen Tagen weiter da.
+  const schluesselVon = (ev) => {
+    if (!ev || !ev.key) return [];
+    if (!ev.uid || !ev.start || !ev.end || ev.start >= ev.end) return [ev.key];
+    const keys = [];
+    for (let d = parseYmd(ev.start), n = 0; d && ymd(d) <= ev.end && n < 120; d = addDays(d, 1), n += 1) keys.push(`${ev.uid}|${ymd(d)}`);
+    return keys.length ? keys : [ev.key];
+  };
+  const hideExtEvent = async (ev) => {
+    const keys = schluesselVon(ev);
+    if (!keys.length) return;
+    setExtEvents((evs) => evs.filter((e) => !keys.includes(e.key)));  // sofort raus
+    await fetch(`${API}/external/hide`, alsJson("POST", { keys })).catch(() => {});
     loadHidden();
   };
   // Ausgeblendete fremde Termine MIT Titel und Datum — der Reiter zeigt sie,
@@ -213,8 +224,8 @@ export default function Kalender() {
   const loadHidden = useCallback(() => {
     hol(`${API}/external-hidden`).then((d) => setExtHiddenList(Array.isArray(d) ? d : []));
   }, []);
-  const unhideExtEvent = async (key) => {
-    await fetch(`${API}/external/unhide`, alsJson("POST", { key })).catch(() => {});
+  const unhideExtEvent = async (ev) => {
+    await fetch(`${API}/external/unhide`, alsJson("POST", { keys: schluesselVon(ev) })).catch(() => {});
     loadHidden();
     loadExt(true);
   };
@@ -616,7 +627,14 @@ export default function Kalender() {
   const ausgeblendet = (() => {
     const [a, b] = range;
     const von = ymd(a), bis = ymd(b);
-    const ext = (extHiddenList || []).filter((e) => e.date >= von && e.date <= bis);
+    // Ein mehrtaegiger Termin steht EINMAL in der Liste, nicht je Tag.
+    const gesehen = new Set();
+    const ext = (extHiddenList || []).filter((e) => e.date >= von && e.date <= bis).filter((e) => {
+      const id = e.uid && e.start && e.end && e.start < e.end ? `${e.uid}|${e.start}|${e.end}` : e.key;
+      if (gesehen.has(id)) return false;
+      gesehen.add(id);
+      return true;
+    });
     const stunden = (slotCancels || []).map((c) => {
       const d = new Date(c.date);
       const s = tt.slots.find((x) => x.weekday === wochentagMo0(d) && x.period === c.period && slotActiveOn(x, d));
@@ -1025,7 +1043,7 @@ export default function Kalender() {
         </Modal>
       )}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} kurse={kurse} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setSlotColor} onRaum={setKursRaum} onClose={() => setSlotEdit(null)} t={t} />}
-      {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} onHide={(k) => { hideExtEvent(k); setExtInfo(null); }} t={t} />}
+      {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} onHide={() => { hideExtEvent(extInfo); setExtInfo(null); }} t={t} />}
     </div>
   );
 }
@@ -1067,7 +1085,7 @@ function AusgeblendetModal({ ext, cancels, onExtBack, onSlotBack, onClose, t }) 
               geloescht oder der Feed abgemeldet. Er steht trotzdem hier, sonst
               liesse er sich nie wieder loswerden. */}
           {ext.map((e) => zeile(fmt(e.date), e.title || t("kalender.hiddenGone"),
-            !!e.verwaist, () => onExtBack(e.key), e.key))}
+            !!e.verwaist, () => onExtBack(e), e.key))}
         </div>
       )}
       <div style={{ marginTop: 16, textAlign: "right" }}>

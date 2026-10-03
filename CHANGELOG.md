@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Kalender:** ein abonnierter Termin über mehrere Tage wird beim Ausblenden
+  an allen Tagen ausgeblendet (und beim Zurückholen an allen wieder gezeigt).
 - **Einstiege** und **Tafel** sind keine Beta mehr.
 - **Feiertage und Ferien auf dem richtigen Tag:** ein freier Tag, der auf
   Mitternacht lag, stand im Handy-Kalender, auf der Startseite und bei der

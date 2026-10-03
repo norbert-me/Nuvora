@@ -99,3 +99,20 @@ async def test_ausgeblendete_liste_nennt_titel_und_verwaiste(s):
     verwaist = nach_key["gibtsnichtmehr|2026-01-01"]
     assert verwaist["verwaist"] is True
     assert verwaist["date"] == "2026-01-01"
+
+
+@pytest.mark.asyncio
+async def test_mehrtaegiger_termin_wird_als_einer_ausgeblendet(s):
+    # Je Tag ein Schluessel, aber EIN Handgriff: alle Tage auf einmal aus und
+    # wieder an. Vorher blieb der Termin an den uebrigen Tagen stehen.
+    from app.models import User
+    from app.routers.kalender import ExtHideIn, hide_external_event, unhide_external_event
+    u = User(email="mehrtag@b.de", password_hash="x", name="L"); s.add(u); await s.commit()
+    tage = ["fahrt|2026-10-05", "fahrt|2026-10-06", "fahrt|2026-10-07"]
+    await hide_external_event(ExtHideIn(keys=tage), user=u, db=s)
+    assert list(u.external_hidden) == tage
+    await unhide_external_event(ExtHideIn(keys=tage), user=u, db=s)
+    assert list(u.external_hidden) == []
+    # Der alte Weg mit einem einzelnen Schluessel bleibt gueltig.
+    await hide_external_event(ExtHideIn(key=tage[0]), user=u, db=s)
+    assert list(u.external_hidden) == [tage[0]]

@@ -2183,7 +2183,14 @@ class ExtCalsIn(BaseModel):
 
 
 class ExtHideIn(BaseModel):
-    key: str  # "uid|YYYY-MM-DD"
+    key: str = ""  # "uid|YYYY-MM-DD"
+    # Mehrere auf einmal: ein Termin ueber mehrere Tage hat je Tag einen
+    # Schluessel, wird aber als EINER aus- und eingeblendet.
+    keys: list[str] = []
+
+
+def _hide_keys(body: ExtHideIn) -> list:
+    return [k[:300] for k in ([body.key] if body.key else []) + list(body.keys or [])[:120] if k]
 
 
 def _ext_calendars(user: User) -> list:
@@ -2232,17 +2239,19 @@ async def set_external(body: ExtCalsIn, user: User = Depends(require_module), db
 
 @router.post("/external/hide", status_code=204)
 async def hide_external_event(body: ExtHideIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    """Ein einzelnes externes Ereignis ausblenden (Schlüssel uid|Datum)."""
+    """Ein externes Ereignis ausblenden (Schluessel uid|Datum) — bei einem
+    mehrtaegigen alle seine Tage auf einmal (`keys`)."""
     hid = list(user.external_hidden or [])
-    if body.key and body.key not in hid:
-        hid.append(body.key)
-        user.external_hidden = hid[:2000]
+    neu = [k for k in _hide_keys(body) if k not in hid]
+    if neu:
+        user.external_hidden = (hid + neu)[:2000]
         await db.commit()
 
 
 @router.post("/external/unhide", status_code=204)
 async def unhide_external_event(body: ExtHideIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    hid = [k for k in (user.external_hidden or []) if k != body.key]
+    weg = set(_hide_keys(body))
+    hid = [k for k in (user.external_hidden or []) if k not in weg]
     user.external_hidden = hid
     await db.commit()
 
