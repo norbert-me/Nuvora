@@ -211,6 +211,7 @@ def endpunkte(u):
             ("GET", "/api/tafel"),
         ],
         "mathespiele": [],
+        "koerper": [],
     }
 
 
@@ -241,6 +242,7 @@ def tore(u):
         "pap": [("GET", "/api/pap/aufgaben")],
         "tafel": [("GET", "/api/tafel")],
         "mathespiele": [],
+        "koerper": [],
     }
 
 
@@ -1331,6 +1333,7 @@ INHALT = {
     "pap": inhalt_pap,
     "tafel": inhalt_tafel,
     "mathespiele": None,
+    "koerper": None,
 }
 
 

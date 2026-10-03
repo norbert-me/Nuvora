@@ -43,6 +43,8 @@ export const MODULE_ICONS = {
   notizen: ["M6 4h8a1 1 0 011 1v11l-2.5-1.5L10 17l-2.5-1.5L5 17V5a1 1 0 011-1z", "M8 8h4", "M8 11h4"],
   klassenleitung: ["M7 4a2.5 2.5 0 100 5 2.5 2.5 0 000-5z", "M3 16c0-2.5 1.8-4 4-4s4 1.5 4 4", "M13 9h4", "M13 12h4", "M12 6h5a1 1 0 011 1v3"],
   mathespiele: ["M10 3a7 7 0 100 14 7 7 0 000-14z", "M10 6.5l2.5 1.8-1 3h-3l-1-3z"],
+  // Koerper: ein Quader in Schraegansicht.
+  koerper: ["M4 7l6-3 6 3v7l-6 3-6-3z", "M4 7l6 3 6-3", "M10 10v7"],
   tafel: ["M3 4h14v10H3z", "M7 8h6", "M7 11h4", "M8 17l2-3 2 3"],
   // PAP: die drei Formen des Ablaufplans untereinander — Oval (Start),
   // Raute (Verzweigung), Rechteck (Anweisung), verbunden.

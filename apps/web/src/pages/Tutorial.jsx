@@ -39,6 +39,7 @@ const BEREICHE = [
   { key: "notizbrett", ziel: "/notizbrett", modul: "notizbrett" },
   { key: "einstiege", ziel: "/unterrichtsplanung", modul: "unterrichtsplanung" },
   { key: "mathespiele", ziel: "/mathespiele", modul: "mathespiele" },
+  { key: "koerper", ziel: "/koerper", modul: "koerper" },
   { key: "codedetektiv", ziel: "/code-detektiv", modul: "code-detektiv" },
   // „Wohin mit dem alten Jahr?"
   { key: "jahresende", ziel: "/kurse" },

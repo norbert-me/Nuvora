@@ -355,6 +355,7 @@ const Orga = React.lazy(() => import("./pages/Orga.jsx"));
 const KlassenarbeitVergleich = React.lazy(() => import("./pages/Klassenarbeit.jsx").then((m) => ({ default: m.KlassenarbeitVergleich })));
 const Notizbrett = React.lazy(() => import("./pages/Notizbrett.jsx"));
 const Mathefussball = React.lazy(() => import("./pages/Mathefussball.jsx"));
+const Koerper = React.lazy(() => import("./pages/Koerper.jsx"));
 const Tafel = React.lazy(() => import("./pages/Tafel.jsx"));
 const Pap = React.lazy(() => import("./pages/Pap.jsx"));
 const Personen = React.lazy(() => import("./pages/Personen.jsx"));
@@ -422,6 +423,7 @@ function helpArea(pathname) {
   // Nicht startsWith("/pap") — das faengt auch /papierkorb, und der gehoert dem Kern.
   if (pathname === "/pap" || pathname.startsWith("/pap/")) return "pap";
   if (pathname.startsWith("/mathespiele")) return "mathespiele";
+  if (pathname.startsWith("/koerper")) return "koerper";
   return "core";
 }
 const LP = "/lernpfad";
@@ -435,6 +437,7 @@ const ORG = "/orga";
 const NOTIZBRETT = "/notizbrett";
 const PAP = "/pap";
 const MATHEF = "/mathespiele";
+const KOERPER = "/koerper";
 const TAFEL = "/tafel";
 
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
@@ -453,6 +456,7 @@ const getModuleNavItems = (t, location, user) => {
     : pathname.startsWith(ORG) ? "orga"
     : pathname.startsWith(NOTIZBRETT) ? "notizbrett"
     : pathname.startsWith(MATHEF) ? "mathespiele"
+    : pathname.startsWith(KOERPER) ? "koerper"
     : pathname.startsWith(TAFEL) ? "tafel"
     // Nicht startsWith("/pap") — das faengt auch /papierkorb (Kern).
     : (pathname === PAP || pathname.startsWith(`${PAP}?`) || pathname.startsWith(`${PAP}/`)) ? "pap"
@@ -524,6 +528,7 @@ const getModuleNavItems = (t, location, user) => {
     ];
   }
   if (area === "mathespiele") return [{ to: MATHEF, label: t("mathefussball.title") }];
+  if (area === "koerper") return [{ to: KOERPER, label: t("koerper.title") }];
   if (area === "tafel") return [{ to: TAFEL, label: t("tafel.title") }];
   if (area === "pap") {
     const cur = params.get("tab");
@@ -1188,6 +1193,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={ZUF} element={user ? <ModuleGate moduleKey="zufall"><Zufall /></ModuleGate> : <Landing />} />
           <Route path={NOTIZBRETT} element={user ? <ModuleGate moduleKey="notizbrett"><Notizbrett /></ModuleGate> : <Landing />} />
           <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathespiele"><Mathefussball /></ModuleGate> : <Landing />} />
+          <Route path={KOERPER} element={user ? <ModuleGate moduleKey="koerper"><Koerper /></ModuleGate> : <Landing />} />
           <Route path={TAFEL} element={user ? <ModuleGate moduleKey="tafel"><Tafel /></ModuleGate> : <Landing />} />
           <Route path={PAP} element={user ? <ModuleGate moduleKey="pap"><Pap /></ModuleGate> : <Landing />} />
           <Route path={`${AUSW}/vergleich`} element={user ? <ModuleGate moduleKey="auswertung"><KlassenarbeitVergleich /></ModuleGate> : <Landing />} />

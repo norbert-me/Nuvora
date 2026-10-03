@@ -93,6 +93,7 @@ export const ZIELE = [
   { pfad: "/pap", key: "pap.tabZeichnen", modul: "pap", worte: ["pap", "ablaufplan", "flussdiagramm", "programmablaufplan", "struktogramm", "informatik", "zeichnen"] },
   { pfad: "/pap?tab=aufgaben", key: "pap.tabAufgaben", modul: "pap", worte: ["pap aufgabe", "abgabe", "flussdiagramm aufgabe"] },
   { pfad: "/mathespiele", key: "mathefussball.title", modul: "mathespiele", worte: ["spiel", "fußball", "üben"] },
+  { pfad: "/koerper", key: "koerper.title", modul: "koerper", worte: ["körper", "netz", "quader", "würfel", "zylinder", "pyramide", "oberfläche", "volumen", "geometrie"] },
 ];
 
 /**

@@ -330,8 +330,9 @@ abgeschaltet ist die Anzeige:
 | Orga | `/orga` | Klassenführung in Reitern: Checklisten, Anwesenheit/Fehlzeiten je Kurs und Stunde (PDF-Report), Ausleihe, Sitzplan (Hervorheben von Gruppen; SEGEL-Stufen als abschaltbarer Teil) |
 | Zufall | `/zufall` | Zufallsschüler (fair gewichtet nach Zeit seit dem letzten Ziehen) und Zufallsgruppen |
 | Notizbrett | `/notizbrett` | Notizzettel + To-do-Liste. Datierte Aufgaben erscheinen im Kalender. Nicht an Schüler gebunden |
-| Tafel | `/tafel` | Classroom-Screen für den Beamer: frei platzierbare Textfelder, Timer, Lautstärke-Anzeige, mit dem Kalender der Verlaufsplan der laufenden Stunde. Mehrere Tafeln, am Konto gespeichert |
+| Tafel | `/tafel` | Classroom-Screen für den Beamer: frei platzierbare Textfelder, Timer, Lautstärke-Anzeige, **Stille-Safari** (Tiere kommen, solange es leise ist), mit dem Kalender der Verlaufsplan der laufenden Stunde. Mehrere Tafeln, am Konto gespeichert |
 | Mathespiele | `/mathespiele` | Aktuell Mathefußball: Kopfrechen-Duell für zwei Teams am Beamer |
+| Körper | `/koerper` | Geometrische Körper (Quader, Würfel, Prisma, Pyramide, Zylinder, Kegel, Kugel): drehen, mit einem Regler zum Netz auffalten, Flächen einfärben, gegenüberliegende Flächen entdecken; Oberfläche und Volumen mit Formel laufen mit den Maßen mit. Reines Werkzeug, ohne Daten |
 | PAP-Editor | `/pap` | Programmablaufpläne nach DIN 66001: frei zeichnen (ohne Zuordnung, im Browser gespeichert) oder als Aufgabe stellen — Lernende geben über ihren QR-Zugang ab |
 
 Ein **Reifegrad** steht an jedem Modul (`stable` / `beta`); die Shell zeigt ihn

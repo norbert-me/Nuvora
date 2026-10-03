@@ -697,6 +697,27 @@ const bedienung = (td) => [
     },
   },
   {
+    modul: "koerper",
+    name: "Quader zum Netz auffalten und einfärben (/koerper)",
+    pfad: "/koerper",
+    // Reines Werkzeug ohne Daten. Geprueft wird die Mechanik: der Knopf „Netz"
+    // muss den Regler auf 100 % fahren (Auffalten laeuft), und ein Klick auf
+    // eine Flaeche muss sie einfaerben (der Klick erreicht die Flaeche — einmal
+    // hatte die Zeichenflaeche ihn abgefangen, und Faerben tat nichts).
+    beweis: "Netz aufgefaltet (100 %), Fläche eingefärbt",
+    async eigen(seite) {
+      await seite.getByRole("button", { name: "Netz", exact: true }).first().click({ timeout: 8000 });
+      await seite.getByText("100 %", { exact: true }).first().waitFor({ timeout: 8000 });
+      const flaechen = seite.locator("svg polygon");
+      const n = await flaechen.count();
+      if (n < 6) return `nur ${n} Flächen gezeichnet, erwartet 6`;
+      const vorher = await flaechen.nth(n - 1).evaluate((el) => getComputedStyle(el).fill);
+      await flaechen.nth(n - 1).click({ force: true, timeout: 8000 });
+      const nachher = await flaechen.nth(n - 1).evaluate((el) => getComputedStyle(el).fill);
+      return vorher === nachher ? "Klick auf die Fläche hat sie nicht eingefärbt" : "";
+    },
+  },
+  {
     modul: "mathespiele",
     name: "Mathefußball spielen (/mathespiele)",
     pfad: "/mathespiele",

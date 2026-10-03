@@ -89,6 +89,7 @@ MODUL_PREFIX = {
     "pap": "/api/pap",
     "tafel": "/api/tafel",
     "mathespiele": None,
+    "koerper": None,
 }
 
 # Betreiberdaten: ohne diese Felder ist das Impressum unvollstaendig.

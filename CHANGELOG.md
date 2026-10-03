@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Neues Modul „Körper“** (Beta): Quader, Würfel, Prisma, Pyramide, Zylinder,
+  Kegel und Kugel drehen, mit einem Regler zum Netz auffalten, Flächen
+  einfärben, gegenüberliegende Flächen entdecken; Oberfläche und Volumen
+  mit Formel laufen mit den Maßen mit.
 - **Tafel: Stille-Safari** — solange die Klasse leise ist, kommen nach und nach
   Tiere in eine Savanne; bei Lärm laufen sie weg oder alles hält still.
   Schwelle, Tempo (alle 2/5/8 min) und Verhalten einstellbar.

@@ -373,6 +373,20 @@ REGISTRY: List[ModuleDef] = [
         path="/mathespiele",
         stage="beta",
     ),
+    ModuleDef(
+        key="koerper",
+        group="unterricht",
+        name="Körper",
+        description=(
+            "Geometrische Körper zum Anfassen: Quader, Würfel, Prisma, Pyramide, "
+            "Zylinder, Kegel und Kugel drehen, mit einem Regler zum Netz "
+            "auffalten, Flächen einfärben und gegenüberliegende Flächen "
+            "entdecken. Maße lassen sich verändern; Oberfläche und Volumen "
+            "laufen mit, samt Formel. Reines Werkzeug, ohne Daten."
+        ),
+        path="/koerper",
+        stage="beta",
+    ),
 ]
 
 _BY_KEY = {m.key: m for m in REGISTRY}

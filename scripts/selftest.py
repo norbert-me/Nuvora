@@ -1390,6 +1390,7 @@ PROBEN = {
     "pap": probe_pap,
     "tafel": probe_tafel,
     "mathespiele": None,
+    "koerper": None,
 }
 
 
