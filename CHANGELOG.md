@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Klassenarbeit, Auswertung: **„Wiederholung erzeugen“ und „Rückmeldebogen
+  drucken“** stehen auch dort — für alle Kinder beider Blätter.
 - Klassenarbeit, Auswertung: **Anteil jedes Themas an der Note** je
   E- und G-Arbeit (Punkte und Prozent, Darstellung als eigene Zeile);
   unter „Alle“ beide nebeneinander. Gegliedert nach Oberthema (mit Summe)

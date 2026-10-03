@@ -1016,14 +1016,24 @@ export default function Klassenarbeit() {
     });
     return { gesamt: vereineAnalysen(teile, topicLabel), teile, aufgaben: aufgabenUeberAlle(blaetter, alleStudents) };
   }, [alleAn, work, partner, alleStudents, scale, topics]);
+  // Unter „Auswertung" fuer BEIDE Blaetter: jedes Blatt kennt nur seine Kinder.
   const wiederholen = async () => {
     if (!work) return;
+    const ziele = alleAn ? [work, partner].filter(Boolean) : [work];
     setBusy(true);
-    const res = await fetch(`${API}/works/${work.id}/remediate`, alsJson("POST", { threshold: 0.5, cards: kartenAktiv, exercises: lernpfadAktiv })).catch(() => null);
+    const summe = { students: 0, cards: 0, exercises: 0 };
+    let ok = true;
+    for (const w of ziele) {
+      const res = await fetch(`${API}/works/${w.id}/remediate`, alsJson("POST", { threshold: 0.5, cards: kartenAktiv, exercises: lernpfadAktiv })).catch(() => null);
+      if (res && res.ok) { const j = await res.json(); summe.students += j.students || 0; summe.cards += j.cards_requeued || 0; summe.exercises += j.exercises_created || 0; }
+      else ok = false;
+    }
     setBusy(false);
-    if (res && res.ok) { const j = await res.json(); showAlert(t("klassenarbeit.remediateDone", { students: j.students, cards: j.cards_requeued, exercises: j.exercises_created || 0 })); }
+    if (ok) showAlert(t("klassenarbeit.remediateDone", summe));
     else showAlert(t("common.notWork"));
   };
+  // Rueckmeldebogen: unter „Auswertung" fuer alle Kinder beider Blaetter.
+  const druckBogen = alleAn && alleAnalysen ? alleAnalysen.gesamt.bogen : analyse ? analyse.bogen : [];
 
   // Aus den zentralen Tabellenstilen abgeleitet, nicht daneben neu gebaut: nur
   // die kraeftigere Kopf-Trennlinie und die polsterlose Zelle (die Eingabefelder
@@ -1666,6 +1676,13 @@ export default function Klassenarbeit() {
                 </div>
                 {zeigeAuswertung(A, alleTeil === "alle" ? t("klassenarbeit.auswertungGesamt") : t("klassenarbeit.auswertungBlatt", { n: alleTeil }), alleTeil,
                   { nurArbeit: true, aufgaben: aufgabenDerArbeit(alleAnalysen.aufgaben, alleTeil) })}
+                <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+                  {(kartenAktiv || lernpfadAktiv) && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.restore} size={15} /> {t("klassenarbeit.remediate")}</button>}
+                  {druckBogen.length > 0 && (
+                    <button onClick={() => window.print()} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
+                      title={t("bogen.printHint")}><Icon d={ICONS.print} size={15} /> {t("bogen.print")}</button>
+                  )}
+                </div>
               </>);
             })()}
             {/* SuS-Ansicht (am Beamer): keine Namen mit Noten. */}
@@ -1698,8 +1715,8 @@ export default function Klassenarbeit() {
       {/* Am Bildschirm unsichtbar, auf dem Papier das Einzige. Die Komponente
           haengt sich per Portal an den <body> — der Rahmen hier gaebe ihr sonst
           seinen Platz im Fluss, und der Drucker zaehlte danach die Seiten. */}
-      {work && analyse && analyse.bogen.length > 0 && (
-        <Rueckmeldebogen titel={work.name} bogen={analyse.bogen}
+      {work && druckBogen.length > 0 && (
+        <Rueckmeldebogen titel={work.name} bogen={druckBogen}
           fehlerLabel={(k) => t(`klassenarbeit.fehler.${k}`)}
           kartenAktiv={kartenAktiv} lernpfadAktiv={lernpfadAktiv} />
       )}
