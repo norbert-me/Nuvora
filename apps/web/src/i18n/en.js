@@ -2254,7 +2254,7 @@ export default {
   "bogen.aufgabe": "Task {{n}}",
   "bogen.wdhBis": "Hand in by:",
   "bogen.wdhKeine": "No revision needed.",
-  "bogen.wdhOriginal": "(solve again)",
+  "bogen.wdhFehlt": "The Lernpfad task list has no task for these topics: {{themen}}. Print anyway?",
   "bogen.printHint": "One sheet per student: what worked, what is still missing, what to do now. No comparison with the class.",
   "bogen.punkte": "{{p}} of {{max}} points",
   "bogen.note": "Grade {{n}}",

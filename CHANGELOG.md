@@ -24,8 +24,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   „Das saß“, Fehlerart-Hinweis, Wiederholungsaufgaben, Notizzeilen, Datum
   und Unterschrift. **Wiederholungsaufgaben** kommen aus dem Lernpfad: je
   Thema, das in einer (Teil-)Aufgabe unter der Hälfte blieb, eine andere
-  Aufgabe zum selben Thema (sonst Oberthema), je Kind möglichst verschieden;
-  nur mit aktivem Lernpfad. Auch in der Auswertung, für beide Blätter.
+  Aufgabe aus der Aufgabenliste des Lernpfads — gesucht nach Thema, gleichnamigem
+  Thema, Unter- und Oberthema, nie die Original-Aufgabe der Arbeit. Wie viele,
+  richtet sich nach dem Thema: unter 25 % drei, unter 50 % zwei, sonst eine.
+  Fehlt zu einem Thema jede Aufgabe, sagt es der Dialog vor dem Druck. Je
+  Kind möglichst verschiedene; nur mit aktivem Lernpfad. Auch in der Auswertung, für beide Blätter.
   „Wiederholung erzeugen“ ist entfallen.
 - Klassenarbeit, Auswertung: **Anteil jedes Themas an der Note** je
   E- und G-Arbeit (Punkte und Prozent, Darstellung als eigene Zeile);

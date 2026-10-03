@@ -158,7 +158,7 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
 
           {/* Wiederholung: je schwachem Thema eine andere Aufgabe zum selben
               Thema aus dem Lernpfad (siehe wdhZuteilen in Klassenarbeit.jsx).
-              Ohne passende Aufgabe steht die Original-Aufgabe als Verweis da.
+              Die Original-Aufgabe der Arbeit kommt nie auf den Bogen.
               Die Nummer (#…) ist für die Lehrkraft: sie findet damit die
               Lösung im Lernpfad. Abgabetermin per Hand. */}
           {an("wdh") && b.wdhAufgaben && (
@@ -173,9 +173,7 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
                       <div style={{ ...klein, marginBottom: 2 }}>
                         {x.thema}{x.ex && x.ex.code ? ` · ${x.ex.code}` : ""}
                       </div>
-                      {x.ex
-                        ? <div style={{ whiteSpace: "pre-wrap" }}><Latex>{x.ex.text}</Latex></div>
-                        : <div>{t("bogen.aufgabe", { n: x.statt.label })} <span style={klein}>{t("bogen.wdhOriginal")}</span></div>}
+                      <div style={{ whiteSpace: "pre-wrap" }}><Latex>{x.ex.text}</Latex></div>
                     </li>
                   ))}
                 </ol>

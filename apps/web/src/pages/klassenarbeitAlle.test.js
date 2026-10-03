@@ -113,7 +113,7 @@ describe("Klassenarbeit: Gewichtung nach Ober- und Unterthema", () => {
   });
 });
 
-import { wdhZuteilen, rechneAnalyse as rechne2 } from "./Klassenarbeit.jsx";
+import { wdhAnzahl, wdhZuteilen, rechneAnalyse as rechne2 } from "./Klassenarbeit.jsx";
 
 describe("Klassenarbeit: Wiederholung aus dem Lernpfad", () => {
   const w = { id: 9, tasks: [{ id: "a", max: 4, topic_id: 11 }, { id: "b", max: 4, topic_id: 12 }, { id: "d", max: 2, form: true }],
@@ -125,17 +125,25 @@ describe("Klassenarbeit: Wiederholung aus dem Lernpfad", () => {
     expect(A.bogen[1].wdh.map((x) => x.id)).toEqual(["a", "b"]);
   });
 
-  it("nimmt Lernpfad-Aufgaben zum Thema, sonst zum Oberthema, sonst das Original", () => {
-    const byId = new Map([[11, { id: 11, parent_id: 1 }], [12, { id: 12, parent_id: 2 }]]);
+  it("nimmt Lernpfad-Aufgaben zum Thema, nach Name oder Oberthema — nie das Original", () => {
+    const byId = new Map([[1, { id: 1, name: "Brüche" }], [11, { id: 11, parent_id: 1, name: "Kürzen" }], [12, { id: 12, parent_id: 2, name: "Terme" }],
+      [2, { id: 2, name: "Algebra" }], [99, { id: 99, name: "kürzen" }]]);
     const pool = [
-      { id: 100, topic_id: 11, aufgabentext: "x1" }, { id: 101, topic_id: 11, aufgabentext: "x2" },
+      { id: 100, topic_id: 11, aufgabentext: "x1" }, { id: 101, topic_id: 11, aufgabentext: "x2" }, { id: 104, topic_id: 11, aufgabentext: "x3" },
       { id: 102, topic_id: 11, aufgabentext: "Wiederholung: Thema (aus KA)" },
     ];
     const b = wdhZuteilen(A.bogen, pool, byId);
-    expect(b[0].wdhAufgaben.map((x) => x.ex.id)).toEqual([100]);
-    expect(b[1].wdhAufgaben[0].ex.id).toBe(101);   // anderes Kind, andere Aufgabe
-    expect(b[1].wdhAufgaben[1].statt.id).toBe("b");   // Thema 12 hat keine Aufgabe
+    // Kind A: Thema 11 bei 25 % → 2 Aufgaben; Kind B: 0 % → 3
+    expect(b[0].wdhAufgaben).toHaveLength(2);
+    expect(b[1].wdhAufgaben.filter((x) => x.ex)).toHaveLength(3);
+    expect(b.fehlend).toEqual(["Thema 12"]);   // zu Thema 12 nichts — kein Original
+    const nachName = wdhZuteilen(A.bogen, [{ id: 300, topic_id: 99, aufgabentext: "z" }], byId);
+    expect(nachName[0].wdhAufgaben[0].ex.id).toBe(300);
     const mitEltern = wdhZuteilen(A.bogen, [{ id: 200, topic_id: 2, aufgabentext: "y" }], byId);
-    expect(mitEltern[1].wdhAufgaben.map((x) => x.ex ? x.ex.id : x.statt.id)).toEqual(["a", 200]);
+    expect(mitEltern[1].wdhAufgaben.map((x) => x.ex.id)).toEqual([200]);
+  });
+
+  it("Anzahl nach Stärke der Schwäche", () => {
+    expect([wdhAnzahl(10), wdhAnzahl(30), wdhAnzahl(60)]).toEqual([3, 2, 1]);
   });
 });

@@ -2244,7 +2244,7 @@ export default {
   "bogen.aufgabe": "Aufgabe {{n}}",
   "bogen.wdhBis": "Abgeben bis:",
   "bogen.wdhKeine": "Keine Wiederholung nötig.",
-  "bogen.wdhOriginal": "(noch einmal lösen)",
+  "bogen.wdhFehlt": "Zu diesen Themen gibt es in der Aufgabenliste des Lernpfads keine Aufgabe: {{themen}}. Trotzdem drucken?",
   "bogen.printHint": "Ein Blatt je Kind: was saß, was noch fehlt, was jetzt zu tun ist. Ohne Vergleich mit der Klasse.",
   "bogen.punkte": "{{p}} von {{max}} Punkten",
   "bogen.note": "Note {{n}}",

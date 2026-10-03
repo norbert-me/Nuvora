@@ -434,6 +434,9 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
       offen: themen.filter((x) => x.pct < 50),
       haupt: haeufigste,
       wdh: wdhVon(s.id),
+      // Anteil je Thema in Prozent — daraus folgt, wie viele Wiederholungs-
+      // aufgaben das Thema bekommt (wdhAnzahl).
+      themenPct: Object.fromEntries(Object.entries(profil.get(s.id)).map(([tid, [e, m]]) => [tid, m ? (e / m) * 100 : 0])),
     };
   });
 
@@ -441,23 +444,50 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
 }
 
 // Wiederholung aus dem Lernpfad: statt der Original-Aufgabe bekommt jedes Kind
-// je schwachem Thema eine ANDERE Aufgabe zum selben Thema aus dem eigenen
-// Lernpfad-Pool — so viele, wie Einheiten des Themas unter der Haelfte
-// blieben (hoechstens zwei). Hat das Unterthema keine, wird im Oberthema
-// gesucht. Die Kinder bekommen verschiedene Aufgaben, soweit der Pool reicht
-// (Versatz je Kind) — sonst schreibt der Nachbar ab. Leere Aufgaben und die
-// Platzhalter des alten Knopfs („Wiederholung: …") zaehlen nicht. Ohne Treffer
-// bleibt die Original-Aufgabe als Verweis stehen.
+// je schwachem Thema eine ANDERE Aufgabe zum selben Thema aus der eigenen
+// Aufgabenliste des Lernpfads — so viele, wie Einheiten des Themas unter der
+// Haelfte blieben — wie viele, sagt `wdhAnzahl`. Die Original-Aufgabe der Arbeit kommt
+// NIE auf den Bogen (ausdruecklich nicht gewollt).
+// Gesucht wird der Reihe nach, bis etwas da ist:
+//   1. dasselbe Thema (id),
+//   2. ein Thema gleichen Namens (der Lernpfad legt Themen beim Import nach
+//      NAMEN an — dasselbe Unterthema kann zweimal existieren),
+//   3. die Unterthemen, wenn die Arbeit nur das Oberthema nennt,
+//   4. das Oberthema und seine anderen Unterthemen.
+// Die Kinder bekommen verschiedene Aufgaben, soweit der Pool reicht (Versatz je
+// Kind). Leere Aufgaben und Platzhalter des alten Knopfs zaehlen nicht.
+// Themen ohne jeden Treffer stehen in `fehlend` — die Lehrkraft erfaehrt es
+// vor dem Druck, statt einen Bogen mit Luecke zu verteilen.
+// Je schlechter das Thema insgesamt, desto mehr Uebung: unter 25 % drei
+// Aufgaben, unter 50 % zwei, sonst eine (dann war nur eine einzelne
+// Teilaufgabe schwach, das Thema als Ganzes sass).
+export function wdhAnzahl(pct) {
+  return pct == null ? 1 : pct < 25 ? 3 : pct < 50 ? 2 : 1;
+}
+
 export function wdhZuteilen(bogen, pool, byId) {
   const brauchbar = (pool || []).filter((x) => (x.aufgabentext || "").trim() && !/^Wiederholung: /.test(x.aufgabentext));
   const jeThema = new Map();
   brauchbar.forEach((x) => { if (x.topic_id != null) jeThema.set(x.topic_id, [...(jeThema.get(x.topic_id) || []), x]); });
+  const alle = byId ? [...byId.values()] : [];
+  const nameVon = (tid) => ((byId && byId.get(tid)) ? (byId.get(tid).name || "").trim().toLowerCase() : "");
+  const aus = (ids) => ids.flatMap((i) => jeThema.get(i) || []);
   const kandidaten = (tid) => {
     if (jeThema.has(tid)) return jeThema.get(tid);
+    const name = nameVon(tid);
+    const gleichNamig = name ? aus(alle.filter((x) => x.id !== tid && (x.name || "").trim().toLowerCase() === name).map((x) => x.id)) : [];
+    if (gleichNamig.length) return gleichNamig;
+    const kinder = aus(alle.filter((x) => x.parent_id === tid).map((x) => x.id));
+    if (kinder.length) return kinder;
     const tp = byId && byId.get(tid);
-    return tp && tp.parent_id && jeThema.has(tp.parent_id) ? jeThema.get(tp.parent_id) : [];
+    if (tp && tp.parent_id) {
+      const eltern = [...(jeThema.get(tp.parent_id) || []), ...aus(alle.filter((x) => x.parent_id === tp.parent_id && x.id !== tid).map((x) => x.id))];
+      if (eltern.length) return eltern;
+    }
+    return [];
   };
-  return bogen.map((b, k) => {
+  const fehlend = new Set();
+  const out = bogen.map((b, k) => {
     const themen = new Map();
     (b.wdh || []).forEach((x) => {
       const key = x.topic ?? `ohne-${x.id}`;
@@ -467,15 +497,18 @@ export function wdhZuteilen(bogen, pool, byId) {
     const wdhAufgaben = [];
     [...themen.values()].forEach((g) => {
       const liste = g.topic != null ? kandidaten(g.topic) : [];
-      const n = Math.min(g.statt.length, 2, liste.length);
+      const pct = g.topic != null && b.themenPct ? b.themenPct[g.topic] : null;
+      const n = Math.min(wdhAnzahl(pct), liste.length);
       for (let i = 0; i < n; i++) {
-        const ex = liste[(k + i) % liste.length];
+        const ex = liste[(k * 3 + i) % liste.length];
         wdhAufgaben.push({ thema: g.thema, ex: { id: ex.id, code: ex.code, text: ex.aufgabentext } });
       }
-      if (!n) g.statt.forEach((x) => wdhAufgaben.push({ thema: g.thema, statt: x }));
+      if (!n) fehlend.add(g.thema || "–");
     });
     return { ...b, wdhAufgaben };
   });
+  out.fehlend = [...fehlend];
+  return out;
 }
 
 // „Auswertung" einer E/G-Arbeit prueft die ARBEIT, nicht die Kurse: jede
@@ -1085,6 +1118,10 @@ export default function Klassenarbeit() {
     if (teile.includes("wdh") && lernpfadAktiv) {
       const res = await fetch("/api/lernpfad/exercises").catch(() => null);
       pool = res && res.ok ? await res.json() : [];
+    }
+    if (pool) {
+      const probe = wdhZuteilen(druckBogenRoh, pool, themen.byId);
+      if (probe.fehlend.length && !(await askConfirm(t("bogen.wdhFehlt", { themen: probe.fehlend.join(", ") })))) return;
     }
     setWdhPool(pool);
     setBogenTeile(teile);

@@ -2255,7 +2255,7 @@ export default {
   "bogen.aufgabe": "Tarea {{n}}",
   "bogen.wdhBis": "Entregar antes del:",
   "bogen.wdhKeine": "No hace falta repasar.",
-  "bogen.wdhOriginal": "(resolver de nuevo)",
+  "bogen.wdhFehlt": "La lista de tareas de Lernpfad no tiene ninguna tarea para estos temas: {{themen}}. ¿Imprimir de todos modos?",
   "bogen.printHint": "Una hoja por alumno: qué salió bien, qué falta, qué hacer ahora. Sin comparación con la clase.",
   "bogen.punkte": "{{p}} de {{max}} puntos",
   "bogen.note": "Nota {{n}}",
