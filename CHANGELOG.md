@@ -17,10 +17,12 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 ## Unveröffentlicht
 
 - **Neues Modul Waage (Beta): Äquivalenzumformungen an der Balkenwaage.**
-  Eine Gleichung liegt als Päckchen x und Gewichte auf zwei Schalen. Nimmt
-  man nur auf einer Seite etwas weg, kippt die Waage; „auf beiden Seiten“
-  (− 2, − x, : 3 …) formt in einem Schritt um. Jeder Schritt steht als Zeile
-  darunter, am „=“ ausgerichtet, am Ende mit Probe. Frei üben ohne Konto
+  Eine Gleichung liegt als Päckchen x und Gewichte auf zwei Schalen — die
+  Gleichung selbst steht nicht da, die Kinder lesen sie von der Waage ab.
+  Umgeformt wird durch Antippen: nimmt man nur auf einer Seite etwas weg,
+  kippt die Waage, bis auf der anderen Seite dasselbe passiert; nur das
+  Teilen hat einen Knopf. Nach dem Lösen erscheint der Weg als Zeilen am „=“
+  ausgerichtet, samt Probe. Frei üben ohne Konto
   (`/waage-frei`, vier Stufen oder eigene Gleichung) oder Aufgabenblätter mit
   mehreren Gleichungen, die die Kinder über ihren QR-Zugang lösen und
   abgeben — je Kind „3 / 5 gelöst“ und jeder Weg; ob gelöst, rechnet der

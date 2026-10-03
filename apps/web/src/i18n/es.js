@@ -1550,7 +1550,7 @@ export default {
   "waage.fehler.art": "Esa transformación no existe.",
   "waage.kippt": "La balanza se inclina: haz lo mismo en el otro lado.",
   "waage.fertig": "¡Resuelto! Comprobación: {{probe}}",
-  "waage.beide": "En ambos lados:",
+  "waage.teilen": "Dividir ambos lados entre",
   "waage.zahl": "Número",
   "waage.zurueck": "Deshacer",
   "waage.freiHinweis": "Se quitaron cosas distintas en cada lado: la balanza está equilibrada, pero no fue «lo mismo en ambos lados».",

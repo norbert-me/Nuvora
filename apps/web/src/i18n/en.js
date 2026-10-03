@@ -1549,7 +1549,7 @@ export default {
   "waage.fehler.art": "That step doesn't exist.",
   "waage.kippt": "The scale tips — do the same on the other side.",
   "waage.fertig": "Solved! Check: {{probe}}",
-  "waage.beide": "On both sides:",
+  "waage.teilen": "Divide both sides by",
   "waage.zahl": "Number",
   "waage.zurueck": "Undo",
   "waage.freiHinweis": "Different things were removed on each side — the scale balances, but it wasn't “the same on both sides”.",

@@ -1532,7 +1532,7 @@ export default {
   "waage.fehler.art": "Diese Umformung gibt es nicht.",
   "waage.kippt": "Die Waage kippt — tu auf der anderen Seite dasselbe.",
   "waage.fertig": "Gelöst! Probe: {{probe}}",
-  "waage.beide": "Auf beiden Seiten:",
+  "waage.teilen": "Auf beiden Seiten teilen durch",
   "waage.zahl": "Zahl",
   "waage.zurueck": "Rückgängig",
   "waage.freiHinweis": "Hier wurde auf den Seiten Verschiedenes weggenommen — die Waage stimmt, aber es war nicht „auf beiden Seiten dasselbe“.",

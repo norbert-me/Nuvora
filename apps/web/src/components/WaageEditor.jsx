@@ -11,7 +11,7 @@
 //
 // Gerechnet wird in core/waage.js (Spiegel im Server). Gezeichnet als SVG wie
 // der PAP-Editor und die Körper: ein Gewicht ist ein Element, antippbar.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { COLORS as C, CONTROL_R, btnSecondary, btnSmall, inputStyle, panelStyle } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { ablesen, geloest, gleich, gleichungText, kopie, loesung, neigung, opText, probeText, term, umformen, MAX_SCHRITTE } from "../core/waage.js";
@@ -41,7 +41,10 @@ function Schale({ seite, cx, cy, lesen, onNehmen, t }) {
   const zelle = Math.min(32, Math.floor(130 / zeilen));
   const g = zelle - 4;
   return (
-    <g style={{ transform: `translate(${cx}px, ${cy}px)`, transition: "transform .45s ease" }}>
+    // Lage als SVG-Attribut, nicht als CSS-transform: Safari verrechnete bei
+    // CSS-Transforms an SVG-Gruppen die Trefferflaechen, und auf dem iPad liess
+    // sich nichts antippen. Bewegt wird ueber den Winkel (useWinkel).
+    <g transform={`translate(${cx} ${cy})`}>
       {/* Aufhängung */}
       <line x1={-breite / 2 + 10} y1={0} x2={0} y2={-150} stroke="#6b7280" strokeWidth={1.5} />
       <line x1={breite / 2 - 10} y1={0} x2={0} y2={-150} stroke="#6b7280" strokeWidth={1.5} />
@@ -58,6 +61,9 @@ function Schale({ seite, cx, cy, lesen, onNehmen, t }) {
         return (
           <g key={i} transform={`translate(${x} ${y})`} onClick={klick} style={{ cursor: lesen ? "default" : "pointer" }}>
             <title>{titel}</title>
+            {/* Trefferflaeche: die ganze Zelle, nicht nur der kleine Kreis —
+                mit dem Finger trifft man sonst daneben. */}
+            <rect x={-zelle / 2} y={-zelle / 2} width={zelle} height={zelle} fill="transparent" />
             {it.art === "x" ? (
               <>
                 <rect x={-g / 2} y={-g / 2} width={g} height={g} rx={4} fill={FARBE_X} />
@@ -89,15 +95,15 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
   // Was gerade auf der Waage liegt — kann vom festen Stand abweichen, solange
   // jemand von einer Seite etwas genommen hat und die Waage schief hängt.
   const [arbeit, setArbeit] = useState(null);
-  const [n, setN] = useState(1);
+  const [n, setN] = useState(2);
   const [fehler, setFehler] = useState("");
   const jetzt = arbeit || festerStand;
   const kipp = xWahr == null ? 0 : neigung(jetzt, xWahr);
   const fertig = geloest(festerStand) && !arbeit;
 
-  const festhalten = (neu, op) => {
+  const festhalten = (neu, op, hand = false) => {
     if (schritte.length >= MAX_SCHRITTE) { setFehler(t("waage.fehler.zuViele")); return; }
-    onChange({ schritte: [...schritte, { l: neu.l, r: neu.r, op }] });
+    onChange({ schritte: [...schritte, { l: neu.l, r: neu.r, op, ...(hand ? { hand: true } : {}) }] });
     setArbeit(null);
     setFehler("");
   };
@@ -109,13 +115,28 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
     setFehler("");
     // Wieder im Gleichgewicht und anders als vorher: das ist ein Schritt.
     if (xWahr != null && neigung(neu, xWahr) === 0 && !gleich(neu, festerStand)) {
+      // Zweimal je ein Gewicht von beiden Seiten ist EIN Schritt „− 2“, nicht
+      // zwei Zeilen „− 1“: ein Antipp-Schritt gleicher Art wird mit dem
+      // vorigen zusammengelegt.
+      const letzter = schritte[schritte.length - 1];
+      if (letzter && letzter.hand) {
+        const davor = schritte.length > 1 ? schritte[schritte.length - 2] : start;
+        const zusammen = ablesen(davor, neu);
+        const einzeln = ablesen(festerStand, neu);
+        if (zusammen.art !== "frei" && zusammen.art === einzeln.art) {
+          onChange({ schritte: [...schritte.slice(0, -1), { l: neu.l, r: neu.r, op: opText(zusammen.art, zusammen.n), hand: true }] });
+          setArbeit(null);
+          return;
+        }
+      }
       const o = ablesen(festerStand, neu);
-      festhalten(neu, o.art === "frei" ? "frei" : opText(o.art, o.n));
+      festhalten(neu, o.art === "frei" ? "frei" : opText(o.art, o.n), true);
       return;
     }
     setArbeit(gleich(neu, festerStand) ? null : neu);
   };
 
+  const teilen = () => beide(":");
   const beide = (art) => {
     if (arbeit) return;
     const zahl = Number(n);
@@ -131,7 +152,8 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
   };
 
   // Geometrie: Drehpunkt in der Mitte, Balken ± 220, Schalen 150 darunter.
-  const winkel = kipp * 7 * (Math.PI / 180);
+  const grad = useWinkel(kipp * 7);
+  const winkel = grad * (Math.PI / 180);
   const ende = (dx) => [300 + dx * Math.cos(winkel), 60 + dx * Math.sin(winkel)];
   const [lx, ly] = ende(-220);
   const [rx, ry] = ende(220);
@@ -141,16 +163,20 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
 
   return (
     <div>
-      <div style={{ textAlign: "center", fontSize: 22, fontWeight: 700, margin: "4px 0 8px", fontVariantNumeric: "tabular-nums" }}>
-        {gleichungText(jetzt)}
-        {fertig && <span style={{ color: C.success, marginLeft: 8 }}>✓</span>}
-      </div>
-      <svg viewBox="0 0 600 300" style={{ width: "100%", maxHeight: 340, display: "block", touchAction: "manipulation" }} role="img" aria-label={gleichungText(jetzt)}>
+      {/* Die Gleichung steht NICHT da: die Kinder lesen sie von der Waage ab
+          und schreiben sie selbst auf. Erst wenn x allein steht, kommt sie. */}
+      {(fertig || lesen) && (
+        <div style={{ textAlign: "center", fontSize: 22, fontWeight: 700, margin: "4px 0 8px", fontVariantNumeric: "tabular-nums" }}>
+          {gleichungText(jetzt)}
+          {fertig && <span style={{ color: C.success, marginLeft: 8 }}>✓</span>}
+        </div>
+      )}
+      <svg viewBox="0 0 600 300" style={{ width: "100%", maxHeight: 340, display: "block", touchAction: "manipulation" }} role="img" aria-label={t("waage.titel")}>
         {/* Ständer */}
         <path d="M 300 60 L 270 290 L 330 290 Z" fill="#9ca3af" />
         <rect x={230} y={286} width={140} height={8} rx={4} fill="#6b7280" />
         {/* Balken */}
-        <g style={{ transform: `rotate(${kipp * 7}deg)`, transformOrigin: "300px 60px", transition: "transform .45s ease" }}>
+        <g transform={`rotate(${grad} 300 60)`}>
           <rect x={76} y={55} width={448} height={10} rx={5} fill="#4b5563" />
         </g>
         <circle cx={300} cy={60} r={9} fill="#374151" />
@@ -171,13 +197,13 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
             </div>
           ) : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "center", margin: "8px 0" }}>
-              <span style={{ fontSize: 13, color: "var(--text2)" }}>{t("waage.beide")}</span>
-              <input type="number" min={1} max={60} value={n} onChange={(e) => setN(Math.max(1, Math.min(60, Math.round(Number(e.target.value) || 1))))}
+              {/* Wegnehmen geht per Antippen auf der Waage. Nur das Teilen
+                  laesst sich nicht antippen — dafuer bleibt ein Knopf. */}
+              <span style={{ fontSize: 13, color: "var(--text2)" }}>{t("waage.teilen")}</span>
+              <input type="number" min={2} max={60} value={n} onChange={(e) => setN(Math.max(2, Math.min(60, Math.round(Number(e.target.value) || 2))))}
                 aria-label={t("waage.zahl")} style={{ ...inputStyle, width: 64, textAlign: "center" }} />
-              {[["-e", `− ${n}`], ["-x", `− ${n === 1 ? "" : n}x`], [":", `: ${n}`], ["+e", `+ ${n}`], ["+x", `+ ${n === 1 ? "" : n}x`]].map(([art, label]) => (
-                <button key={art} onClick={() => beide(art)} disabled={!!arbeit}
-                  style={{ ...btnSecondary, ...btnSmall, minWidth: 52, fontVariantNumeric: "tabular-nums", opacity: arbeit ? 0.5 : 1 }}>{label}</button>
-              ))}
+              <button onClick={teilen} disabled={!!arbeit}
+                style={{ ...btnSecondary, ...btnSmall, minWidth: 52, fontVariantNumeric: "tabular-nums", opacity: arbeit ? 0.5 : 1 }}>: {n}</button>
             </div>
           )}
           {fehler && <div style={{ fontSize: 13, color: C.danger, textAlign: "center", marginBottom: 8 }}>{fehler}</div>}
@@ -187,10 +213,13 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
         </>
       )}
 
-      {/* Der Lösungsweg — so, wie er ins Heft gehört: am „=" ausgerichtet. */}
-      <div style={{ ...panelStyle, padding: "8px 12px" }}>
-        <Protokoll zeilen={protokoll} t={t} />
-      </div>
+      {/* Der Lösungsweg — so, wie er ins Heft gehört: am „=" ausgerichtet.
+          Erst nach dem Lösen: vorher wäre er die Lösung zum Abschreiben. */}
+      {(fertig || lesen) && (
+        <div style={{ ...panelStyle, padding: "8px 12px" }}>
+          <Protokoll zeilen={protokoll} t={t} />
+        </div>
+      )}
       <div style={{ display: "flex", gap: 16, justifyContent: "center", fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
         <span><span style={{ display: "inline-block", width: 10, height: 10, background: FARBE_X, marginRight: 4 }} />{t("waage.legX")}</span>
         <span><span style={{ display: "inline-block", width: 10, height: 10, background: FARBE_E, borderRadius: CONTROL_R, marginRight: 4 }} />{t("waage.legE")}</span>
@@ -201,6 +230,30 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
 
 // Gleichungen untereinander, am Gleichheitszeichen ausgerichtet, die Umformung
 // rechts daneben — die Form aus dem Heft. Auch die Lehrkraft-Sicht nimmt sie.
+// Der Winkel des Balkens, weich nachgezogen — ohne CSS-Transition (siehe
+// oben, Safari). Ein Bild je Frame, 450 ms.
+function useWinkel(ziel) {
+  const [w, setW] = useState(ziel);
+  const vorher = useRef(ziel);
+  useEffect(() => {
+    const von = vorher.current;
+    if (von === ziel) return undefined;
+    const t0 = performance.now();
+    let raf = 0;
+    const schritt = (jetzt) => {
+      const p = Math.min(1, (jetzt - t0) / 450);
+      const e = 1 - (1 - p) * (1 - p);
+      const wert = von + (ziel - von) * e;
+      vorher.current = wert;
+      setW(wert);
+      if (p < 1) raf = requestAnimationFrame(schritt);
+    };
+    raf = requestAnimationFrame(schritt);
+    return () => cancelAnimationFrame(raf);
+  }, [ziel]);
+  return w;
+}
+
 export function Protokoll({ zeilen, t, klein = false }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto 1fr", columnGap: 8, rowGap: 2,
