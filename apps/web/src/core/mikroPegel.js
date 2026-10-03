@@ -34,8 +34,20 @@ export function useMikroPegel(onMessung) {
   // leuchtet die Aufnahme-Anzeige des Browsers weiter.
   useEffect(() => () => stopp(), []);
 
+  // `fehler` ist der GRUND, nicht nur ein Ja: „kein Mikrofon" und „Zugriff
+  // verweigert" brauchen verschiedene Handgriffe, und ein Satz, der beides
+  // plus https aufzählt, schickt jemanden am Rechner ohne Mikrofon auf die
+  // Suche nach einem Fehler in der Adresse.
+  //   "unsicher"  — kein sicherer Kontext (http), getUserMedia fehlt ganz
+  //   "keins"     — kein Aufnahmegerät angeschlossen
+  //   "verweigert"— Browser oder System haben den Zugriff abgelehnt
+  //   "belegt"    — ein anderes Programm hält es fest
   const start = async () => {
     setFehler(false);
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setFehler("unsicher");
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         // Keine Aufbereitung: die Automatiken regeln genau das weg, was hier
@@ -68,9 +80,11 @@ export function useMikroPegel(onMessung) {
       technik.current = { stream, ctx, raf: 0 };
       setAn(true);
       technik.current.raf = requestAnimationFrame(schleife);
-    } catch {
-      // Abgelehnt, kein Mikrofon, oder unsicherer Kontext (http).
-      setFehler(true);
+    } catch (e) {
+      const n = e && e.name;
+      setFehler(n === "NotFoundError" || n === "OverconstrainedError" ? "keins"
+        : n === "NotAllowedError" || n === "SecurityError" ? "verweigert"
+        : n === "NotReadableError" || n === "AbortError" ? "belegt" : "keins");
     }
   };
 

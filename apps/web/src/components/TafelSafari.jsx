@@ -165,7 +165,7 @@ export default function TafelSafari({ item, t }) {
       </div>
       {fehler && (
         <div style={{ position: "absolute", bottom: 80, left: 16, right: 16, textAlign: "center", fontSize: 22, color: C.danger, background: "rgba(255,255,255,0.9)", borderRadius: CONTROL_R, padding: 8 }}>
-          {t("tafel.laermKeinMikro")}
+          {t(`tafel.mikro.${fehler}`)}
         </div>
       )}
     </div>

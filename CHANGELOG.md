@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Tafel (Lautstärke, Stille-Safari): **die Mikrofon-Meldung nennt den
+  Grund** — kein Gerät angeschlossen, Zugriff verweigert, von einem anderen
+  Programm belegt oder kein https — statt alle drei in einem Satz.
 - Klassenarbeit: **Rückmeldebogen mit Bausteinen** — vor dem Druck wählt man
   Vorlage (Wiederholung / Rückmeldung / Alles) oder einzeln: Punkte und Note,
   „Das saß“, Fehlerart-Hinweis, Wiederholungsaufgaben, Notizzeilen, Datum

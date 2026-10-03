@@ -477,7 +477,7 @@ function TafelLaerm({ item, t }) {
           : <button onClick={stopp} style={miniBtn}>{t("tafel.laermStop")}</button>}
         {an && <span style={{ fontSize: 34, fontWeight: 800, color: farbe, fontVariantNumeric: "tabular-nums", minWidth: 90, textAlign: "center" }}>{pegel}</span>}
       </div>
-      {fehler && <div style={{ fontSize: 24, color: C.danger, textAlign: "center" }}>{t("tafel.laermKeinMikro")}</div>}
+      {fehler && <div style={{ fontSize: 24, color: C.danger, textAlign: "center" }}>{t(`tafel.mikro.${fehler}`)}</div>}
       {/* Datenschutz-Angabe: sie sagt etwas, das man dem Bildschirm nicht
           ansieht, und bleibt deshalb stehen. */}
       <div style={{ fontSize: 22, color: "var(--text3)", textAlign: "center", lineHeight: 1.3 }}>{t("tafel.laermHinweis")}</div>
