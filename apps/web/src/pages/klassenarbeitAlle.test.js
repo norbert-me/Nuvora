@@ -112,3 +112,30 @@ describe("Klassenarbeit: Gewichtung nach Ober- und Unterthema", () => {
     expect(Math.round(z[0].anteil)).toBe(60);
   });
 });
+
+import { wdhZuteilen, rechneAnalyse as rechne2 } from "./Klassenarbeit.jsx";
+
+describe("Klassenarbeit: Wiederholung aus dem Lernpfad", () => {
+  const w = { id: 9, tasks: [{ id: "a", max: 4, topic_id: 11 }, { id: "b", max: 4, topic_id: 12 }, { id: "d", max: 2, form: true }],
+    results: { 1: { a: 1, b: 4, d: 0 }, 2: { a: 0, b: 1, d: 0 } } };
+  const A = rechne2({ work: w, wk: w, students: [{ id: 1, name: "A" }, { id: 2, name: "B" }], effScale: DEFAULT_SCALE, topicLabel: label, eigeneStufe: "", andereStufe: "" });
+
+  it("listet Aufgaben unter der Haelfte, ohne Darstellung", () => {
+    expect(A.bogen[0].wdh.map((x) => x.id)).toEqual(["a"]);
+    expect(A.bogen[1].wdh.map((x) => x.id)).toEqual(["a", "b"]);
+  });
+
+  it("nimmt Lernpfad-Aufgaben zum Thema, sonst zum Oberthema, sonst das Original", () => {
+    const byId = new Map([[11, { id: 11, parent_id: 1 }], [12, { id: 12, parent_id: 2 }]]);
+    const pool = [
+      { id: 100, topic_id: 11, aufgabentext: "x1" }, { id: 101, topic_id: 11, aufgabentext: "x2" },
+      { id: 102, topic_id: 11, aufgabentext: "Wiederholung: Thema (aus KA)" },
+    ];
+    const b = wdhZuteilen(A.bogen, pool, byId);
+    expect(b[0].wdhAufgaben.map((x) => x.ex.id)).toEqual([100]);
+    expect(b[1].wdhAufgaben[0].ex.id).toBe(101);   // anderes Kind, andere Aufgabe
+    expect(b[1].wdhAufgaben[1].statt.id).toBe("b");   // Thema 12 hat keine Aufgabe
+    const mitEltern = wdhZuteilen(A.bogen, [{ id: 200, topic_id: 2, aufgabentext: "y" }], byId);
+    expect(mitEltern[1].wdhAufgaben.map((x) => x.ex ? x.ex.id : x.statt.id)).toEqual(["a", 200]);
+  });
+});

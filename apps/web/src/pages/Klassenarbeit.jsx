@@ -10,7 +10,7 @@ import { DialogFuss, nurGeaendertIn, useAutoSpeichern, useEntwurf } from "../com
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
-import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
+import Rueckmeldebogen, { BogenWahl } from "../components/Rueckmeldebogen.jsx";
 import { mitNummer, themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
@@ -393,6 +393,25 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
   // Klasse: das Blatt wird ausgedruckt und ausgeteilt, und was ein anderes
   // Kind geschrieben hat, geht niemanden etwas an. Kein Rang, kein
   // Klassenschnitt, keine fremden Namen.
+  // Wiederholungsaufgaben: jede Einheit (Teilaufgabe, sonst die Aufgabe) unter
+  // der Haelfte — in der Fassung, die das Kind geschrieben hat. Die
+  // Darstellung nicht: sie ist keine Aufgabe, die man wiederholt.
+  const wdhVon = (sid) => {
+    const liste = [];
+    tasks.forEach((tk, i) => {
+      if (tk.form) return;
+      const anders = gewechselt(wk, sid, tk);
+      const us = einheitenFuer(wk, sid, tk);
+      const basisLabel = `${tk.label || `${i + 1}.`}`;
+      us.forEach((u) => {
+        const e = pu(sid, u.id);
+        if (e >= u.max * 0.5) return;
+        const label = us.length > 1 && u.label ? `${basisLabel.replace(/\.$/, "")}${u.label}` : basisLabel;
+        liste.push({ id: u.id, label: anders ? `${label} (${andereStufe})` : label, topic: u.topic ? Number(u.topic) : null, thema: u.topic ? topicLabel(Number(u.topic)) : "", erreicht: rund(e, 2), max: u.max });
+      });
+    });
+    return liste;
+  };
   const bogen = graded.map((s) => {
     const w = wert.get(s.id);
     const themen = Object.entries(profil.get(s.id)).map(([tid, [e, m]]) => (
@@ -414,10 +433,49 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
       sass: themen.filter((x) => x.pct >= 75),
       offen: themen.filter((x) => x.pct < 50),
       haupt: haeufigste,
+      wdh: wdhVon(s.id),
     };
   });
 
   return { topics: topicsOut, students: studentsOut, weakGroups, fehlerStat, fehlerRoh, bogen, gradedCount: graded.length, perTask, perUnit, noten };
+}
+
+// Wiederholung aus dem Lernpfad: statt der Original-Aufgabe bekommt jedes Kind
+// je schwachem Thema eine ANDERE Aufgabe zum selben Thema aus dem eigenen
+// Lernpfad-Pool — so viele, wie Einheiten des Themas unter der Haelfte
+// blieben (hoechstens zwei). Hat das Unterthema keine, wird im Oberthema
+// gesucht. Die Kinder bekommen verschiedene Aufgaben, soweit der Pool reicht
+// (Versatz je Kind) — sonst schreibt der Nachbar ab. Leere Aufgaben und die
+// Platzhalter des alten Knopfs („Wiederholung: …") zaehlen nicht. Ohne Treffer
+// bleibt die Original-Aufgabe als Verweis stehen.
+export function wdhZuteilen(bogen, pool, byId) {
+  const brauchbar = (pool || []).filter((x) => (x.aufgabentext || "").trim() && !/^Wiederholung: /.test(x.aufgabentext));
+  const jeThema = new Map();
+  brauchbar.forEach((x) => { if (x.topic_id != null) jeThema.set(x.topic_id, [...(jeThema.get(x.topic_id) || []), x]); });
+  const kandidaten = (tid) => {
+    if (jeThema.has(tid)) return jeThema.get(tid);
+    const tp = byId && byId.get(tid);
+    return tp && tp.parent_id && jeThema.has(tp.parent_id) ? jeThema.get(tp.parent_id) : [];
+  };
+  return bogen.map((b, k) => {
+    const themen = new Map();
+    (b.wdh || []).forEach((x) => {
+      const key = x.topic ?? `ohne-${x.id}`;
+      if (!themen.has(key)) themen.set(key, { topic: x.topic, thema: x.thema, statt: [] });
+      themen.get(key).statt.push(x);
+    });
+    const wdhAufgaben = [];
+    [...themen.values()].forEach((g) => {
+      const liste = g.topic != null ? kandidaten(g.topic) : [];
+      const n = Math.min(g.statt.length, 2, liste.length);
+      for (let i = 0; i < n; i++) {
+        const ex = liste[(k + i) % liste.length];
+        wdhAufgaben.push({ thema: g.thema, ex: { id: ex.id, code: ex.code, text: ex.aufgabentext } });
+      }
+      if (!n) g.statt.forEach((x) => wdhAufgaben.push({ thema: g.thema, statt: x }));
+    });
+    return { ...b, wdhAufgaben };
+  });
 }
 
 // „Auswertung" einer E/G-Arbeit prueft die ARBEIT, nicht die Kurse: jede
@@ -619,7 +677,6 @@ export default function Klassenarbeit() {
   // haelt sonst an ihr fest und zeigte die Punkte der vorigen Arbeit weiter.
   const frisch = useRef(false);
   const zeigeArbeit = (w) => { frisch.current = true; setSavedWork(w); }; // { id, name, tasks:[{id,label,topic_id}], results:{sid:[taskId]} }
-  const [busy, setBusy] = useState(false);
   const kq = kursId != null ? `?kurs_id=${kursId}` : "";
 
   // Beim ersten Besuch gleich eine Klasse wählen (zuletzt genutzte, sonst erste),
@@ -1016,24 +1073,28 @@ export default function Klassenarbeit() {
     });
     return { gesamt: vereineAnalysen(teile, topicLabel), teile, aufgaben: aufgabenUeberAlle(blaetter, alleStudents) };
   }, [alleAn, work, partner, alleStudents, scale, topics]);
-  // Unter „Auswertung" fuer BEIDE Blaetter: jedes Blatt kennt nur seine Kinder.
-  const wiederholen = async () => {
-    if (!work) return;
-    const ziele = alleAn ? [work, partner].filter(Boolean) : [work];
-    setBusy(true);
-    const summe = { students: 0, cards: 0, exercises: 0 };
-    let ok = true;
-    for (const w of ziele) {
-      const res = await fetch(`${API}/works/${w.id}/remediate`, alsJson("POST", { threshold: 0.5, cards: kartenAktiv, exercises: lernpfadAktiv })).catch(() => null);
-      if (res && res.ok) { const j = await res.json(); summe.students += j.students || 0; summe.cards += j.cards_requeued || 0; summe.exercises += j.exercises_created || 0; }
-      else ok = false;
+  // Rueckmeldebogen: erst fragen, was darauf soll (BogenWahl), dann drucken.
+  // Wiederholungsaufgaben kommen aus dem Lernpfad-Pool — ohne das Modul gibt
+  // es den Baustein nicht (Regel 3).
+  const [bogenWahl, setBogenWahl] = useState(false);
+  const [bogenTeile, setBogenTeile] = useState(undefined);
+  const [wdhPool, setWdhPool] = useState(null);
+  const bogenDrucken = async (teile) => {
+    setBogenWahl(false);
+    let pool = null;
+    if (teile.includes("wdh") && lernpfadAktiv) {
+      const res = await fetch("/api/lernpfad/exercises").catch(() => null);
+      pool = res && res.ok ? await res.json() : [];
     }
-    setBusy(false);
-    if (ok) showAlert(t("klassenarbeit.remediateDone", summe));
-    else showAlert(t("common.notWork"));
+    setWdhPool(pool);
+    setBogenTeile(teile);
+    // KaTeX zeichnet die Aufgabentexte nachgeladen — kurz warten, sonst steht
+    // im Ausdruck der Quelltext.
+    setTimeout(() => window.print(), pool ? 900 : 100);
   };
   // Rueckmeldebogen: unter „Auswertung" fuer alle Kinder beider Blaetter.
-  const druckBogen = alleAn && alleAnalysen ? alleAnalysen.gesamt.bogen : analyse ? analyse.bogen : [];
+  const druckBogenRoh = alleAn && alleAnalysen ? alleAnalysen.gesamt.bogen : analyse ? analyse.bogen : [];
+  const druckBogen = useMemo(() => (wdhPool ? wdhZuteilen(druckBogenRoh, wdhPool, themen.byId) : druckBogenRoh), [druckBogenRoh, wdhPool, topics]);
 
   // Aus den zentralen Tabellenstilen abgeleitet, nicht daneben neu gebaut: nur
   // die kraeftigere Kopf-Trennlinie und die polsterlose Zelle (die Eingabefelder
@@ -1601,12 +1662,11 @@ export default function Klassenarbeit() {
                 <Icon d={ICONS.link} size={14} /> {verknuepft.map((v) => v.section ? `${v.section} · ${v.name}` : v.name).join(", ")}
               </Link>
             ) : <button onClick={() => setNotenModal(true)} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.link} size={15} /> {t("klassenarbeit.toNoten")}</button>)}
-            {(kartenAktiv || lernpfadAktiv) && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.restore} size={15} /> {t("klassenarbeit.remediate")}</button>}
             {/* Ein Blatt je Kind. Der Ausdruck laesst den Rahmen weg (Druck-CSS
                 in index.html: `.nur-drucken` gewinnt), deshalb reicht hier
                 window.print() ohne eigenes Fenster. */}
             {analyse && analyse.bogen.length > 0 && (
-              <button onClick={() => window.print()} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
+              <button onClick={() => setBogenWahl(true)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
                 title={t("bogen.printHint")}><Icon d={ICONS.print} size={15} /> {t("bogen.print")}</button>
             )}
             {(work.tasks || []).length > 0 && (
@@ -1677,9 +1737,8 @@ export default function Klassenarbeit() {
                 {zeigeAuswertung(A, alleTeil === "alle" ? t("klassenarbeit.auswertungGesamt") : t("klassenarbeit.auswertungBlatt", { n: alleTeil }), alleTeil,
                   { nurArbeit: true, aufgaben: aufgabenDerArbeit(alleAnalysen.aufgaben, alleTeil) })}
                 <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-                  {(kartenAktiv || lernpfadAktiv) && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.restore} size={15} /> {t("klassenarbeit.remediate")}</button>}
                   {druckBogen.length > 0 && (
-                    <button onClick={() => window.print()} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
+                    <button onClick={() => setBogenWahl(true)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
                       title={t("bogen.printHint")}><Icon d={ICONS.print} size={15} /> {t("bogen.print")}</button>
                   )}
                 </div>
@@ -1716,10 +1775,10 @@ export default function Klassenarbeit() {
           haengt sich per Portal an den <body> — der Rahmen hier gaebe ihr sonst
           seinen Platz im Fluss, und der Drucker zaehlte danach die Seiten. */}
       {work && druckBogen.length > 0 && (
-        <Rueckmeldebogen titel={work.name} bogen={druckBogen}
-          fehlerLabel={(k) => t(`klassenarbeit.fehler.${k}`)}
-          kartenAktiv={kartenAktiv} lernpfadAktiv={lernpfadAktiv} />
+        <Rueckmeldebogen titel={work.name} bogen={druckBogen} teile={bogenTeile}
+          fehlerLabel={(k) => t(`klassenarbeit.fehler.${k}`)} />
       )}
+      {bogenWahl && <BogenWahl mitWdh={lernpfadAktiv} onClose={() => setBogenWahl(false)} onDrucken={bogenDrucken} />}
 
       {hasRoster && work && students.length === 0 && <Empty title={t("klassenarbeit.noStudents")} />}
 

@@ -156,14 +156,16 @@ const verbindungen = (td) => [
     zusammen: ["auswertung", "code-detektiv"],
   },
   {
-    name: "Klassenarbeit → „Wiederholung erzeugen\" (braucht Karten/Lernpfad)",
+    name: "Klassenarbeit → Rückmeldebogen mit Wiederholungsaufgaben (braucht Lernpfad)",
     // Auch die Klassenarbeit selbst per Deep-Link waehlen (?work=): die Seite
     // nimmt sonst die NEUESTE der Klasse, und das ist auf einer Instanz mit
     // echten Daten nicht die des Tests.
     pfad: `/auswertung?tab=klassenarbeit${klassenParam(td, "&")}${td.arbeit?.id ? `&work=${td.arbeit.id}` : ""}`,
-    marker: "Wiederholung erzeugen",
+    // Der Baustein „Wiederholungsaufgaben" kommt aus dem Lernpfad-Pool und
+    // steht im Druck-Dialog nur, wenn das Modul laeuft.
+    marker: "Wiederholungsaufgaben",
     allein: ["auswertung"],
-    zusammen: ["auswertung", "karten", "lernpfad"],
+    zusammen: ["auswertung", "lernpfad"],
     // Auf das ERGEBNIS warten, nicht auf die Uhr: die Seite laedt Klasse, Kurs
     // und Klassenarbeiten nacheinander nach. Eine feste Wartezeit von 1,5 s
     // reichte mal und mal nicht — der Test meldete dann eine "tote Bruecke",
@@ -174,6 +176,8 @@ const verbindungen = (td) => [
       // Auswahlfeldes, und ein option gilt Playwright grundsaetzlich als
       // unsichtbar. Vorhanden heisst hier: die Liste ist geladen.
       await seite.getByText(`${MARKE}-Arbeit`).first().waitFor({ state: "attached", timeout: 15000 });
+      await seite.getByRole("button", { name: "Rückmeldebogen drucken" }).first().click({ timeout: 10000 }).catch(() => {});
+      await seite.waitForTimeout(300);
     },
   },
   {
@@ -1283,6 +1287,15 @@ async function testdatenAnlegen(td) {
     td.arbeit = await muss("Klassenarbeit anlegen", "/api/klassenarbeit/works", "post", {
       class_id: klasse.id, kurs_id: td.kurs?.id ?? null, name: `${MARKE}-Arbeit`,
     });
+    // Eine Aufgabe und ein korrigiertes Kind: ohne Ergebnis gibt es keinen
+    // Rueckmeldebogen und damit keinen Knopf, an dem die Bruecke haengt.
+    const erstesKind = (klasse.students || [])[0];
+    if (td.arbeit?.id && erstesKind) {
+      await muss("Klassenarbeit fuellen", `/api/klassenarbeit/works/${td.arbeit.id}`, "put", {
+        tasks: [{ id: "t1", label: "1.", max: 4, topic_id: td.topic?.id ?? null }],
+        results: { [erstesKind.id]: { t1: 1 } },
+      });
+    }
 
     // Noten-Vorbedingung: ohne Abschnitt zeigt das Notenbuch keinen einzigen
     // Knopf (auch nicht "Aus Code-Detektiv"), und ohne eingetragene Note gibt

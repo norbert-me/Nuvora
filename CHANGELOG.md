@@ -16,8 +16,14 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
-- Klassenarbeit, Auswertung: **„Wiederholung erzeugen“ und „Rückmeldebogen
-  drucken“** stehen auch dort — für alle Kinder beider Blätter.
+- Klassenarbeit: **Rückmeldebogen mit Bausteinen** — vor dem Druck wählt man
+  Vorlage (Wiederholung / Rückmeldung / Alles) oder einzeln: Punkte und Note,
+  „Das saß“, Fehlerart-Hinweis, Wiederholungsaufgaben, Notizzeilen, Datum
+  und Unterschrift. **Wiederholungsaufgaben** kommen aus dem Lernpfad: je
+  Thema, das in einer (Teil-)Aufgabe unter der Hälfte blieb, eine andere
+  Aufgabe zum selben Thema (sonst Oberthema), je Kind möglichst verschieden;
+  nur mit aktivem Lernpfad. Auch in der Auswertung, für beide Blätter.
+  „Wiederholung erzeugen“ ist entfallen.
 - Klassenarbeit, Auswertung: **Anteil jedes Themas an der Note** je
   E- und G-Arbeit (Punkte und Prozent, Darstellung als eigene Zeile);
   unter „Alle“ beide nebeneinander. Gegliedert nach Oberthema (mit Summe)
