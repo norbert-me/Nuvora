@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Notenbuch:** beim Eintragen sind Zeile und Spalte der offenen Zelle
+  hervorgehoben (wie bei den Punkten der Klassenarbeit).
 - **Kalender:** ein abonnierter Termin über mehrere Tage wird beim Ausblenden
   an allen Tagen ausgeblendet (und beim Zurückholen an allen wieder gezeigt).
 - **Einstiege** und **Tafel** sind keine Beta mehr.

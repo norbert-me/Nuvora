@@ -1128,3 +1128,11 @@ export function Toggle({ checked, onChange, label }) {
     </label>
   );
 }
+
+// Toenung fuer Zeile und Spalte des Feldes, in dem gerade eingetragen wird
+// (Punkte in der Klassenarbeit, Noten im Notenbuch) — beim Uebertragen vom
+// Papier verrutscht man sonst in die Nachbarzeile. Eine Quelle fuer beide.
+// Die klebende Namenszelle braucht die DECKENDE Fassung, sonst scheint beim
+// waagerechten Scrollen das Raster durch.
+export const FOKUS_TON = "color-mix(in srgb, var(--accent) 10%, transparent)";
+export const FOKUS_TON_DECKEND = "color-mix(in srgb, var(--accent) 14%, var(--card))";

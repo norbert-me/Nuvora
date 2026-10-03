@@ -4,7 +4,7 @@
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ANTWORT_COLORS, Boxplot, Segment, segmentBtn, COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, td as tdBase, th as thBase, toolbarBtn, toolbarIconBtn } from "../components/Icons.jsx";
+import { ANTWORT_COLORS, Boxplot, FOKUS_TON, FOKUS_TON_DECKEND, Segment, segmentBtn, COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, td as tdBase, th as thBase, toolbarBtn, toolbarIconBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { DialogFuss, nurGeaendertIn, useAutoSpeichern, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
@@ -46,11 +46,6 @@ const FEHLER_CYCLE = ["", ...FEHLER.map((f) => f.key)];
 // Das Kuerzel in der Zelle: abgeleitet aus chipStyle (dieselbe Pillenform wie
 // ueberall), nur schmaler — es steht unter einem 42 px breiten Zahlenfeld.
 const fehlerChip = { ...chipStyle, fontSize: 11, fontWeight: 700, padding: "1px 6px", minWidth: 20, textAlign: "center" };
-// Tönung fuer Zeile und Spalte des Feldes, in dem getippt wird. Die klebende
-// Namenszelle braucht eine DECKENDE Fassung, sonst scheint beim Scrollen das
-// Raster durch.
-const FOKUS_TON = "color-mix(in srgb, var(--accent) 10%, transparent)";
-const FOKUS_TON_DECKEND = "color-mix(in srgb, var(--accent) 14%, var(--card))";
 const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 // Eine Zeile „je Aufgabe/Teilaufgabe": Label, Ø-Punkte, farbige %-Zahl, Balken

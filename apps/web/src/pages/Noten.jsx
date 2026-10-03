@@ -11,7 +11,7 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
-import { COLORS as C, CONTROL_R, DialogKopf, Empty, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { COLORS as C, CONTROL_R, DialogKopf, Empty, FOKUS_TON, FOKUS_TON_DECKEND, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
@@ -89,6 +89,14 @@ export default function Noten() {
   const [summary, setSummary] = useState([]);
   const [error, setError] = useState("");
   const [zelle, setZelle] = useState(null);
+  // Wo wird gerade eingetragen? Zeile (Kind) und Spalte der offenen Zelle
+  // werden hervorgehoben — dieselbe Hilfe wie bei den Punkten der
+  // Klassenarbeit. `zelle` ist „Kind:Spalte" bzw. „sec:Kind:Abschnitt".
+  const [fokusKind, fokusSpalte] = (() => {
+    if (!zelle) return [null, null];
+    const p = String(zelle).split(":");
+    return p[0] === "sec" ? [p[1], null] : [p[0], p[1]];
+  })();
   const [neuAbschnitt, setNeuAbschnitt] = useState(false);
   const [neuSpalteIn, setNeuSpalteIn] = useState(null);
   const [renameCol, setRenameCol] = useState(null);
@@ -753,7 +761,8 @@ export default function Noten() {
                       style={{ ...th2, padding: 0, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500,
                         cursor: "grab", opacity: ziehCol.zieht === c.id ? 0.4 : 1,
                         borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
-                        boxShadow: colSeite === "vor" ? "inset 3px 0 0 var(--accent)" : colSeite === "nach" ? "inset -3px 0 0 var(--accent)" : undefined }}>
+                        boxShadow: colSeite === "vor" ? "inset 3px 0 0 var(--accent)" : colSeite === "nach" ? "inset -3px 0 0 var(--accent)" : undefined,
+                        ...(fokusSpalte === String(c.id) ? { background: FOKUS_TON, color: "var(--accent)" } : null) }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center", position: "relative" }}>
                         <button onClick={() => setRenameCol(renameCol === c.id ? null : c.id)} title={t("noten.colOverview")}
                           style={{ width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: "8px 6px" }}>{c.name}</button>
@@ -793,8 +802,9 @@ export default function Noten() {
             </thead>
             <tbody>
               {summary.map((s, si) => (
-                <tr key={s.student_id}>
-                  <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0 }}>
+                <tr key={s.student_id} style={fokusKind === String(s.student_id) ? { background: FOKUS_TON } : undefined}>
+                  <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0,
+                    ...(fokusKind === String(s.student_id) ? { background: FOKUS_TON_DECKEND, boxShadow: "inset 3px 0 0 var(--accent)" } : null) }}>
                     <button onClick={() => setInfoFuer(s.student_id)} title={t("noten.studentInfo")}
                       style={{ width: "100%", textAlign: "left", padding: "6px 8px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}>
                       {/* Nummer in fester Breite, rechtsbuendig: sonst faengt
@@ -834,6 +844,8 @@ export default function Noten() {
                         return (
                           <td key={c.id} title={statFarbe ? t(`anwesenheit.${stat}`) : undefined}
                             style={{ ...td, padding: 0, position: "relative", width: 56, minWidth: 56, maxWidth: 56, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
+                                     // Die Spalte der offenen Zelle; die Abwesenheit geht vor (sie ist eine Aussage, die Toenung nur Orientierung).
+                                     ...(fokusSpalte === String(c.id) ? { background: FOKUS_TON } : null),
                                      ...(statFarbe ? { background: `${statFarbe}1f`, boxShadow: `inset 3px 0 0 ${statFarbe}` } : null) }}>
                             {zelle === id
                               ? <Zelle initial={wert != null ? de(wert) : ""}
