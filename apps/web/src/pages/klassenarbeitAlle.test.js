@@ -144,7 +144,8 @@ describe("Klassenarbeit: Wiederholung aus dem Lernpfad", () => {
   });
 
   it("Anzahl nach Stärke der Schwäche", () => {
-    expect([wdhAnzahl(10), wdhAnzahl(30), wdhAnzahl(60)]).toEqual([3, 2, 1]);
+    expect([wdhAnzahl(0), wdhAnzahl(30), wdhAnzahl(80)]).toEqual([3, 2, 1]);
+    expect([wdhAnzahl(0, 5), wdhAnzahl(40, 5), wdhAnzahl(0, 1)]).toEqual([5, 3, 1]);
   });
 });
 

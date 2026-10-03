@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- Rückmeldebogen: **Anzahl der Wiederholungsaufgaben anteilig** — je Thema
+  so viele, wie fehlen (0 % ergibt das Maximum, mindestens eine), das
+  Maximum wählt man im Dialog (1–5, am Konto gemerkt). Ohne Aufgabennummer,
+  „Das saß“ ohne Anteile, und kein „Keine Wiederholung nötig“ unter „Weiter so“.
 - Waage: **Umformen per Drag and Drop** — ein Teil auf den Mülleimer ziehen
   (er erscheint beim Ziehen) löscht es, auf die andere Schale legt es hinüber,
   anderswo kehrt es zurück; die Waage zeigt schon beim Ziehen, was passiert.

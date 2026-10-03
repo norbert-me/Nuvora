@@ -458,14 +458,17 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
 // Kind). Leere Aufgaben und Platzhalter des alten Knopfs zaehlen nicht.
 // Themen ohne jeden Treffer stehen in `fehlend` — die Lehrkraft erfaehrt es
 // vor dem Druck, statt einen Bogen mit Luecke zu verteilen.
-// Je schlechter das Thema insgesamt, desto mehr Uebung: unter 25 % drei
-// Aufgaben, unter 50 % zwei, sonst eine (dann war nur eine einzelne
-// Teilaufgabe schwach, das Thema als Ganzes sass).
-export function wdhAnzahl(pct) {
-  return pct == null ? 1 : pct < 25 ? 3 : pct < 50 ? 2 : 1;
+// Je schlechter das Thema insgesamt, desto mehr Uebung — anteilig bis zu
+// einer Obergrenze, die die Lehrkraft im Druck-Dialog waehlt: 0 % ergibt das
+// Maximum, 50 % die Haelfte (gerundet), mindestens eine (das Thema steht nur
+// hier, weil eine Teilaufgabe schwach war).
+export function wdhAnzahl(pct, max = 3) {
+  const m = Math.max(1, Math.min(5, Math.round(max) || 3));
+  if (pct == null) return 1;
+  return Math.max(1, Math.min(m, Math.round(m * (1 - pct / 100))));
 }
 
-export function wdhZuteilen(bogen, pool, byId) {
+export function wdhZuteilen(bogen, pool, byId, max = 3) {
   // Brauchbar ist, was das Kind finden kann: ein Aufgabentext, eine Formel
   // ODER ein Verweis („Schulbuch S.11 Nr.8") — viele Aufgabenlisten bestehen
   // nur aus Verweisen, und die fielen vorher alle heraus. Die leeren
@@ -507,7 +510,7 @@ export function wdhZuteilen(bogen, pool, byId) {
     [...themen.values()].forEach((g) => {
       const liste = g.topic != null ? kandidaten(g.topic) : [];
       const pct = g.topic != null && b.themenPct ? b.themenPct[g.topic] : null;
-      const n = Math.min(wdhAnzahl(pct), liste.length);
+      const n = Math.min(wdhAnzahl(pct, max), liste.length);
       for (let i = 0; i < n; i++) {
         const ex = liste[(k * 3 + i) % liste.length];
         wdhAufgaben.push({ thema: g.thema, ex: {
@@ -1129,6 +1132,7 @@ export default function Klassenarbeit() {
   // zu welchen Themen der Lernpfad nichts hat — als Hinweis, nicht als
   // Rueckfrage beim Drucken (die hielt nur auf und aenderte nichts).
   const [poolVorab, setPoolVorab] = useState(null);
+  const [wdhMax, setWdhMax] = useState(3);
   // Rueckmeldebogen: unter „Auswertung" fuer alle Kinder beider Blaetter.
   const druckBogenRoh = alleAn && alleAnalysen ? alleAnalysen.gesamt.bogen : analyse ? analyse.bogen : [];
   const bogenOeffnen = async () => {
@@ -1145,8 +1149,9 @@ export default function Klassenarbeit() {
     const kopf = tp ? [tp.fach || ober?.fach, (tp.jahrgang || ober?.jahrgang) ? `Kl. ${tp.jahrgang || ober?.jahrgang}` : ""].filter(Boolean).join(" · ") : "";
     return { kopf, pfad: tp ? (ober ? `${mitNummer(ober)} › ${mitNummer(tp)}` : mitNummer(tp)) : f.thema };
   }), [poolVorab, druckBogenRoh, topics]);
-  const bogenDrucken = async (teile) => {
+  const bogenDrucken = async (teile, max) => {
     setBogenWahl(false);
+    setWdhMax(max);
     const pool = teile.includes("wdh") && lernpfadAktiv ? (poolVorab || []) : null;
     setWdhPool(pool);
     setBogenTeile(teile);
@@ -1154,7 +1159,7 @@ export default function Klassenarbeit() {
     // im Ausdruck der Quelltext.
     setTimeout(() => window.print(), pool ? 900 : 100);
   };
-  const druckBogen = useMemo(() => (wdhPool ? wdhZuteilen(druckBogenRoh, wdhPool, themen.byId) : druckBogenRoh), [druckBogenRoh, wdhPool, topics]);
+  const druckBogen = useMemo(() => (wdhPool ? wdhZuteilen(druckBogenRoh, wdhPool, themen.byId, wdhMax) : druckBogenRoh), [druckBogenRoh, wdhPool, topics, wdhMax]);
 
   // Aus den zentralen Tabellenstilen abgeleitet, nicht daneben neu gebaut: nur
   // die kraeftigere Kopf-Trennlinie und die polsterlose Zelle (die Eingabefelder

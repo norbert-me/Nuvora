@@ -65,13 +65,15 @@ export function BogenWahl({ onDrucken, onClose, mitWdh = true, wdhFehlt = [] }) 
   const { t } = useLanguage();
   const verfuegbar = BOGEN_TEILE.filter((k) => mitWdh || k !== "wdh");
   const [teile, setTeile] = useState(() => gemerkteTeile().filter((k) => verfuegbar.includes(k)));
+  // Hoechstzahl Wiederholungsaufgaben je Thema — am Konto, wie die Bausteine.
+  const [max, setMax] = useState(() => { const x = lokal("rueckmeldebogen"); return x && Number(x.max) >= 1 ? Math.min(5, Number(x.max)) : 3; });
   const vorlage = Object.keys(BOGEN_VORLAGEN).find((v) => {
     const a = BOGEN_VORLAGEN[v].filter((k) => verfuegbar.includes(k));
     return a.length === teile.length && a.every((k) => teile.includes(k));
   });
   const drucken = () => {
-    sichern("rueckmeldebogen", { teile });
-    onDrucken(teile);
+    sichern("rueckmeldebogen", { teile, max });
+    onDrucken(teile, max);
   };
   return (
     <Modal onClose={onClose} title={t("bogen.wahlTitel")} width={420}>
@@ -90,6 +92,18 @@ export function BogenWahl({ onDrucken, onClose, mitWdh = true, wdhFehlt = [] }) 
           <div key={k}>
             <Toggle checked={teile.includes(k)} label={t(`bogen.teil.${k}`)}
               onChange={(an) => setTeile((l) => (an ? BOGEN_TEILE.filter((x) => x === k || l.includes(x)) : l.filter((x) => x !== k)))} />
+            {/* Wie viele je Thema: anteilig nach dem, was fehlt, hoechstens so viele. */}
+            {k === "wdh" && teile.includes("wdh") && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0 0 46px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, color: "var(--text2)" }}>{t("bogen.wdhMax")}</span>
+                <Segment>
+                  {[1, 2, 3, 4, 5].map((z) => (
+                    <button key={z} onClick={() => setMax(z)} aria-pressed={max === z}
+                      style={{ ...segmentBtn, minWidth: 32, fontWeight: max === z ? 700 : 500, color: max === z ? "var(--accent)" : "var(--text2)" }}>{z}</button>
+                  ))}
+                </Segment>
+              </div>
+            )}
             {/* Ein Hinweis, keine Rueckfrage: zu diesen Themen bleibt der Abschnitt leer. */}
             {k === "wdh" && teile.includes("wdh") && wdhFehlt.length > 0 && (
               <div style={{ margin: "8px 0 4px", padding: "8px 12px", borderRadius: CONTROL_R, fontSize: 13, lineHeight: 1.4,
@@ -145,7 +159,7 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
           {b.sass.length > 0 && (
             <Abschnitt titel={t("bogen.sass")} farbe={C.success} icon={ICONS.check}>
               {b.sass.map((x) => (
-                <li key={x.label} style={zeile}>{x.label} <span style={klein}>({x.erreicht} / {x.max})</span></li>
+                <li key={x.label} style={zeile}>{x.label}</li>
               ))}
             </Abschnitt>
           )}
@@ -191,7 +205,7 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
                   {b.wdhAufgaben.map((x, i) => (
                     <li key={i} style={{ fontSize: 14, marginBottom: 12, breakInside: "avoid" }}>
                       <div style={{ ...klein, marginBottom: 2 }}>
-                        {x.thema}{x.ex && x.ex.code ? ` · ${x.ex.code}` : ""}
+                        {x.thema}
                       </div>
                       {/* Text, wenn es einen gibt; sonst der Verweis („Schulbuch S.11 Nr.8, Berechne") — so findet das Kind die Aufgabe im Buch. */}
                       {x.ex.text
@@ -205,7 +219,8 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
                   {t("bogen.wdhBis")} <span style={{ borderBottom: "1px solid #999", width: 140, height: 18 }} />
                 </div>
               </div>
-            ) : <p style={{ fontSize: 14, marginBottom: 20 }}>{t("bogen.wdhKeine")}</p>
+            ) : (an("themen") && b.offen.length === 0) ? null   // „Weiter so" steht schon da — nicht zweimal dasselbe
+              : <p style={{ fontSize: 14, marginBottom: 20 }}>{t("bogen.wdhKeine")}</p>
           )}
 
           {/* Zwei Zeilen für die Hand: eine Rückmeldung ohne Platz für den
