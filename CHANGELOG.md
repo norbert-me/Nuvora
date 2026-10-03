@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Tafel: Stille-Safari** — solange die Klasse leise ist, kommen nach und nach
+  Tiere in eine Savanne; bei Lärm laufen sie weg oder alles hält still.
+  Schwelle, Tempo (alle 2/5/8 min) und Verhalten einstellbar.
 - **Konto löschen** scheiterte, wenn das Konto CardVote-Sitzungen hatte
   (Datenbank-Fehler „sessions_class_id_fkey“).
 - **Scrollbalken immer sichtbar** (Notenbuch und überall sonst) — in Chrome

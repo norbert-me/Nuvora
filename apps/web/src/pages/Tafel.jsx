@@ -11,6 +11,8 @@ import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
 import { hmToMin, minToHm, ymd } from "../core/datum.js";
 import { stundenZeit } from "../core/stunden";
+import { useMikroPegel } from "../core/mikroPegel.js";
+import TafelSafari from "../components/TafelSafari.jsx";
 
 const KEY = "nuvora_tafel_v1";
 // Stiftfarben der Tafel. Bewusst feste Werte wie ANTWORT_COLORS: die Farbe IST
@@ -112,6 +114,12 @@ export default function Tafel() {
   const addLaerm = () => {
     const w = 520, h = 300;
     const it = { id: uid(), type: "laerm", x: (REF_W - w) / 2, y: 140, w, h, schwelle: 55, _ref: true };
+    setItems((p) => [...p, it]); setSel(it.id);
+  };
+  // Stille-Safari: Tiere kommen, solange es leise ist (components/TafelSafari.jsx).
+  const addSafari = () => {
+    const w = 1120, h = 630;
+    const it = { id: uid(), type: "safari", x: (REF_W - w) / 2, y: 120, w, h, schwelle: 40, takt: 5, modus: "weglaufen", _ref: true };
     setItems((p) => [...p, it]); setSel(it.id);
   };
   const patch = (id, o) => setItems((p) => p.map((i) => (i.id === id ? { ...i, ...o } : i)));
@@ -228,6 +236,8 @@ export default function Tafel() {
           <Icon d={ICONS.hourglass} size={17} /></button>
         <button onClick={addLaerm} className="icon-btn" style={toolbarIconBtn} title={t("tafel.addLaerm")} aria-label={t("tafel.addLaerm")}>
           <Icon d={ICONS.volume} size={17} /></button>
+        <button onClick={addSafari} className="icon-btn" style={toolbarIconBtn} title={t("tafel.addSafari")} aria-label={t("tafel.addSafari")}>
+          <Icon d={ICONS.sun} size={17} /></button>
         {kalenderAktiv && <button onClick={addVerlauf} className="icon-btn" style={toolbarIconBtn} title={t("tafel.addVerlauf")} aria-label={t("tafel.addVerlauf")}>
           <Icon d={ICONS.clock} size={17} /></button>}
         <button onClick={() => setFs((v) => !v)} className="icon-btn" style={toolbarIconBtn}
@@ -275,7 +285,9 @@ export default function Tafel() {
               {it.type === "timer" ? (
                 <TafelTimer item={it} onPatch={(o) => patch(it.id, o)} t={t} />
               ) : it.type === "laerm" ? (
-                <TafelLaerm item={it} onPatch={(o) => patch(it.id, o)} t={t} />
+                <TafelLaerm item={it} t={t} />
+              ) : it.type === "safari" ? (
+                <TafelSafari item={it} t={t} />
               ) : it.type === "verlauf" ? (
                 <TafelVerlauf t={t} />
               ) : (
@@ -303,7 +315,7 @@ export default function Tafel() {
               <button onPointerDown={(e) => onDown(e, selItem.id, "move")} className="icon-btn" style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", cursor: "grab", touchAction: "none" }} title={t("tafel.move") || ""} aria-label={t("tafel.move") || ""}>
                 <Icon d={ICONS.moveAll} size={18} color="var(--text2)" />
               </button>
-              {selItem.type !== "timer" && selItem.type !== "verlauf" && selItem.type !== "laerm" && (<>
+              {selItem.type !== "timer" && selItem.type !== "verlauf" && selItem.type !== "laerm" && selItem.type !== "safari" && (<>
                 <button onClick={() => setFontPop((v) => !v)} className="icon-btn" style={{ ...toolbarIconBtn, border: fontPop ? "1px solid var(--accent)" : "1px solid var(--border2)" }} title={t("tafel.textSize")} aria-label={t("tafel.textSize")}>
                   <Icon d={ICONS.edit} size={16} color={fontPop ? "var(--accent)" : "var(--text2)"} />
                 </button>
@@ -317,12 +329,25 @@ export default function Tafel() {
                   <button onClick={() => bumpFont(2)} style={leistenBtn} title={t("tafel.textLarger")} aria-label={t("tafel.textLarger")}>A<Icon d={ICONS.plus} size={13} color="var(--text2)" /></button>
                 </>)}
               </>)}
-              {selItem.type === "laerm" && (<>
-                <button onClick={() => patch(selItem.id, { schwelle: Math.max(10, (selItem.schwelle ?? 55) - 5) })} style={leistenBtn}
-                  title={t("tafel.laermStrenger")} aria-label={t("tafel.laermStrenger")}><Icon d={ICONS.minus} size={13} color="var(--text2)" /></button>
-                <span style={{ fontSize: 13, minWidth: 74, textAlign: "center", fontWeight: 600 }}>{t("tafel.laermSchwelle", { n: selItem.schwelle ?? 55 })}</span>
-                <button onClick={() => patch(selItem.id, { schwelle: Math.min(95, (selItem.schwelle ?? 55) + 5) })} style={leistenBtn}
-                  title={t("tafel.laermLockerer")} aria-label={t("tafel.laermLockerer")}><Icon d={ICONS.plus} size={13} color="var(--text2)" /></button>
+              {(selItem.type === "laerm" || selItem.type === "safari") && (() => {
+                const vor = selItem.type === "safari" ? 40 : 55;
+                return (<>
+                  <button onClick={() => patch(selItem.id, { schwelle: Math.max(10, (selItem.schwelle ?? vor) - 5) })} style={leistenBtn}
+                    title={t("tafel.laermStrenger")} aria-label={t("tafel.laermStrenger")}><Icon d={ICONS.minus} size={13} color="var(--text2)" /></button>
+                  <span style={{ fontSize: 13, minWidth: 74, textAlign: "center", fontWeight: 600 }}>{t("tafel.laermSchwelle", { n: selItem.schwelle ?? vor })}</span>
+                  <button onClick={() => patch(selItem.id, { schwelle: Math.min(95, (selItem.schwelle ?? vor) + 5) })} style={leistenBtn}
+                    title={t("tafel.laermLockerer")} aria-label={t("tafel.laermLockerer")}><Icon d={ICONS.plus} size={13} color="var(--text2)" /></button>
+                </>);
+              })()}
+              {selItem.type === "safari" && (<>
+                {/* Wie oft ein Tier kommt: 2 / 5 / 8 Minuten im Mittel. */}
+                <button onClick={() => patch(selItem.id, { takt: ({ 2: 5, 5: 8, 8: 2 })[selItem.takt ?? 5] ?? 5 })} style={{ ...leistenBtn, fontWeight: 500 }}
+                  title={t("tafel.safariTaktHint")}>{t("tafel.safariTakt", { n: selItem.takt ?? 5 })}</button>
+                {/* Was bei Laerm passiert: Tiere laufen weg / Szene haelt an. */}
+                <button onClick={() => patch(selItem.id, { modus: selItem.modus === "pause" ? "weglaufen" : "pause" })} style={{ ...leistenBtn, fontWeight: 500 }}
+                  title={t("tafel.safariModusHint")}>{selItem.modus === "pause" ? t("tafel.safariModusPause") : t("tafel.safariModusWeg")}</button>
+                <button onClick={() => patch(selItem.id, { _reset: Date.now() })} style={{ ...leistenBtn, fontWeight: 500 }}
+                  title={t("tafel.safariNeuHint")}>{t("tafel.safariNeu")}</button>
               </>)}
               {selItem.type === "laerm" && !selItem.muted && (
                 <button onClick={() => warnton()} style={{ ...leistenBtn, fontWeight: 500 }}
@@ -409,86 +434,29 @@ const LAERM_HALTE_S = 0.5;
 // Klasse, die dauerpiept, ist lauter als vorher.
 const LAERM_RUHE_S = 20;
 
-function TafelLaerm({ item, onPatch, t }) {
-  const [an, setAn] = useState(false);
-  const [pegel, setPegel] = useState(0);      // 0..100, geglaettet
-  const [fehler, setFehler] = useState("");
+function TafelLaerm({ item, t }) {
   const [warnt, setWarnt] = useState(false);
-  const technik = useRef(null);               // { stream, ctx, raf }
   const ueber = useRef(0);                    // seit wann ueber der Schwelle (ms)
   const letzteWarnung = useRef(0);
   const schwelle = item.schwelle ?? 55;
   const stumm = !!item.muted;
-  // Die Schwelle steckt in einem Ref: die Messschleife laeuft ausserhalb von
-  // React und saehe sonst den Wert von ihrem Start.
-  const schwelleRef = useRef(schwelle); schwelleRef.current = schwelle;
-  const stummRef = useRef(stumm); stummRef.current = stumm;
-
-  const stopp = () => {
-    const tk = technik.current;
-    if (!tk) return;
-    cancelAnimationFrame(tk.raf);
-    tk.stream.getTracks().forEach((sp) => sp.stop());
-    tk.ctx.close().catch(() => {});
-    technik.current = null;
-    setAn(false); setPegel(0); setWarnt(false); ueber.current = 0;
-  };
-  // Das Mikrofon muss auch dann aus, wenn das Feld geloescht oder die Seite
-  // verlassen wird — sonst leuchtet die Aufnahme-Anzeige des Browsers weiter.
-  useEffect(() => () => stopp(), []);   // eslint-disable-line react-hooks/exhaustive-deps
-
-  const start = async () => {
-    setFehler("");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        // Keine Aufbereitung: die Automatiken regeln genau das weg, was hier
-        // gemessen werden soll.
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-      });
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const quelle = ctx.createMediaStreamSource(stream);
-      const analyse = ctx.createAnalyser();
-      analyse.fftSize = 1024;
-      quelle.connect(analyse);
-      const puffer = new Float32Array(analyse.fftSize);
-      let geglaettet = 0, vorher = performance.now();
-      const schleife = () => {
-        analyse.getFloatTimeDomainData(puffer);
-        let summe = 0;
-        for (let i = 0; i < puffer.length; i++) summe += puffer[i] * puffer[i];
-        const rms = Math.sqrt(summe / puffer.length);
-        // dBFS auf 0..100: -60 dB (sehr leise) bis -10 dB (sehr laut).
-        const db = 20 * Math.log10(Math.max(rms, 1e-7));
-        const roh = Math.max(0, Math.min(100, ((db + 60) / 50) * 100));
-        geglaettet = geglaettet * 0.85 + roh * 0.15;
-        const wert = Math.round(geglaettet);
-        setPegel(wert);
-
-        const jetzt = performance.now();
-        const delta = jetzt - vorher; vorher = jetzt;
-        if (wert >= schwelleRef.current) {
-          ueber.current += delta;
-          if (ueber.current >= LAERM_HALTE_S * 1000 && jetzt - letzteWarnung.current >= LAERM_RUHE_S * 1000) {
-            letzteWarnung.current = jetzt;
-            ueber.current = 0;
-            setWarnt(true);
-            setTimeout(() => setWarnt(false), 4000);
-            if (!stummRef.current) warnton(technik.current && technik.current.ctx);
-          }
-        } else {
-          ueber.current = 0;
-        }
-        technik.current.raf = requestAnimationFrame(schleife);
-      };
-      technik.current = { stream, ctx, raf: 0 };
-      setAn(true);
-      technik.current.raf = requestAnimationFrame(schleife);
-    } catch {
-      // Abgelehnt, kein Mikrofon, oder unsicherer Kontext (http): alle drei
-      // enden hier, und alle drei helfen mit demselben Satz.
-      setFehler(t("tafel.laermKeinMikro"));
+  // Gemessen wird in core/mikroPegel.js (dieselbe Messung wie die Stille-Safari);
+  // hier steht nur, was bei zu viel Laerm passiert.
+  const { an, pegel, fehler, start, stopp } = useMikroPegel((wert, delta, ctx) => {
+    if (wert >= schwelle) {
+      ueber.current += delta;
+      const jetzt = performance.now();
+      if (ueber.current >= LAERM_HALTE_S * 1000 && jetzt - letzteWarnung.current >= LAERM_RUHE_S * 1000) {
+        letzteWarnung.current = jetzt;
+        ueber.current = 0;
+        setWarnt(true);
+        setTimeout(() => setWarnt(false), 4000);
+        if (!stumm) warnton(ctx);
+      }
+    } else {
+      ueber.current = 0;
     }
-  };
+  });
 
   const farbe = pegel >= schwelle ? C.danger : pegel >= schwelle * 0.75 ? C.warning : C.success;
   const bh = item.h || 300;
@@ -509,7 +477,7 @@ function TafelLaerm({ item, onPatch, t }) {
           : <button onClick={stopp} style={miniBtn}>{t("tafel.laermStop")}</button>}
         {an && <span style={{ fontSize: 34, fontWeight: 800, color: farbe, fontVariantNumeric: "tabular-nums", minWidth: 90, textAlign: "center" }}>{pegel}</span>}
       </div>
-      {fehler && <div style={{ fontSize: 24, color: C.danger, textAlign: "center" }}>{fehler}</div>}
+      {fehler && <div style={{ fontSize: 24, color: C.danger, textAlign: "center" }}>{t("tafel.laermKeinMikro")}</div>}
       {/* Datenschutz-Angabe: sie sagt etwas, das man dem Bildschirm nicht
           ansieht, und bleibt deshalb stehen. */}
       <div style={{ fontSize: 22, color: "var(--text3)", textAlign: "center", lineHeight: 1.3 }}>{t("tafel.laermHinweis")}</div>

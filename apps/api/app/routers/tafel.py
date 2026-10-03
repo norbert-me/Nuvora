@@ -65,13 +65,14 @@ def _items(roh) -> list:
         # niemand gemacht hat. `minutes` (Timer) und `schwelle`
         # (Lautstaerke-Anzeige) fielen vorher stillschweigend heraus, und die
         # Einstellung war nach dem Speichern weg.
-        for zahl in ("minutes", "schwelle"):
+        # `takt` (Stille-Safari: Minuten je Tier) dazu.
+        for zahl in ("minutes", "schwelle", "takt"):
             if zahl in it:
                 try:
                     sauber[zahl] = float(it[zahl])
                 except (TypeError, ValueError):
                     pass    # keine Zahl: das Feld faellt weg, die Tafel bleibt gueltig
-        for text in ("text", "color", "bold", "align", "bis", "titel", "kurs_id", "muted", "_ref"):
+        for text in ("text", "color", "bold", "align", "bis", "titel", "kurs_id", "muted", "_ref", "modus"):
             if text in it:
                 wert = it[text]
                 sauber[text] = wert[:MAX_TEXT] if isinstance(wert, str) else wert
