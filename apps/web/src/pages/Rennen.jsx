@@ -19,7 +19,7 @@ import { zeichneAuto } from "../core/rennauto.js";
 import { useLanguage } from "../i18n/index.jsx";
 import {
   BREITE, HOEHE, PHYSIK, SPUR, STRAHLEN, STRAHL_MAX, ZEITGRENZE, STRECKEN, strecke as streckeVon, denkeInnen, fahre, fitness, gewicht,
-  gehirnAusJson, gehirnZuJson, gleicheForm, netzForm,
+  gehirnAusJson, gehirnZuJson, netzForm,
   kiSchritt, mutiere, rundenSchnitt, naechsteGeneration, neuesAuto, sensoren, zeitText, zufallsGehirn,
 } from "../core/rennen.js";
 
@@ -52,6 +52,14 @@ export default function Rennen() {
   // Ist die Hilfe offen (Startbild bzw. Erklaerung), bleiben alle anderen
   // Felder auf der Karte weg — sie verdeckten sie sonst.
   const hilfeOffen = !laeuft && !gestartet.has(modus);
+  // Eine andere Strecke heisst: die KI vergisst alles und beginnt bei null —
+  // keine gespeicherte KI, kein Uebertrag von der vorigen Strecke.
+  const streckeWechseln = (k) => {
+    if (k === streckeName) return;
+    try { Object.keys(STRECKEN).forEach((n) => localStorage.removeItem(speicherKey(n))); } catch { /* egal */ }
+    if (welt.current) welt.current.besteKi = null;
+    setStreckeName(k);
+  };
   const erklaerungZeigen = () => {
     setLaeuft(false);
     setGestartet((g) => { const n = new Set(g); n.delete(modus); return n; });
@@ -78,9 +86,6 @@ export default function Rennen() {
     let gespeichert = formNeu ? null : ladeKi(streckeName);
     const form = formNeu || (gespeichert ? gespeichert.beste.form : netzForm(schichten, neuronen));
     if (!formNeu && gespeichert) { setSchichten(form.length - 2); setNeuronen(form.length > 2 ? form[1] : neuronen); }
-    // Noch keine KI fuer diese Strecke? Dann faengt sie mit dem an, was sie
-    // auf der vorigen gelernt hat — so sieht man, ob Gelerntes uebertragbar ist.
-    const mitgebracht = !gespeichert && welt.current?.besteKi && gleicheForm(welt.current.besteKi.form, form) ? welt.current.besteKi : null;
     const w = { mensch: null, autos: [], gehirne: [], gen: gespeichert?.gen || 0, verlauf: gespeichert?.verlauf || [],
       zeiten: gespeichert?.zeiten || [], geschafft: gespeichert?.geschafft || [],
       aufwand: gespeichert?.aufwand || 0,
@@ -91,7 +96,7 @@ export default function Rennen() {
       // Weiterlernen heisst: ALLE fangen bei der gespeicherten KI an (zwei
       // unveraendert, der Rest leicht mutiert). Vorher waren nur zwei davon
       // Kopien und 28 Zufall — das sah aus, als sei die KI geloescht.
-      const start = w.besteKi || mitgebracht;
+      const start = w.besteKi;
       w.gehirne = Array.from({ length: anzahl }, (_, i) => (!start ? zufallsGehirn(Math.random, form) : i < 2 ? start : mutiere(start, rate)));
       w.autos = w.gehirne.map(() => neuesAuto(strecke));
     }
@@ -322,7 +327,7 @@ export default function Rennen() {
         {/* Strecken: als kleine Bilder der Mittellinie — man erkennt sie schneller, als man sie liest. */}
         <Segment>
           {Object.keys(STRECKEN).map((k) => (
-            <button key={k} onClick={() => setStreckeName(k)} aria-pressed={streckeName === k} title={t(`rennen.strecke.${k}`)} aria-label={t(`rennen.strecke.${k}`)}
+            <button key={k} onClick={() => streckeWechseln(k)} aria-pressed={streckeName === k} title={t(`rennen.strecke.${k}`)} aria-label={t(`rennen.strecke.${k}`)}
               style={{ ...segmentBtn, padding: "0 6px", color: streckeName === k ? "var(--accent)" : "var(--text3)" }}>
               <StreckenBild punkte={streckeVon(k).mitte} />
             </button>
