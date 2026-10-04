@@ -13,16 +13,23 @@ import { experimentLauf, laufBilanz, zeitText } from "../core/rennen.js";
 
 const FARBEN = ["#1e88e5", "#e53935", "#43a047", "#fb8c00"];
 const VORGABE = [
-  { rate: 0.02, anzahl: 30, grenze: 30 },
-  { rate: 0.15, anzahl: 30, grenze: 30 },
-  { rate: 0.5, anzahl: 30, grenze: 30 },
+  { rate: 0.02, anzahl: 30, grenze: 30, schichten: 1, neuronen: 8 },
+  { rate: 0.15, anzahl: 30, grenze: 30, schichten: 1, neuronen: 8 },
+  { rate: 0.5, anzahl: 30, grenze: 30, schichten: 1, neuronen: 8 },
 ];
 
 export default function RennenExperiment({ strecke, t }) {
   const [einst, setEinst] = useState(VORGABE);
   const [generationen, setGenerationen] = useState(20);
   const [wdh, setWdh] = useState(1);
+  // Vergleich nach GENERATIONEN (jede Einstellung gleich viele) oder nach
+  // gleichem AUFWAND (jede gleich viel Rechenzeit). Nur der zweite ist fair:
+  // 60 Autos sehen je Generation besser aus als 30 — kosten aber doppelt.
+  const [nach, setNach] = useState("aufwand");
+  const [budget, setBudget] = useState(100);   // Minuten Fahrzeit aller Autos zusammen
   const [ergebnis, setErgebnis] = useState(null);   // [[reihe je Wiederholung] je Einstellung]
+  const [nachErg, setNachErg] = useState("aufwand");   // womit das angezeigte Ergebnis lief
+  const [budgetErg, setBudgetErg] = useState(100);
   const [laeuft, setLaeuft] = useState(false);
   const [fort, setFort] = useState(0);
   const abbruch = useRef(false);
@@ -36,23 +43,30 @@ export default function RennenExperiment({ strecke, t }) {
     const laeufe = einst.flatMap((e, ei) => Array.from({ length: wdh }, (_, w) => ({ ei, w,
       lauf: experimentLauf({ ...e, seed: 1000 + ei * 97 + w * 7919, strecke }) })));
     const reihen = einst.map(() => Array.from({ length: wdh }, () => []));
-    const gesamt = laeufe.length * generationen;
-    let erledigt = 0;
+    const MAXGEN = 300;
+    const fertig = (l) => (nach === "gen" ? reihen[l.ei][l.w].length >= generationen
+      : (l.cum || 0) >= budget * 60 || reihen[l.ei][l.w].length >= MAXGEN);
+    const gesamt = laeufe.length * (nach === "gen" ? generationen : budget * 60);
+    let k = 0;
     setErgebnis(reihen.map((r) => r.map((x) => [...x])));
-    setLaeuft(true); setFort(0);
+    setLaeuft(true); setFort(0); setNachErg(nach); setBudgetErg(budget);
     // Reihum: jede Einstellung eine Generation weiter — so wachsen alle Kurven
     // gleichzeitig, und ein Abbruch hinterlaesst einen fairen Vergleich.
     const schritt = () => {
       if (abbruch.current) { setLaeuft(false); return; }
       const t0 = performance.now();
-      while (performance.now() - t0 < 40 && erledigt < gesamt) {
-        const l = laeufe[erledigt % laeufe.length];
-        reihen[l.ei][l.w].push(l.lauf.weiter());
-        erledigt += 1;
+      let offen = laeufe.filter((l) => !fertig(l));
+      while (performance.now() - t0 < 40 && offen.length) {
+        const l = offen[k % offen.length]; k += 1;
+        const g = l.lauf.weiter();
+        l.cum = (l.cum || 0) + g.aufwand;
+        reihen[l.ei][l.w].push({ ...g, cum: l.cum });
+        offen = laeufe.filter((x) => !fertig(x));
       }
+      const stand = laeufe.reduce((x, l) => x + Math.min(nach === "gen" ? reihen[l.ei][l.w].length : l.cum || 0, nach === "gen" ? generationen : budget * 60), 0);
       setErgebnis(reihen.map((r) => r.map((x) => [...x])));
-      setFort(erledigt / gesamt);
-      if (erledigt < gesamt) setTimeout(schritt, 0); else setLaeuft(false);
+      setFort(stand / gesamt);
+      if (offen.length) setTimeout(schritt, 0); else setLaeuft(false);
     };
     setTimeout(schritt, 0);
   };
@@ -63,11 +77,14 @@ export default function RennenExperiment({ strecke, t }) {
   const alle = (ergebnis || []).flat(2).map((g) => g.beste).filter((z) => z != null);
   const zmin = alle.length ? Math.min(...alle) : 0, zmax = alle.length ? Math.max(...alle) : 1;
   const W = 600, H = 220, R = 30;
-  const px = (i) => R + (generationen > 1 ? (i / (generationen - 1)) * (W - R - 10) : 0);
+  // x: Generation — oder, beim fairen Vergleich, der bisherige Aufwand.
+  const xMax = nachErg === "gen" ? Math.max(1, generationen - 1) : budgetErg * 60;
+  const xVon = (g, i) => (nachErg === "gen" ? i : g.cum);
+  const px = (v) => R + (v / xMax) * (W - R - 10);
   const py = (z) => 12 + ((z - zmin) / Math.max(0.01, zmax - zmin)) * (H - 40);
   const linie = (reihe) => {
     const teile = []; let akt = [];
-    reihe.forEach((g, i) => { if (g.beste == null) { if (akt.length) teile.push(akt); akt = []; } else akt.push(`${px(i)},${py(g.beste)}`); });
+    reihe.forEach((g, i) => { if (g.beste == null) { if (akt.length) teile.push(akt); akt = []; } else akt.push(`${px(Math.min(xMax, xVon(g, i)))},${py(g.beste)}`); });
     if (akt.length) teile.push(akt);
     return teile;
   };
@@ -85,6 +102,8 @@ export default function RennenExperiment({ strecke, t }) {
                 <th style={th}>{t("rennen.mutation")}</th>
                 <th style={th}>{t("rennen.anzahl")}</th>
                 <th style={th}>{t("rennen.grenze")}</th>
+                <th style={th}>{t("rennen.schichten")}</th>
+                <th style={th}>{t("rennen.neuronen")}</th>
                 <th style={th} />
               </tr>
             </thead>
@@ -95,6 +114,8 @@ export default function RennenExperiment({ strecke, t }) {
                   <td style={td}><Zahl wert={Math.round(e.rate * 100)} stufen={[1, 2, 5, 10, 15, 20, 30, 50, 80]} einheit="%" onChange={(v) => setze(i, "rate", v / 100)} aus={laeuft} /></td>
                   <td style={td}><Zahl wert={e.anzahl} stufen={[5, 10, 20, 30, 45, 60]} onChange={(v) => setze(i, "anzahl", v)} aus={laeuft} /></td>
                   <td style={td}><Zahl wert={e.grenze} stufen={[5, 10, 15, 20, 30, 45, 60, 90]} einheit="s" onChange={(v) => setze(i, "grenze", v)} aus={laeuft} /></td>
+                  <td style={td}><Zahl wert={e.schichten ?? 1} stufen={[0, 1, 2, 3]} onChange={(v) => setze(i, "schichten", v)} aus={laeuft} /></td>
+                  <td style={td}><Zahl wert={e.neuronen ?? 8} stufen={[2, 4, 8, 12, 16]} onChange={(v) => setze(i, "neuronen", v)} aus={laeuft || e.schichten === 0} /></td>
                   <td style={td}>
                     {einst.length > 1 && !laeuft && (
                       <button onClick={() => setEinst((l) => l.filter((_, j) => j !== i))} style={{ ...toolbarBtn, color: C.danger }} aria-label={t("common.delete")}>×</button>
@@ -109,13 +130,28 @@ export default function RennenExperiment({ strecke, t }) {
           {einst.length < 4 && !laeuft && (
             <button onClick={() => setEinst((l) => [...l, { ...l[l.length - 1] }])} style={toolbarBtn}>+ {t("rennen.exp.einstellung")}</button>
           )}
-          <span style={{ fontSize: 13, color: "var(--text2)" }}>{t("rennen.exp.generationen")}</span>
+          <span style={{ fontSize: 13, color: "var(--text2)" }}>{t("rennen.exp.nach")}</span>
           <Segment>
-            {[10, 20, 30, 50].map((g) => (
-              <button key={g} disabled={laeuft} onClick={() => setGenerationen(g)} aria-pressed={generationen === g}
-                style={{ ...segmentBtn, fontWeight: generationen === g ? 700 : 500, color: generationen === g ? "var(--accent)" : "var(--text2)" }}>{g}</button>
+            {["aufwand", "gen"].map((m) => (
+              <button key={m} disabled={laeuft} onClick={() => setNach(m)} aria-pressed={nach === m}
+                style={{ ...segmentBtn, fontWeight: nach === m ? 700 : 500, color: nach === m ? "var(--accent)" : "var(--text2)" }}>{t(`rennen.exp.nach_${m}`)}</button>
             ))}
           </Segment>
+          {nach === "gen" ? (
+            <Segment>
+              {[10, 20, 30, 50].map((g) => (
+                <button key={g} disabled={laeuft} onClick={() => setGenerationen(g)} aria-pressed={generationen === g}
+                  style={{ ...segmentBtn, fontWeight: generationen === g ? 700 : 500, color: generationen === g ? "var(--accent)" : "var(--text2)" }}>{g}</button>
+              ))}
+            </Segment>
+          ) : (
+            <Segment>
+              {[50, 100, 200, 400].map((g) => (
+                <button key={g} disabled={laeuft} onClick={() => setBudget(g)} aria-pressed={budget === g} title={t("rennen.aufwandHint")}
+                  style={{ ...segmentBtn, fontWeight: budget === g ? 700 : 500, color: budget === g ? "var(--accent)" : "var(--text2)" }}>{t("rennen.exp.minuten", { n: g })}</button>
+              ))}
+            </Segment>
+          )}
           <span style={{ fontSize: 13, color: "var(--text2)" }}>{t("rennen.exp.wdh")}</span>
           <Segment>
             {[1, 2, 3].map((g) => (
@@ -141,9 +177,10 @@ export default function RennenExperiment({ strecke, t }) {
             <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", display: "block", background: "var(--bg3)", borderRadius: CONTROL_R }}>
               <text x={4} y={16} fontSize={11} fill="var(--text3)">{zeitText(zmin)}</text>
               <text x={4} y={H - 26} fontSize={11} fill="var(--text3)">{zeitText(zmax)}</text>
-              {[0, generationen - 1].map((g) => (
-                <text key={g} x={px(g)} y={H - 6} fontSize={11} textAnchor={g ? "end" : "start"} fill="var(--text3)">{t("rennen.exp.gen", { n: g + 1 })}</text>
-              ))}
+              <text x={px(0)} y={H - 6} fontSize={11} textAnchor="start" fill="var(--text3)">{nachErg === "gen" ? t("rennen.exp.gen", { n: 1 }) : "0"}</text>
+              <text x={px(xMax)} y={H - 6} fontSize={11} textAnchor="end" fill="var(--text3)">
+                {nachErg === "gen" ? t("rennen.exp.gen", { n: generationen }) : t("rennen.exp.minuten", { n: budgetErg })}
+              </text>
               {ergebnis.map((laeufe, ei) => laeufe.map((reihe, w) => linie(reihe).map((pkt, k) => (
                 <polyline key={`${ei}-${w}-${k}`} points={pkt.join(" ")} fill="none" stroke={FARBEN[ei]}
                   strokeWidth={w === 0 ? 2.4 : 1.4} strokeOpacity={w === 0 ? 1 : 0.55} strokeDasharray={w === 0 ? undefined : "5 4"} />
@@ -159,6 +196,8 @@ export default function RennenExperiment({ strecke, t }) {
                 <th style={th}>{t("rennen.exp.ersteRunde")}</th>
                 <th style={th}>{t("rennen.exp.bestzeit")}</th>
                 <th style={th}>{t("rennen.exp.anteilEnde")}</th>
+                <th style={th}>{t("rennen.exp.generationen")}</th>
+                <th style={th}>{t("rennen.exp.aufwandSpalte")}</th>
               </tr>
             </thead>
             <tbody>
@@ -171,10 +210,12 @@ export default function RennenExperiment({ strecke, t }) {
                 return (
                   <tr key={ei}>
                     <td style={td}><span style={{ display: "inline-block", width: 14, height: 14, borderRadius: CONTROL_R, background: FARBEN[ei] }} /></td>
-                    <td style={td}>{Math.round((e.rate || 0) * 100)} % · {e.anzahl} · {e.grenze} s</td>
+                    <td style={td}>{Math.round((e.rate || 0) * 100)} % · {e.anzahl} · {e.grenze} s · {e.schichten ? `${e.schichten}×${e.neuronen}` : "–"}</td>
                     <td style={td}>{ersteListe}</td>
                     <td style={td}>{zeitListe}</td>
                     <td style={td}>{anteil}</td>
+                    <td style={td}>{laeufe.map((rh) => rh.length).join(" / ")}</td>
+                    <td style={td}>{laeufe.map((rh) => `${Math.round((rh.length ? rh[rh.length - 1].cum : 0) / 60)} min`).join(" / ")}</td>
                   </tr>
                 );
               })}

@@ -148,36 +148,50 @@ export function sensoren(auto, strecke) {
   });
 }
 
-// ── Gehirn: 6 Eingaenge (5 Strahlen + Tempo) → 8 versteckt → 2 (lenken, gas) ──
-export const NETZ = { ein: STRAHLEN.length + 1, mitte: 8, aus: 2 };
-export const GENE = NETZ.ein * NETZ.mitte + NETZ.mitte + NETZ.mitte * NETZ.aus + NETZ.aus;
+// ── Gehirn: ein neuronales Netz mit einstellbaren Schichten ──
+// Eingaenge: fuenf Strahlen + Tempo. Ausgaenge: Lenken, Gas. Dazwischen
+// beliebig viele versteckte Schichten mit je gleich vielen Neuronen — wie
+// viele, ist eine Lernfrage: mehr Neuronen koennen mehr, brauchen aber auch
+// mehr Generationen, bis sie es koennen.
+// Ein Gehirn ist { form: [6, …, 2], w: Float32Array }: je Schicht erst die
+// Gewichte (Zeile = Zielknoten), dann die Verschiebungen (Bias).
+export const EIN = STRAHLEN.length + 1, AUS = 2;
+export const netzForm = (schichten = 1, neuronen = 8) => [EIN, ...Array(Math.max(0, schichten)).fill(neuronen), AUS];
+export const genAnzahl = (form) => form.slice(1).reduce((n, b, l) => n + b * form[l] + b, 0);
+export const gleicheForm = (a, b) => !!a && !!b && a.length === b.length && a.every((x, i) => x === b[i]);
 
-export function zufallsGehirn(rnd = Math.random) {
-  return Float32Array.from({ length: GENE }, () => rnd() * 2 - 1);
+export function zufallsGehirn(rnd = Math.random, form = netzForm()) {
+  return { form: [...form], w: Float32Array.from({ length: genAnzahl(form) }, () => rnd() * 2 - 1) };
 }
+
+// Wo die Gewichte der Schicht l beginnen.
+function versatz(form, l) {
+  let o = 0;
+  for (let k = 0; k < l; k++) o += form[k + 1] * form[k] + form[k + 1];
+  return o;
+}
+// Gewicht von Knoten i (Schicht l) zu Knoten j (Schicht l + 1).
+export const gewicht = (g, l, i, j) => g.w[versatz(g.form, l) + j * g.form[l] + i];
 
 // Das Netz rechnen — mit allen Zwischenwerten, damit man es zeigen kann.
 export function denkeInnen(gehirn, eingaben) {
-  const { ein, mitte, aus } = NETZ;
-  const h = new Array(mitte);
-  for (let j = 0; j < mitte; j++) {
-    let s = 0;
-    for (let i = 0; i < ein; i++) s += gehirn[j * ein + i] * eingaben[i];
-    h[j] = Math.tanh(s + gehirn[ein * mitte + j]);
+  const { form, w } = gehirn;
+  const schichten = [eingaben];
+  let a = eingaben, o = 0;
+  for (let l = 0; l < form.length - 1; l++) {
+    const n = form[l], m = form[l + 1];
+    const b = new Array(m);
+    for (let j = 0; j < m; j++) {
+      let s = 0;
+      for (let i = 0; i < n; i++) s += w[o + j * n + i] * a[i];
+      b[j] = Math.tanh(s + w[o + m * n + j]);
+    }
+    o += m * n + m;
+    schichten.push(b);
+    a = b;
   }
-  const o = ein * mitte + mitte;
-  const out = [];
-  for (let k = 0; k < aus; k++) {
-    let s = 0;
-    for (let j = 0; j < mitte; j++) s += gehirn[o + k * mitte + j] * h[j];
-    out.push(Math.tanh(s + gehirn[o + mitte * aus + k]));
-  }
-  return { ein: eingaben, mitte: h, aus: out };
+  return { schichten, ein: eingaben, aus: a };
 }
-
-// Gewicht von Eingang i zu Mittelknoten j bzw. von Mittelknoten j zu Ausgang k.
-export const gewichtEin = (g, i, j) => g[j * NETZ.ein + i];
-export const gewichtAus = (g, j, k) => g[NETZ.ein * NETZ.mitte + NETZ.mitte + k * NETZ.mitte + j];
 
 export function denke(gehirn, eingaben) {
   return denkeInnen(gehirn, eingaben).aus;   // [lenken, gas]
@@ -192,19 +206,34 @@ export function kiSchritt(auto, gehirn, strecke) {
 // Mutation: jedes Gewicht mit Wahrscheinlichkeit `rate` um einen normal-
 // verteilten Betrag verschoben. Das ist der ganze „Lernschritt".
 export function mutiere(gehirn, rate, rnd = Math.random, staerke = 0.5) {
-  const neu = Float32Array.from(gehirn);
+  const neu = Float32Array.from(gehirn.w);
   for (let i = 0; i < neu.length; i++) if (rnd() < rate) neu[i] += gauss(rnd) * staerke;
-  return neu;
+  return { form: gehirn.form, w: neu };
 }
 
-// Fitness: das Ziel ist die SCHNELLSTE RUNDE, nicht moeglichst viele. Wer eine
-// Runde geschafft hat, wird nur nach ihrer Zeit gewertet — und steht immer
-// vor jedem, der keine geschafft hat (der Sockel 1000 liegt ueber jedem Weg
-// einer unvollendeten Runde). Ohne Runde zaehlt der Weg: sonst gaebe es am
-// Anfang nichts, woran die Auswahl ansetzen koennte.
+// Speichern und Laden. Aeltere Speicherstaende sind ein blankes Zahlenfeld
+// des alten Netzes 6 → 8 → 2.
+export const gehirnZuJson = (g) => ({ form: g.form, w: Array.from(g.w) });
+export function gehirnAusJson(x) {
+  if (Array.isArray(x)) return { form: netzForm(1, 8), w: Float32Array.from(x) };
+  if (x && Array.isArray(x.form) && Array.isArray(x.w) && x.w.length === genAnzahl(x.form)) return { form: x.form, w: Float32Array.from(x.w) };
+  return null;
+}
+
+// Fitness: der WEG in der Fahrzeit. Jedes Auto faehrt, bis die Zeit um ist
+// oder es verunglueckt — wer am weitesten kommt, faehrt im Schnitt die
+// schnellsten Runden. So zaehlt Bestaendigkeit: eine einzelne schnelle Runde
+// mit Unfall danach bringt weniger als drei saubere. (Zuerst war ein Auto
+// nach einer Runde fertig — dann gewann die Glueckrunde, und die Generation
+// endete lange vor der eingestellten Fahrzeit.)
 export function fitness(auto) {
-  const zeit = auto.runden_zeiten.length ? auto.runden_zeiten[0] : null;
-  return zeit ? 1000 + 10000 / zeit : auto.weg;
+  return auto.weg;
+}
+
+// Durchschnittliche Rundenzeit eines Autos — oder null ohne volle Runde.
+export function rundenSchnitt(auto) {
+  const z = auto.runden_zeiten;
+  return z.length ? z.reduce((x, y) => x + y, 0) / z.length : null;
 }
 
 // Naechste Generation: die zwei Besten unveraendert (sonst kann das Beste
@@ -231,7 +260,6 @@ export function fahreGeneration(gehirne, strecke, grenze = ZEITGRENZE) {
     for (let i = 0; i < autos.length; i++) {
       if (!autos[i].lebt) continue;
       kiSchritt(autos[i], gehirne[i], strecke);
-      if (autos[i].runden >= 1) autos[i].lebt = false;   // eine Runde — fertig
       lebend += autos[i].lebt ? 1 : 0;
     }
     if (!lebend) break;
@@ -250,19 +278,26 @@ export function zeitText(s) {
 // Gehirne aus seinem Startwert), damit nichts Gelerntes den Vergleich
 // verfaelscht. Liefert je Aufruf von `weiter()` die Werte EINER Generation —
 // die Seite ruft es in kleinen Haeppchen, damit sie dabei bedienbar bleibt.
-export function experimentLauf({ rate, anzahl, grenze, seed, strecke: st }) {
+export function experimentLauf({ rate, anzahl, grenze, seed, strecke: st, schichten = 1, neuronen = 8 }) {
   const rnd = zufallsquelle(seed);
-  let gehirne = Array.from({ length: anzahl }, () => zufallsGehirn(rnd));
+  const form = netzForm(schichten, neuronen);
+  let gehirne = Array.from({ length: anzahl }, () => zufallsGehirn(rnd, form));
   return {
     weiter() {
       const autos = fahreGeneration(gehirne, st, grenze);
-      const zeiten = autos.flatMap((a) => a.runden_zeiten.slice(0, 1));
       const punkte = autos.map(fitness);
+      let bi = 0;
+      punkte.forEach((p, i) => { if (p > punkte[bi]) bi = i; });
       gehirne = naechsteGeneration(gehirne, punkte, rate, rnd);
       return {
-        beste: zeiten.length ? Math.min(...zeiten) : null,
-        schnitt: zeiten.length ? zeiten.reduce((x, y) => x + y, 0) / zeiten.length : null,
-        anteil: zeiten.length / autos.length,
+        // Rechenaufwand: wie viele Sekunden alle Autos zusammen gefahren sind —
+        // jedes simulierte Auto kostet Rechenzeit, auch wenn es auf dem
+        // Bildschirm „gleichzeitig" faehrt.
+        aufwand: autos.reduce((x, a) => x + a.t, 0),
+        // Der Rundenschnitt des BESTEN Autos dieser Generation.
+        beste: rundenSchnitt(autos[bi]),
+        runden: autos[bi].runden,
+        anteil: autos.filter((a) => a.runden > 0).length / autos.length,
       };
     },
   };

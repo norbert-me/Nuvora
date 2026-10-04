@@ -17,8 +17,9 @@ import RennenExperiment from "../components/RennenExperiment.jsx";
 import RennenErklaerung from "../components/RennenErklaerung.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import {
-  BREITE, HOEHE, NETZ, PHYSIK, SPUR, STRAHLEN, STRAHL_MAX, ZEITGRENZE, STRECKEN, strecke as streckeVon, denkeInnen, fahre, fitness, gewichtAus, gewichtEin,
-  kiSchritt, mutiere, naechsteGeneration, neuesAuto, sensoren, zeitText, zufallsGehirn,
+  BREITE, HOEHE, PHYSIK, SPUR, STRAHLEN, STRAHL_MAX, ZEITGRENZE, STRECKEN, strecke as streckeVon, denkeInnen, fahre, fitness, gewicht,
+  gehirnAusJson, gehirnZuJson, gleicheForm, netzForm,
+  kiSchritt, mutiere, rundenSchnitt, naechsteGeneration, neuesAuto, sensoren, zeitText, zufallsGehirn,
 } from "../core/rennen.js";
 
 // Je Strecke ihre beste KI. Die Rundkurs-KI lag frueher unter dem Schluessel
@@ -29,7 +30,8 @@ const speicherKey = (name) => (name === "rundkurs" ? SPEICHER : `${SPEICHER}_${n
 function ladeKi(name) {
   try {
     const x = JSON.parse(localStorage.getItem(speicherKey(name)) || "null");
-    if (x && Array.isArray(x.beste)) return { ...x, beste: Float32Array.from(x.beste) };
+    const beste = x ? gehirnAusJson(x.beste) : null;
+    if (beste) return { ...x, beste };
   } catch { /* leer oder gesperrt */ }
   return null;
 }
@@ -43,6 +45,14 @@ export default function Rennen() {
   const [tempo, setTempo] = useState(1);
   const [nurBeste, setNurBeste] = useState(false);
   const [grenze, setGrenze] = useState(ZEITGRENZE);
+  // In welchen Modi schon einmal gestartet wurde (diese Sitzung).
+  const [gestartet, setGestartet] = useState(() => new Set());
+  useEffect(() => { if (laeuft) setGestartet((g) => (g.has(modus) ? g : new Set([...g, modus]))); }, [laeuft, modus]);
+  const erklaerungZeigen = () => {
+    setLaeuft(false);
+    setGestartet((g) => { const n = new Set(g); n.delete(modus); return n; });
+    if (modus === "ki") setErklaert(false);
+  };
   // Hat dieses Geraet die Schritt-fuer-Schritt-Erklaerung schon durchlaufen?
   const [erklaert, setErklaert] = useState(() => { try { return localStorage.getItem("nuvora_rennen_erklaert") === "1"; } catch { return false; } });
   const merkeErklaert = () => { setErklaert(true); try { localStorage.setItem("nuvora_rennen_erklaert", "1"); } catch { /* egal */ } };   // maximale Fahrzeit je Generation (s)
@@ -51,17 +61,26 @@ export default function Rennen() {
   const tasten = useRef({});
   const welt = useRef(null);   // alles, was je Bild weiterlaeuft
   const [streckeName, setStreckeName] = useState("rundkurs");
+  // Form des Netzes: versteckte Schichten und Neuronen je Schicht. Eine andere
+  // Form ist ein anderes Gehirn — die KI faengt dann von vorn an.
+  const [schichten, setSchichten] = useState(1);
+  const [neuronen, setNeuronen] = useState(8);
   const strecke = streckeVon(streckeName);
 
   // ── Welt aufbauen, wenn der Modus wechselt ──
-  const neueWelt = (m = modus) => {
-    const gespeichert = ladeKi(streckeName);
+  const neueWelt = (m = modus, formNeu = null) => {
+    // Eine neu gewaehlte Netzform verwirft das Gespeicherte (es passt nicht
+    // mehr); sonst uebernimmt die Seite die Form der gespeicherten KI.
+    let gespeichert = formNeu ? null : ladeKi(streckeName);
+    const form = formNeu || (gespeichert ? gespeichert.beste.form : netzForm(schichten, neuronen));
+    if (!formNeu && gespeichert) { setSchichten(form.length - 2); setNeuronen(form.length > 2 ? form[1] : neuronen); }
     // Noch keine KI fuer diese Strecke? Dann faengt sie mit dem an, was sie
     // auf der vorigen gelernt hat — so sieht man, ob Gelerntes uebertragbar ist.
-    const mitgebracht = !gespeichert && welt.current?.besteKi ? welt.current.besteKi : null;
+    const mitgebracht = !gespeichert && welt.current?.besteKi && gleicheForm(welt.current.besteKi.form, form) ? welt.current.besteKi : null;
     const w = { mensch: null, autos: [], gehirne: [], gen: gespeichert?.gen || 0, verlauf: gespeichert?.verlauf || [],
-      zeiten: gespeichert?.zeiten || [], schnitte: gespeichert?.schnitte || [], geschafft: gespeichert?.geschafft || [],
-      besteKi: gespeichert?.beste || null, besteZeit: gespeichert?.besteZeit ?? null, menschBest: null, simZeit: 0 };
+      zeiten: gespeichert?.zeiten || [], geschafft: gespeichert?.geschafft || [],
+      aufwand: gespeichert?.aufwand || 0,
+      besteKi: gespeichert?.beste || null, form, besteZeit: gespeichert?.besteZeit ?? null, menschBest: null, simZeit: 0 };
     if (m === "selbst" || m === "gegen") w.mensch = neuesAuto(strecke);
     if (m === "gegen" && w.besteKi) { w.gehirne = [w.besteKi]; w.autos = [neuesAuto(strecke)]; }
     if (m === "ki") {
@@ -69,7 +88,7 @@ export default function Rennen() {
       // unveraendert, der Rest leicht mutiert). Vorher waren nur zwei davon
       // Kopien und 28 Zufall — das sah aus, als sei die KI geloescht.
       const start = w.besteKi || mitgebracht;
-      w.gehirne = Array.from({ length: anzahl }, (_, i) => (!start ? zufallsGehirn() : i < 2 ? start : mutiere(start, rate)));
+      w.gehirne = Array.from({ length: anzahl }, (_, i) => (!start ? zufallsGehirn(Math.random, form) : i < 2 ? start : mutiere(start, rate)));
       w.autos = w.gehirne.map(() => neuesAuto(strecke));
     }
     welt.current = w;
@@ -151,7 +170,6 @@ export default function Rennen() {
     w.autos.forEach((a, i) => {
       if (!a.lebt) return;
       kiSchritt(a, w.gehirne[i], strecke);
-      if (a.runden >= 1) a.lebt = false;   // eine Runde — fertig, gewertet wird ihre Zeit
       if (a.lebt) lebend += 1;
     });
     if (!lebend || w.simZeit >= grenze) generationFertig(w);
@@ -161,24 +179,22 @@ export default function Rennen() {
     const punkte = w.autos.map(fitness);
     let bi = 0;
     punkte.forEach((p, i) => { if (p > punkte[bi]) bi = i; });
-    const zeiten = w.autos.flatMap((a) => a.runden_zeiten);
-    const beste = zeiten.length ? Math.min(...zeiten) : null;
+    // Der Rundenschnitt des besten Autos — das ist, was gelernt werden soll.
+    const beste = rundenSchnitt(w.autos[bi]);
     if (beste != null && (w.besteZeit == null || beste < w.besteZeit)) w.besteZeit = beste;
     w.gen += 1;
-    // Je Generation: beste und durchschnittliche Rundenzeit derer, die eine
-    // Runde geschafft haben, und wie viele das waren — daran sieht man das Lernen.
-    const schnitt = zeiten.length ? zeiten.reduce((a, b) => a + b, 0) / zeiten.length : null;
-    w.zeiten = [...w.zeiten, beste].slice(-200);
-    w.schnitte = [...w.schnitte, schnitt].slice(-200);
-    w.geschafft = [...w.geschafft, zeiten.length / w.autos.length].slice(-200);
     w.besteKi = w.gehirne[bi];
     w.letzte = beste;
+    w.zeiten = [...w.zeiten, beste].slice(-200);
+    w.geschafft = [...w.geschafft, w.autos.filter((a) => a.runden > 0).length / w.autos.length].slice(-200);
+    // Was das gekostet hat: gefahrene Sekunden aller Autos zusammen.
+    w.aufwand = (w.aufwand || 0) + w.autos.reduce((x, a) => x + a.t, 0);
     try {
-      localStorage.setItem(speicherKey(streckeName), JSON.stringify({ beste: Array.from(w.besteKi), gen: w.gen, zeiten: w.zeiten, schnitte: w.schnitte, geschafft: w.geschafft, besteZeit: w.besteZeit }));
+      localStorage.setItem(speicherKey(streckeName), JSON.stringify({ beste: gehirnZuJson(w.besteKi), gen: w.gen, zeiten: w.zeiten, geschafft: w.geschafft, aufwand: w.aufwand, besteZeit: w.besteZeit }));
     } catch { /* voll oder gesperrt */ }
     // Die Populationsgroesse kann sich geaendert haben: auffuellen bzw. kuerzen.
     let gehirne = naechsteGeneration(w.gehirne, punkte, rate);
-    while (gehirne.length < anzahl) gehirne.push(zufallsGehirn());
+    while (gehirne.length < anzahl) gehirne.push(zufallsGehirn(Math.random, w.form));
     gehirne = gehirne.slice(0, anzahl);
     w.gehirne = gehirne;
     w.autos = gehirne.map(() => neuesAuto(strecke));
@@ -196,10 +212,10 @@ export default function Rennen() {
       netz = { g: w.gehirne[bi], werte: denkeInnen(w.gehirne[bi], [...sensoren(a, strecke), a.v / PHYSIK.max]) };
     }
     setHud({
-      netz,
+      netz, aufwand: (w.aufwand || 0) + w.autos.reduce((x, a) => x + a.t, 0),
       gen: w.gen, lebend: w.autos.filter((a) => a.lebt).length, zeit: m ? m.t - m.rundeSeit : w.simZeit,
       runde: m ? m.runden_zeiten[m.runden_zeiten.length - 1] ?? null : null,
-      beste: m ? w.menschBest : w.besteZeit, kiBeste: w.besteZeit, letzte: w.letzte ?? null, zeiten: w.zeiten, schnitte: w.schnitte, geschafft: w.geschafft,
+      beste: m ? w.menschBest : w.besteZeit, kiBeste: w.besteZeit, letzte: w.letzte ?? null, zeiten: w.zeiten, geschafft: w.geschafft,
       runden: m ? m.runden : null, unfall: (w.unfall || 0) > 0,
     });
   };
@@ -249,16 +265,21 @@ export default function Rennen() {
   };
 
   tun.current = { neueWelt, schritt, zeichne, meldeHud };
+  const formAendern = (sch, neu) => {
+    setSchichten(sch); setNeuronen(neu); setLaeuft(false);
+    if (welt.current) welt.current.besteKi = null;
+    neueWelt(modus, netzForm(sch, neu));
+  };
   const neuStart = () => { setLaeuft(false); neueWelt(modus); };
   const kiVergessen = () => {
     try { localStorage.removeItem(speicherKey(streckeName)); } catch { /* egal */ }
     if (welt.current) welt.current.besteKi = null;   // auch nichts mitbringen
     setLaeuft(false); neueWelt(modus);
   };
-  // Rundenzeiten je Generation: oben = schneller. Beste (gruen) und Schnitt
-  // (weiss) derer mit Runde; Generationen ohne Runde bleiben Luecken.
-  const zs = hud.zeiten || [], ss = hud.schnitte || [];
-  const zda = [...zs, ...ss].filter((z) => z != null);
+  // Rundenschnitt des besten Autos je Generation: oben = schneller.
+  // Generationen ohne volle Runde bleiben Luecken.
+  const zs = hud.zeiten || [];
+  const zda = zs.filter((z) => z != null);
   const zmin = zda.length ? Math.min(...zda) : 0, zmax = zda.length ? Math.max(...zda) : 1;
   const linie = (reihe) => reihe.map((z, i) => (z == null ? null
     : `${reihe.length > 1 ? (i / (reihe.length - 1)) * 280 : 0},${8 + ((z - zmin) / Math.max(0.01, zmax - zmin)) * 56}`)).filter(Boolean).join(" ");
@@ -282,6 +303,7 @@ export default function Rennen() {
         {modus !== "experiment" && (<>
           <button onClick={() => setLaeuft((x) => !x)} style={toolbarBtnPrimary}>{laeuft ? t("rennen.pause") : t("rennen.los")}</button>
           <button onClick={neuStart} style={toolbarBtn}>{t("rennen.neu")}</button>
+          <button onClick={erklaerungZeigen} style={toolbarBtn} title={t("rennen.erklaerungZeigen")} aria-label={t("rennen.erklaerungZeigen")}>?</button>
         </>)}
         {/* Strecken: als kleine Bilder der Mittellinie — man erkennt sie schneller, als man sie liest. */}
         <Segment>
@@ -301,7 +323,15 @@ export default function Rennen() {
         {/* Startbild mit Erklaerung — beim Oeffnen und bei jeder Pause. Es liegt UNTER
             den Feldern auf der Karte: die Einstellungen sollen vor dem Start erreichbar sein. Wer
             das Werkzeug zum ersten Mal sieht, soll wissen, was er tut. */}
-        {!laeuft && (
+        {/* Nach dem ersten Start eines Modus: Pause und Kartenwechsel zeigen
+            nur noch einen kleinen Knopf — die Erklaerung holt „?" zurueck. */}
+        {!laeuft && gestartet.has(modus) && (
+          <button onClick={() => setLaeuft(true)}
+            style={{ ...toolbarBtnPrimary, position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", fontSize: 16, padding: "10px 20px", height: "auto" }}>
+            ▶ {t("rennen.weiter")}
+          </button>
+        )}
+        {!laeuft && !gestartet.has(modus) && (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)", padding: 16 }}>
             <div style={{ ...ueber, position: "static", maxWidth: modus === "ki" && !erklaert ? 560 : 520, maxHeight: "100%", overflowY: "auto", fontSize: 14, lineHeight: 1.5, padding: "16px 20px", background: "rgba(20,20,20,0.88)" }}>
               {/* „KI lernt": beim ersten Mal Schritt fuer Schritt erklaert, danach
@@ -330,6 +360,7 @@ export default function Rennen() {
             <div><b>{t("rennen.generation")} {hud.gen + 1}</b> · {t("rennen.lebend", { n: hud.lebend })}</div>
             <div>{t("rennen.zeitGen")} {zeitText(hud.zeit)} / {zeitText(grenze)}</div>
             <div>{t("rennen.kiBeste")} {zeitText(hud.beste)}</div>
+            <div title={t("rennen.aufwandHint")}>{t("rennen.aufwand", { n: Math.round((hud.aufwand || 0) / 60) })}</div>
           </>) : (<>
             <div><b>{t("rennen.runde")}</b> {zeitText(hud.zeit)}</div>
             <div>{t("rennen.letzte")} {zeitText(hud.runde)}</div>
@@ -357,6 +388,23 @@ export default function Rennen() {
                   style={{ ...chip, background: tempo === x ? "#fff" : "transparent", color: tempo === x ? "#111" : "#fff" }}>{x}×</button>
               ))}
             </div>
+            {/* Netzform: eine andere Form ist ein neues Gehirn — die KI beginnt von vorn. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }} title={t("rennen.formHinweis")}>
+              <span style={{ minWidth: 70 }}>{t("rennen.schichten")}</span>
+              {[0, 1, 2, 3].map((x) => (
+                <button key={x} onClick={() => formAendern(x, neuronen)} aria-pressed={schichten === x}
+                  style={{ ...chip, background: schichten === x ? "#fff" : "transparent", color: schichten === x ? "#111" : "#fff" }}>{x}</button>
+              ))}
+            </div>
+            {schichten > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }} title={t("rennen.formHinweis")}>
+                <span style={{ minWidth: 70 }}>{t("rennen.neuronen")}</span>
+                {[2, 4, 8, 12, 16].map((x) => (
+                  <button key={x} onClick={() => formAendern(schichten, x)} aria-pressed={neuronen === x}
+                    style={{ ...chip, background: neuronen === x ? "#fff" : "transparent", color: neuronen === x ? "#111" : "#fff" }}>{x}</button>
+                ))}
+              </div>
+            )}
             <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
               <input type="checkbox" checked={nurBeste} onChange={(e) => setNurBeste(e.target.checked)} /> {t("rennen.nurBeste")}
             </label>
@@ -376,18 +424,15 @@ export default function Rennen() {
         {modus === "ki" && (
           <div style={{ ...ueber, bottom: 10, right: 10, width: 260, fontSize: 12 }}>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>{t("rennen.zeitVerlauf")}</div>
-            {zda.length < 2 ? <div style={{ opacity: 0.8 }}>{t("rennen.nochKeineRunde")}</div> : (
+            {zda.length === 0 ? <div style={{ opacity: 0.8 }}>{t("rennen.nochKeineRunde")}</div> : (
               <svg viewBox="0 0 280 72" style={{ width: "100%", height: 70, display: "block" }}>
                 <text x={2} y={12} fontSize={10} fill="rgba(255,255,255,0.75)">{zeitText(zmin)}</text>
                 <text x={2} y={70} fontSize={10} fill="rgba(255,255,255,0.75)">{zeitText(zmax)}</text>
-                <polyline points={linie(ss)} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth={1.6} strokeDasharray="4 3" />
                 <polyline points={linie(zs)} fill="none" stroke="#81c784" strokeWidth={2.2} />
+                {/* Punkte dazu: bei einer einzigen Generation mit Runde gibt es noch keine Linie. */}
+                {linie(zs).split(" ").filter(Boolean).map((pt, i) => { const [x, y] = pt.split(",").map(Number); return <circle key={i} cx={x} cy={y} r={2.2} fill="#81c784" />; })}
               </svg>
             )}
-            <div style={{ display: "flex", gap: 10, marginTop: 4, opacity: 0.9 }}>
-              <span style={{ color: "#81c784" }}>— {t("rennen.linieBeste")}</span>
-              <span>- - {t("rennen.linieSchnitt")}</span>
-            </div>
             {geschafftJetzt != null && (
               <div style={{ marginTop: 4 }}>{t("rennen.geschafft", { p: Math.round(geschafftJetzt * 100) })}</div>
             )}
@@ -407,37 +452,37 @@ const chip = { border: "1px solid rgba(255,255,255,0.5)", borderRadius: CONTROL_
 // dicker desto staerker; Knoten: je heller, desto staerker gerade aktiv.
 function NetzBild({ netz, t }) {
   const { g, werte } = netz;
+  const form = g.form;
   const B = 260, H = 170;
+  // Spalten gleichmaessig zwischen Eingaengen (links) und Ausgaengen (rechts).
+  const xs = form.map((_, l) => 70 + (l / (form.length - 1)) * 140);
   const spalte = (n, x) => Array.from({ length: n }, (_, i) => [x, 14 + (i + 0.5) * ((H - 20) / n)]);
-  const E = spalte(NETZ.ein, 70), M = spalte(NETZ.mitte, 145), A = spalte(NETZ.aus, 210);
+  const pos = form.map((n, l) => spalte(n, xs[l]));
+  const r = Math.max(2.5, Math.min(6, (H - 20) / Math.max(...form) / 2.6));
   const linie = (w, p, q, key) => (
     <line key={key} x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} stroke={w >= 0 ? "#64b5f6" : "#ef5350"}
-      strokeWidth={Math.min(3, Math.abs(w) * 1.4)} strokeOpacity={Math.min(0.9, 0.15 + Math.abs(w) * 0.35)} />
+      strokeWidth={Math.min(3, Math.abs(w) * 1.2)} strokeOpacity={Math.min(0.9, 0.12 + Math.abs(w) * 0.3)} />
   );
   const knoten = (wert, p, key) => (
-    <circle key={key} cx={p[0]} cy={p[1]} r={6} fill={`rgba(255,255,255,${0.1 + 0.9 * Math.min(1, Math.abs(wert))})`}
-      stroke={wert >= 0 ? "#64b5f6" : "#ef5350"} strokeWidth={1.5} />
+    <circle key={key} cx={p[0]} cy={p[1]} r={r} fill={`rgba(255,255,255,${0.1 + 0.9 * Math.min(1, Math.abs(wert))})`}
+      stroke={wert >= 0 ? "#64b5f6" : "#ef5350"} strokeWidth={1.3} />
   );
   const einNamen = [...STRAHLEN.map((_, i) => t("rennen.strahl", { n: i + 1 })), t("rennen.tempo")];
   const ausNamen = [t("rennen.lenken"), t("rennen.gasAus")];
+  const letzte = form.length - 1;
   return (
     <svg viewBox={`0 0 ${B} ${H}`} style={{ width: "100%", display: "block" }}>
-      {E.flatMap((p, i) => M.map((q, j) => linie(gewichtEin(g, i, j), p, q, `e${i}-${j}`)))}
-      {M.flatMap((p, j) => A.map((q, k) => linie(gewichtAus(g, j, k), p, q, `a${j}-${k}`)))}
-      {E.map((p, i) => (
-        <g key={`ek${i}`}>
-          <text x={p[0] - 10} y={p[1] + 3} fontSize={9} textAnchor="end" fill="rgba(255,255,255,0.85)">{einNamen[i]}</text>
-          {knoten(werte.ein[i], p, `en${i}`)}
+      {form.slice(0, -1).flatMap((_, l) => pos[l].flatMap((p, i) => pos[l + 1].map((q, j) => linie(gewicht(g, l, i, j), p, q, `${l}-${i}-${j}`))))}
+      {pos.map((spalteP, l) => spalteP.map((p, i) => (
+        <g key={`k${l}-${i}`}>
+          {knoten(werte.schichten[l][i], p, `n${l}-${i}`)}
+          {l === 0 && <text x={p[0] - 10} y={p[1] + 3} fontSize={9} textAnchor="end" fill="rgba(255,255,255,0.85)">{einNamen[i]}</text>}
+          {l === letzte && (<>
+            <text x={p[0] + 10} y={p[1] - 2} fontSize={9} fill="rgba(255,255,255,0.85)">{ausNamen[i]}</text>
+            <text x={p[0] + 10} y={p[1] + 9} fontSize={9} fill="rgba(255,255,255,0.65)">{werte.aus[i].toFixed(2)}</text>
+          </>)}
         </g>
-      ))}
-      {M.map((p, j) => knoten(werte.mitte[j], p, `m${j}`))}
-      {A.map((p, k) => (
-        <g key={`ak${k}`}>
-          {knoten(werte.aus[k], p, `an${k}`)}
-          <text x={p[0] + 10} y={p[1] - 2} fontSize={9} fill="rgba(255,255,255,0.85)">{ausNamen[k]}</text>
-          <text x={p[0] + 10} y={p[1] + 9} fontSize={9} fill="rgba(255,255,255,0.65)">{werte.aus[k].toFixed(2)}</text>
-        </g>
-      ))}
+      )))}
     </svg>
   );
 }

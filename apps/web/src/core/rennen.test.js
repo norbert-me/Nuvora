@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { experimentLauf, laufBilanz, STRECKEN, SPUR, strecke as streckeVon, baueStrecke, neuesAuto, fahre, sensoren, zufallsGehirn, mutiere, naechsteGeneration, fahreGeneration, fitness, zufallsquelle, GENE, zeitText } from "./rennen.js";
+import { experimentLauf, laufBilanz, STRECKEN, SPUR, strecke as streckeVon, baueStrecke, neuesAuto, fahre, sensoren, zufallsGehirn, mutiere, naechsteGeneration, fahreGeneration, fitness, zufallsquelle, genAnzahl, netzForm, denkeInnen, gehirnAusJson, gehirnZuJson, zeitText } from "./rennen.js";
 
 const strecke = baueStrecke();
 
@@ -38,9 +38,10 @@ describe("KI-Rennen: Evolution", () => {
     const rnd = zufallsquelle(7);
     const g = zufallsGehirn(rnd);
     const m = mutiere(g, 0.2, rnd);
-    const anders = g.filter((w, i) => w !== m[i]).length;
-    expect(anders).toBeGreaterThan(GENE * 0.05);
-    expect(anders).toBeLessThan(GENE * 0.45);
+    const anders = g.w.filter((w, i) => w !== m.w[i]).length;
+    const n = genAnzahl(g.form);
+    expect(anders).toBeGreaterThan(n * 0.05);
+    expect(anders).toBeLessThan(n * 0.45);
   });
 
   it("die Besten werden unveraendert uebernommen", () => {
@@ -96,5 +97,24 @@ describe("KI-Rennen: Experiment", () => {
     expect(laufBilanz([{ beste: null, anteil: 0 }, { beste: 12, anteil: 0.1 }, { beste: 10, anteil: 0.3 }]))
       .toEqual({ ersteRunde: 2, bestzeit: 10, anteilEnde: 0.3 });
     expect(laufBilanz([{ beste: null, anteil: 0 }]).ersteRunde).toBe(null);
+  });
+});
+
+describe("KI-Rennen: Netzform", () => {
+  it("Schichten und Neuronen bestimmen die Zahl der Gewichte und die Zwischenwerte", () => {
+    expect(genAnzahl(netzForm(1, 8))).toBe(6 * 8 + 8 + 8 * 2 + 2);
+    expect(genAnzahl(netzForm(0, 8))).toBe(6 * 2 + 2);
+    const g = zufallsGehirn(zufallsquelle(1), netzForm(2, 4));
+    const r = denkeInnen(g, [0.5, 0.5, 1, 0.5, 0.5, 0.3]);
+    expect(r.schichten.map((x) => x.length)).toEqual([6, 4, 4, 2]);
+    expect(r.aus.every((v) => v >= -1 && v <= 1)).toBe(true);
+  });
+  it("Speichern und Laden, alter Speicherstand wird zum Netz 6-8-2", () => {
+    const g = zufallsGehirn(zufallsquelle(2), netzForm(2, 5));
+    const z = gehirnAusJson(JSON.parse(JSON.stringify(gehirnZuJson(g))));
+    expect(z.form).toEqual(g.form);
+    expect(Array.from(z.w)).toEqual(Array.from(g.w));
+    expect(gehirnAusJson(new Array(74).fill(0)).form).toEqual([6, 8, 2]);
+    expect(gehirnAusJson({ form: [6, 2], w: [1] })).toBe(null);
   });
 });
