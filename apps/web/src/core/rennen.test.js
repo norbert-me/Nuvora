@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { baueStrecke, neuesAuto, fahre, sensoren, zufallsGehirn, mutiere, naechsteGeneration, fahreGeneration, fitness, zufallsquelle, GENE, zeitText } from "./rennen.js";
+import { STRECKEN, SPUR, strecke as streckeVon, baueStrecke, neuesAuto, fahre, sensoren, zufallsGehirn, mutiere, naechsteGeneration, fahreGeneration, fitness, zufallsquelle, GENE, zeitText } from "./rennen.js";
 
 const strecke = baueStrecke();
 
@@ -65,5 +65,20 @@ describe("KI-Rennen: Evolution", () => {
     // Die Besten bleiben erhalten — schlechter wird es nie, und am Ende besser als am Anfang.
     for (let i = 1; i < bestJe.length; i++) expect(bestJe[i]).toBeGreaterThanOrEqual(bestJe[i - 1] - 1e-9);
     expect(bestJe[bestJe.length - 1]).toBeGreaterThan(bestJe[0]);
+  });
+});
+
+describe("KI-Rennen: alle Strecken", () => {
+  it.each(Object.keys(STRECKEN))("%s: liegt im Bild, Start auf der Strasse, Fahrbahnen halten Abstand", (name) => {
+    const s = streckeVon(name);
+    const m = s.mitte, n = m.length;
+    expect(s.aufStrasse(s.start.x, s.start.y)).toBe(true);
+    expect(m.every(([x, y]) => x > SPUR / 2 && x < 900 - SPUR / 2 && y > SPUR / 2 && y < 600 - SPUR / 2)).toBe(true);
+    let min = Infinity;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      if (Math.min(Math.abs(i - j), n - Math.abs(i - j)) < 25) continue;
+      min = Math.min(min, Math.hypot(m[i][0] - m[j][0], m[i][1] - m[j][1]));
+    }
+    expect(min).toBeGreaterThan(SPUR + 30);
   });
 });

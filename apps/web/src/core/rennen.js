@@ -20,6 +20,27 @@ const STUETZEN = [
   [830, 300], [760, 445], [580, 480], [450, 400], [320, 500], [180, 470],
 ];
 
+// Weitere Strecken — von leicht (Oval) bis kurvig (Schikane, Haarnadel). Jede
+// muss Abstand halten: liegen zwei Stellen der Strasse naeher als eine
+// Spurbreite plus Rand, springt der Fortschritt zwischen ihnen, und eine KI
+// lernte die Abkuerzung statt der Strecke (Test in rennen.test.js).
+export const STRECKEN = {
+  rundkurs: STUETZEN,
+  oval: [[200, 300], [230, 165], [450, 115], [670, 165], [700, 300], [670, 435], [450, 485], [230, 435]],
+  schikane: [[110, 320], [120, 140], [250, 80], [360, 110], [430, 250], [500, 110], [620, 80], [760, 110], [810, 260],
+    [700, 340], [800, 440], [720, 530], [560, 520], [470, 420], [380, 520], [200, 520]],
+  haarnadel: [[120, 450], [110, 160], [220, 80], [330, 150], [340, 360], [420, 420], [500, 360], [510, 150], [620, 80],
+    [760, 120], [800, 300], [740, 500], [560, 540], [300, 540]],
+};
+const gebaut = {};
+// Eine Strecke nach Namen — einmal gebaut, danach aus dem Zwischenspeicher
+// (das Raster kostet einen Augenblick).
+export function strecke(name) {
+  const key = STRECKEN[name] ? name : "rundkurs";
+  if (!gebaut[key]) gebaut[key] = baueStrecke(STRECKEN[key]);
+  return gebaut[key];
+}
+
 // Zufall mit Startwert — fuer reproduzierbare Tests.
 export function zufallsquelle(seed = Date.now()) {
   let s = (seed >>> 0) || 1;

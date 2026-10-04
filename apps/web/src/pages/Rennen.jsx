@@ -15,16 +15,18 @@ import { CONTROL_R, Segment, segmentBtn, cardStyle, pageFull, toolbarBtn, toolba
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import {
-  BREITE, HOEHE, NETZ, PHYSIK, SPUR, STRAHLEN, STRAHL_MAX, ZEITGRENZE, baueStrecke, denkeInnen, fahre, fitness, gewichtAus, gewichtEin,
-  kiSchritt, naechsteGeneration, neuesAuto, sensoren, zeitText, zufallsGehirn,
+  BREITE, HOEHE, NETZ, PHYSIK, SPUR, STRAHLEN, STRAHL_MAX, ZEITGRENZE, STRECKEN, strecke as streckeVon, denkeInnen, fahre, fitness, gewichtAus, gewichtEin,
+  kiSchritt, mutiere, naechsteGeneration, neuesAuto, sensoren, zeitText, zufallsGehirn,
 } from "../core/rennen.js";
 
+// Je Strecke ihre beste KI. Die Rundkurs-KI lag frueher unter dem Schluessel
+// ohne Namen — sie bleibt die des Rundkurses.
 const SPEICHER = "nuvora_rennen_ki";
-const strecke = baueStrecke();
+const speicherKey = (name) => (name === "rundkurs" ? SPEICHER : `${SPEICHER}_${name}`);
 
-function ladeKi() {
+function ladeKi(name) {
   try {
-    const x = JSON.parse(localStorage.getItem(SPEICHER) || "null");
+    const x = JSON.parse(localStorage.getItem(speicherKey(name)) || "null");
     if (x && Array.isArray(x.beste)) return { ...x, beste: Float32Array.from(x.beste) };
   } catch { /* leer oder gesperrt */ }
   return null;
@@ -43,26 +45,33 @@ export default function Rennen() {
   const canvas = useRef(null);
   const tasten = useRef({});
   const welt = useRef(null);   // alles, was je Bild weiterlaeuft
+  const [streckeName, setStreckeName] = useState("rundkurs");
+  const strecke = streckeVon(streckeName);
 
   // ── Welt aufbauen, wenn der Modus wechselt ──
   const neueWelt = (m = modus) => {
-    const gespeichert = ladeKi();
+    const gespeichert = ladeKi(streckeName);
+    // Noch keine KI fuer diese Strecke? Dann faengt sie mit dem an, was sie
+    // auf der vorigen gelernt hat — so sieht man, ob Gelerntes uebertragbar ist.
+    const mitgebracht = !gespeichert && welt.current?.besteKi ? welt.current.besteKi : null;
     const w = { mensch: null, autos: [], gehirne: [], gen: gespeichert?.gen || 0, verlauf: gespeichert?.verlauf || [],
       zeiten: gespeichert?.zeiten || [], schnitte: gespeichert?.schnitte || [], geschafft: gespeichert?.geschafft || [],
       besteKi: gespeichert?.beste || null, besteZeit: gespeichert?.besteZeit ?? null, menschBest: null, simZeit: 0 };
     if (m === "selbst" || m === "gegen") w.mensch = neuesAuto(strecke);
     if (m === "gegen" && w.besteKi) { w.gehirne = [w.besteKi]; w.autos = [neuesAuto(strecke)]; }
     if (m === "ki") {
-      w.gehirne = Array.from({ length: anzahl }, (_, i) => (w.besteKi && i < 2 ? w.besteKi : zufallsGehirn()));
+      const start = w.besteKi || mitgebracht;
+      w.gehirne = Array.from({ length: anzahl }, (_, i) => (start && i < 2 ? start : start && i < anzahl / 2 ? mutiere(start, rate) : zufallsGehirn()));
       w.autos = w.gehirne.map(() => neuesAuto(strecke));
     }
     welt.current = w;
     zeichne();
+    meldeHud(w);   // Anzeige gleich auf die neue Strecke/den neuen Modus
   };
   // Die Funktionen sehen immer den aktuellen Stand (Regler, Modus) — die
   // Effekte haengen nur an dem, wonach sie sich wirklich neu aufbauen.
   const tun = useRef(null);
-  useEffect(() => { setLaeuft(false); tun.current.neueWelt(modus); }, [modus]);
+  useEffect(() => { setLaeuft(false); tun.current.neueWelt(modus); }, [modus, streckeName]);
 
   // ── Tastatur (nur, wenn ein Mensch faehrt) ──
   useEffect(() => {
@@ -157,7 +166,7 @@ export default function Rennen() {
     w.besteKi = w.gehirne[bi];
     w.letzte = beste;
     try {
-      localStorage.setItem(SPEICHER, JSON.stringify({ beste: Array.from(w.besteKi), gen: w.gen, zeiten: w.zeiten, schnitte: w.schnitte, geschafft: w.geschafft, besteZeit: w.besteZeit }));
+      localStorage.setItem(speicherKey(streckeName), JSON.stringify({ beste: Array.from(w.besteKi), gen: w.gen, zeiten: w.zeiten, schnitte: w.schnitte, geschafft: w.geschafft, besteZeit: w.besteZeit }));
     } catch { /* voll oder gesperrt */ }
     // Die Populationsgroesse kann sich geaendert haben: auffuellen bzw. kuerzen.
     let gehirne = naechsteGeneration(w.gehirne, punkte, rate);
@@ -233,7 +242,11 @@ export default function Rennen() {
 
   tun.current = { neueWelt, schritt, zeichne, meldeHud };
   const neuStart = () => { setLaeuft(false); neueWelt(modus); };
-  const kiVergessen = () => { try { localStorage.removeItem(SPEICHER); } catch { /* egal */ } setLaeuft(false); neueWelt(modus); };
+  const kiVergessen = () => {
+    try { localStorage.removeItem(speicherKey(streckeName)); } catch { /* egal */ }
+    if (welt.current) welt.current.besteKi = null;   // auch nichts mitbringen
+    setLaeuft(false); neueWelt(modus);
+  };
   // Rundenzeiten je Generation: oben = schneller. Beste (gruen) und Schnitt
   // (weiss) derer mit Runde; Generationen ohne Runde bleiben Luecken.
   const zs = hud.zeiten || [], ss = hud.schnitte || [];
@@ -260,6 +273,15 @@ export default function Rennen() {
         )}>
         <button onClick={() => setLaeuft((x) => !x)} style={toolbarBtnPrimary}>{laeuft ? t("rennen.pause") : t("rennen.los")}</button>
         <button onClick={neuStart} style={toolbarBtn}>{t("rennen.neu")}</button>
+        {/* Strecken: als kleine Bilder der Mittellinie — man erkennt sie schneller, als man sie liest. */}
+        <Segment>
+          {Object.keys(STRECKEN).map((k) => (
+            <button key={k} onClick={() => setStreckeName(k)} aria-pressed={streckeName === k} title={t(`rennen.strecke.${k}`)} aria-label={t(`rennen.strecke.${k}`)}
+              style={{ ...segmentBtn, padding: "0 6px", color: streckeName === k ? "var(--accent)" : "var(--text3)" }}>
+              <StreckenBild punkte={streckeVon(k).mitte} />
+            </button>
+          ))}
+        </Segment>
       </Werkzeugleiste>
 
       <div style={{ ...cardStyle, padding: 0, overflow: "hidden", position: "relative" }}>
@@ -395,6 +417,11 @@ function NetzBild({ netz, t }) {
       ))}
     </svg>
   );
+}
+
+function StreckenBild({ punkte }) {
+  const d = punkte.filter((_, i) => i % 3 === 0).map(([x, y], i) => `${i ? "L" : "M"}${(x / BREITE * 34).toFixed(1)} ${(y / HOEHE * 22).toFixed(1)}`).join(" ") + " Z";
+  return <svg viewBox="0 0 34 22" width={34} height={22} aria-hidden="true"><path d={d} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinejoin="round" /></svg>;
 }
 
 function Regler({ label, wert, ...rest }) {

@@ -29,6 +29,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   Durchschnitt, Anteil mit Runde), maximale Fahrzeit und das **neuronale Netz
   der besten KI live** liegen auf der Karte; ein Startbild erklärt jeden Modus.
   Wer selbst fährt und den roten Rand berührt, beginnt neu am Start.
+  **Vier Strecken** (Rundkurs, Oval, Schikane, Haarnadel) mit je eigener
+  gelernter KI; auf einer neuen Strecke startet die KI mit dem, was sie auf
+  der vorigen gelernt hat — so sieht man, ob Gelerntes übertragbar ist.
 - Kurse: **die Stufe ist zurück** (neben dem Fach, auch „7/8“). Mit Fach und
   Stufe zeigen die Themenauswahlen nur noch die Themen dieses Kurses —
   Klassenarbeitstermin, Kalendereintrag, Notenspalte und die Aufgaben der
