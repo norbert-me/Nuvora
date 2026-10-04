@@ -43,6 +43,17 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   der Karte steht); danach eine Kurzfassung mit „Erklärung von vorn“. Beim
   erneuten Öffnen lernt die gespeicherte KI weiter — vorher waren 28 von 30
   Autos Zufall, und es sah aus, als sei sie gelöscht.
+  **Gewertet wird der Rundenschnitt**: jedes Auto fährt bis zur eingestellten
+  Fahrzeit (nicht mehr nur eine Runde); wer am weitesten kommt, fährt im
+  Schnitt am schnellsten. **Rechenaufwand wird sichtbar** (gefahrene Zeit aller
+  Autos), und das Experiment vergleicht wahlweise nach **gleichem Aufwand** —
+  „alle Regler nach rechts“ ist nicht mehr automatisch besser. **Das Netz ist
+  einstellbar** (0–3 versteckte Schichten, 2–16 Neuronen). **Mutation heißt
+  jetzt Stärke**: jedes Gewicht wackelt ein wenig — bei 1 % schaffen Kopien
+  einer guten KI fast alle eine Runde (vorher kam selbst da nur die Hälfte an).
+  **Gegen die KI**: die KI fährt endlos Runden, ohne Netz-Anzeige. **Weichere
+  Lenkung** und bei hohem Tempo etwas weniger Einschlag. Pause und
+  Streckenwechsel zeigen die Erklärung nicht erneut („?“ holt sie zurück).
 - Kurse: **die Stufe ist zurück** (neben dem Fach, auch „7/8“). Mit Fach und
   Stufe zeigen die Themenauswahlen nur noch die Themen dieses Kurses —
   Klassenarbeitstermin, Kalendereintrag, Notenspalte und die Aufgaben der

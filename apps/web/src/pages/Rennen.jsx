@@ -143,7 +143,12 @@ export default function Rennen() {
   const schritt = (w) => {
     if (w.mensch) {
       const k = tasten.current;
-      const lenk = (k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0);
+      // Weich lenken: die Taste dreht das Lenkrad in gut 0,1 s ein, Loslassen
+      // laesst es zurueckgehen — eine Taste ist ein Schalter, ein Lenkrad nicht,
+      // und schlagartig voller Einschlag liess das Auto bei jedem Antippen zucken.
+      const ziel = (k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0);
+      w.lenkrad = (w.lenkrad || 0) + (ziel - (w.lenkrad || 0)) * Math.min(1, (1 / 60) * 9);
+      const lenk = w.lenkrad;
       const gas = (k.ArrowUp ? 1 : 0) - (k.ArrowDown ? 1 : 0);
       const vor = w.mensch.runden_zeiten.length;
       fahre(w.mensch, strecke, lenk, gas, false);
@@ -161,7 +166,13 @@ export default function Rennen() {
     }
     if (w.unfall > 0) w.unfall -= 1 / 60;
     if (modus === "gegen") {
-      w.autos.forEach((a, i) => { if (a.lebt) kiSchritt(a, w.gehirne[i], strecke); });
+      // Die KI faehrt endlos Runden, unabhaengig vom Menschen. Verunglueckt
+      // sie doch einmal (oder steht still), setzt sie am Start wieder an —
+      // ihre Bestzeit bleibt.
+      w.autos.forEach((a, i) => {
+        if (!a.lebt) { const neu = neuesAuto(strecke); neu.runden_zeiten = a.runden_zeiten; w.autos[i] = neu; return; }
+        kiSchritt(a, w.gehirne[i], strecke);
+      });
       return;
     }
     if (modus !== "ki") return;
@@ -413,7 +424,7 @@ export default function Rennen() {
         )}
 
         {/* Unten links: das Gehirn der besten KI, live. */}
-        {(modus === "ki" || modus === "gegen") && hud.netz && laeuft && (
+        {modus === "ki" && hud.netz && laeuft && (
           <div style={{ ...ueber, bottom: 10, left: 10, width: 270, fontSize: 12 }}>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>{t("rennen.netz")}</div>
             <NetzBild netz={hud.netz} t={t} />

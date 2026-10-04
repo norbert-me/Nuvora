@@ -113,7 +113,11 @@ export function fahre(auto, strecke, lenk, gas, toetlich) {
   const max = auf ? P.max : P.wiese;
   auto.v = Math.max(-max * 0.4, Math.min(max, auto.v));
   // Gelenkt wird mit der Fahrt: im Stand dreht sich kein Auto.
-  const griff = Math.min(1, Math.abs(auto.v) / 90) * Math.sign(auto.v || 1);
+  // Bei hohem Tempo lenkt das Auto etwas weniger scharf (ein Auto mit 300
+  // km/h dreht nicht auf der Stelle) — Geraden werden ruhiger, und wer in die
+  // Kurve will, muss vorher bremsen. Gilt fuer Mensch und KI gleich.
+  const tempoAnteil = Math.min(1, Math.abs(auto.v) / P.max);
+  const griff = Math.min(1, Math.abs(auto.v) / 90) * (1 - 0.35 * tempoAnteil) * Math.sign(auto.v || 1);
   auto.w += Math.max(-1, Math.min(1, lenk)) * P.lenk * griff * DT;
   auto.x += Math.cos(auto.w) * auto.v * DT;
   auto.y += Math.sin(auto.w) * auto.v * DT;
@@ -203,12 +207,17 @@ export function kiSchritt(auto, gehirn, strecke) {
   fahre(auto, strecke, lenk, gas, true);
 }
 
-// Mutation: jedes Gewicht mit Wahrscheinlichkeit `rate` um einen normal-
-// verteilten Betrag verschoben. Das ist der ganze „Lernschritt".
-export function mutiere(gehirn, rate, rnd = Math.random, staerke = 0.5) {
-  const neu = Float32Array.from(gehirn.w);
-  for (let i = 0; i < neu.length; i++) if (rnd() < rate) neu[i] += gauss(rnd) * staerke;
-  return { form: gehirn.form, w: neu };
+// Mutation: JEDES Gewicht wackelt ein wenig — normalverteilt, die Staerke
+// sagt der Regler (1 % ein Hauch, 50 % ein kraeftiger Stoss). Das ist der
+// ganze „Lernschritt". Frueher hiess der Regler „wie viele Gewichte aendern
+// sich", und jede Aenderung war gross: selbst bei 1 % fuhr dann gut die
+// Haelfte der Kopien einer guten KI in die Wand, und „wenig Mutation" sah aus
+// wie ein Fehler. Gemessen (Rundkurs, Weiterlernen von einer guten KI): mit
+// 1 % schaffen jetzt 83–100 % eine Runde, mit 50 % rund 15 %.
+export const MUTATION_SKALA = 2;
+export function mutiere(gehirn, rate, rnd = Math.random) {
+  const s = rate * MUTATION_SKALA;
+  return { form: gehirn.form, w: Float32Array.from(gehirn.w, (w) => w + gauss(rnd) * s) };
 }
 
 // Speichern und Laden. Aeltere Speicherstaende sind ein blankes Zahlenfeld

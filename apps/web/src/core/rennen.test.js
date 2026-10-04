@@ -34,14 +34,14 @@ describe("KI-Rennen: Strecke und Auto", () => {
 });
 
 describe("KI-Rennen: Evolution", () => {
-  it("Mutation veraendert ungefaehr den eingestellten Anteil der Gewichte", () => {
+  it("Mutation: jedes Gewicht wackelt, die Staerke folgt dem Regler", () => {
     const rnd = zufallsquelle(7);
     const g = zufallsGehirn(rnd);
-    const m = mutiere(g, 0.2, rnd);
-    const anders = g.w.filter((w, i) => w !== m.w[i]).length;
-    const n = genAnzahl(g.form);
-    expect(anders).toBeGreaterThan(n * 0.05);
-    expect(anders).toBeLessThan(n * 0.45);
+    const schnitt = (rate) => { const m = mutiere(g, rate, rnd); return g.w.reduce((x, w, i) => x + Math.abs(w - m.w[i]), 0) / g.w.length; };
+    const klein = schnitt(0.01), gross = schnitt(0.5);
+    expect(klein).toBeGreaterThan(0);
+    expect(klein).toBeLessThan(0.05);
+    expect(gross).toBeGreaterThan(0.4);
   });
 
   it("die Besten werden unveraendert uebernommen", () => {
