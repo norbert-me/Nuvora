@@ -54,6 +54,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   **Gegen die KI**: die KI fährt endlos Runden, ohne Netz-Anzeige. **Weichere
   Lenkung** und bei hohem Tempo etwas weniger Einschlag. Pause und
   Streckenwechsel zeigen die Erklärung nicht erneut („?“ holt sie zurück).
+  **Schickeres Auto**: ein Formel-Rennwagen von oben (Flügel, Reifen, Cockpit,
+  Helm) — auf der Strecke und in der Erklärung dieselbe Form.
 - Kurse: **die Stufe ist zurück** (neben dem Fach, auch „7/8“). Mit Fach und
   Stufe zeigen die Themenauswahlen nur noch die Themen dieses Kurses —
   Klassenarbeitstermin, Kalendereintrag, Notenspalte und die Aufgaben der

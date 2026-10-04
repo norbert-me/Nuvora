@@ -15,6 +15,7 @@ import { CONTROL_R, Segment, segmentBtn, cardStyle, pageFull, toolbarBtn, toolba
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import RennenExperiment from "../components/RennenExperiment.jsx";
 import RennenErklaerung from "../components/RennenErklaerung.jsx";
+import { zeichneAuto } from "../core/rennauto.js";
 import { useLanguage } from "../i18n/index.jsx";
 import {
   BREITE, HOEHE, PHYSIK, SPUR, STRAHLEN, STRAHL_MAX, ZEITGRENZE, STRECKEN, strecke as streckeVon, denkeInnen, fahre, fitness, gewicht,
@@ -255,7 +256,7 @@ export default function Rennen() {
     const beste = w.autos.length ? w.autos.reduce((b, a) => (a.lebt && a.weg > (b?.weg ?? -1e9) ? a : b), null) : null;
     w.autos.forEach((a) => {
       if (nurBeste && a !== beste) return;
-      auto(g, a, a === beste ? "#1e88e5" : "rgba(30,136,229,0.35)", a.lebt ? 1 : 0.25);
+      auto(g, a, "#1e88e5", a === beste ? (a.lebt ? 1 : 0.3) : (a.lebt ? 0.4 : 0.15));
     });
     // Sensorstrahlen der besten KI: so „sieht" sie die Strecke.
     if (beste && beste.lebt && modus === "ki") {
@@ -269,9 +270,8 @@ export default function Rennen() {
     if (w.mensch) auto(g, w.mensch, "#e53935", 1);
   };
   const auto = (g, a, farbe, alpha) => {
-    g.save(); g.globalAlpha = alpha; g.translate(a.x, a.y); g.rotate(a.w);
-    g.fillStyle = farbe; g.fillRect(-11, -6, 22, 12);
-    g.fillStyle = "rgba(255,255,255,0.8)"; g.fillRect(3, -4, 5, 8);   // Scheibe = vorn
+    g.save(); g.translate(a.x, a.y); g.rotate(a.w);
+    zeichneAuto(g, farbe, alpha);   // core/rennauto.js — dieselbe Form wie in der Erklaerung
     g.restore();
   };
 
@@ -387,7 +387,7 @@ export default function Rennen() {
 
         {/* Oben rechts: Einstellungen der KI — auf der Karte, damit Karte und
             Regler zusammen auf den Beamer passen. */}
-        {modus === "ki" && (
+        {modus === "ki" && !(!laeuft && !gestartet.has("ki") && !erklaert) && (
           <div style={{ ...ueber, top: 10, right: 10, width: 250, fontSize: 13 }}>
             <Regler label={t("rennen.mutation")} wert={`${Math.round(rate * 100)} %`} min={1} max={60} value={Math.round(rate * 100)} onChange={(x) => setRate(x / 100)} />
             <Regler label={t("rennen.anzahl")} wert={anzahl} min={5} max={60} value={anzahl} onChange={setAnzahl} />

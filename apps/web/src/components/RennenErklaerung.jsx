@@ -4,6 +4,7 @@
 // derselben Bildsprache wie die Strecke (grauer Asphalt, roter Rand, gelbe
 // Strahlen, blaue Autos).
 import { useState } from "react";
+import { AUTO } from "../core/rennauto.js";
 import { CONTROL_R, panelStyle, toolbarBtn, toolbarBtnPrimary } from "./Icons.jsx";
 
 const SCHRITTE = ["augen", "zahlen", "ausgaenge", "beispiel", "zufall", "auswahl", "zuschauen"];
@@ -38,11 +39,18 @@ const hell = { ...toolbarBtn, background: "transparent", color: "#fff", borderCo
 // ── Bilder ──
 const ASPHALT = "#555", RAND = "#d33", GRAS = "#6aa84f", STRAHL = "#ffeb3b";
 
+// Dieselbe Form wie auf der Strecke (core/rennauto.js).
 function Auto({ x, y, w = 0, farbe = "#1e88e5", s = 1 }) {
   return (
     <g transform={`translate(${x} ${y}) rotate(${w}) scale(${s})`}>
-      <rect x={-13} y={-7} width={26} height={14} rx={3} fill={farbe} />
-      <rect x={4} y={-5} width={6} height={10} fill="rgba(255,255,255,0.85)" />
+      <path d={AUTO.schatten} fill="rgba(0,0,0,0.3)" transform="translate(1.5 2)" />
+      {AUTO.reifen.map((d, i) => <path key={i} d={d} fill="#1b1b1b" />)}
+      <path d={AUTO.heckfluegel} fill="#1b1b1b" />
+      <path d={AUTO.frontfluegel} fill="#1b1b1b" />
+      <path d={AUTO.karosserie} fill={farbe} />
+      <path d={AUTO.streifen} stroke="rgba(255,255,255,0.75)" strokeWidth={1.4} />
+      <path d={AUTO.cockpit} fill="rgba(20,30,40,0.85)" />
+      <circle cx={AUTO.helm.x} cy={AUTO.helm.y} r={AUTO.helm.r} fill="#ffd54f" />
     </g>
   );
 }
