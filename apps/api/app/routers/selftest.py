@@ -88,6 +88,7 @@ MODUL_PREFIX = {
     "code-detektiv": "/api/codedetektiv",
     "pap": "/api/pap",
     "waage": "/api/waage",
+    "rennen": None,
     "tafel": "/api/tafel",
     "mathespiele": None,
     "koerper": None,

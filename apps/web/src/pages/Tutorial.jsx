@@ -41,6 +41,7 @@ const BEREICHE = [
   { key: "mathespiele", ziel: "/mathespiele", modul: "mathespiele" },
   { key: "koerper", ziel: "/koerper", modul: "koerper" },
   { key: "waage", ziel: "/waage", modul: "waage" },
+  { key: "rennen", ziel: "/rennen", modul: "rennen" },
   { key: "codedetektiv", ziel: "/code-detektiv", modul: "code-detektiv" },
   // „Wohin mit dem alten Jahr?"
   { key: "jahresende", ziel: "/kurse" },

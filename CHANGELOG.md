@@ -16,6 +16,14 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Neues Modul KI-Rennen (Beta).** Ein Autorennen von oben: mit den
+  Pfeiltasten (am Tablet mit Tasten unter der Strecke) Runden drehen, die
+  Zeit läuft mit, Bestzeit wird gemerkt. Daneben **lernt eine KI das Fahren
+  durch Mutation**: eine Generation Autos mit kleinen neuronalen Netzen fährt
+  gleichzeitig, sieht die Strecke über fünf Sensorstrahlen, und die besten
+  werden kopiert und leicht verändert. Generation, Fortschritt und beste
+  Rundenzeit je Generation laufen als Kurve mit; Mutationsstärke, Anzahl der
+  Autos und Tempo (bis 10×) sind einstellbar. Danach: gegen die beste KI fahren.
 - Kurse: **die Stufe ist zurück** (neben dem Fach, auch „7/8“). Mit Fach und
   Stufe zeigen die Themenauswahlen nur noch die Themen dieses Kurses —
   Klassenarbeitstermin, Kalendereintrag, Notenspalte und die Aufgaben der

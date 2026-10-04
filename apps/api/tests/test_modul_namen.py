@@ -94,6 +94,6 @@ async def test_schranken_nennen_den_registernamen():
         f"gibt: {falsch}"
     )
     # Rein informativ: welche Register-Module gar kein Backend haben.
-    assert set(ohne_schranke) <= {"tafel", "mathespiele", "koerper"}, (
+    assert set(ohne_schranke) <= {"tafel", "mathespiele", "koerper", "rennen"}, (
         f"Modul im Register ohne jede Backend-Schranke: {ohne_schranke}"
     )

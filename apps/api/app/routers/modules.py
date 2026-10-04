@@ -405,6 +405,23 @@ REGISTRY: List[ModuleDef] = [
         path="/waage",
         stage="beta",
     ),
+    ModuleDef(
+        key="rennen",
+        group="unterricht",
+        name="KI-Rennen",
+        description=(
+            "Ein Autorennen von oben, mit den Pfeiltasten gefahren: Rundkurs mit "
+            "Start und Ziel, Rundenzeit und Bestzeit. Daneben lernt eine KI das "
+            "Fahren durch Mutation — eine ganze Generation Autos mit kleinen "
+            "neuronalen Netzen fährt gleichzeitig, die besten werden kopiert und "
+            "leicht verändert, und nach ein paar Generationen fährt die beste "
+            "saubere Runden. Mutationsstärke, Anzahl und Tempo sind einstellbar, "
+            "die Sensoren der besten KI sichtbar; danach kann man gegen sie "
+            "fahren. Reines Werkzeug, ohne Daten."
+        ),
+        path="/rennen",
+        stage="beta",
+    ),
 ]
 
 _BY_KEY = {m.key: m for m in REGISTRY}

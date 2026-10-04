@@ -362,6 +362,7 @@ const Personen = React.lazy(() => import("./pages/Personen.jsx"));
 const PapFrei = React.lazy(() => import("./pages/PapFrei.jsx"));
 const Waage = React.lazy(() => import("./pages/Waage.jsx"));
 const WaageFrei = React.lazy(() => import("./pages/WaageFrei.jsx"));
+const Rennen = React.lazy(() => import("./pages/Rennen.jsx"));
 const NichtGefunden = React.lazy(() => import("./pages/NichtGefunden.jsx"));
 
 // Ladezustand fuer nachgeladene Seiten: dieselben pulsierenden Balken wie beim
@@ -428,6 +429,7 @@ function helpArea(pathname) {
   if (pathname.startsWith("/koerper")) return "koerper";
   // Nicht startsWith("/waage") — das faengt auch /waage-frei (oeffentlich).
   if (pathname === "/waage" || pathname.startsWith("/waage/")) return "waage";
+  if (pathname.startsWith("/rennen")) return "rennen";
   return "core";
 }
 const LP = "/lernpfad";
@@ -443,6 +445,7 @@ const PAP = "/pap";
 const MATHEF = "/mathespiele";
 const KOERPER = "/koerper";
 const WAAGE = "/waage";
+const RENNEN = "/rennen";
 const TAFEL = "/tafel";
 
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
@@ -463,6 +466,7 @@ const getModuleNavItems = (t, location, user) => {
     : pathname.startsWith(MATHEF) ? "mathespiele"
     : pathname.startsWith(KOERPER) ? "koerper"
     : (pathname === WAAGE || pathname.startsWith(`${WAAGE}/`)) ? "waage"
+    : pathname.startsWith(RENNEN) ? "rennen"
     : pathname.startsWith(TAFEL) ? "tafel"
     // Nicht startsWith("/pap") — das faengt auch /papierkorb (Kern).
     : (pathname === PAP || pathname.startsWith(`${PAP}?`) || pathname.startsWith(`${PAP}/`)) ? "pap"
@@ -535,6 +539,7 @@ const getModuleNavItems = (t, location, user) => {
   }
   if (area === "mathespiele") return [{ to: MATHEF, label: t("mathefussball.title") }];
   if (area === "koerper") return [{ to: KOERPER, label: t("koerper.title") }];
+  if (area === "rennen") return [{ to: RENNEN, label: t("rennen.titel") }];
   if (area === "waage") {
     const cur = params.get("tab");
     return [
@@ -1208,6 +1213,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathespiele"><Mathefussball /></ModuleGate> : <Landing />} />
           <Route path={KOERPER} element={user ? <ModuleGate moduleKey="koerper"><Koerper /></ModuleGate> : <Landing />} />
           <Route path={WAAGE} element={user ? <ModuleGate moduleKey="waage"><Waage /></ModuleGate> : <Landing />} />
+          <Route path={RENNEN} element={user ? <ModuleGate moduleKey="rennen"><Rennen /></ModuleGate> : <Landing />} />
           <Route path={TAFEL} element={user ? <ModuleGate moduleKey="tafel"><Tafel /></ModuleGate> : <Landing />} />
           <Route path={PAP} element={user ? <ModuleGate moduleKey="pap"><Pap /></ModuleGate> : <Landing />} />
           <Route path={`${AUSW}/vergleich`} element={user ? <ModuleGate moduleKey="auswertung"><KlassenarbeitVergleich /></ModuleGate> : <Landing />} />

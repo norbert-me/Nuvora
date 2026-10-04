@@ -1415,6 +1415,7 @@ PROBEN = {
     "mathespiele": None,
     "koerper": None,
     "waage": probe_waage,
+    "rennen": None,
 }
 
 

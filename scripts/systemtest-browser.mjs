@@ -701,6 +701,24 @@ const bedienung = (td) => [
     },
   },
   {
+    modul: "rennen",
+    name: "KI lernt fahren (/rennen)",
+    pfad: "/rennen",
+    // Reines Werkzeug ohne Daten. Geprueft wird die Mechanik: die KI startet,
+    // und eine Generation wird fertig, sodass die naechste beginnt — daran
+    // haengt das ganze Lernen (Auswahl und Mutation).
+    beweis: "KI gestartet, Generation 2 läuft",
+    async eigen(seite) {
+      await seite.getByRole("button", { name: "KI lernt", exact: true }).first().click({ timeout: 8000 });
+      await seite.getByRole("button", { name: "10×", exact: true }).first().click({ timeout: 8000 });
+      await seite.getByRole("button", { name: "Los", exact: true }).first().click({ timeout: 8000 });
+      try {
+        await seite.getByText(/Generation ([2-9]|\d\d)/).first().waitFor({ timeout: 30000 });
+      } catch { return "nach 30 s noch keine zweite Generation"; }
+      return "";
+    },
+  },
+  {
     modul: "koerper",
     name: "Quader zum Netz auffalten und einfärben (/koerper)",
     pfad: "/koerper",

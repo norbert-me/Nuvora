@@ -120,7 +120,7 @@ export async function setModuleOption(key, option, an) {
 export const MODUL_KEYS = [
   "cardvote", "lernpfad", "auswertung", "code-detektiv", "karten", "kalender",
   "orga", "zufall", "unterrichtsplanung", "notizbrett", "tafel", "mathespiele",
-  "pap", "koerper", "waage",
+  "pap", "koerper", "waage", "rennen",
 ];
 
 /**

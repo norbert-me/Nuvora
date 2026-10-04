@@ -215,6 +215,7 @@ def endpunkte(u):
         "waage": [
             ("GET", "/api/waage/aufgaben"),
         ],
+        "rennen": [],
     }
 
 
@@ -247,6 +248,7 @@ def tore(u):
         "mathespiele": [],
         "koerper": [],
         "waage": [("GET", "/api/waage/aufgaben")],
+        "rennen": [],
     }
 
 
@@ -1388,6 +1390,7 @@ INHALT = {
     "mathespiele": None,
     "koerper": None,
     "waage": inhalt_waage,
+    "rennen": None,
 }
 
 
