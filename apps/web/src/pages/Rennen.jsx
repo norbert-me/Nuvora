@@ -49,6 +49,9 @@ export default function Rennen() {
   // In welchen Modi schon einmal gestartet wurde (diese Sitzung).
   const [gestartet, setGestartet] = useState(() => new Set());
   useEffect(() => { if (laeuft) setGestartet((g) => (g.has(modus) ? g : new Set([...g, modus]))); }, [laeuft, modus]);
+  // Ist die Hilfe offen (Startbild bzw. Erklaerung), bleiben alle anderen
+  // Felder auf der Karte weg — sie verdeckten sie sonst.
+  const hilfeOffen = !laeuft && !gestartet.has(modus);
   const erklaerungZeigen = () => {
     setLaeuft(false);
     setGestartet((g) => { const n = new Set(g); n.delete(modus); return n; });
@@ -366,7 +369,7 @@ export default function Rennen() {
           </div>
         )}
         {/* Oben links: Zeiten bzw. Generation */}
-        <div style={{ ...ueber, top: 10, left: 10 }}>
+        {!hilfeOffen && <div style={{ ...ueber, top: 10, left: 10 }}>
           {modus === "ki" ? (<>
             <div><b>{t("rennen.generation")} {hud.gen + 1}</b> · {t("rennen.lebend", { n: hud.lebend })}</div>
             <div>{t("rennen.zeitGen")} {zeitText(hud.zeit)} / {zeitText(grenze)}</div>
@@ -378,8 +381,8 @@ export default function Rennen() {
             <div>{t("rennen.beste")} {zeitText(hud.beste)}</div>
             {modus === "gegen" && <div>{t("rennen.kiBeste")} {zeitText(hud.kiBeste)}</div>}
           </>)}
-        </div>
-        {hud.unfall && (
+        </div>}
+        {hud.unfall && !hilfeOffen && (
           <div style={{ ...ueber, top: "45%", left: "50%", transform: "translate(-50%, -50%)", fontSize: 22, fontWeight: 800, background: "rgba(229,57,53,0.9)" }}>
             {t("rennen.unfall")}
           </div>
@@ -387,7 +390,7 @@ export default function Rennen() {
 
         {/* Oben rechts: Einstellungen der KI — auf der Karte, damit Karte und
             Regler zusammen auf den Beamer passen. */}
-        {modus === "ki" && !(!laeuft && !gestartet.has("ki") && !erklaert) && (
+        {modus === "ki" && !hilfeOffen && (
           <div style={{ ...ueber, top: 10, right: 10, width: 250, fontSize: 13 }}>
             <Regler label={t("rennen.mutation")} wert={`${Math.round(rate * 100)} %`} min={1} max={60} value={Math.round(rate * 100)} onChange={(x) => setRate(x / 100)} />
             <Regler label={t("rennen.anzahl")} wert={anzahl} min={5} max={60} value={anzahl} onChange={setAnzahl} />
@@ -424,7 +427,7 @@ export default function Rennen() {
         )}
 
         {/* Unten links: das Gehirn der besten KI, live. */}
-        {modus === "ki" && hud.netz && laeuft && (
+        {modus === "ki" && hud.netz && laeuft && !hilfeOffen && (
           <div style={{ ...ueber, bottom: 10, left: 10, width: 270, fontSize: 12 }}>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>{t("rennen.netz")}</div>
             <NetzBild netz={hud.netz} t={t} />
@@ -432,7 +435,7 @@ export default function Rennen() {
         )}
 
         {/* Unten rechts: wie die KI lernt — Rundenzeit je Generation. */}
-        {modus === "ki" && (
+        {modus === "ki" && !hilfeOffen && (
           <div style={{ ...ueber, bottom: 10, right: 10, width: 260, fontSize: 12 }}>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>{t("rennen.zeitVerlauf")}</div>
             {zda.length === 0 ? <div style={{ opacity: 0.8 }}>{t("rennen.nochKeineRunde")}</div> : (
