@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STRECKEN, SPUR, strecke as streckeVon, baueStrecke, neuesAuto, fahre, sensoren, zufallsGehirn, mutiere, naechsteGeneration, fahreGeneration, fitness, zufallsquelle, GENE, zeitText } from "./rennen.js";
+import { experimentLauf, laufBilanz, STRECKEN, SPUR, strecke as streckeVon, baueStrecke, neuesAuto, fahre, sensoren, zufallsGehirn, mutiere, naechsteGeneration, fahreGeneration, fitness, zufallsquelle, GENE, zeitText } from "./rennen.js";
 
 const strecke = baueStrecke();
 
@@ -80,5 +80,21 @@ describe("KI-Rennen: alle Strecken", () => {
       min = Math.min(min, Math.hypot(m[i][0] - m[j][0], m[i][1] - m[j][1]));
     }
     expect(min).toBeGreaterThan(SPUR + 30);
+  });
+});
+
+describe("KI-Rennen: Experiment", () => {
+  it("ein Lauf ist mit gleichem Startwert reproduzierbar und liefert je Generation Werte", () => {
+    const st = streckeVon("oval");
+    const a = experimentLauf({ rate: 0.15, anzahl: 12, grenze: 10, seed: 5, strecke: st });
+    const b = experimentLauf({ rate: 0.15, anzahl: 12, grenze: 10, seed: 5, strecke: st });
+    const ra = [a.weiter(), a.weiter(), a.weiter()], rb = [b.weiter(), b.weiter(), b.weiter()];
+    expect(ra).toEqual(rb);
+    expect(ra[0]).toHaveProperty("anteil");
+  });
+  it("Bilanz: erste Runde und Bestzeit", () => {
+    expect(laufBilanz([{ beste: null, anteil: 0 }, { beste: 12, anteil: 0.1 }, { beste: 10, anteil: 0.3 }]))
+      .toEqual({ ersteRunde: 2, bestzeit: 10, anteilEnde: 0.3 });
+    expect(laufBilanz([{ beste: null, anteil: 0 }]).ersteRunde).toBe(null);
   });
 });

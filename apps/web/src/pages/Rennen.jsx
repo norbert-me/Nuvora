@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CONTROL_R, Segment, segmentBtn, cardStyle, pageFull, toolbarBtn, toolbarBtnPrimary, panelStyle, COLORS as C } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import RennenExperiment from "../components/RennenExperiment.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import {
   BREITE, HOEHE, NETZ, PHYSIK, SPUR, STRAHLEN, STRAHL_MAX, ZEITGRENZE, STRECKEN, strecke as streckeVon, denkeInnen, fahre, fitness, gewichtAus, gewichtEin,
@@ -262,7 +263,7 @@ export default function Rennen() {
       <Werkzeugleiste style={{ marginBottom: 12 }}
         links={(
           <Segment>
-            {["selbst", "ki", "gegen"].map((m) => (
+            {["selbst", "ki", "gegen", "experiment"].map((m) => (
               <button key={m} onClick={() => setModus(m)} aria-pressed={modus === m} disabled={m === "gegen" && !hatKi && modus !== "gegen"}
                 title={m === "gegen" && !hatKi ? t("rennen.erstLernen") : undefined}
                 style={{ ...segmentBtn, fontWeight: modus === m ? 700 : 500, color: modus === m ? "var(--accent)" : "var(--text2)" }}>
@@ -271,8 +272,10 @@ export default function Rennen() {
             ))}
           </Segment>
         )}>
-        <button onClick={() => setLaeuft((x) => !x)} style={toolbarBtnPrimary}>{laeuft ? t("rennen.pause") : t("rennen.los")}</button>
-        <button onClick={neuStart} style={toolbarBtn}>{t("rennen.neu")}</button>
+        {modus !== "experiment" && (<>
+          <button onClick={() => setLaeuft((x) => !x)} style={toolbarBtnPrimary}>{laeuft ? t("rennen.pause") : t("rennen.los")}</button>
+          <button onClick={neuStart} style={toolbarBtn}>{t("rennen.neu")}</button>
+        </>)}
         {/* Strecken: als kleine Bilder der Mittellinie — man erkennt sie schneller, als man sie liest. */}
         <Segment>
           {Object.keys(STRECKEN).map((k) => (
@@ -284,7 +287,8 @@ export default function Rennen() {
         </Segment>
       </Werkzeugleiste>
 
-      <div style={{ ...cardStyle, padding: 0, overflow: "hidden", position: "relative" }}>
+      {modus === "experiment" && <RennenExperiment strecke={strecke} t={t} />}
+      <div style={{ ...cardStyle, padding: 0, overflow: "hidden", position: "relative", display: modus === "experiment" ? "none" : "block" }}>
         <canvas ref={canvas} width={BREITE} height={HOEHE} style={{ width: "100%", height: "auto", display: "block" }} />
 
         {/* Startbild mit Erklaerung — beim Oeffnen und bei jeder Pause. Es liegt UNTER
@@ -295,7 +299,6 @@ export default function Rennen() {
             <div style={{ ...ueber, position: "static", maxWidth: 520, fontSize: 14, lineHeight: 1.5, padding: "16px 20px", background: "rgba(20,20,20,0.88)" }}>
               <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{t(`rennen.modus.${modus}`)}</div>
               <p style={{ margin: "0 0 10px" }}>{t(`rennen.erklaer.${modus}`)}</p>
-              {modus !== "ki" && <p style={{ margin: "0 0 10px", opacity: 0.85 }}>{t("rennen.tastenHinweis")}</p>}
               {modus === "ki" && <p style={{ margin: "0 0 10px", opacity: 0.85 }}>{t("rennen.kiHinweis")}</p>}
               <button onClick={() => setLaeuft(true)} style={{ ...toolbarBtnPrimary, marginTop: 4 }}>{t("rennen.los")}</button>
             </div>

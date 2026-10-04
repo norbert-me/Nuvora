@@ -244,3 +244,34 @@ export function zeitText(s) {
   const m = Math.floor(s / 60), r = s - m * 60;
   return `${m}:${r.toFixed(2).padStart(5, "0")}`;
 }
+
+// ── Experiment: dieselbe Evolution ohne Bild, Generation fuer Generation ──
+// Fuer den Vergleich von Einstellungen: jeder Lauf beginnt bei null (zufaellige
+// Gehirne aus seinem Startwert), damit nichts Gelerntes den Vergleich
+// verfaelscht. Liefert je Aufruf von `weiter()` die Werte EINER Generation —
+// die Seite ruft es in kleinen Haeppchen, damit sie dabei bedienbar bleibt.
+export function experimentLauf({ rate, anzahl, grenze, seed, strecke: st }) {
+  const rnd = zufallsquelle(seed);
+  let gehirne = Array.from({ length: anzahl }, () => zufallsGehirn(rnd));
+  return {
+    weiter() {
+      const autos = fahreGeneration(gehirne, st, grenze);
+      const zeiten = autos.flatMap((a) => a.runden_zeiten.slice(0, 1));
+      const punkte = autos.map(fitness);
+      gehirne = naechsteGeneration(gehirne, punkte, rate, rnd);
+      return {
+        beste: zeiten.length ? Math.min(...zeiten) : null,
+        schnitt: zeiten.length ? zeiten.reduce((x, y) => x + y, 0) / zeiten.length : null,
+        anteil: zeiten.length / autos.length,
+      };
+    },
+  };
+}
+
+// Auswertung eines Laufs: in welcher Generation die erste Runde gelang (1-
+// basiert, null = nie) und die Bestzeit am Ende.
+export function laufBilanz(reihe) {
+  const i = reihe.findIndex((g) => g.beste != null);
+  const zeiten = reihe.map((g) => g.beste).filter((z) => z != null);
+  return { ersteRunde: i < 0 ? null : i + 1, bestzeit: zeiten.length ? Math.min(...zeiten) : null, anteilEnde: reihe.length ? reihe[reihe.length - 1].anteil : 0 };
+}
