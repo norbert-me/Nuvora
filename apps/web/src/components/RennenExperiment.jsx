@@ -128,7 +128,7 @@ export default function RennenExperiment({ strecke, t }) {
             : <button onClick={starten} style={toolbarBtnPrimary}>{t("rennen.exp.starten")}</button>}
         </div>
         {laeuft && (
-          <div style={{ marginTop: 10, height: 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ marginTop: 10, height: 8, background: "var(--bg2)", borderRadius: "999px", overflow: "hidden" }}>
             <div style={{ width: `${Math.round(fort * 100)}%`, height: "100%", background: "var(--accent)" }} />
           </div>
         )}

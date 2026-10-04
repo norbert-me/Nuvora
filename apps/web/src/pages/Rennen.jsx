@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { CONTROL_R, Segment, segmentBtn, cardStyle, pageFull, toolbarBtn, toolbarBtnPrimary, panelStyle, COLORS as C } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import RennenExperiment from "../components/RennenExperiment.jsx";
+import RennenErklaerung from "../components/RennenErklaerung.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import {
   BREITE, HOEHE, NETZ, PHYSIK, SPUR, STRAHLEN, STRAHL_MAX, ZEITGRENZE, STRECKEN, strecke as streckeVon, denkeInnen, fahre, fitness, gewichtAus, gewichtEin,
@@ -41,7 +42,10 @@ export default function Rennen() {
   const [anzahl, setAnzahl] = useState(30);
   const [tempo, setTempo] = useState(1);
   const [nurBeste, setNurBeste] = useState(false);
-  const [grenze, setGrenze] = useState(ZEITGRENZE);   // maximale Fahrzeit je Generation (s)
+  const [grenze, setGrenze] = useState(ZEITGRENZE);
+  // Hat dieses Geraet die Schritt-fuer-Schritt-Erklaerung schon durchlaufen?
+  const [erklaert, setErklaert] = useState(() => { try { return localStorage.getItem("nuvora_rennen_erklaert") === "1"; } catch { return false; } });
+  const merkeErklaert = () => { setErklaert(true); try { localStorage.setItem("nuvora_rennen_erklaert", "1"); } catch { /* egal */ } };   // maximale Fahrzeit je Generation (s)
   const [hud, setHud] = useState({ gen: 0, lebend: 0, zeit: 0, runde: null, beste: null, letzte: null, verlauf: [] });
   const canvas = useRef(null);
   const tasten = useRef({});
@@ -61,8 +65,11 @@ export default function Rennen() {
     if (m === "selbst" || m === "gegen") w.mensch = neuesAuto(strecke);
     if (m === "gegen" && w.besteKi) { w.gehirne = [w.besteKi]; w.autos = [neuesAuto(strecke)]; }
     if (m === "ki") {
+      // Weiterlernen heisst: ALLE fangen bei der gespeicherten KI an (zwei
+      // unveraendert, der Rest leicht mutiert). Vorher waren nur zwei davon
+      // Kopien und 28 Zufall — das sah aus, als sei die KI geloescht.
       const start = w.besteKi || mitgebracht;
-      w.gehirne = Array.from({ length: anzahl }, (_, i) => (start && i < 2 ? start : start && i < anzahl / 2 ? mutiere(start, rate) : zufallsGehirn()));
+      w.gehirne = Array.from({ length: anzahl }, (_, i) => (!start ? zufallsGehirn() : i < 2 ? start : mutiere(start, rate)));
       w.autos = w.gehirne.map(() => neuesAuto(strecke));
     }
     welt.current = w;
@@ -296,11 +303,24 @@ export default function Rennen() {
             das Werkzeug zum ersten Mal sieht, soll wissen, was er tut. */}
         {!laeuft && (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)", padding: 16 }}>
-            <div style={{ ...ueber, position: "static", maxWidth: 520, fontSize: 14, lineHeight: 1.5, padding: "16px 20px", background: "rgba(20,20,20,0.88)" }}>
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{t(`rennen.modus.${modus}`)}</div>
-              <p style={{ margin: "0 0 10px" }}>{t(`rennen.erklaer.${modus}`)}</p>
-              {modus === "ki" && <p style={{ margin: "0 0 10px", opacity: 0.85 }}>{t("rennen.kiHinweis")}</p>}
-              <button onClick={() => setLaeuft(true)} style={{ ...toolbarBtnPrimary, marginTop: 4 }}>{t("rennen.los")}</button>
+            <div style={{ ...ueber, position: "static", maxWidth: modus === "ki" && !erklaert ? 560 : 520, maxHeight: "100%", overflowY: "auto", fontSize: 14, lineHeight: 1.5, padding: "16px 20px", background: "rgba(20,20,20,0.88)" }}>
+              {/* „KI lernt": beim ersten Mal Schritt fuer Schritt erklaert, danach
+                  nur die Kurzfassung — mit dem Weg zurueck zur Erklaerung. */}
+              {modus === "ki" && !erklaert ? (
+                <RennenErklaerung t={t} onLos={() => { merkeErklaert(); setLaeuft(true); }} />
+              ) : (<>
+                <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{t(`rennen.modus.${modus}`)}</div>
+                <p style={{ margin: "0 0 10px" }}>{t(`rennen.erklaer.${modus}`)}</p>
+                {modus === "ki" && <p style={{ margin: "0 0 10px", opacity: 0.85 }}>{t("rennen.kiHinweis")}</p>}
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <button onClick={() => setLaeuft(true)} style={toolbarBtnPrimary}>{t("rennen.los")}</button>
+                  {modus === "ki" && (
+                    <button onClick={() => setErklaert(false)} style={{ ...toolbarBtn, background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,0.45)" }}>
+                      {t("rennen.erk.vonVorn")}
+                    </button>
+                  )}
+                </div>
+              </>)}
             </div>
           </div>
         )}

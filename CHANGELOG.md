@@ -37,6 +37,12 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   mehrmals; danach liegen ihre Rundenzeit-Kurven übereinander, und eine Tabelle
   nennt erste Runde, Bestzeit und Anteil mit Runde — zum Vergleichen statt
   Mitschreiben.
+  **„KI lernt“ wird Schritt für Schritt erklärt** (sieben Bilder: fünf
+  Strahlen, sechs Zahlen, zwei Ausgänge von −1 bis +1, ein Beispiel „Wand
+  links → nach rechts“, Zufall am Anfang, Auswahl und Mutation, wo was auf
+  der Karte steht); danach eine Kurzfassung mit „Erklärung von vorn“. Beim
+  erneuten Öffnen lernt die gespeicherte KI weiter — vorher waren 28 von 30
+  Autos Zufall, und es sah aus, als sei sie gelöscht.
 - Kurse: **die Stufe ist zurück** (neben dem Fach, auch „7/8“). Mit Fach und
   Stufe zeigen die Themenauswahlen nur noch die Themen dieses Kurses —
   Klassenarbeitstermin, Kalendereintrag, Notenspalte und die Aufgaben der
