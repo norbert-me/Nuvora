@@ -15,8 +15,8 @@ import { CONTROL_R, Segment, segmentBtn, cardStyle, pageFull, toolbarBtn, toolba
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import {
-  BREITE, HOEHE, SPUR, STRAHLEN, STRAHL_MAX, ZEITGRENZE, baueStrecke, fahre, fitness, kiSchritt, naechsteGeneration,
-  neuesAuto, zeitText, zufallsGehirn,
+  BREITE, HOEHE, NETZ, PHYSIK, SPUR, STRAHLEN, STRAHL_MAX, ZEITGRENZE, baueStrecke, denkeInnen, fahre, fitness, gewichtAus, gewichtEin,
+  kiSchritt, naechsteGeneration, neuesAuto, sensoren, zeitText, zufallsGehirn,
 } from "../core/rennen.js";
 
 const SPEICHER = "nuvora_rennen_ki";
@@ -38,6 +38,7 @@ export default function Rennen() {
   const [anzahl, setAnzahl] = useState(30);
   const [tempo, setTempo] = useState(1);
   const [nurBeste, setNurBeste] = useState(false);
+  const [grenze, setGrenze] = useState(ZEITGRENZE);   // maximale Fahrzeit je Generation (s)
   const [hud, setHud] = useState({ gen: 0, lebend: 0, zeit: 0, runde: null, beste: null, letzte: null, verlauf: [] });
   const canvas = useRef(null);
   const tasten = useRef({});
@@ -47,7 +48,7 @@ export default function Rennen() {
   const neueWelt = (m = modus) => {
     const gespeichert = ladeKi();
     const w = { mensch: null, autos: [], gehirne: [], gen: gespeichert?.gen || 0, verlauf: gespeichert?.verlauf || [],
-      zeiten: gespeichert?.zeiten || [],
+      zeiten: gespeichert?.zeiten || [], schnitte: gespeichert?.schnitte || [], geschafft: gespeichert?.geschafft || [],
       besteKi: gespeichert?.beste || null, besteZeit: gespeichert?.besteZeit ?? null, menschBest: null, simZeit: 0 };
     if (m === "selbst" || m === "gegen") w.mensch = neuesAuto(strecke);
     if (m === "gegen" && w.besteKi) { w.gehirne = [w.besteKi]; w.autos = [neuesAuto(strecke)]; }
@@ -101,7 +102,7 @@ export default function Rennen() {
     };
     raf = requestAnimationFrame(takt);
     return () => cancelAnimationFrame(raf);
-  }, [laeuft, modus, tempo]);
+  }, [laeuft, modus, tempo]);   // grenze: liest schritt() ueber tun.current
 
   const schritt = (w) => {
     if (w.mensch) {
@@ -114,7 +115,15 @@ export default function Rennen() {
         const z = w.mensch.runden_zeiten[w.mensch.runden_zeiten.length - 1];
         w.menschBest = w.menschBest == null ? z : Math.min(w.menschBest, z);
       }
+      // Den roten Rand beruehrt: Unfall — zurueck an den Start, die Runde
+      // zaehlt neu. Dieselbe Regel wie fuer die KI, sonst waere „Abkuerzen
+      // ueber die Wiese" der schnellste Weg.
+      if (!strecke.aufStrasse(w.mensch.x, w.mensch.y)) {
+        w.mensch = neuesAuto(strecke);
+        w.unfall = 1.2;
+      }
     }
+    if (w.unfall > 0) w.unfall -= 1 / 60;
     if (modus === "gegen") {
       w.autos.forEach((a, i) => { if (a.lebt) kiSchritt(a, w.gehirne[i], strecke); });
       return;
@@ -125,10 +134,10 @@ export default function Rennen() {
     w.autos.forEach((a, i) => {
       if (!a.lebt) return;
       kiSchritt(a, w.gehirne[i], strecke);
-      if (a.runden >= 2) a.lebt = false;
+      if (a.runden >= 1) a.lebt = false;   // eine Runde — fertig, gewertet wird ihre Zeit
       if (a.lebt) lebend += 1;
     });
-    if (!lebend || w.simZeit >= ZEITGRENZE) generationFertig(w);
+    if (!lebend || w.simZeit >= grenze) generationFertig(w);
   };
 
   const generationFertig = (w) => {
@@ -139,15 +148,16 @@ export default function Rennen() {
     const beste = zeiten.length ? Math.min(...zeiten) : null;
     if (beste != null && (w.besteZeit == null || beste < w.besteZeit)) w.besteZeit = beste;
     w.gen += 1;
-    // Fortschritt in Runden (1 = eine Runde geschafft), fuer die Kurve.
-    w.verlauf = [...w.verlauf, Math.round((w.autos[bi].weg / strecke.n) * 100) / 100].slice(-200);
-    // Und die beste Rundenzeit dieser Generation — sobald Runden gelingen,
-    // sieht man das Lernen an der ZEIT (der Weg ist dann bei zwei Runden voll).
+    // Je Generation: beste und durchschnittliche Rundenzeit derer, die eine
+    // Runde geschafft haben, und wie viele das waren — daran sieht man das Lernen.
+    const schnitt = zeiten.length ? zeiten.reduce((a, b) => a + b, 0) / zeiten.length : null;
     w.zeiten = [...w.zeiten, beste].slice(-200);
+    w.schnitte = [...w.schnitte, schnitt].slice(-200);
+    w.geschafft = [...w.geschafft, zeiten.length / w.autos.length].slice(-200);
     w.besteKi = w.gehirne[bi];
     w.letzte = beste;
     try {
-      localStorage.setItem(SPEICHER, JSON.stringify({ beste: Array.from(w.besteKi), gen: w.gen, verlauf: w.verlauf, zeiten: w.zeiten, besteZeit: w.besteZeit }));
+      localStorage.setItem(SPEICHER, JSON.stringify({ beste: Array.from(w.besteKi), gen: w.gen, zeiten: w.zeiten, schnitte: w.schnitte, geschafft: w.geschafft, besteZeit: w.besteZeit }));
     } catch { /* voll oder gesperrt */ }
     // Die Populationsgroesse kann sich geaendert haben: auffuellen bzw. kuerzen.
     let gehirne = naechsteGeneration(w.gehirne, punkte, rate);
@@ -160,11 +170,20 @@ export default function Rennen() {
 
   const meldeHud = (w) => {
     const m = w.mensch;
+    // Das Netz der besten noch fahrenden KI, mit den Werten dieses Augenblicks.
+    let netz = null;
+    let bi = -1;
+    w.autos.forEach((a, i) => { if (a.lebt && (bi < 0 || a.weg > w.autos[bi].weg)) bi = i; });
+    if (bi >= 0 && w.gehirne[bi]) {
+      const a = w.autos[bi];
+      netz = { g: w.gehirne[bi], werte: denkeInnen(w.gehirne[bi], [...sensoren(a, strecke), a.v / PHYSIK.max]) };
+    }
     setHud({
+      netz,
       gen: w.gen, lebend: w.autos.filter((a) => a.lebt).length, zeit: m ? m.t - m.rundeSeit : w.simZeit,
       runde: m ? m.runden_zeiten[m.runden_zeiten.length - 1] ?? null : null,
-      beste: m ? w.menschBest : w.besteZeit, kiBeste: w.besteZeit, letzte: w.letzte ?? null, verlauf: w.verlauf, zeiten: w.zeiten,
-      runden: m ? m.runden : null,
+      beste: m ? w.menschBest : w.besteZeit, kiBeste: w.besteZeit, letzte: w.letzte ?? null, zeiten: w.zeiten, schnitte: w.schnitte, geschafft: w.geschafft,
+      runden: m ? m.runden : null, unfall: (w.unfall || 0) > 0,
     });
   };
 
@@ -215,22 +234,14 @@ export default function Rennen() {
   tun.current = { neueWelt, schritt, zeichne, meldeHud };
   const neuStart = () => { setLaeuft(false); neueWelt(modus); };
   const kiVergessen = () => { try { localStorage.removeItem(SPEICHER); } catch { /* egal */ } setLaeuft(false); neueWelt(modus); };
-  // Tasten am Bildschirm (Tablet): halten = fahren
-  const taste = (key) => ({
-    onPointerDown: (e) => { e.preventDefault(); tasten.current[key] = true; if (!laeuft) setLaeuft(true); },
-    onPointerUp: () => { tasten.current[key] = false; },
-    onPointerLeave: () => { tasten.current[key] = false; },
-    onPointerCancel: () => { tasten.current[key] = false; },
-  });
-
-  const v = hud.verlauf || [];
-  const vmax = Math.max(1, ...v);
-  const kurve = v.map((y, i) => `${v.length > 1 ? (i / (v.length - 1)) * 280 : 0},${70 - (y / vmax) * 56}`).join(" ");
-  // Rundenzeiten: oben = schneller (die beste steht oben, wie beim Weg). Generationen ohne Runde bleiben Luecken.
-  const zs = (hud.zeiten || []);
-  const zda = zs.filter((z) => z != null);
+  // Rundenzeiten je Generation: oben = schneller. Beste (gruen) und Schnitt
+  // (weiss) derer mit Runde; Generationen ohne Runde bleiben Luecken.
+  const zs = hud.zeiten || [], ss = hud.schnitte || [];
+  const zda = [...zs, ...ss].filter((z) => z != null);
   const zmin = zda.length ? Math.min(...zda) : 0, zmax = zda.length ? Math.max(...zda) : 1;
-  const zKurve = zs.map((z, i) => (z == null ? null : `${zs.length > 1 ? (i / (zs.length - 1)) * 280 : 0},${8 + ((z - zmin) / Math.max(0.01, zmax - zmin)) * 56}`)).filter(Boolean).join(" ");
+  const linie = (reihe) => reihe.map((z, i) => (z == null ? null
+    : `${reihe.length > 1 ? (i / (reihe.length - 1)) * 280 : 0},${8 + ((z - zmin) / Math.max(0.01, zmax - zmin)) * 56}`)).filter(Boolean).join(" ");
+  const geschafftJetzt = (hud.geschafft || []).slice(-1)[0];
   const hatKi = !!welt.current?.besteKi;
 
   return (
@@ -251,109 +262,148 @@ export default function Rennen() {
         <button onClick={neuStart} style={toolbarBtn}>{t("rennen.neu")}</button>
       </Werkzeugleiste>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12 }}>
-        <div style={{ ...cardStyle, padding: 0, overflow: "hidden", position: "relative" }}>
-          <canvas ref={canvas} width={BREITE} height={HOEHE} style={{ width: "100%", height: "auto", display: "block" }} />
-          {/* Anzeige oben links: Rundenzeiten bzw. Generation */}
-          <div style={{ position: "absolute", top: 10, left: 10, background: "rgba(0,0,0,0.6)", color: "#fff", borderRadius: CONTROL_R,
-            padding: "6px 10px", fontSize: 14, fontVariantNumeric: "tabular-nums", lineHeight: 1.5 }}>
-            {modus === "ki" ? (<>
-              <div><b>{t("rennen.generation")} {hud.gen + 1}</b> · {t("rennen.lebend", { n: hud.lebend })}</div>
-              <div>{t("rennen.zeitGen")} {zeitText(hud.zeit)} / {zeitText(ZEITGRENZE)}</div>
-              <div>{t("rennen.kiBeste")} {zeitText(hud.beste)}</div>
-            </>) : (<>
-              <div><b>{t("rennen.runde")}</b> {zeitText(hud.zeit)}</div>
-              <div>{t("rennen.letzte")} {zeitText(hud.runde)}</div>
-              <div>{t("rennen.beste")} {zeitText(hud.beste)}</div>
-              {modus === "gegen" && <div>{t("rennen.kiBeste")} {zeitText(hud.kiBeste)}</div>}
-            </>)}
-          </div>
-          {!laeuft && (
-            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-              <div style={{ background: "rgba(0,0,0,0.55)", color: "#fff", borderRadius: CONTROL_R, padding: "10px 16px", fontSize: 16, fontWeight: 700 }}>
-                {modus === "ki" ? t("rennen.startKi") : t("rennen.startSelbst")}
-              </div>
-            </div>
-          )}
-        </div>
+      <div style={{ ...cardStyle, padding: 0, overflow: "hidden", position: "relative" }}>
+        <canvas ref={canvas} width={BREITE} height={HOEHE} style={{ width: "100%", height: "auto", display: "block" }} />
 
-        {modus !== "ki" && (
-          // Fuer Tablets: Tasten zum Halten (links/rechts lenken, oben Gas, unten Bremse).
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, touchAction: "none", userSelect: "none" }}>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button {...taste("ArrowLeft")} style={pedal} aria-label={t("rennen.links")}>◀</button>
-              <button {...taste("ArrowRight")} style={pedal} aria-label={t("rennen.rechts")}>▶</button>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button {...taste("ArrowDown")} style={pedal} aria-label={t("rennen.bremse")}>▼</button>
-              <button {...taste("ArrowUp")} style={{ ...pedal, background: C.success, color: "#fff" }} aria-label={t("rennen.gas")}>▲</button>
+        {/* Startbild mit Erklaerung — beim Oeffnen und bei jeder Pause. Es liegt UNTER
+            den Feldern auf der Karte: die Einstellungen sollen vor dem Start erreichbar sein. Wer
+            das Werkzeug zum ersten Mal sieht, soll wissen, was er tut. */}
+        {!laeuft && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)", padding: 16 }}>
+            <div style={{ ...ueber, position: "static", maxWidth: 520, fontSize: 14, lineHeight: 1.5, padding: "16px 20px", background: "rgba(20,20,20,0.88)" }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{t(`rennen.modus.${modus}`)}</div>
+              <p style={{ margin: "0 0 10px" }}>{t(`rennen.erklaer.${modus}`)}</p>
+              {modus !== "ki" && <p style={{ margin: "0 0 10px", opacity: 0.85 }}>{t("rennen.tastenHinweis")}</p>}
+              {modus === "ki" && <p style={{ margin: "0 0 10px", opacity: 0.85 }}>{t("rennen.kiHinweis")}</p>}
+              <button onClick={() => setLaeuft(true)} style={{ ...toolbarBtnPrimary, marginTop: 4 }}>{t("rennen.los")}</button>
             </div>
           </div>
         )}
+        {/* Oben links: Zeiten bzw. Generation */}
+        <div style={{ ...ueber, top: 10, left: 10 }}>
+          {modus === "ki" ? (<>
+            <div><b>{t("rennen.generation")} {hud.gen + 1}</b> · {t("rennen.lebend", { n: hud.lebend })}</div>
+            <div>{t("rennen.zeitGen")} {zeitText(hud.zeit)} / {zeitText(grenze)}</div>
+            <div>{t("rennen.kiBeste")} {zeitText(hud.beste)}</div>
+          </>) : (<>
+            <div><b>{t("rennen.runde")}</b> {zeitText(hud.zeit)}</div>
+            <div>{t("rennen.letzte")} {zeitText(hud.runde)}</div>
+            <div>{t("rennen.beste")} {zeitText(hud.beste)}</div>
+            {modus === "gegen" && <div>{t("rennen.kiBeste")} {zeitText(hud.kiBeste)}</div>}
+          </>)}
+        </div>
+        {hud.unfall && (
+          <div style={{ ...ueber, top: "45%", left: "50%", transform: "translate(-50%, -50%)", fontSize: 22, fontWeight: 800, background: "rgba(229,57,53,0.9)" }}>
+            {t("rennen.unfall")}
+          </div>
+        )}
 
+        {/* Oben rechts: Einstellungen der KI — auf der Karte, damit Karte und
+            Regler zusammen auf den Beamer passen. */}
         {modus === "ki" && (
-          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
-            <div style={{ ...cardStyle, padding: 12 }}>
-              <Regler label={t("rennen.mutation")} wert={`${Math.round(rate * 100)} %`} min={1} max={60} value={Math.round(rate * 100)} onChange={(x) => setRate(x / 100)} />
-              <Regler label={t("rennen.anzahl")} wert={anzahl} min={5} max={60} value={anzahl} onChange={setAnzahl} />
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 13, color: "var(--text2)", minWidth: 110 }}>{t("rennen.tempo")}</span>
-                <Segment>
-                  {[1, 2, 5, 10].map((x) => (
-                    <button key={x} onClick={() => setTempo(x)} aria-pressed={tempo === x}
-                      style={{ ...segmentBtn, fontWeight: tempo === x ? 700 : 500, color: tempo === x ? "var(--accent)" : "var(--text2)" }}>{x}×</button>
-                  ))}
-                </Segment>
-              </div>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginTop: 10 }}>
-                <input type="checkbox" checked={nurBeste} onChange={(e) => setNurBeste(e.target.checked)} /> {t("rennen.nurBeste")}
-              </label>
-              <button onClick={kiVergessen} style={{ ...toolbarBtn, marginTop: 10, color: C.danger }}>{t("rennen.vergessen")}</button>
+          <div style={{ ...ueber, top: 10, right: 10, width: 250, fontSize: 13 }}>
+            <Regler label={t("rennen.mutation")} wert={`${Math.round(rate * 100)} %`} min={1} max={60} value={Math.round(rate * 100)} onChange={(x) => setRate(x / 100)} />
+            <Regler label={t("rennen.anzahl")} wert={anzahl} min={5} max={60} value={anzahl} onChange={setAnzahl} />
+            <Regler label={t("rennen.grenze")} wert={`${grenze} s`} min={5} max={90} value={grenze} onChange={setGrenze} />
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+              <span style={{ minWidth: 70 }}>{t("rennen.tempo")}</span>
+              {[1, 2, 5, 10].map((x) => (
+                <button key={x} onClick={() => setTempo(x)} aria-pressed={tempo === x}
+                  style={{ ...chip, background: tempo === x ? "#fff" : "transparent", color: tempo === x ? "#111" : "#fff" }}>{x}×</button>
+              ))}
             </div>
-            {/* Wie weit kam die beste KI je Generation? 1 = eine Runde. */}
-            <div style={{ ...cardStyle, padding: 12 }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>{t("rennen.verlauf")}</div>
-              {v.length < 2 ? <div style={{ fontSize: 13, color: "var(--text3)" }}>{t("rennen.verlaufLeer")}</div> : (
-                <svg viewBox="0 0 280 72" style={{ width: "100%", height: 110, background: "var(--bg3)", borderRadius: CONTROL_R }}>
-                  {[1, 2].filter((r) => r <= vmax).map((r) => (
-                    <g key={r}>
-                      <line x1={0} x2={280} y1={70 - (r / vmax) * 56} y2={70 - (r / vmax) * 56} stroke="var(--border2)" strokeDasharray="3 3" />
-                      <text x={2} y={68 - (r / vmax) * 56} fontSize={8} fill="var(--text3)">{t("rennen.rundenN", { n: r })}</text>
-                    </g>
-                  ))}
-                  <polyline points={kurve} fill="none" stroke="#1e88e5" strokeWidth={1.8} />
-                </svg>
-              )}
-              {zda.length >= 2 && (<>
-                <div style={{ fontWeight: 700, margin: "10px 0 6px" }}>{t("rennen.zeitVerlauf")}</div>
-                <svg viewBox="0 0 280 72" style={{ width: "100%", height: 90, background: "var(--bg3)", borderRadius: CONTROL_R }}>
-                  <text x={2} y={10} fontSize={8} fill="var(--text3)">{zeitText(zmin)}</text>
-                  <text x={2} y={70} fontSize={8} fill="var(--text3)">{zeitText(zmax)}</text>
-                  <polyline points={zKurve} fill="none" stroke={C.success} strokeWidth={1.8} />
-                </svg>
-              </>)}
-              <div style={{ fontSize: 13, color: "var(--text2)", marginTop: 6 }}>
-                {t("rennen.letzteGen")} {zeitText(hud.letzte)} · {t("rennen.kiBeste")} {zeitText(hud.beste)}
-              </div>
-            </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+              <input type="checkbox" checked={nurBeste} onChange={(e) => setNurBeste(e.target.checked)} /> {t("rennen.nurBeste")}
+            </label>
+            <button onClick={kiVergessen} style={{ ...chip, marginTop: 8, color: "#ffb4b4", borderColor: "#ffb4b4" }}>{t("rennen.vergessen")}</button>
           </div>
         )}
-        <div style={{ ...panelStyle, padding: 12, fontSize: 13, color: "var(--text2)", lineHeight: 1.5 }}>
-          {t(`rennen.erklaer.${modus}`)}
-        </div>
+
+        {/* Unten links: das Gehirn der besten KI, live. */}
+        {(modus === "ki" || modus === "gegen") && hud.netz && laeuft && (
+          <div style={{ ...ueber, bottom: 10, left: 10, width: 270, fontSize: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>{t("rennen.netz")}</div>
+            <NetzBild netz={hud.netz} t={t} />
+          </div>
+        )}
+
+        {/* Unten rechts: wie die KI lernt — Rundenzeit je Generation. */}
+        {modus === "ki" && (
+          <div style={{ ...ueber, bottom: 10, right: 10, width: 260, fontSize: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>{t("rennen.zeitVerlauf")}</div>
+            {zda.length < 2 ? <div style={{ opacity: 0.8 }}>{t("rennen.nochKeineRunde")}</div> : (
+              <svg viewBox="0 0 280 72" style={{ width: "100%", height: 70, display: "block" }}>
+                <text x={2} y={12} fontSize={10} fill="rgba(255,255,255,0.75)">{zeitText(zmin)}</text>
+                <text x={2} y={70} fontSize={10} fill="rgba(255,255,255,0.75)">{zeitText(zmax)}</text>
+                <polyline points={linie(ss)} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth={1.6} strokeDasharray="4 3" />
+                <polyline points={linie(zs)} fill="none" stroke="#81c784" strokeWidth={2.2} />
+              </svg>
+            )}
+            <div style={{ display: "flex", gap: 10, marginTop: 4, opacity: 0.9 }}>
+              <span style={{ color: "#81c784" }}>— {t("rennen.linieBeste")}</span>
+              <span>- - {t("rennen.linieSchnitt")}</span>
+            </div>
+            {geschafftJetzt != null && (
+              <div style={{ marginTop: 4 }}>{t("rennen.geschafft", { p: Math.round(geschafftJetzt * 100) })}</div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
+const ueber = { position: "absolute", background: "rgba(0,0,0,0.62)", color: "#fff", borderRadius: CONTROL_R, padding: "8px 12px",
+  fontSize: 14, fontVariantNumeric: "tabular-nums", lineHeight: 1.5 };
+const chip = { border: "1px solid rgba(255,255,255,0.5)", borderRadius: CONTROL_R, padding: "2px 8px", fontSize: 12, cursor: "pointer", background: "transparent", color: "#fff" };
+
+// Das neuronale Netz: links die Eingaenge (fuenf Strahlen, Tempo), in der Mitte
+// acht Knoten, rechts Lenken und Gas. Linien: blau positiv, rot negativ, je
+// dicker desto staerker; Knoten: je heller, desto staerker gerade aktiv.
+function NetzBild({ netz, t }) {
+  const { g, werte } = netz;
+  const B = 260, H = 170;
+  const spalte = (n, x) => Array.from({ length: n }, (_, i) => [x, 14 + (i + 0.5) * ((H - 20) / n)]);
+  const E = spalte(NETZ.ein, 70), M = spalte(NETZ.mitte, 145), A = spalte(NETZ.aus, 210);
+  const linie = (w, p, q, key) => (
+    <line key={key} x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} stroke={w >= 0 ? "#64b5f6" : "#ef5350"}
+      strokeWidth={Math.min(3, Math.abs(w) * 1.4)} strokeOpacity={Math.min(0.9, 0.15 + Math.abs(w) * 0.35)} />
+  );
+  const knoten = (wert, p, key) => (
+    <circle key={key} cx={p[0]} cy={p[1]} r={6} fill={`rgba(255,255,255,${0.1 + 0.9 * Math.min(1, Math.abs(wert))})`}
+      stroke={wert >= 0 ? "#64b5f6" : "#ef5350"} strokeWidth={1.5} />
+  );
+  const einNamen = [...STRAHLEN.map((_, i) => t("rennen.strahl", { n: i + 1 })), t("rennen.tempo")];
+  const ausNamen = [t("rennen.lenken"), t("rennen.gasAus")];
+  return (
+    <svg viewBox={`0 0 ${B} ${H}`} style={{ width: "100%", display: "block" }}>
+      {E.flatMap((p, i) => M.map((q, j) => linie(gewichtEin(g, i, j), p, q, `e${i}-${j}`)))}
+      {M.flatMap((p, j) => A.map((q, k) => linie(gewichtAus(g, j, k), p, q, `a${j}-${k}`)))}
+      {E.map((p, i) => (
+        <g key={`ek${i}`}>
+          <text x={p[0] - 10} y={p[1] + 3} fontSize={9} textAnchor="end" fill="rgba(255,255,255,0.85)">{einNamen[i]}</text>
+          {knoten(werte.ein[i], p, `en${i}`)}
+        </g>
+      ))}
+      {M.map((p, j) => knoten(werte.mitte[j], p, `m${j}`))}
+      {A.map((p, k) => (
+        <g key={`ak${k}`}>
+          {knoten(werte.aus[k], p, `an${k}`)}
+          <text x={p[0] + 10} y={p[1] - 2} fontSize={9} fill="rgba(255,255,255,0.85)">{ausNamen[k]}</text>
+          <text x={p[0] + 10} y={p[1] + 9} fontSize={9} fill="rgba(255,255,255,0.65)">{werte.aus[k].toFixed(2)}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 function Regler({ label, wert, ...rest }) {
   return (
-    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 6 }}>
-      <span style={{ minWidth: 110, color: "var(--text2)" }}>{label}</span>
+    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 4 }}>
+      <span style={{ minWidth: 70 }}>{label}</span>
       <input type="range" {...rest} onChange={(e) => rest.onChange(Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
       <span style={{ minWidth: 44, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{wert}</span>
     </label>
   );
 }
 
-const pedal = { ...toolbarBtn, minWidth: 64, height: 56, fontSize: 22, justifyContent: "center", touchAction: "none" };

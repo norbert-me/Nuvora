@@ -135,23 +135,31 @@ export function zufallsGehirn(rnd = Math.random) {
   return Float32Array.from({ length: GENE }, () => rnd() * 2 - 1);
 }
 
-export function denke(gehirn, eingaben) {
+// Das Netz rechnen — mit allen Zwischenwerten, damit man es zeigen kann.
+export function denkeInnen(gehirn, eingaben) {
   const { ein, mitte, aus } = NETZ;
-  let o = 0;
   const h = new Array(mitte);
   for (let j = 0; j < mitte; j++) {
     let s = 0;
-    for (let i = 0; i < ein; i++) s += gehirn[o + j * ein + i] * eingaben[i];
+    for (let i = 0; i < ein; i++) s += gehirn[j * ein + i] * eingaben[i];
     h[j] = Math.tanh(s + gehirn[ein * mitte + j]);
   }
-  o = ein * mitte + mitte;
+  const o = ein * mitte + mitte;
   const out = [];
   for (let k = 0; k < aus; k++) {
     let s = 0;
     for (let j = 0; j < mitte; j++) s += gehirn[o + k * mitte + j] * h[j];
     out.push(Math.tanh(s + gehirn[o + mitte * aus + k]));
   }
-  return out;   // [lenken, gas]
+  return { ein: eingaben, mitte: h, aus: out };
+}
+
+// Gewicht von Eingang i zu Mittelknoten j bzw. von Mittelknoten j zu Ausgang k.
+export const gewichtEin = (g, i, j) => g[j * NETZ.ein + i];
+export const gewichtAus = (g, j, k) => g[NETZ.ein * NETZ.mitte + NETZ.mitte + k * NETZ.mitte + j];
+
+export function denke(gehirn, eingaben) {
+  return denkeInnen(gehirn, eingaben).aus;   // [lenken, gas]
 }
 
 export function kiSchritt(auto, gehirn, strecke) {
@@ -168,11 +176,14 @@ export function mutiere(gehirn, rate, rnd = Math.random, staerke = 0.5) {
   return neu;
 }
 
-// Fitness: wie weit die Fahrt kam — bei gleicher Zeitgrenze heisst das auch,
-// wie schnell. Eine geschaffte Runde zaehlt zusaetzlich nach ihrer Zeit.
+// Fitness: das Ziel ist die SCHNELLSTE RUNDE, nicht moeglichst viele. Wer eine
+// Runde geschafft hat, wird nur nach ihrer Zeit gewertet — und steht immer
+// vor jedem, der keine geschafft hat (der Sockel 1000 liegt ueber jedem Weg
+// einer unvollendeten Runde). Ohne Runde zaehlt der Weg: sonst gaebe es am
+// Anfang nichts, woran die Auswahl ansetzen koennte.
 export function fitness(auto) {
-  const beste = auto.runden_zeiten.length ? Math.min(...auto.runden_zeiten) : null;
-  return auto.weg + (beste ? 2000 / beste : 0);
+  const zeit = auto.runden_zeiten.length ? auto.runden_zeiten[0] : null;
+  return zeit ? 1000 + 10000 / zeit : auto.weg;
 }
 
 // Naechste Generation: die zwei Besten unveraendert (sonst kann das Beste
@@ -199,7 +210,7 @@ export function fahreGeneration(gehirne, strecke, grenze = ZEITGRENZE) {
     for (let i = 0; i < autos.length; i++) {
       if (!autos[i].lebt) continue;
       kiSchritt(autos[i], gehirne[i], strecke);
-      if (autos[i].runden >= 2) autos[i].lebt = false;
+      if (autos[i].runden >= 1) autos[i].lebt = false;   // eine Runde — fertig
       lebend += autos[i].lebt ? 1 : 0;
     }
     if (!lebend) break;

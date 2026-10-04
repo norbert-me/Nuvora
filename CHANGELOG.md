@@ -24,6 +24,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   werden kopiert und leicht verändert. Generation, Fortschritt und beste
   Rundenzeit je Generation laufen als Kurve mit; Mutationsstärke, Anzahl der
   Autos und Tempo (bis 10×) sind einstellbar. Danach: gegen die beste KI fahren.
+  **Ziel ist die schnellste Runde**: ein Auto ist nach einer Runde fertig und
+  wird nach ihrer Zeit gewertet. Einstellungen, Rundenzeit-Kurve (beste und
+  Durchschnitt, Anteil mit Runde), maximale Fahrzeit und das **neuronale Netz
+  der besten KI live** liegen auf der Karte; ein Startbild erklärt jeden Modus.
+  Wer selbst fährt und den roten Rand berührt, beginnt neu am Start.
 - Kurse: **die Stufe ist zurück** (neben dem Fach, auch „7/8“). Mit Fach und
   Stufe zeigen die Themenauswahlen nur noch die Themen dieses Kurses —
   Klassenarbeitstermin, Kalendereintrag, Notenspalte und die Aufgaben der
