@@ -766,10 +766,6 @@ export default function Klassenarbeit() {
   // nach dem UNTERthema: „… / 1 Kreis" landete zwischen fremden Oberthemen.
   const themen = themenIndex(topics);
   const kursObj = useKurs(kursId);
-  // Einmal je Render fuer alle Themen-Auswahlen (Aufgabe und Teilaufgabe).
-  // Nur die Themen dieses Kurses (Fach und Stufe); bereits vergebene bleiben.
-  const vergeben = (work?.tasks || []).flatMap((tk) => [tk.topic_id, ...((tk.parts || []).map((p) => p.topic_id))]).filter(Boolean);
-  const themenOptionen = themenFuerKurs(themen, kursObj, vergeben).map((tp) => ({ wert: String(tp.id), label: themen.label(tp) }));
   const topicLabel = (id) => themen.labelFuerId(id);
 
   // ── Ein Entwurf für die ganze Arbeit ──
@@ -805,6 +801,11 @@ export default function Klassenarbeit() {
   // der Leiste.
   const autoSpeichern = useAutoSpeichern(entwurf, (w) => nurGeaendertIn(w, savedWork, (k) => ["results", "absent", "fehler", "wechsel"].includes(k)));
   const work = entwurf.wert;
+  // Einmal je Render fuer alle Themen-Auswahlen (Aufgabe und Teilaufgabe).
+  // Erst nach `work`: davor stuende es in der TDZ (ReferenceError beim Oeffnen).
+  // Nur die Themen dieses Kurses (Fach und Stufe); bereits vergebene bleiben.
+  const vergeben = (work?.tasks || []).flatMap((tk) => [tk.topic_id, ...((tk.parts || []).map((p) => p.topic_id))]).filter(Boolean);
+  const themenOptionen = themenFuerKurs(themen, kursObj, vergeben).map((tp) => ({ wert: String(tp.id), label: themen.label(tp) }));
   const aufgabenAuf = aufgabenOffen ?? !((work && work.tasks) || []).length;
   const offenFuer = work && work.id;
   // Beim Oeffnen einer Arbeit EINMAL entscheiden — nicht laufend: sonst klappte
