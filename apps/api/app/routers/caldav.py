@@ -32,6 +32,7 @@ alles andere an die Weboberflaeche. Apple sucht zuerst unter
 `/.well-known/caldav`; dafuer steht in `nginx.conf` eine Weiterleitung hierher.
 """
 import base64
+import hashlib
 import logging
 import secrets
 import time as _time
@@ -201,6 +202,11 @@ def _kennung_aus(request: Request) -> str:
 
 # ─── Anmeldung ───
 
+# Bestaetigte Anmeldungen: sha256(Authorization-Kopf) -> (Konto, Geraete-Passwort, bis).
+# Nur im Arbeitsspeicher; ein Neustart kostet einmal Rechenzeit, sonst nichts.
+_ANGEMELDET: dict = {}
+
+
 class _Unangemeldet(Exception):
     """Mit Grund. Der Grund ist der ganze Zweck: „401" beantwortet nicht die
     Frage, warum das iPad seit gestern nichts mehr abgleicht."""
@@ -245,7 +251,26 @@ async def _anmelden(request: Request, db: AsyncSession) -> User:
     # der Proxy durchlaesst, ein Vielfaches der Echtzeit rechnen lassen — und
     # die Bremse je Benutzername greift dabei nicht, weil man den Namen
     # wechseln kann.
-    rate_limit("caldav_ip", client_ip(request), 120, 60, "Zu viele Anmeldungen.")
+    # Gezaehlt werden nur FEHLversuche (siehe unten): zaehlte die Bremse jede
+    # Anfrage, trieb ein Abgleich mit vielen Terminen — oder ein Testlauf von
+    # derselben Adresse — sie ueber die Grenze, und der Server antwortete mit
+    # 429. Apple deutet das als abgelehnte Anmeldung und fragt das Passwort neu
+    # ab; der Kalender darf das nie tun, solange das Geraete-Passwort stimmt.
+    ip = client_ip(request)
+    fehlversuche_pruefen("caldav_ip", ip, 120, 60, "Zu viele Anmeldungen.")
+
+    # Schon bestaetigte Anmeldung: ohne erneutes Argon2 (Apple schickt sie mit
+    # JEDER Anfrage). Der Zugang gilt nur weiter, solange sein Geraete-Passwort
+    # noch existiert — Zuruecknehmen wirkt also sofort.
+    schluessel = hashlib.sha256(kopf.encode("utf-8", "replace")).hexdigest()
+    treffer = _ANGEMELDET.get(schluessel)
+    if treffer and treffer[2] > _time.time():
+        marke = (await db.execute(select(CaldavToken).where(
+            CaldavToken.id == treffer[1], CaldavToken.owner_id == treffer[0]))).scalar_one_or_none()
+        gast = await db.get(User, treffer[0]) if marke else None
+        if gast is not None:
+            return gast
+        _ANGEMELDET.pop(schluessel, None)
 
     u = (await db.execute(select(User).where(User.email == kennung.strip().lower()))).scalar_one_or_none()
     if not u:
@@ -253,6 +278,7 @@ async def _anmelden(request: Request, db: AsyncSession) -> User:
         # Adresse ein Konto hat (unbekannt ~0 ms, bekannt ~14 ms je Passwort).
         _verify_pw(passwort, _DUMMY_PW_HASH)
         fehlversuch_merken("caldav", name_schluessel)
+        fehlversuch_merken("caldav_ip", ip)
         raise _Unangemeldet("Benutzername unbekannt")
     marken = (await db.execute(select(CaldavToken).where(CaldavToken.owner_id == u.id))).scalars().all()
     if not marken:
@@ -261,8 +287,12 @@ async def _anmelden(request: Request, db: AsyncSession) -> User:
         if _verify_pw(passwort, m.token_hash):
             m.last_used_at = datetime.now(timezone.utc)
             await db.commit()
+            if len(_ANGEMELDET) > 500:
+                _ANGEMELDET.clear()
+            _ANGEMELDET[schluessel] = (u.id, m.id, _time.time() + 600)
             return u
     fehlversuch_merken("caldav", name_schluessel)
+    fehlversuch_merken("caldav_ip", ip)
     raise _Unangemeldet("Geraete-Passwort stimmt nicht"
                         if marken else "fuer dieses Konto gibt es kein Geraete-Passwort")
 

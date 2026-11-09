@@ -61,3 +61,19 @@ async def session(s):
 async def db(s):
     """Dieselbe Sitzung wie `s`, unter dem Namen, den diese Dateien benutzen."""
     return s
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _caldav_anmeldungen_leeren():
+    """Der Anmelde-Zwischenspeicher des CalDAV-Servers lebt im Arbeitsspeicher
+    und gilt je Prozess — ein Test darf nicht von der Anmeldung eines anderen
+    zehren (gleiche Kopfzeile, andere Datenbank)."""
+    try:
+        from app.routers import caldav as _c
+        _c._ANGEMELDET.clear()
+    except Exception:
+        pass
+    yield
