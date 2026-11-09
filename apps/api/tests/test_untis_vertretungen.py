@@ -20,10 +20,12 @@ def _montag(woche):
     return heute - timedelta(days=heute.weekday()) + timedelta(weeks=woche)
 
 
-def _ev(tag, titel, zeit="060000"):
+def _ev(tag, titel, zeit="080000"):
+    # Ortszeit ohne „Z": mit UTC-Zeit hing der Test an Sommer-/Winterzeit
+    # (06:00Z ist im November 07:00, nicht 08:00).
     d = tag.strftime("%Y%m%d")
-    return (f"BEGIN:VEVENT\r\nUID:{d}{titel}\r\nDTSTART:{d}T{zeit}Z\r\n"
-            f"DTEND:{d}T064500Z\r\nSUMMARY:{titel}\r\nEND:VEVENT\r\n")
+    return (f"BEGIN:VEVENT\r\nUID:{d}{titel}\r\nDTSTART:{d}T{zeit}\r\n"
+            f"DTEND:{d}T084500\r\nSUMMARY:{titel}\r\nEND:VEVENT\r\n")
 
 
 def _feed(*events):

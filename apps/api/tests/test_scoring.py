@@ -217,13 +217,16 @@ def test_noten_trend_spiegelt_das_frontend():
 
 
 def _qs():
+    # Zwei G-Fragen (eine bleibt offen, Basis < 100 %: sonst gibt es keine
+    # naechste Stufe, auf die ein Bonus gehen koennte) und eine E-Frage.
     return [{"id": 1, "correct_answer": "A", "niveau": "", "topic_id": None},
+            {"id": 3, "correct_answer": "A", "niveau": "", "topic_id": None},
             {"id": 2, "correct_answer": "A", "niveau": "E", "topic_id": None}]
 
 
 def test_bonus_regel_vorgabe_und_einstellbar():
     from app.scoring import bewerte, bonus_regel_von
-    antw = {1: "A", 2: "A"}
+    antw = {1: "A", 3: "B", 2: "A"}
     kw = dict(niveau="G", niveau_aktiv=True)
     standard = bewerte(_qs(), antw, **kw, regel=bonus_regel_von({}))
     ganz = bewerte(_qs(), antw, **kw, regel=bonus_regel_von({"bonus_regel": {"max_stufen": 2, "mindest_nenner": 1}}))
@@ -231,6 +234,6 @@ def test_bonus_regel_vorgabe_und_einstellbar():
     assert nichts["bonus_pct"] == 0
     assert ganz["bonus_pct"] > standard["bonus_pct"] > 0
     # falsche E-Antwort: zehrt den Bonus nur, wenn eingestellt
-    falsch = {1: "A", 2: "B"}
+    falsch = {1: "A", 3: "B", 2: "B"}
     assert bewerte(_qs(), falsch, **kw, regel={"falsch_zehrt": True})["bonus_pct"] == 0
     assert bewerte(_qs(), falsch, **kw, regel={"falsch_zehrt": False})["bonus_pct"] == 0  # keine richtige E: nichts zu holen
