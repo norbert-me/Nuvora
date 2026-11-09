@@ -51,6 +51,9 @@ KERN = (
     "/api/personen",
     # Die Aenderungsliste: gehoert der Installation, nicht einem Modul.
     "/api/changelog",
+    # QR-Bild zu einem Link: ein Dienst des Kerns fuer alles, was weitergegeben
+    # wird (Waage, PAP, Kalender-Abo) — angemeldet, nur http(s), begrenzt.
+    "/api/qr",
     # Dateiablage der Lehrkraft: haengt an Themen (Kern), gehoert keinem Modul.
     "/api/material",
     # Klassen-Export/-Import gehoeren dem Kern. Die Fragen-, Ordner- und

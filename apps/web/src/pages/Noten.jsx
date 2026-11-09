@@ -30,6 +30,7 @@ import { alsJson, hol } from "../core/melden.js";
 import { parseYmd, ymd } from "../core/datum.js";
 import { median as medianVon, mittel, streuung } from "../core/statistik.js";
 import { verteilung } from "../core/notenstufen.js";
+import { kurzName, kurzNameAn, useKurzName } from "../core/namen.js";
 import { notenTrend, spaltenNachZeit } from "../core/notentrend.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
 
@@ -97,6 +98,7 @@ export default function Noten() {
   const [loading, setLoading] = useState(true);
   const loadedOnce = useRef(false); // Skeleton nur beim allerersten Laden, nicht bei Reloads
   const [entries, setEntries] = useState([]);
+  const kurz = useKurzName();
   const [suche, setSuche] = useState("");          // Kinder in der Tabelle suchen
   const [susModus, setSusModus] = useState(false);  // alle Noten verbergen (SuS schauen mit)
   const [summary, setSummary] = useState([]);
@@ -577,6 +579,9 @@ export default function Noten() {
             key: "sus", label: t("noten.susModus"), hint: t("noten.susModusHint"),
             value: susModus, onChange: setSusModus,
           }, {
+            key: "kurz", label: t("namen.kuerzen"), hint: t("namen.kuerzenHint"),
+            value: kurz.an, onChange: kurz.umschalten,
+          }, {
             key: "agg", art: "wahl",
             label: t("noten.agg"),
             hint: t("noten.aggHint"),
@@ -860,7 +865,7 @@ export default function Noten() {
                           „10. Jamiro" weiter rechts an als „7. Selina" und die
                           Namensspalte franst aus. */}
                       <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span><span title={notenFehlen(s.student_id) ? t("noten.notenFehlen") : undefined}
-                        style={notenFehlen(s.student_id) ? { background: `${C.warning}33`, borderRadius: 6, padding: "1px 6px", margin: "0 -6px" } : undefined}>{s.name}</span>{s.le && <span title={t("kurse.leHint")} style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: C.warning }}>LE</span>}
+                        style={notenFehlen(s.student_id) ? { background: `${C.warning}33`, borderRadius: 6, padding: "1px 6px", margin: "0 -6px" } : undefined}>{kurz.name(s.name)}</span>{s.le && <span title={t("kurse.leHint")} style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: C.warning }}>LE</span>}
                     </button>
                   </td>
                   {secListe.map((sec) => {
@@ -976,7 +981,7 @@ export default function Noten() {
                   })}
                   <td style={{ ...td, padding: 0, borderLeft: "2px solid var(--border3)" }}>
                     {s.le ? (
-                      <div title={t("kurse.leHint")} style={{ minHeight: 32, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 12, fontWeight: 700 }}>LE</div>
+                      <div title={t("noten.nbHint")} style={{ minHeight: 32, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 12, fontWeight: 700 }}>NB</div>
                     ) : (
                     <NoteZelle t={t} bold
                       editing={zelle === `end:${s.student_id}`}
@@ -1715,6 +1720,9 @@ function Fehlzeiten({ classId, studentId, t }) {
   );
 }
 
+// Der Name im Dialog folgt derselben Option (ausserhalb des Hooks gelesen).
+const kurzNameOrt = (n) => (kurzNameAn() ? kurzName(n) : n);
+
 function StudentInfo({ t, student, summary, sections, entries = [], classId = null, kursId = null, onZeugnis, onClose }) {
   // Hook vor jedem fruehen Ausstieg: sonst haengt die Hook-Reihenfolge daran,
   // ob gerade ein Kind gewaehlt ist.
@@ -1780,12 +1788,12 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
     // Kind selbst zeigen lassen, ohne dass dahinter die Notentabelle der
     // anderen lesbar bleibt. Stark genug fuer Ziffern, schwach genug, dass die
     // Seite als Ort erkennbar bleibt.
-    <UiModal onClose={onClose} width={460} label={student.name}
+    <UiModal onClose={onClose} width={460} label={kurzNameOrt(student.name)}
       overlayStyle={{ backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
         {/* Zu ist das Kreuz oben rechts (DialogKopf) — ein zweiter
             „Schliessen"-Knopf unter einer langen Maske ist derselbe Weg,
             nur weiter unten. */}
-        <DialogKopf titel={student.name} onClose={onClose} schliessenLabel={t("noten.close")} style={{ marginBottom: 12 }}>
+        <DialogKopf titel={kurzNameOrt(student.name)} onClose={onClose} schliessenLabel={t("noten.close")} style={{ marginBottom: 12 }}>
           {onZeugnis && <button onClick={onZeugnis} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, whiteSpace: "nowrap" }} title={t("noten.zeugnisHint")}>{t("noten.zeugnis")}</button>}
         </DialogKopf>
 

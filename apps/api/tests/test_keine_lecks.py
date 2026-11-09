@@ -561,6 +561,7 @@ def _routen():
 # Zusätzliche Abfrageparameter, ohne die eine Route nur mit 422 antwortet —
 # eine 422 prüft nichts.
 QUERY = {
+    "/api/qr": "text=https://example.org/x",
     "/api/reihen/{reihe_id}/vorschau": "kurs_id={kurs_id}&ab=2026-11-16",
     "/api/kalender/entries": "von=2020-01-01&bis=2030-01-01",
     "/api/kalender/external-events": "von=2020-01-01&bis=2030-01-01",

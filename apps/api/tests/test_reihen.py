@@ -195,3 +195,16 @@ async def test_aus_kalender_speichert_gehaltene_stunden_als_reihe(s):
     assert [(x.titel, x.dauer) for x in d.stunden] == [("Kuerzen", 1), ("Erweitern", 2)]   # zwei Eintraege = Doppelstunde
     assert d.fach == "Mathematik" and d.quelle == "7.5 Mathe"
     assert d.stunden[0].dateien == 1 and d.stunden[0].notizen == "AB 3"
+
+
+@pytest.mark.asyncio
+async def test_qr_nur_fuer_links():
+    from fastapi import HTTPException as H
+    from app.routers import qr as Q
+    u = SimpleNamespace(id=1)
+    antwort = await Q.qr_bild("https://nuvora.example/waage-frei", user=u)
+    assert antwort.media_type == "image/png" and antwort.body[:4] == b"\x89PNG"
+    for schlecht in ("", "javascript:alert(1)", "irgendein text", "https://x/" + "a" * 1100):
+        with pytest.raises(H) as f:
+            await Q.qr_bild(schlecht, user=u)
+        assert f.value.status_code == 400

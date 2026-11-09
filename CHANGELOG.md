@@ -20,6 +20,12 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   und Note, darunter der Stand insgesamt).
 - **Notenbuch:** schneller Schalter in der Leiste — berechnete Noten als Zahl
   oder als Tendenz mit Zahl in Klammern („2− (2,46)“).
+- **QR-Code zu Links:** Waage, PAP und Kalender-Abo zeigen den Link auf
+  Wunsch als QR-Code (Knopf „QR“).
+- **LE-Kinder:** „NB“ (nicht bewertet) statt Note — in Notenbuch und
+  Klassenarbeit.
+- **Namen kürzen („Anna M.“)** als Anzeigeoption im Notenbuch und im Sitzplan
+  (je Gerät, gespeichert bleibt der volle Name).
 - **CardVote:** ein Test lässt sich nachträglich einem anderen Kurs derselben
   Klasse zuweisen (Auswertung, Auswahl „Kurs“).
 

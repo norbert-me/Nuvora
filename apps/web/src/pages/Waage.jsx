@@ -11,6 +11,7 @@ import { Protokoll, protokollZeilen } from "../components/WaageEditor.jsx";
 import { useLanguage } from "../i18n";
 import { alsJson } from "../core/melden";
 import { showAlert } from "../core/dialog.jsx";
+import QrKnopf from "../components/QrKnopf.jsx";
 import { oeffentlicheBasis } from "../core/basis.js";
 import { gleichungText, pruefeGleichung, stand, zufall } from "../core/waage.js";
 
@@ -41,6 +42,7 @@ function Austeilen() {
         <code style={{ fontSize: 12, background: "var(--bg)", padding: "4px 8px", borderRadius: CONTROL_R, overflowWrap: "anywhere" }}>{link}</code>
         <button onClick={() => { navigator.clipboard?.writeText(link); setKopiert(true); setTimeout(() => setKopiert(false), 2000); }}
           style={{ ...btnSecondary, ...btnSmall }}>{kopiert ? t("pap.linkKopiert") : t("pap.kopieren")}</button>
+        <QrKnopf url={link} />
       </div>
       <p style={{ fontSize: 12, color: "var(--text3)", margin: "10px 0 0" }}>{t("waage.linkUeberwacht")}</p>
     </div>

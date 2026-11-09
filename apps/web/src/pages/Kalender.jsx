@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, Segment, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, pageApp, Popover } from "../components/Icons.jsx";
 import { themenFuerKurs, themenIndex } from "../core/topics.js";
 import ThemenWahl from "../components/ThemenWahl.jsx";
+import QrKnopf from "../components/QrKnopf.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
 import Zeitleiste from "../components/Zeitleiste.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -1031,6 +1032,7 @@ export default function Kalender() {
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>{t("kalender.subscribeTitle")}</h3>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <a href={abo.webcal} style={{ ...btnPrimary, display: "inline-block", textDecoration: "none" }}>{t("kalender.subscribeNow")}</a>
+              <QrKnopf url={abo.webcal} titel={t("kalender.subscribeTitle")} />
               {/* Der Hinweis steht im title: er wird einmal gebraucht, kostet
                   daneben aber dauerhaft eine Zeile. */}
               <button onClick={resyncAbo} disabled={resyncing} title={t("kalender.resyncHint")}
