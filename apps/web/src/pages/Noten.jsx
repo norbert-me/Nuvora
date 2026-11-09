@@ -610,7 +610,8 @@ export default function Noten() {
         const st = colStats(statsCol.id);
         const de1 = (n) => kommaRund(n, 2);
         return (
-          <Modal title={t("noten.colStatsTitle", { name: statsCol.name })} onClose={() => setStatsCol(null)}>
+          <Modal title={t("noten.colStatsTitle", { name: statsCol.name })} onClose={() => setStatsCol(null)}
+            overlayStyle={{ backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
             {!st ? <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("noten.colNoGrades")}</p> : (
               <div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>

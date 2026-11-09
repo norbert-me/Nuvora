@@ -9,7 +9,8 @@ import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
-import { bewerte, statusOf } from "../core/scoring.js";
+import { bewerte, bonusRegelVon, statusOf } from "../core/scoring.js";
+import BonusRegel, { profilBonus } from "../components/BonusRegel.jsx";
 import { mmss } from "../core/datum.js";
 import { median, streuung as stddev } from "../core/statistik.js";
 import { alsJson, hol } from "../core/melden.js";
@@ -101,7 +102,7 @@ export default function Evaluation() {
   // Vorher lief jede dieser Aenderungen nach 800 ms von selbst zum Server —
   // man sah nur ein kurzes „gespeichert" und hatte nichts in der Hand.
   const [gespeicherteConfig, setGespeicherteConfig] = useState({
-    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [], gefehlt: {}, eModus: "bonus",
+    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [], gefehlt: {}, eModus: "bonus", bonus: profilBonus(),
   });
   // Was sonst noch in der Konfiguration steht (Zeiten aus der Live-Sitzung).
   // Die PUT ersetzt sie als Ganzes — ohne diese Kopie waeren sie nach dem
@@ -113,11 +114,12 @@ export default function Evaluation() {
         weights: wert.weights, grade_scale: wert.gradeScale,
         krank: wert.krank, anwesend: wert.anwesend, gefehlt: wert.gefehlt,
         e_modus: wert.eModus,
+        bonus_regel: { max_stufen: wert.bonus.maxStufen, mindest_nenner: wert.bonus.mindestNenner, falsch_zehrt: wert.bonus.falschZehrt },
       })).catch(() => null);
     if (!r || !r.ok) return false;
     setGespeicherteConfig(wert);
   });
-  const { weights, gradeScale, krank: krankListe, anwesend: anwesendListe, gefehlt: gefehltMap, eModus } = eConf.wert;
+  const { weights, gradeScale, krank: krankListe, anwesend: anwesendListe, gefehlt: gefehltMap, eModus, bonus } = eConf.wert;
 
   // Nach dem Laden die Arbeitskopie auf den geladenen Stand setzen. `useEntwurf`
   // uebernimmt einen neuen Stand nur, wenn NICHTS offen ist — und beim ersten
@@ -169,6 +171,10 @@ export default function Evaluation() {
         // Fehlt der Schluessel (jede Auswertung vor dieser Fassung), gilt
         // „bonus" — sonst aenderte sich ueber Nacht jede alte Note.
         eModus: ["bonus", "keine", "alle"].includes(config && config.e_modus) ? config.e_modus : "bonus",
+        // Ohne eigene Regel an dieser Auswertung gilt die Vorgabe aus dem Profil,
+        // sonst die eingebaute. Bestandsauswertungen behalten damit ihre Zahlen,
+        // solange im Profil nichts steht.
+        bonus: config && config.bonus_regel ? bonusRegelVon(config) : profilBonus(),
       });
       setLadeStand((n) => n + 1);
     });
@@ -271,7 +277,7 @@ export default function Evaluation() {
   const werte = (s) => bewerte(
     questions.map((q) => ({ id: q.id, correct_answer: q.correct_answer, niveau: q.niveau || "", topic_id: q.topic_id ?? null })),
     Object.fromEntries(s.answers.map((a) => [a.question_id, a.answer])),
-    { niveau: s.niveau || "", niveauAktiv, eModus, minuspunkte, weights, scale: gradeScale,
+    { niveau: s.niveau || "", niveauAktiv, eModus, regel: bonus, minuspunkte, weights, scale: gradeScale,
       gefehltTopics: (gefehltMap || {})[String(s.card_id)] || [] },
   );
 
@@ -652,6 +658,7 @@ const gradeDistribution = (() => {
               : eModus === "keine" ? t("cv.eModusKeineText")
               : t("cv.eModusAlleText")}
           </p>
+          {eModus === "bonus" && <BonusRegel wert={bonus} onChange={(b) => eConf.setz({ bonus: b })} t={t} />}
         </div>
       )}
 

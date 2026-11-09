@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 # Unterstrich im Namen) und in noten.py ein drittes Mal mit Text-Schluesseln.
 # Es gibt eine: die in scoring.py, wo auch gerechnet wird.
 from ..uploads import eigene_bilder, eigenes_bild
-from ..scoring import DEFAULT_SCALE, bewerte, e_modus_von, gefehlt_von, status_of
+from ..scoring import DEFAULT_SCALE, bewerte, bonus_regel_von, e_modus_von, gefehlt_von, status_of
 from ..uploads import anhang_kopf
 from ..schueler import sortiert
 from ..pdfdruck import als_anhang, neue_seite
@@ -885,7 +885,7 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
                     cell.fill = red_fill
             cell.alignment = Alignment(horizontal="center")
         eigene = {q.id: scan_map.get((student.card_id, q.id)) for q in questions}
-        w = bewerte(qdicts, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
+        w = bewerte(qdicts, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config),
                     minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
                     gefehlt_topics=gefehlt_von(student.card_id, config))
         ws.cell(row=row, column=len(questions) + 2, value=f"{w['score']:g}/{w['max_score']:g}")
@@ -953,7 +953,7 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
         if status_of(student.card_id, has_any, config) == "krank":
             continue
         eigene = {qn["id"]: scan_map.get((student.card_id, qn["id"])) for qn in qdicts}
-        pct = round(bewerte(qdicts, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
+        pct = round(bewerte(qdicts, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config),
                             minuspunkte=minuspunkte, weights=weights, scale=scale,
                             gefehlt_topics=gefehlt_von(student.card_id, config))["pct"])
         grade = _decimal_grade(pct, scale)
@@ -1034,7 +1034,7 @@ def _build_student_pdf_single(student, questions, scan_map, session, config, niv
     # Punkte, Prozent und damit die Note kommen aus der gemeinsamen Wertung
     # (E/G-Bonus, Minuspunkte) — sonst stuende im PDF etwas anderes als am Schirm.
     wertung = bewerte(questions, eigene, niveau=student.get("niveau", ""),
-                      niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), minuspunkte=minuspunkte,
+                      niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config), minuspunkte=minuspunkte,
                       weights=weights, scale=scale,
                       gefehlt_topics=gefehlt_von(student["card_id"], config))
     score, max_score, pct = wertung["score"], wertung["max_score"], round(wertung["pct"])
@@ -1170,7 +1170,7 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
         results, eigene = _antwort_zeilen(student_questions, student["card_id"], scan_map, get_w)
 
         wertung = bewerte(student_questions, eigene, niveau=student.get("niveau", ""),
-                          niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), minuspunkte=minuspunkte,
+                          niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config), minuspunkte=minuspunkte,
                           weights=weights, scale=scale,
                           gefehlt_topics=gefehlt_von(student["card_id"], config))
         score, student_max, pct = wertung["score"], wertung["max_score"], round(wertung["pct"])

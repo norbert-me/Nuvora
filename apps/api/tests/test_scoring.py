@@ -214,3 +214,23 @@ def test_noten_trend_spiegelt_das_frontend():
     from app.scoring import noten_trend as n
     assert n([3]) is None and n([3, 2]) == 1 and n([2, 3]) == -1 and n([2, 2.1, 2]) == 0
     assert n([4, 3, 2]) == 1 and n([None, 3, 2]) == 1
+
+
+def _qs():
+    return [{"id": 1, "correct_answer": "A", "niveau": "", "topic_id": None},
+            {"id": 2, "correct_answer": "A", "niveau": "E", "topic_id": None}]
+
+
+def test_bonus_regel_vorgabe_und_einstellbar():
+    from app.scoring import bewerte, bonus_regel_von
+    antw = {1: "A", 2: "A"}
+    kw = dict(niveau="G", niveau_aktiv=True)
+    standard = bewerte(_qs(), antw, **kw, regel=bonus_regel_von({}))
+    ganz = bewerte(_qs(), antw, **kw, regel=bonus_regel_von({"bonus_regel": {"max_stufen": 2, "mindest_nenner": 1}}))
+    nichts = bewerte(_qs(), antw, **kw, regel=bonus_regel_von({"bonus_regel": {"max_stufen": 0}}))
+    assert nichts["bonus_pct"] == 0
+    assert ganz["bonus_pct"] > standard["bonus_pct"] > 0
+    # falsche E-Antwort: zehrt den Bonus nur, wenn eingestellt
+    falsch = {1: "A", 2: "B"}
+    assert bewerte(_qs(), falsch, **kw, regel={"falsch_zehrt": True})["bonus_pct"] == 0
+    assert bewerte(_qs(), falsch, **kw, regel={"falsch_zehrt": False})["bonus_pct"] == 0  # keine richtige E: nichts zu holen

@@ -34,7 +34,23 @@ export function statusOf(cardId, hasAnyScan, config) {
 // questions: [{ id, correct_answer, niveau, topic_id }] · answers: { [questionId]: "A" | null }
 // gefehltTopics: Themen, bei denen dieses Kind gefehlt hat — ihre Fragen zaehlen
 // nicht zur Basis, sondern geben Bonus wie E-Fragen (siehe app/scoring.py).
-export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, eModus = "bonus", minuspunkte = false, weights = {}, scale = null, gefehltTopics = null } = {}) {
+export const STANDARD_BONUS = { maxStufen: 1, mindestNenner: 2, falschZehrt: true };
+
+/** Bonus-Regel aus der Konfiguration (Spiegel von bonus_regel_von in app/scoring.py). */
+export function bonusRegelVon(config) {
+  const roh = config && config.bonus_regel;
+  const out = { ...STANDARD_BONUS };
+  if (!roh || typeof roh !== "object") return out;
+  const ms = Number(roh.max_stufen);
+  if (roh.max_stufen != null && Number.isFinite(ms)) out.maxStufen = Math.min(3, Math.max(0, ms));
+  const mn = parseInt(roh.mindest_nenner, 10);
+  if (Number.isFinite(mn)) out.mindestNenner = Math.min(5, Math.max(1, mn));
+  if (typeof roh.falsch_zehrt === "boolean") out.falschZehrt = roh.falsch_zehrt;
+  return out;
+}
+
+export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, eModus = "bonus", minuspunkte = false, weights = {}, scale = null, gefehltTopics = null, regel = null } = {}) {
+  const rg = { ...STANDARD_BONUS, ...(regel || {}) };
   const s = scale || DEFAULT_SCALE;
   const gewicht = (qid) => Number(weights[String(qid)] ?? weights[qid] ?? 1) || 0;
   const gegeben = (q) => answers[q.id] ?? answers[String(q.id)] ?? null;
@@ -73,9 +89,9 @@ export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, 
   // Schon EINE richtige Anforderungsfrage zaehlt — anteilig, geteilt durch
   // mindestens zwei. Begruendung siehe app/scoring.py (die Regel steht doppelt
   // und muss zusammen geaendert werden).
-  const netto = Math.max(0, eRichtig - eFalsch);
+  const netto = rg.falschZehrt ? Math.max(0, eRichtig - eFalsch) : eRichtig;
   if (bonusFragen.length && netto >= 1) {
-    bonusPct = (netto / Math.max(bonusFragen.length, 2)) * naechsteStufe(basePct, s);
+    bonusPct = Math.min(1, netto / Math.max(bonusFragen.length, rg.mindestNenner)) * rg.maxStufen * naechsteStufe(basePct, s);
   }
 
   return {

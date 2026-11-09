@@ -5,6 +5,8 @@ import { istAdmin } from "../core/admin.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
 import { sparsamAn, setzeSparsam } from "../core/sparsam.js";
 import { beamerWahl, setzeBeamerWahl } from "../core/beamer.js";
+import BonusRegel, { profilBonus } from "../components/BonusRegel.jsx";
+import { sichern as ansichtSichern } from "../core/ansichten.js";
 import { beobachteMelderKnopf, melderKnopfAus, setzeMelderKnopf } from "../core/melderKnopf.js";
 import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, Toggle, InfoDot, linkBtn,
   sectionLabel, Tabs, th as thBasis, td as tdBasis, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
@@ -142,6 +144,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     // dieser Lehrkraft dasselbe — je Klasse waere es dieselbe Angabe
     // fuenfzehnmal, und beim ersten Abweichen wuesste niemand, welche stimmt.
     hj1: user.hj1_start || "", hj2: user.hj2_start || "", ende: user.jahr_ende || "",
+    // Vorgabe fuer den E/G-Bonus neuer Auswertungen (am Konto, siehe core/ansichten.js).
+    bonus: profilBonus(),
   });
   const profil = useEntwurf(profilBasis, (w) => saveProfile(w));
   const { gradeScale, gradeTendency, anwDefault } = profil.wert;
@@ -246,6 +250,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     });
     if (res.ok) {
       const data = await res.json();
+      await ansichtSichern("bonus_regel", { max_stufen: w.bonus.maxStufen, mindest_nenner: w.bonus.mindestNenner, falsch_zehrt: w.bonus.falschZehrt });
       setProfileMsg(t("profile.saved"));
       setProfilBasis(w);
       const updated = { ...user, ...data };
@@ -412,6 +417,10 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         <Zeile label={t("profile.gradeTendency")} hint={t("profile.gradeTendencyHint")}>
           <Tabs value={gradeTendency ? "an" : "aus"} onChange={(v) => profil.setz({ gradeTendency: v === "an" })}
             options={[["an", t("profile.gradeTendencyOn")], ["aus", t("profile.gradeTendencyOff")]]} />
+        </Zeile>
+
+        <Zeile label={t("profile.bonusRegel")} hint={t("profile.bonusRegelHint")} block>
+          <BonusRegel wert={profil.wert.bonus} onChange={(b) => profil.setz({ bonus: b })} t={t} />
         </Zeile>
 
         <Zeile label={t("profile.anwDefault")} hint={t("profile.anwDefaultHint")}>

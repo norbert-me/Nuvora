@@ -143,6 +143,37 @@ def e_modus_von(config: Optional[dict]) -> str:
     return wert if wert in ("bonus", "keine", "alle") else "bonus"
 
 
+STANDARD_BONUS = {"max_stufen": 1.0, "mindest_nenner": 2, "falsch_zehrt": True}
+
+
+def bonus_regel_von(config: Optional[dict]) -> dict:
+    """Wie rechnet der Anforderungs-Bonus? (aus eval_config["bonus_regel"])
+
+    max_stufen:     hoechstens so viele Notenstufen Bonus insgesamt (0 … 3)
+    mindest_nenner: der Bonus ist richtig/max(Zahl der E-Fragen, n) einer Stufe —
+                    bei n = 2 gibt eine einzige E-Frage hoechstens eine halbe Stufe
+    falsch_zehrt:   falsche E-Antworten zehren den Bonus auf (nie die G-Punkte)
+
+    Fehlendes und Unlesbares gilt als Vorgabe, damit Bestandsauswertungen sich
+    nicht aendern. Steht doppelt in core/scoring.js.
+    """
+    roh = (config or {}).get("bonus_regel")
+    out = dict(STANDARD_BONUS)
+    if not isinstance(roh, dict):
+        return out
+    try:
+        out["max_stufen"] = min(3.0, max(0.0, float(roh.get("max_stufen", 1.0))))
+    except (TypeError, ValueError):
+        pass
+    try:
+        out["mindest_nenner"] = min(5, max(1, int(roh.get("mindest_nenner", 2))))
+    except (TypeError, ValueError):
+        pass
+    if isinstance(roh.get("falsch_zehrt"), bool):
+        out["falsch_zehrt"] = roh["falsch_zehrt"]
+    return out
+
+
 def gefehlt_von(card_id, config: Optional[dict]):
     """Themen, bei denen dieses Kind gefehlt hat (aus eval_config).
 
@@ -167,7 +198,7 @@ def gefehlt_von(card_id, config: Optional[dict]):
 
 def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False, e_modus: str = "bonus",
             minuspunkte: bool = False, weights: Optional[dict] = None,
-            scale: Optional[dict] = None, gefehlt_topics=None) -> dict:
+            scale: Optional[dict] = None, gefehlt_topics=None, regel: Optional[dict] = None) -> dict:
     """Punkte und Prozent für ein Kind.
 
     questions: [{"id", "correct_answer", "niveau", "topic_id"}] — "niveau" ist "E" oder "".
@@ -175,6 +206,7 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
     niveau:    Kursniveau des Kindes ("E" | "G" | "")
     gefehlt_topics: Themen, bei denen dieses Kind gefehlt hat (topic_ids)
     """
+    regel = {**STANDARD_BONUS, **(regel or {})}
     w = weights or {}
     scale = {int(k): v for k, v in (scale or DEFAULT_SCALE).items()}
 
@@ -263,10 +295,10 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
     # „eine einzelne richtige Antwort hebt nie um eine volle Notenstufe" (der
     # Ratefall), aber sie zaehlt: eine von einer ergibt eine halbe Stufe, eine
     # von fuenf ein Fuenftel. Falsche Antworten zehren den Bonus wie bisher auf.
-    netto = max(0, e_richtig - e_falsch)
+    netto = max(0, e_richtig - e_falsch) if regel["falsch_zehrt"] else e_richtig
     if bonus_fragen and netto >= 1:
-        anteil = netto / max(len(bonus_fragen), 2)
-        bonus_pct = anteil * naechste_stufe(base_pct, scale)
+        anteil = min(1.0, netto / max(len(bonus_fragen), regel["mindest_nenner"]))
+        bonus_pct = anteil * regel["max_stufen"] * naechste_stufe(base_pct, scale)
 
     return {
         "score": kaufmaennisch(score, 2),
