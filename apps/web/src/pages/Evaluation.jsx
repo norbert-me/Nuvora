@@ -930,7 +930,11 @@ const gradeDistribution = (() => {
             {presentStudents
               .map((student) => {
               const pct = Math.round(student.pct);
-              const grade = gradeFromPct(pct, gradeScale);
+              // Die Note aus dem GENAUEN Prozentwert, nicht aus dem gerundeten
+              // Anzeigewert: Verteilung und Notenübernahme rechnen auch genau, und
+              // aus „89 %“ ein 1,8 zu machen, während die Verteilung 2,0 zählt,
+              // ließ dieselbe Leistung zwei Noten haben.
+              const grade = gradeFromPct(student.pct, gradeScale);
               return (
                 <tr key={student.card_id}>
                   <td style={{ ...td, ...klebtLinks, fontWeight: "bold" }}>

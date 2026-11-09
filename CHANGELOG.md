@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote-Auswertung:** die Dezimalnote in der Tabelle wird aus dem genauen Prozentwert
+  gerechnet, nicht aus dem gerundeten (89 % → „1,8“, während die Verteilung 2,0 zählte).
 - **Untis automatisch, ohne Passwort.** Im Untis-Dialog verbindest du den Untis-Mobile-Schlüssel
   (QR-Code aus WebUntis, gilt nur für Apps und ist dort widerrufbar). Nuvora holt dann
   Vertretungen, Entfälle und Zusatzstunden mit Fach, Klasse, Raum, Info-Text und dem
