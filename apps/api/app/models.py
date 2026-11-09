@@ -974,6 +974,8 @@ class CalendarEntry(Versioniert, Base):
     # Karten-Deck (wird am Kalendertag freigeschaltet), Lernpfad-Lernleiter.
     cardvote_set_id: Mapped[Optional[int]] = mapped_column(ForeignKey("question_sets.id", ondelete="SET NULL"), nullable=True, index=True)
     karten_deck_id: Mapped[Optional[int]] = mapped_column(ForeignKey("card_decks.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Weitere Stapel der Stunde neben `karten_deck_id` — ohne FK (Verweise, wie bei topic_ids).
+    karten_deck_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     lernpfad_ladder_id: Mapped[Optional[int]] = mapped_column(ForeignKey("learning_ladders.id", ondelete="SET NULL"), nullable=True, index=True)
     # Code-Detektiv-Rätsel per stabiler client_id (kein FK, App-eigener ID-Raum).
     codedetektiv_puzzle: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

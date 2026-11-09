@@ -1202,6 +1202,7 @@ export default {
   "kalender.noClass": "sin clase",
   "kalender.topic": "Tema",
   "kalender.moreTopics": "Más temas",
+  "kalender.weitererStapel": "Otro mazo",
   "kalender.noTopic": "sin tema",
   "kalender.verlauf": "Plan de la clase",
   "kalender.verlaufAdd": "Añadir fase",

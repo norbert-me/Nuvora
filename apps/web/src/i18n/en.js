@@ -1201,6 +1201,7 @@ export default {
   "kalender.noClass": "no class",
   "kalender.topic": "Topic",
   "kalender.moreTopics": "More topics",
+  "kalender.weitererStapel": "Another deck",
   "kalender.noTopic": "no topic",
   "kalender.verlauf": "Lesson plan",
   "kalender.verlaufAdd": "Add phase",

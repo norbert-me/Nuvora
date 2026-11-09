@@ -1190,6 +1190,7 @@ export default {
   "kalender.noClass": "keine Klasse",
   "kalender.topic": "Thema",
   "kalender.moreTopics": "Weitere Themen",
+  "kalender.weitererStapel": "Weiterer Stapel",
   "kalender.noTopic": "kein Thema",
   "kalender.verlauf": "Verlaufsplan",
   "kalender.verlaufAdd": "Phase hinzufügen",

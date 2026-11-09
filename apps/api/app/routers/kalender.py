@@ -150,6 +150,7 @@ class EntryIn(BaseModel):
         return self
     cardvote_set_id: Optional[int] = None
     karten_deck_id: Optional[int] = None
+    karten_deck_ids: Optional[List[int]] = None   # weitere Stapel der Stunde
     lernpfad_ladder_id: Optional[int] = None
     codedetektiv_puzzle: Optional[str] = None
 
@@ -439,6 +440,7 @@ async def create_entry(body: EntryIn, user: User = Depends(require_module), db: 
     await _check_verknuepfungen(db, user, body)
     daten = body.model_dump()
     daten["topic_ids"] = await _check_topics(db, user, daten.get("topic_ids"))
+    daten["karten_deck_ids"] = await _check_decks(db, user, daten.get("karten_deck_ids"))
     e = CalendarEntry(owner_id=user.id, **daten)
     db.add(e)
     await db.commit()
@@ -459,6 +461,7 @@ async def update_entry(entry_id: int, body: EntryIn, request: Request = None, us
     await _check_verknuepfungen(db, user, body)
     daten = body.model_dump()
     daten["topic_ids"] = await _check_topics(db, user, daten.get("topic_ids"))
+    daten["karten_deck_ids"] = await _check_decks(db, user, daten.get("karten_deck_ids"))
     for k, v in daten.items():
         setattr(e, k, v)
     await db.commit()
@@ -502,8 +505,8 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
                 db.add(CardDeckKurs(deck_id=deck_id, kurs_id=kid))
 
     # Explizit verknuepftes Deck: am Kalendertag freischalten, falls noch Entwurf.
-    if e.karten_deck_id:
-        deck = await db.get(CardDeck, e.karten_deck_id)
+    for deck_id_x in [i for i in [e.karten_deck_id, *(e.karten_deck_ids or [])] if i]:
+        deck = await db.get(CardDeck, deck_id_x)
         if deck and deck.owner_id == user.id:
             if deck.released_at is None:
                 deck.released_at = _tagesbeginn(e.date)
@@ -801,7 +804,7 @@ async def serien_ausnahme(entry_id: int, body: AusnahmeIn,
         felder = {k: getattr(e, k) for k in (
             "class_id", "kurs_id", "topic_id", "topic_ids", "method_id", "period", "title", "notes",
             "location", "start_time", "end_time", "verlaufsplan",
-            "cardvote_set_id", "karten_deck_id", "lernpfad_ladder_id", "codedetektiv_puzzle")}
+            "cardvote_set_id", "karten_deck_id", "karten_deck_ids", "lernpfad_ladder_id", "codedetektiv_puzzle")}
         # Ohne caldav_uid und ohne rrule: die Kopie ist ein eigener Termin, kein
         # zweiter Kopf derselben Serie — sonst legte der naechste Abgleich im
         # Handy zwei Serien uebereinander.
@@ -845,6 +848,21 @@ class ExamOut(ExamIn):
     id: int
     work_id: Optional[int] = None   # verknüpfte Auswertung im Modul „Klassenarbeit"
     model_config = {"from_attributes": True}
+
+
+async def _check_decks(db: AsyncSession, user: User, ids) -> Optional[list]:
+    """Weitere Kartenstapel auf die EIGENEN eingrenzen (wie `_check_topics`:
+    Fremdes fliegt still heraus statt den Termin abzulehnen)."""
+    if not ids:
+        return None
+    eigene = {i for (i,) in (await db.execute(
+        select(CardDeck.id).where(CardDeck.owner_id == user.id, CardDeck.deleted_at.is_(None),
+                                  CardDeck.id.in_(list(ids))))).all()}
+    out = []
+    for i in ids:
+        if i in eigene and i not in out:
+            out.append(i)
+    return out or None
 
 
 async def _check_topics(db: AsyncSession, user: User, ids) -> Optional[list]:
