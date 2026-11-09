@@ -30,6 +30,7 @@ import { alsJson, hol } from "../core/melden.js";
 import { parseYmd, ymd } from "../core/datum.js";
 import { median as medianVon, mittel, streuung } from "../core/statistik.js";
 import { verteilung } from "../core/notenstufen.js";
+import { notenTrend, spaltenNachZeit } from "../core/notentrend.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
 
 const API = "/api/noten";
@@ -481,6 +482,11 @@ export default function Noten() {
 
   const gewichtSumme = sections.reduce((n, s) => n + (s.weight || 0), 0);
   const notenVon = (sid, cid) => entries.filter((e) => e.student_id === sid && e.category_id === cid && e.kind === "grade");
+  // Besser oder schlechter? Je Bereich (Teilnote) und für alle Spalten zusammen.
+  const trendVon = (sid, cats) => notenTrend(spaltenNachZeit(cats).map((c) => {
+    const w = notenVon(sid, c.id).filter((e) => e.value != null);
+    return w.length ? w[w.length - 1].value : null;
+  }).filter((v) => v != null));
   // Auswertung je Spalte: Anzahl, Schnitt, Spanne über alle eingetragenen Noten.
   const colStats = (cid) => {
     const vals = entries.filter((e) => e.category_id === cid && e.kind === "grade" && e.value != null).map((e) => e.value).sort((a, b) => a - b);
@@ -810,6 +816,7 @@ export default function Noten() {
                           editing={zelle === `sec:${s.student_id}:${sec.id}`}
                           onEdit={() => setZelle(`sec:${s.student_id}:${sec.id}`)}
                           value={secNoteVon(s, sec.id)}
+                          trend={trendVon(s.student_id, sec.categories || [])}
                           isOverride={istSecOverride(s, sec.id)}
                           onSave={(txt) => overrideSetzen(s.student_id, sec.id, txt)}
                           onCancel={() => setZelle(null)}
@@ -917,6 +924,7 @@ export default function Noten() {
                       editing={zelle === `end:${s.student_id}`}
                       onEdit={() => setZelle(`end:${s.student_id}`)}
                       value={endNoteVon(s)}
+                      trend={trendVon(s.student_id, allCats)}
                       isOverride={istEndOverride(s)}
                       onSave={(txt) => overrideSetzen(s.student_id, null, txt)}
                       onCancel={() => setZelle(null)}
@@ -1075,7 +1083,13 @@ function Zelle({ onSave, onCancel, onTab, onEnter, onPfeil, initial = "" }) {
 // Bereichs- oder Endnote: zeigt den Schnitt, per Klick ueberschreibbar, mit
 // Kreuz wieder auf den Schnitt zuruecksetzbar. Ueberschriebene Note steht in
 // Akzentfarbe, damit „gerechnet" und „gesetzt" unterscheidbar bleiben.
-function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, onReset, bold }) {
+function TrendPfeil({ t, trend }) {
+  if (trend == null) return null;
+  const [zeichen, farbe, titel] = trend > 0 ? ["↗", C.success, "noten.trendBesser"] : trend < 0 ? ["↘", C.danger, "noten.trendSchlechter"] : ["→", "var(--text3)", "noten.trendGleich"];
+  return <span title={t(titel)} aria-label={t(titel)} style={{ color: farbe, fontWeight: 700, fontSize: 14, marginLeft: 2 }}>{zeichen}</span>;
+}
+
+function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, onReset, bold, trend = null }) {
   if (editing) return <Zelle initial={value != null ? de(value) : ""} onSave={onSave} onCancel={onCancel} />;
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, minHeight: 32 }}>
@@ -1083,6 +1097,7 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
         style={{ border: "none", background: "none", cursor: "pointer", color: isOverride ? "var(--accent)" : "var(--text)", fontWeight: bold ? 700 : 600, fontSize: 14, padding: "0 2px" }}>
         {value != null ? de(value) : <span style={{ color: "var(--border2)" }}>·</span>}
       </button>
+      <TrendPfeil t={t} trend={trend} />
       {isOverride && (
         <button onClick={onReset} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("noten.overrideReset")} aria-label={t("noten.overrideReset")}>
           <Icon d={ICONS.close} color={C.danger} size={12} />
@@ -1761,7 +1776,10 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
                     <span style={{ color: "var(--text3)" }}>·</span>
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sec.name}</span>
                   </span>
-                  <strong>{v !== undefined ? de(v) : "·"}</strong>
+                  <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+                    <TrendPfeil t={t} trend={notenTrend(einzeln(sec.id).map((p) => p.value))} />
+                    <strong>{v !== undefined ? de(v) : "·"}</strong>
+                  </span>
                 </div>
               );
             })}
@@ -1770,7 +1788,7 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
                 cursor: "pointer", borderRadius: CONTROL_R, background: bereich === "gesamt" ? "var(--bg2)" : "transparent",
                 boxShadow: bereich === "gesamt" ? "inset 3px 0 0 var(--accent)" : undefined }}>
               <span>{t("noten.total")}</span>
-              <span>{summary.weighted !== null ? de(summary.weighted) : "·"}{summary.unweighted_fallback ? ` (${t("noten.unweighted")})` : ""}</span>
+              <span><TrendPfeil t={t} trend={notenTrend(alleEinzeln.map((p) => p.value))} />{" "}{summary.weighted !== null ? de(summary.weighted) : "·"}{summary.unweighted_fallback ? ` (${t("noten.unweighted")})` : ""}</span>
             </div>
           </div>
         )}
