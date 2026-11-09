@@ -552,6 +552,7 @@ export default {
   "dash.publishTitle": "Publicar en el mercado",
   "dash.clickEdit": "Clic para editar",
   "dash.setsHeading": "Bancos de preguntas",
+  "dash.setQuestions": "{{count}} preguntas",
   "dash.dragSets": "Arrastra para reordenar",
   "dash.emptySets": "No hay bancos de preguntas en esta carpeta.",
   "dash.countFolders": "carpetas",

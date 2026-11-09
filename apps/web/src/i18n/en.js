@@ -551,6 +551,7 @@ export default {
   "dash.publishTitle": "Publish to marketplace",
   "dash.clickEdit": "Click to edit",
   "dash.setsHeading": "Question sets",
+  "dash.setQuestions": "{{count}} questions",
   "dash.dragSets": "Drag to reorder",
   "dash.emptySets": "No question sets in this folder.",
   "dash.countFolders": "folders",

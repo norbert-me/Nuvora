@@ -553,6 +553,7 @@ export default {
   "dash.publishTitle": "Im Marktplatz veröffentlichen",
   "dash.clickEdit": "Klicken zum Bearbeiten",
   "dash.setsHeading": "Fragesets",
+  "dash.setQuestions": "{{count}} Fragen",
   "dash.dragSets": "Ziehen, um die Reihenfolge zu ändern",
   "dash.emptySets": "Keine Fragesets in diesem Ordner.",
   "dash.countFolders": "Ordner",

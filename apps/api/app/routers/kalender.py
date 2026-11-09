@@ -2563,7 +2563,9 @@ async def _untis_vertretungen(user: User, db, text: str, cal: dict, von, bis) ->
     from .. import untis as U
     if not text:
         return []
-    stunden = U.stunden_aus_ics_text(text, von, bis)
+    alle = U.stunden_aus_ics_text(text, von, bis, mit_ausfall=True)
+    stunden = [x for x in alle if not x.get("faellt_aus")]
+    ausfaelle = [x for x in alle if x.get("faellt_aus")]
     regulaer = None
     zeiten = _untis_zeiten(user)
     if db is not None and zeiten:
@@ -2575,7 +2577,21 @@ async def _untis_vertretungen(user: User, db, text: str, cal: dict, von, bis) ->
             return [s.title for s in slots if nr and s.period == nr
                     and s.weekday == d.weekday() and _slot_active_on(s, d)]
     out = []
-    for s in U.abweichungen(stunden, regulaer):
+    vertretungen = U.abweichungen(stunden, regulaer)
+    # Entfall nur, wo nichts an dessen Stelle tritt: gibt es zur selben Zeit eine
+    # Vertretung (oder andere Stunde im Feed), ist die Stunde nicht ausgefallen.
+    besetzt = {(x["datum"], x.get("start", "")) for x in stunden}
+    for s in ausfaelle:
+        if (s["datum"], s.get("start", "")) in besetzt:
+            continue
+        d = s["datum"]
+        uid = "untis-aus-" + hashlib.md5(f"{d}|{s.get('start')}|{s.get('titel')}".encode()).hexdigest()[:16]
+        out.append({"title": f"Entfall: {s.get('titel', '')}"[:200],
+                    "time": s.get("start") or None, "endtime": s.get("ende") or None,
+                    "cal": cal["url"], "cal_name": cal["name"], "location": s.get("raum", ""),
+                    "color": cal["color"], "uid": uid, "description": "",
+                    "start": d, "end": d, "date": d, "key": f"{uid}|{d}", "untis": True})
+    for s in vertretungen:
         d = s["datum"]
         uid = "untis-" + hashlib.md5(f"{d}|{s.get('start')}|{s.get('titel')}".encode()).hexdigest()[:16]
         out.append({"title": f"Vertretung: {s.get('titel', '')}"[:200],

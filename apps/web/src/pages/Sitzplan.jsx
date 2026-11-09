@@ -222,12 +222,14 @@ export default function Sitzplan() {
   const ladenr = useRef(0);
   // Frische Serverdaten (anderer Kurs) beenden den Entwurf.
   const frisch = useRef(false);
+  const fitOffen = useRef(false);
   const load = useCallback((id) => {
     if (!id) return;
     const meine = ++ladenr.current;
     hol(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`, null).then((d) => {
       if (meine !== ladenr.current) return;
       frisch.current = true;
+      fitOffen.current = true;   // frisch geladen: beim Oeffnen immer einpassen
       if (!d) { setGSeats([]); return; }
       setGTafel(d.tafel && typeof d.tafel.x === "number" ? d.tafel : { x: 200, y: 8 });
       // Altes Raster (cells) einmalig in freie Positionen umrechnen.
@@ -676,6 +678,7 @@ export default function Sitzplan() {
   // (oder ein anderes Fach) übertragen.
   // Auto-Zoom: alle Elemente einpassen, mit ~30 % Rand ringsum.
   const fitView = () => {
+    if (!scrollRef.current) return;
     if (!seats.length) { setZoom(1); return; }
     const items = [...seats.map((s) => ({ x: s.x, y: s.y, w: SEAT_W, h: SEAT_H })), { x: tafel.x, y: tafel.y, w: TAFEL_W, h: TAFEL_H }];
     const minX = Math.min(...items.map((i) => i.x)), minY = Math.min(...items.map((i) => i.y));
@@ -737,6 +740,12 @@ export default function Sitzplan() {
     window.removeEventListener("pointercancel", onPanUp);
     panRef.current = null;
   };
+
+  // Beim Oeffnen (und Kurswechsel) einpassen, sobald der geladene Stand in der
+  // Arbeitskopie steht — nicht beim Bearbeiten, sonst huepft die Ansicht.
+  useEffect(() => {
+    if (fitOffen.current && !frisch.current) { fitOffen.current = false; fitView(); }
+  }, [seats, tafel]);
 
   // Zwei Finger zoomen — und das Trackpad zieht mit.
   //

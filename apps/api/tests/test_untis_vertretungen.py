@@ -75,3 +75,14 @@ async def test_ohne_abo_link_nichts(s):
     await s.commit()
     assert await K.externe_ereignisse(u, db=s) == []
     assert (await K.get_external(u))["untis"] is False
+
+
+def test_ics_ausfall_nur_auf_wunsch_und_mit_flag():
+    from datetime import date
+    from app import untis as U
+    ics = ("BEGIN:VEVENT\nDTSTART:20260105T080000\nSUMMARY:Mathe\nSTATUS:CANCELLED\nEND:VEVENT\n"
+           "BEGIN:VEVENT\nDTSTART:20260106T080000\nSUMMARY:Mathe\nEND:VEVENT")
+    von, bis = date(2026, 1, 1), date(2026, 2, 1)
+    assert [s["datum"] for s in U.stunden_aus_ics_text(ics, von, bis)] == ["2026-01-06"]
+    mit = U.stunden_aus_ics_text(ics, von, bis, mit_ausfall=True)
+    assert [(s["datum"], s["faellt_aus"]) for s in mit] == [("2026-01-05", True), ("2026-01-06", False)]

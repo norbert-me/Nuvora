@@ -838,6 +838,9 @@ export default function Dashboard() {
                     title={t("dash.dragSets")} aria-hidden="true"><Icon d={ICONS.grip} size={15} /></span>
                 )}
                 <strong style={{ color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{qs.name}</strong>
+                {Array.isArray(qs.questions) && (
+                  <span style={{ color: "var(--text3)", fontSize: 13, flexShrink: 0 }} title={t("dash.setQuestions", { count: qs.questions.length })}>{qs.questions.length}</span>
+                )}
               </span>
               <div style={{ display: "flex", gap: 4 }}>
                 <button onClick={(e) => { e.stopPropagation(); openPublish(qs); }} className="icon-btn" style={iconBtn} title={t("dash.publishTitle")} aria-label={t("dash.publishTitle")}>

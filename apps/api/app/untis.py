@@ -318,10 +318,14 @@ def stunden_aus_ics(url: str, von: date, bis: date) -> list:
     return stunden_aus_ics_text(text, von, bis)
 
 
-def stunden_aus_ics_text(text: str, von: date, bis: date) -> list:
+def stunden_aus_ics_text(text: str, von: date, bis: date, mit_ausfall: bool = False) -> list:
     """Der Parser zu `stunden_aus_ics`, ohne den Abruf — den Text holt auch
     der Kalender (Vertretungen, siehe `abweichungen`), und zwei Parser fuer
-    dieselbe Datei wuerden die UTC-Umrechnung nur einmal richtig machen."""
+    dieselbe Datei wuerden die UTC-Umrechnung nur einmal richtig machen.
+
+    `mit_ausfall`: Ereignisse mit STATUS:CANCELLED kommen mit `faellt_aus`
+    zurueck (der Kalender zeigt den Entfall). Ohne den Schalter bleiben sie
+    draussen wie bisher — die Stundenplan-Uebernahme will sie nicht."""
     text = re.sub(r"\r?\n[ \t]", "", text)
     out, cur = [], None
     for zeile in text.split("\n"):
@@ -331,12 +335,13 @@ def stunden_aus_ics_text(text: str, von: date, bis: date) -> list:
         elif zeile == "END:VEVENT":
             if cur and cur.get("datum"):
                 d = _datum(cur["datum"])
-                if d and von <= d <= bis and cur.get("status") != "CANCELLED":
+                abgesagt = cur.get("status") == "CANCELLED"
+                if d and von <= d <= bis and (mit_ausfall or not abgesagt):
                     out.append({
                         "datum": d.isoformat(), "start": cur.get("start", ""), "ende": cur.get("ende", ""),
                         "titel": (cur.get("titel") or "")[:200], "klassen": [], "faecher": [],
                         "raum": (cur.get("raum") or "")[:60],
-                        "faellt_aus": False, "vertretung": False,
+                        "faellt_aus": abgesagt, "vertretung": False,
                     })
             cur = None
         elif cur is not None and ":" in zeile:
