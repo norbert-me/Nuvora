@@ -1724,6 +1724,37 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
     return out
 
 
+@router.get("/lernen/{token}/aktuelle-note")
+async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
+    """Oeffentlich (Token): die aktuelle Note des Kindes aus dem NOTENBUCH —
+    Endnote des laufenden Halbjahrs (manuell gesetzte schlaegt den gewichteten
+    Schnitt). Ohne Modul Auswertung oder ohne Noten: null. Nicht aus den
+    CardVote-Tests: die sind eine Erhebung, keine Zeugnisgrundlage."""
+    from ..scoring import note_label
+    st = await _student_by_token(db, token, modul="cardvote")
+    owner_id = (await db.execute(select(SchoolClass.owner_id).where(SchoolClass.id == st.class_id))).scalar()
+    if not owner_id or not await is_active(db, owner_id, "auswertung"):
+        return []
+    from .noten import _summarize          # erst hier: noten.py importiert karten.py
+    owner = await db.get(User, owner_id)
+    heute = jetzt().date()
+    termine = ["2", "1"] if owner.hj2_start and owner.hj2_start <= heute else ["1", "2"]
+    # Eine Note je Kurs des Kindes (Mathe, Deutsch …); Bestand ohne Kurs zaehlt als ein Eintrag.
+    kurs_ids = sorted(set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id))
+    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(Kurs.id.in_(kurs_ids), Kurs.deleted_at.is_(None)))).scalars().all()} if kurs_ids else {}
+    ziele = [(kid, kurse[kid].name) for kid in kurs_ids if kid in kurse] or [(None, "")]
+    out = []
+    for kid, name in ziele:
+        for term in termine:
+            _, rows = await _summarize(db, owner, st.class_id, term, agg="mean", kurs_id=kid)
+            r = next((x for x in rows if x.student_id == st.id), None)
+            wert = (r.total_override if r.total_override is not None else r.weighted) if r else None
+            if wert is not None:
+                out.append({"kurs": name, "note": note_label(wert), "wert": round(wert, 1), "halbjahr": term})
+                break
+    return out
+
+
 @router.get("/lernen/{token}")
 async def student_session(token: str, all: bool = False, db: AsyncSession = Depends(get_db)):
     """Faellige Karten fuer diesen Schueler. Token statt Login.

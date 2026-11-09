@@ -97,6 +97,15 @@ def note_mit_tendenz(pct: float, scale: Optional[dict] = None) -> str:
     return "6"
 
 
+def note_label(wert: float) -> str:
+    """Notenwert (2,3 / 2,7 …) -> „2+" / „3-"; kein „1-", kein „6+/-"."""
+    g = min(6, max(1, int(round(wert))))
+    if g in (1, 6):
+        return str(g)
+    d = wert - g
+    return f"{g}+" if d <= -0.15 else f"{g}-" if d >= 0.15 else str(g)
+
+
 def status_of(card_id: int, has_any_scan: bool, config: Optional[dict]) -> str:
     """"anwesend" oder "krank". Ohne jede Antwort gilt krank — es sei denn, die
     Lehrkraft hat das Kind ausdrücklich auf anwesend gestellt (dann zählt die 0)."""

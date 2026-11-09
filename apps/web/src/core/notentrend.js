@@ -3,10 +3,10 @@
 //
 // Verglichen wird die erste Hälfte der Noten mit der zweiten, nie die letzte
 // mit der vorletzten — sonst wäre jede einzelne schwache Arbeit ein „Abstieg"
-// (dieselbe Regel wie beim Themenstand). Unter MINDEST_NOTEN gibt es keine
-// Aussage: aus zwei Noten wird kein Verlauf. Kleiner Wert = bessere Note.
+// (dieselbe Regel wie beim Themenstand). Ab zwei Noten gibt es einen Pfeil
+// (bei zweien: erste gegen zweite); unter zwei keine Aussage. Kleiner Wert = bessere Note.
 
-export const MINDEST_NOTEN = 3;
+export const MINDEST_NOTEN = 2;
 /** Unterschied der Hälftenmittel, ab dem eine Richtung gemeldet wird (eine Tendenzstufe). */
 export const SCHWELLE = 0.3;
 

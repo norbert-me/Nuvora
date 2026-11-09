@@ -4,7 +4,11 @@ import { notenTrend, spaltenNachZeit } from "./notentrend.js";
 describe("notenTrend", () => {
   it("zu wenig Noten: keine Aussage", () => {
     expect(notenTrend([])).toBeNull();
-    expect(notenTrend([3, 2])).toBeNull();
+    expect(notenTrend([3])).toBeNull();
+  });
+  it("zwei Noten reichen für eine Richtung", () => {
+    expect(notenTrend([3, 2])).toBe(1);
+    expect(notenTrend([2, 3])).toBe(-1);
   });
   it("kleinere Noten später = besser", () => {
     expect(notenTrend([4, 3, 2])).toBe(1);

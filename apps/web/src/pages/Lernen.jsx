@@ -26,6 +26,7 @@ export default function Lernen() {
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [results, setResults] = useState(null); // CardVote-Ergebnisse (Token-öffentlich)
+  const [noten, setNoten] = useState([]);       // aktuelle Note(n) aus dem Notenbuch
   const [tab, setTab] = useState(null);         // "karten" | "ergebnisse" | "pap"
   // PAP-Aufgaben dieses Kindes. Leer, wenn das Modul aus ist oder es keine
   // gibt — dann erscheint der Reiter gar nicht erst.
@@ -40,6 +41,11 @@ export default function Lernen() {
   useEffect(() => {
     fetch(`/api/lernen/${token}/pap`).then((r) => (r.ok ? r.json() : []))
       .then((d) => setPapListe(Array.isArray(d) ? d : [])).catch(() => setPapListe([]));
+  }, [token]);
+
+  useEffect(() => {
+    fetch(`${API}/lernen/${token}/aktuelle-note`).then((r) => (r.ok ? r.json() : []))
+      .then((d) => setNoten(Array.isArray(d) ? d : [])).catch(() => setNoten([]));
   }, [token]);
 
   useEffect(() => {
@@ -124,7 +130,7 @@ export default function Lernen() {
   }
 
   if (aktiverTab === "ergebnisse") {
-    return <Center hinweis={t("lernen.footerHint")}><div style={{ width: "100%", maxWidth: 460 }}>{tabBar}<Ergebnisse t={t} results={results} /></div></Center>;
+    return <Center hinweis={t("lernen.footerHint")}><div style={{ width: "100%", maxWidth: 460 }}>{tabBar}<Ergebnisse t={t} results={results} noten={noten} /></div></Center>;
   }
 
   if (done) {
@@ -237,9 +243,9 @@ function MeinFortschritt({ data, t }) {
 }
 
 // CardVote-Testergebnisse des Schülers (öffentlich über den Token).
-function Ergebnisse({ results, t }) {
+function Ergebnisse({ results, noten = [], t }) {
   if (results === null) return <p style={{ color: "var(--text3)", textAlign: "center" }}>{t("common.loading")}</p>;
-  if (!results.length) return (
+  if (!results.length && !noten.length) return (
     <div style={{ textAlign: "center", padding: "40px 0" }}>
       <div style={{ marginBottom: 8 }}><Icon d={ICONS.chart} size={42} color="var(--text3)" /></div>
       <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>{t("lernen.noResultTitle")}</h2>
@@ -249,13 +255,16 @@ function Ergebnisse({ results, t }) {
   return (
     <div>
       <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 12, textAlign: "center" }}>{t("lernen.resultsTitle")}</h2>
-      {/* Übersicht: die Note des neuesten Tests, mit Tendenz. Quizze vor der
-          letzten Klassenarbeit liefert der Server gar nicht mehr aus. */}
-      {results[0]?.note && (
-        <div style={{ ...cardStyle, padding: "16px", textAlign: "center", marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: "var(--text3)" }}>{t("lernen.aktuelleNote")}</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: results[0].pct >= 50 ? C.success : C.danger }}>{results[0].note.replace("-", "−")}</div>
-          <div style={{ fontSize: 12, color: "var(--text3)" }}>{results[0].name}</div>
+      {/* Übersicht: die aktuelle Note aus dem Notenbuch (je Kurs), mit Tendenz.
+          Quizze vor der letzten Klassenarbeit liefert der Server gar nicht mehr aus. */}
+      {noten.length > 0 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          {noten.map((n, i) => (
+            <div key={i} style={{ ...cardStyle, padding: "16px", textAlign: "center", flex: "1 1 120px" }}>
+              <div style={{ fontSize: 12, color: "var(--text3)" }}>{t("lernen.aktuelleNote")}{n.kurs ? ` · ${n.kurs}` : ""}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: n.wert <= 4.4 ? C.success : C.danger }}>{n.note.replace("-", "−")}</div>
+            </div>
+          ))}
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
