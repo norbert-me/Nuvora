@@ -2534,6 +2534,8 @@ export default {
   "kurse.nextYear": "Año siguiente",
   "kurse.chainHint": "El mismo grupo un año antes. Los datos siguen separados — solo se enlaza el orden, para reencontrar los conocimientos previos.",
   "sitzplan.photoToggle": "Mostrar fotos",
+  "sitzplan.namenVoll": "Mostrar nombres completos",
+  "sitzplan.namenVollHint": "Reduce la letra en vez de cortar el apellido con «…»",
   "sitzplan.photoHint": "Sin foto se muestran las iniciales.",
   "noten.runningAvg": "Media acumulada",
   "noten.gradeShortLabel": "Nota",

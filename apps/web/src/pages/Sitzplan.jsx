@@ -83,6 +83,7 @@ export default function Sitzplan() {
   // Bewusst ein FELD und kein „nach aussen ziehen" — die Flaeche waechst nach
   // unten und rechts, „draussen" ist dort also ein gueltiger Platz.
   const [ziehtPlatz, setZiehtPlatz] = useState(false);
+  const [namenVoll, setNamenVoll] = useState(false);   // Namen ganz zeigen (Schrift schrumpft) statt mit „…" kuerzen
   const [ueberMuell, setUeberMuell] = useState(false);
   const muellRef = useRef(null);
   // Anwesenheit lebt im Modul „Orga" (Aufruf-Ansicht nutzt sie).
@@ -305,7 +306,7 @@ export default function Sitzplan() {
     try {
       const v = JSON.parse(localStorage.getItem(`sitzplan_view_${viewKey}`) || "{}");
       setSegelOn(!!v.segel);
-      setHervor(v.hervor || ""); setFoerderArt(v.foerderArt || "");
+      setHervor(v.hervor || ""); setFoerderArt(v.foerderArt || ""); setNamenVoll(!!v.namenVoll);
     } catch { setSegelOn(false); setHervor(""); setFoerderArt(""); }
     // Markierungen haengen am selben Kurs wie die Ansicht.
     try { setMarken(JSON.parse(localStorage.getItem(`sitzplan_mark_${viewKey}`) || "{}")); }
@@ -816,6 +817,7 @@ export default function Sitzplan() {
         links={<KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />}
         ansicht={(
           <ViewMenu title={t("sitzplan.view")} items={[
+            { key: "namenVoll", label: t("sitzplan.namenVoll"), hint: t("sitzplan.namenVollHint"), value: namenVoll, onChange: (v) => { setNamenVoll(v); saveView({ namenVoll: v }); } },
             { key: "fotos", label: t("sitzplan.photoToggle"), hint: t("sitzplan.photoHint"), value: fotosOn, onChange: (v) => { setFotosOn(v); saveView({ fotos: v }); } },
             ...(segelTeil ? [{ key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } }] : []),
             { key: "hervor", art: "wahl", label: t("sitzplan.hervorLabel"), hint: t(hervor === "foerder" ? "sitzplan.hervorHintFoerder" : "sitzplan.hervorHint"),
@@ -1029,7 +1031,10 @@ export default function Sitzplan() {
                   </span>
                   <span title={seat.empty ? t("sitzplan.emptySeat") : s.name}
                     style={{ height: NAME_H, display: "flex", alignItems: "center", justifyContent: "center",
-                      padding: "0 6px", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      padding: "0 6px", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: namenVoll ? "clip" : "ellipsis",
+                      // Ganzer Name: die Schrift schrumpft mit der Laenge, statt dass
+                      // der Nachname hinten abgeschnitten wird.
+                      ...(namenVoll && !seat.empty ? { fontSize: Math.max(8, Math.min(13, Math.floor(96 / (String(s.name || "").length * 0.58 || 1)))) } : null),
                       color: seat.empty ? "var(--text3)" : undefined }}>
                     {seat.empty ? t("sitzplan.emptySeat") : s.name}
                   </span>

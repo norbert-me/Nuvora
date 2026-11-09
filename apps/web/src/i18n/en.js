@@ -2533,6 +2533,8 @@ export default {
   "kurse.nextYear": "Next year",
   "kurse.chainHint": "The same group one year earlier. The data stays separate — only the order is linked, so you can find the prior knowledge.",
   "sitzplan.photoToggle": "Show photos",
+  "sitzplan.namenVoll": "Show full names",
+  "sitzplan.namenVollHint": "Shrinks the font instead of cutting the surname with “…”",
   "sitzplan.photoHint": "Without a photo the initials are shown.",
   "noten.runningAvg": "Running average",
   "noten.gradeShortLabel": "Grade",
