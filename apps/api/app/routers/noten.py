@@ -744,6 +744,8 @@ class StudentSummary(BaseModel):
     total_override: Optional[float]
     # true = ungewichteter Rueckfall (keine Gewichte gesetzt).
     unweighted_fallback: bool
+    # Foerderschwerpunkt Lernen („LE"): keine Gesamtnote, zaehlt nicht in Klassenwerten.
+    le: bool = False
     observations: int
 
 
@@ -803,6 +805,16 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
     total_over = {o.student_id: o.value for o in overrides
                   if o.section_id is None and o.term == term and (o.kurs_id == kurs_id if kurs_id is not None else o.kurs_id is None)}
 
+    # LE (Foerderschwerpunkt Lernen): keine Gesamtnote. Die Angabe steht an der
+    # Person, aelterer Bestand noch an der Zeile.
+    from ..models import Person
+    pids = [x.person_id for x in students if getattr(x, "person_id", None)]
+    personen = {p.id: p for p in (await db.execute(select(Person).where(Person.id.in_(pids)))).scalars().all()} if pids else {}
+
+    def _ist_le(x):
+        p = personen.get(getattr(x, "person_id", None))
+        return "Lernen" in ((p.foerder if p and p.foerder else None) or x.foerder or [])
+
     out = []
     for st in students:
         eigene = [e for e in entries if e.student_id == st.id]
@@ -849,8 +861,9 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
             student_id=st.id, name=st.name,
             per_category=per_cat, per_section=per_sec,
             section_overrides=sec_ovr, section_effective=sec_eff,
-            weighted=weighted, total_override=total_over.get(st.id),
-            unweighted_fallback=fallback,
+            weighted=None if _ist_le(st) else weighted,
+            total_override=None if _ist_le(st) else total_over.get(st.id),
+            unweighted_fallback=fallback, le=_ist_le(st),
             observations=(len([e for e in eigene if e.kind == "observation" and e.category_id in cat_ids])
                           + len([e for e in obs_frei if e.student_id == st.id])),
         ))

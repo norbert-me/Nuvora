@@ -15,6 +15,7 @@ import { mitNummer, themenFuerKurs, themenIndex, useThemen } from "../core/topic
 import { useKurs } from "../core/kurs.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
+import { leIst } from "../core/foerderung.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
@@ -277,7 +278,9 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
     if (Array.isArray(r)) return true;                 // Altformat
     return Object.values(r).some((v) => v != null && v !== "");
   };
-  const graded = students.filter(erfasstIst);
+  // LE-Kinder (Foerderschwerpunkt Lernen) haben keine Note: sie zaehlen nicht in
+  // Schnitt, Verteilung und Aufgabenstatistik der Klasse.
+  const graded = students.filter(erfasstIst).filter((s) => !leIst(s));
   // Je Kind seine Wertung und sein Themenprofil — beides in der Fassung,
   // die es je Aufgabe geschrieben hat.
   const wert = new Map(graded.map((s) => [s.id, wertung(wk, s.id, effScale)]));
@@ -786,7 +789,7 @@ export default function Klassenarbeit() {
     if (verknuepft.length) {
       const sc = (next.scale && Object.keys(next.scale).length) ? next.scale : scale;
       await fetch(`/api/noten/verknuepft/${next.id}`, alsJson("PUT", {
-        student_ids: students.map((s) => s.id), grades: notenAusArbeit(students, partner ? { ...next, _alt: partner.tasks || [] } : next, sc), note: t("klassenarbeit.title"),
+        student_ids: students.map((s) => s.id), grades: notenAusArbeit(students, partner ? { ...next, _alt: partner.tasks || [] } : next, sc), note: "",
       })).catch(() => null);
     }
     // Die Liste der Arbeiten bekommt den GANZEN gespeicherten Stand, nicht nur
@@ -1881,6 +1884,7 @@ function notenAusArbeit(students, work, scale) {
   if (!basis(work.tasks)) return [];
   return students
     .filter((s) => {
+      if (leIst(s)) return false;                          // LE: keine Note
       if (absentU.has(String(s.id))) return false;
       const r = (work.results || {})[String(s.id)];
       if (!r || r === "abwesend") return false;

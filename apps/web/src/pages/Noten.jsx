@@ -484,7 +484,7 @@ export default function Noten() {
   const kommentarVon = (sid, cid) => entwurf.wert[`k:${sid}:${cid}`] || "";
   const secNoteVon = (s, secId) => (entwurf.wert[`so:${s.student_id}:${secId}`] ?? (s.section_effective?.[String(secId)] ?? null));
   const istSecOverride = (s, secId) => entwurf.wert[`so:${s.student_id}:${secId}`] != null;
-  const endNoteVon = (s) => (entwurf.wert[`to:${s.student_id}`] ?? s.weighted);
+  const endNoteVon = (s) => (s.le ? null : (entwurf.wert[`to:${s.student_id}`] ?? s.weighted));
   const istEndOverride = (s) => entwurf.wert[`to:${s.student_id}`] != null;
 
   const allCats = sections.flatMap((s) => s.categories || []);
@@ -647,7 +647,7 @@ export default function Noten() {
 
       {term === "year"
         ? (yearData.rows || []).length > 0 && <NotenStatistik noten={(yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))} stufung={stufung} t={t} />
-        : sections.length > 0 && <NotenStatistik noten={(summary || []).map((s) => endNoteVon(s))} stufung={stufung} t={t} />}
+        : sections.length > 0 && <NotenStatistik noten={(summary || []).filter((s) => !s.le).map((s) => endNoteVon(s))} stufung={stufung} t={t} />}
 
       {loading && !loadedOnce.current && term !== "year" ? (
         <Skeleton rows={6} height={38} />
@@ -830,7 +830,7 @@ export default function Noten() {
                       {/* Nummer in fester Breite, rechtsbuendig: sonst faengt
                           „10. Jamiro" weiter rechts an als „7. Selina" und die
                           Namensspalte franst aus. */}
-                      <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span>{s.name}
+                      <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span>{s.name}{s.le && <span title={t("kurse.leHint")} style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: C.warning }}>LE</span>}
                     </button>
                   </td>
                   {secListe.map((sec) => {
@@ -945,6 +945,9 @@ export default function Noten() {
                     ];
                   })}
                   <td style={{ ...td, padding: 0, borderLeft: "2px solid var(--border3)" }}>
+                    {s.le ? (
+                      <div title={t("kurse.leHint")} style={{ minHeight: 32, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 12, fontWeight: 700 }}>LE</div>
+                    ) : (
                     <NoteZelle t={t} bold
                       editing={zelle === `end:${s.student_id}`}
                       onEdit={() => setZelle(`end:${s.student_id}`)}
@@ -954,6 +957,7 @@ export default function Noten() {
                       onSave={(txt) => overrideSetzen(s.student_id, null, txt)}
                       onCancel={() => setZelle(null)}
                       onReset={() => overrideReset(s.student_id, null)} />
+                    )}
                     {!istEndOverride(s) && s.weighted !== null && s.unweighted_fallback && (
                       <div style={{ fontWeight: 400, fontSize: 11, color: C.warning }}>{t("noten.unweighted")}</div>
                     )}
