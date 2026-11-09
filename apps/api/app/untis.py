@@ -236,6 +236,19 @@ def _zeit(zahl):
     return f"{s[:2]}:{s[2:]}"
 
 
+# Untis' `lstype` (Art des Eintrags), wenn weder Fach noch Klasse noch Text da sind.
+_LSTYPE = {"oh": "Sprechstunde", "sb": "Bereitschaft", "bs": "Aufsicht", "ex": "Prüfung"}
+
+
+def _art(z: dict) -> str:
+    """Wenn eine Stunde keinen Namen hat (eine „Veranstaltung" ohne Fach), sagt
+    wenigstens ihre Art, was es ist — statt gar nichts."""
+    akt = (z.get("activityType") or "").strip()
+    if akt and akt.lower() != "unterricht":
+        return akt[:60]
+    return _LSTYPE.get((z.get("lstype") or "").strip(), "")
+
+
 def _stunde_aus_api(z: dict, stamm: dict) -> dict:
     """Eine Untis-Stunde in Nuvoras Form.
 
@@ -256,7 +269,8 @@ def _stunde_aus_api(z: dict, stamm: dict) -> dict:
     info = " · ".join(x for x in ((z.get(k) or "").strip() for k in ("lstext", "substText", "info")) if x)
     orig = [t for t in ((stamm.get("faecher") or {}).get(x.get("orgid"), "")
                         for x in (z.get("su") or []) if isinstance(x, dict) and x.get("orgid")) if t]
-    titel = " ".join(x for x in [", ".join(faecher), ", ".join(klassen)] if x) or (z.get("lstext") or "").strip()
+    titel = (" ".join(x for x in [", ".join(faecher), ", ".join(klassen)] if x)
+             or (z.get("lstext") or "").strip() or _art(z))
     return {
         "datum": d.isoformat() if d else "",
         "start": _zeit(z.get("startTime")), "ende": _zeit(z.get("endTime")),

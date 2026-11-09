@@ -352,3 +352,11 @@ async def test_vertretungen_holen_speichert_titel_und_zeigt_sie(s, monkeypatch):
     titel = sorted(z["title"] for z in zeilen)
     assert titel == ["Entfall: E 7a", "Vertretung: M 8.3 (statt D)", "Zusatz: Frei"]
     assert [z for z in zeilen if z["title"].startswith("Vertretung")][0]["description"] == "Aufgaben im Buch"
+
+
+def test_stunde_ohne_namen_nennt_ihre_art():
+    stamm = {"faecher": {}, "klassen": {}, "raeume": {}}
+    assert _stunde_aus_api({"date": 20261111, "startTime": 1145, "activityType": "Veranstaltung"},
+                           stamm)["titel"] == "Veranstaltung"
+    assert _stunde_aus_api({"date": 20261111, "startTime": 1145, "lstype": "oh"},
+                           stamm)["titel"] == "Sprechstunde"
