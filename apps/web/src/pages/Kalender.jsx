@@ -180,7 +180,7 @@ export default function Kalender() {
   const extColor = EXT_FARBE;
   const openAbo = async () => {
     const r = await fetch(`${API}/subscribe`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-    if (r) { const ex = await fetch(`${API}/external`).then((x) => (x.ok ? x.json() : {})).catch(() => ({})); setAbo({ ...r, cals: (ex.calendars || []), mit: !!ex.mitschicken }); }
+    if (r) { const ex = await fetch(`${API}/external`).then((x) => (x.ok ? x.json() : {})).catch(() => ({})); setAbo({ ...r, cals: (ex.calendars || []) }); }
   };
   // Force-Resync: neues Abo-Token holen. Die alte URL wird sofort ungueltig —
   // damit behandelt Apple/Google das Abo als neu und laedt alles einmal frisch.
@@ -205,10 +205,15 @@ export default function Kalender() {
     const qs = q.toString();
     return hol(`${API}/external-events${qs ? `?${qs}` : ""}`).then((d) => setExtEvents(Array.isArray(d) ? d : [])).finally(() => force && setExtBusy(false)); };
   // Kalenderliste speichern (URL/Farbe je Kalender) und Events neu ziehen.
-  const saveCals = async (cals, mitschicken) => {
-    const clean = cals.filter((c) => (c.url || "").trim());
-    await fetch(`${API}/external`, alsJson("PUT", { calendars: clean, mitschicken })).catch(() => {});
-    setExtCals(clean); loadExt(true);
+  // Der Server ergaenzt fehlende Namen (aus dem Kalender selbst) — die Antwort
+  // gilt, nicht das Gesendete.
+  const saveCals = async (cals) => {
+    const clean = cals.filter((c) => (c.url || "").trim()).map(({ neu, ...c }) => c); // eslint-disable-line no-unused-vars
+    const res = await fetch(`${API}/external`, alsJson("PUT", { calendars: clean })).catch(() => null);
+    const d = res && res.ok ? await res.json().catch(() => null) : null;
+    const out = d && Array.isArray(d.calendars) ? d.calendars : clean;
+    setExtCals(out); loadExt(true);
+    return out;
   };
   // Ein externes Ereignis aus-/wieder einblenden (Schlüssel uid|Datum). Ein
   // Termin ueber mehrere Tage hat je Tag einen eigenen Schluessel — er wird
@@ -1050,10 +1055,9 @@ export default function Kalender() {
             {/* Andere Richtung: MEHRERE externe Kalender (ICS-URL) read-only einblenden. */}
             <div style={{ borderTop: "1px solid var(--border)", marginTop: 24, paddingTop: 16 }}>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("kalender.extTitle")}</div>
-              <ExtCalEditor cals={abo.cals || []} mit={!!abo.mit}
+              <ExtCalEditor cals={abo.cals || []}
                 onChange={(cals) => setAbo((a) => ({ ...a, cals }))}
-                onMit={(v) => setAbo((a) => ({ ...a, mit: v }))}
-                onSave={(cals, mit) => { saveCals(cals, mit); setAbo((a) => ({ ...a, cals, mit })); }} t={t} />
+                onSave={async (cals) => { const out = await saveCals(cals); setAbo((a) => ({ ...a, cals: out })); }} t={t} />
             </div>
             <ExtArchiv onGeaendert={() => loadExt()} t={t} />
 
@@ -1188,12 +1192,16 @@ function ExtArchiv({ onGeaendert, t }) {
   );
 }
 
-function ExtCalEditor({ cals, mit, onChange, onMit, onSave, t }) {
-  const rows = cals.length ? cals : [{ url: "", color: "", name: "" }];
+function ExtCalEditor({ cals, onChange, onSave, t }) {
+  // Eine neue Zeile fragt die Adresse; danach steht dort nur noch Name, Farbe und
+  // Export — die Adresse ist ein Geheimnis (bei iCloud und Outlook zugleich der
+  // Zugang zum Kalender) und soll nicht in der Liste stehen.
+  const leer = () => ({ url: "", color: "", name: "", export: false, neu: true });
+  const rows = cals.length ? cals : [leer()];
   const [hilfe, setHilfe] = useState(false);
   const setRow = (i, patch) => { const next = rows.map((r, j) => (j === i ? { ...r, ...patch } : r)); onChange(next); };
-  const addRow = () => onChange([...rows, { url: "", color: "", name: "" }]);
-  const delRow = (i) => { const next = rows.filter((_, j) => j !== i); onChange(next.length ? next : [{ url: "", color: "", name: "" }]); };
+  const addRow = () => onChange([...rows, leer()]);
+  const delRow = (i) => { const next = rows.filter((_, j) => j !== i); onChange(next.length ? next : [leer()]); };
   return (
     <div>
       {/* „Wo finde ich die Adresse?" ist die Frage, an der das Abonnieren
@@ -1207,30 +1215,32 @@ function ExtCalEditor({ cals, mit, onChange, onMit, onSave, t }) {
           <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <input type="color" value={c.color || EXT_PALETTE[i % EXT_PALETTE.length]} onChange={(e) => setRow(i, { color: e.target.value })}
               title={t("kalender.extColor")} style={{ width: 26, height: 26, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }} />
-            <input value={c.url || ""} onChange={(e) => setRow(i, { url: e.target.value })} placeholder="https://…/basic.ics"
-              style={{ ...inputStyle, flex: 1, fontSize: 12, minWidth: 0 }} />
+            {c.neu ? (
+              <input value={c.url || ""} onChange={(e) => setRow(i, { url: e.target.value })} placeholder={t("kalender.extNeuAdresse")}
+                autoComplete="off" style={{ ...inputStyle, flex: 1, fontSize: 12, minWidth: 0 }} />
+            ) : (
+              <input value={c.name || ""} onChange={(e) => setRow(i, { name: e.target.value })} placeholder={t("kalender.extName")}
+                style={{ ...inputStyle, flex: 1, fontSize: 13, minWidth: 0 }} />
+            )}
+            {/* Ob dieser Kalender in Abo und CalDAV mitgeschickt wird — je
+                Kalender: der iCloud-Kalender ist im Handy ohnehin da, der
+                Outlook-Kalender vielleicht nicht. */}
+            <label title={t("kalender.extShareHint")} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text2)", flexShrink: 0, cursor: "pointer" }}>
+              <input type="checkbox" checked={!!c.export} onChange={(e) => setRow(i, { export: e.target.checked })} />
+              {t("kalender.extExport")}
+            </label>
             <button onClick={() => delRow(i)} className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }} title={t("common.delete")} aria-label={t("common.delete")}>
               <Icon d={ICONS.trash} size={15} color={C.danger} />
             </button>
           </div>
         ))}
       </div>
-      {/* Die fremden Termine im eigenen Export mitschicken. Aus als Vorgabe,
-          und der Hinweis bleibt trotz der Regel gegen Erklärtexte stehen: dass
-          derselbe Termin dann auf einem Gerät doppelt steht, das die Kalender
-          selbst abonniert hat, sieht man dem Schalter nicht an — man sieht es
-          erst im Handy. */}
-      <label style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500, marginTop: 12, paddingLeft: 0 }}>
-        <input type="checkbox" checked={!!mit} onChange={(e) => onMit(e.target.checked)} />
-        {t("kalender.extShare")}
-      </label>
-      <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2, marginBottom: 4, lineHeight: 1.4 }}>{t("kalender.extShareHint")}</div>
       <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
         <button onClick={addRow} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Icon d={ICONS.plus} size={14} /> {t("kalender.extAdd")}
         </button>
         <span style={{ flex: 1 }} />
-        <button onClick={() => onSave(rows, !!mit)} style={btnPrimary}>{t("common.save")}</button>
+        <button onClick={() => onSave(rows)} style={btnPrimary}>{t("common.save")}</button>
       </div>
     </div>
   );

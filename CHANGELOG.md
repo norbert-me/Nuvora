@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Abonnierte Kalender:** „Exportieren“ jetzt je Kalender statt für alle, mit Name und Farbe;
+  die Adresse steht nur noch beim Hinzufügen. Fehlende Namen holt Nuvora aus dem Kalender selbst.
 - **CardVote-Auswertung:** die Dezimalnote in der Tabelle wird aus dem genauen Prozentwert
   gerechnet, nicht aus dem gerundeten (89 % → „1,8“, während die Verteilung 2,0 zählte).
 - **Untis automatisch, ohne Passwort.** Im Untis-Dialog verbindest du den Untis-Mobile-Schlüssel

@@ -7,6 +7,7 @@ mitreisst.
 """
 import json
 import re
+import urllib.parse
 import time
 from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional
@@ -1717,15 +1718,21 @@ def ext_kurz(key: str) -> str:
 def ext_weitergeben(user, ev: dict) -> bool:
     """Geht dieser fremde Termin nach draussen (ICS-Feed, CalDAV)?
 
-    Die Ansicht-Schalter des Kalenders (fremde Kalender an/aus, einzelne
-    Kalender, Ganztaegiges) blenden nur AUS — sie sperren nichts: wer in Nuvora
-    etwas wegschaltet, damit der Tag uebersichtlich bleibt, will es meist nicht
-    auch im Handy loswerden (geaendert 09.11.2026; vorher war es umgekehrt).
-    Nur der einzeln ausgeblendete Termin (`hidden`) bleibt draussen: er ist das
-    „Loeschen" aus dem Handy (CalDAV DELETE) — kaeme er wieder, stuende er beim
-    naechsten Abgleich erneut da.
+    Je KALENDER entschieden (`export` im Eintrag der Kalenderliste): wer seinen
+    iCloud-Kalender auf dem Handy ohnehin hat, will ihn nicht noch einmal
+    exportieren — den Outlook-Kalender aber schon. Die Ansicht-Schalter des
+    Kalenders (an/aus, einzelne Kalender, Ganztaegiges) blenden nur AUS und
+    sperren nichts (geaendert 09.11.2026). Der einzeln ausgeblendete Termin
+    (`hidden`) bleibt draussen: er ist das „Loeschen" aus dem Handy (CalDAV
+    DELETE) — kaeme er wieder, stuende er beim naechsten Abgleich erneut da.
+    Die Untis-Vertretungen haengen am Gesamtschalter `feed_external` (= mindestens
+    ein Kalender exportiert), den der Server beim Speichern nachfuehrt.
     """
-    return not ev.get("hidden")
+    if ev.get("hidden"):
+        return False
+    if ev.get("untis"):
+        return bool(user.feed_external)
+    return any(c["export"] for c in _ext_calendars(user) if c["url"] == ev.get("cal"))
 
 
 def ganztaegig_weitergeben(user) -> bool:
@@ -2120,6 +2127,7 @@ class ExtCalIn(BaseModel):
     url: str = ""
     color: Optional[str] = ""
     name: Optional[str] = ""
+    export: Optional[bool] = None      # in den ICS-Feed / CalDAV mitschicken (je Kalender)
 
 
 class ExtCalsIn(BaseModel):
@@ -2143,13 +2151,34 @@ def _hide_keys(body: ExtHideIn) -> list:
 def _ext_calendars(user: User) -> list:
     """Die externen Kalender des Nutzers, immer als Liste. Altbestand
     (external_ics_url/_color) wird als erster Eintrag mitgeführt, bis er einmal
-    über die neue Liste überschrieben wird."""
+    über die neue Liste überschrieben wird. `export` fehlt bei Altbestand und
+    folgt dann dem früheren Gesamtschalter."""
+    standard = bool(user.feed_external)
     cals = user.external_calendars
     if isinstance(cals, list) and cals:
-        return [c for c in cals if isinstance(c, dict) and c.get("url")]
+        return [{**c, "export": bool(c.get("export", standard))}
+                for c in cals if isinstance(c, dict) and c.get("url")]
     if user.external_ics_url:
-        return [{"url": user.external_ics_url, "color": user.external_ics_color or "", "name": ""}]
+        return [{"url": user.external_ics_url, "color": user.external_ics_color or "", "name": "",
+                 "export": standard}]
     return []
+
+
+def _name_aus_ics(text: str) -> str:
+    """Der Name, den der Kalender sich selbst gibt (X-WR-CALNAME)."""
+    for zeile in re.sub(r"\r?\n[ \t]", "", text or "").splitlines():
+        if zeile.upper().startswith("X-WR-CALNAME"):
+            return zeile.split(":", 1)[-1].replace("\\,", ",").strip()[:60]
+    return ""
+
+
+def _name_aus_adresse(url: str) -> str:
+    h = (urllib.parse.urlparse(url).hostname or "").lower()
+    for teil, name in (("icloud", "iCloud"), ("office365", "Outlook"), ("outlook", "Outlook"),
+                       ("google", "Google"), ("webuntis", "WebUntis")):
+        if teil in h:
+            return name
+    return h[:60] or "Kalender"
 
 
 @router.get("/external")
@@ -2162,6 +2191,8 @@ async def get_external(user: User = Depends(require_module)):
 
 @router.put("/external")
 async def set_external(body: ExtCalsIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    import asyncio
+    vorher = {c["url"]: c for c in _ext_calendars(user)}
     out = []
     for c in body.calendars:
         url = (c.url or "").strip()
@@ -2172,14 +2203,34 @@ async def set_external(body: ExtCalsIn, user: User = Depends(require_module), db
         url = url.replace("webcal://", "https://", 1)
         col = (c.color or "").strip()
         col = col if re.fullmatch(r"#[0-9a-fA-F]{3,8}", col) else ""
-        out.append({"url": url, "color": col, "name": (c.name or "").strip()[:60]})
+        if c.export is not None:
+            exp = bool(c.export)
+        elif body.mitschicken is not None:
+            exp = bool(body.mitschicken)           # aelterer Client: ein Schalter fuer alle
+        else:
+            exp = bool((vorher.get(url) or {}).get("export", False))
+        out.append({"url": url, "color": col, "name": (c.name or "").strip()[:60], "export": exp})
+    # Ohne Namen holt der Server ihn aus dem Kalender selbst: eine Liste aus
+    # Adressen ist keine Liste, in der man etwas wiederfindet — und die Adresse
+    # ist ein Geheimnis, das nicht herumstehen soll.
+    ohne = [c for c in out if not c["name"]]
+    if ohne:
+        async def _lade(c):
+            try:
+                text = await asyncio.get_event_loop().run_in_executor(None, _fetch_ics, c["url"])
+            except Exception:
+                text = ""
+            c["name"] = _name_aus_ics(text) or _name_aus_adresse(c["url"])
+        await asyncio.gather(*[_lade(c) for c in ohne])
     user.external_calendars = out
     # Altfelder mitziehen (erster Kalender), damit nichts Altes wiederauflebt.
     user.external_ics_url = out[0]["url"] if out else None
     user.external_ics_color = out[0]["color"] if out else ""
-    if body.mitschicken is not None:
-        user.feed_external = bool(body.mitschicken)
+    # Gesamtschalter = mindestens ein Kalender exportiert (die Leser fragen ihn
+    # als schnelle Vorpruefung, bevor sie die Termine holen).
+    user.feed_external = any(c["export"] for c in out)
     await db.commit()
+    _EXT_CACHE.pop(user.id, None)
     return {"calendars": out, "hidden": user.external_hidden or [],
             "mitschicken": bool(user.feed_external)}
 
