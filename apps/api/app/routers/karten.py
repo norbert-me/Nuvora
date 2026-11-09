@@ -39,7 +39,7 @@ from ..uploads import anhang_kopf, bildtyp
 from ..versionierung import VersionOut, pruefe, stand
 from sqlalchemy.orm import selectinload
 from ..models import (Card, CardDeck, CardDeckKurs, CardFolder, CardReview, Kurs,
-                      SchoolClass, Student, User, Session, ExamDate)
+                      SchoolClass, Student, User, Session, ExamDate, GradeCategory)
 from .auth import get_current_user, rate_limit
 from .modules import is_active, modul_pflicht
 
@@ -1730,7 +1730,7 @@ async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
     Endnote des laufenden Halbjahrs (manuell gesetzte schlaegt den gewichteten
     Schnitt). Ohne Modul Auswertung oder ohne Noten: null. Nicht aus den
     CardVote-Tests: die sind eine Erhebung, keine Zeugnisgrundlage."""
-    from ..scoring import note_label
+    from ..scoring import note_label, noten_trend
     st = await _student_by_token(db, token, modul="cardvote")
     owner_id = (await db.execute(select(SchoolClass.owner_id).where(SchoolClass.id == st.class_id))).scalar()
     if not owner_id or not await is_active(db, owner_id, "auswertung"):
@@ -1746,11 +1746,17 @@ async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
     out = []
     for kid, name in ziele:
         for term in termine:
-            _, rows = await _summarize(db, owner, st.class_id, term, agg="mean", kurs_id=kid)
+            secs, rows = await _summarize(db, owner, st.class_id, term, agg="mean", kurs_id=kid)
             r = next((x for x in rows if x.student_id == st.id), None)
             wert = (r.total_override if r.total_override is not None else r.weighted) if r else None
             if wert is not None:
-                out.append({"kurs": name, "note": note_label(wert), "wert": round(wert, 1), "halbjahr": term})
+                # Verlauf: die Spaltennoten in Zeitreihenfolge (Datum der Leistung, sonst Anlage).
+                cats = (await db.execute(select(GradeCategory).where(
+                    GradeCategory.section_id.in_([x.id for x in secs])))).scalars().all() if secs else []
+                cats.sort(key=lambda c: (str(c.date)[:10] if c.date else (c.created_at.date().isoformat() if c.created_at else ""), c.id))
+                reihe = [r.per_category.get(str(c.id)) for c in cats]
+                out.append({"kurs": name, "note": note_label(wert), "wert": round(wert, 1), "halbjahr": term,
+                            "trend": noten_trend(reihe)})
                 break
     return out
 

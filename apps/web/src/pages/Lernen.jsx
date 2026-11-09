@@ -262,7 +262,11 @@ function Ergebnisse({ results, noten = [], t }) {
           {noten.map((n, i) => (
             <div key={i} style={{ ...cardStyle, padding: "16px", textAlign: "center", flex: "1 1 120px" }}>
               <div style={{ fontSize: 12, color: "var(--text3)" }}>{t("lernen.aktuelleNote")}{n.kurs ? ` · ${n.kurs}` : ""}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: n.wert <= 4.4 ? C.success : C.danger }}>{n.note.replace("-", "−")}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: n.wert <= 4.4 ? C.success : C.danger }}>{n.note.replace("-", "−")}
+                {n.trend != null && (
+                  <span title={t(n.trend > 0 ? "noten.trendBesser" : n.trend < 0 ? "noten.trendSchlechter" : "noten.trendGleich")}
+                    style={{ marginLeft: 6, color: n.trend > 0 ? C.success : n.trend < 0 ? C.danger : "var(--text3)" }}>{n.trend > 0 ? "↗" : n.trend < 0 ? "↘" : "→"}</span>
+                )}</div>
             </div>
           ))}
         </div>

@@ -208,3 +208,9 @@ def test_note_mit_tendenz_spiegelt_das_frontend():
     from app.scoring import note_mit_tendenz as n
     assert [n(p) for p in (95, 87, 80, 73, 60, 50, 10, 0)] == ["1", "1", "2", "2-", "3-", "4", "6", "6"]
     assert n(85) == "2+" and n(70) == "3+"
+
+
+def test_noten_trend_spiegelt_das_frontend():
+    from app.scoring import noten_trend as n
+    assert n([3]) is None and n([3, 2]) == 1 and n([2, 3]) == -1 and n([2, 2.1, 2]) == 0
+    assert n([4, 3, 2]) == 1 and n([None, 3, 2]) == 1
