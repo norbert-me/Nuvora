@@ -40,19 +40,23 @@ def totp(secret: str, jetzt: float, schritt: int = 30, stellen: int = 6) -> str:
 
 def form(wert, tiefe=0, name=""):
     """Eine Struktur ohne Inhalte: Schluessel und Typen, Listen mit Laenge."""
-    if tiefe > 4:
+    if tiefe > 7:
         return "…"
     if isinstance(wert, dict):
         return {k: form(v, tiefe + 1, k) for k, v in list(wert.items())[:40]}
     if isinstance(wert, list):
+        if name in ("is", "can"):                    # Kennzeichen wie CANCELLED — keine Personendaten
+            return [str(x) for x in wert][:20]
         return [f"{len(wert)} Eintraege", form(wert[0], tiefe + 1, name)] if wert else []
     if isinstance(wert, bool) or wert is None:
         return repr(wert)
     if isinstance(wert, (int, float)):
         return "<zahl>"
+    if wert == "":
+        return "<leer>"
     # Aufzaehlungswerte (kein Personenbezug) im Klartext, alles andere nur als Typ.
     if name in ("cellState", "state", "lessonType", "type", "code", "status", "lstype",
-                "activityType", "elemType", "substType", "periodState") and len(str(wert)) < 30:
+                "activityType", "elemType", "substType", "periodState", "missing", "orgId") and len(str(wert)) < 30:
         return str(wert)
     return "<text>"
 
@@ -125,7 +129,17 @@ def main():
         t = ruf("getTimetable2017", v)
         if isinstance(t, dict) and t.get("result") is not None:
             print(f"Versuch {i} geht. Struktur:")
-            print(json.dumps(form(t["result"]), indent=1, ensure_ascii=False)[:5000])
+            tt = (t["result"].get("timetable") or {}) if isinstance(t["result"], dict) else {}
+            ps = tt.get("periods") or []
+            print(json.dumps(form(ps[0] if ps else {}), indent=1, ensure_ascii=False)[:5000])
+            from collections import Counter
+            print("\n== 3. Haeufigkeiten ueber alle", len(ps), "Stunden (nur Kennzeichen, keine Namen)")
+            print("is:", Counter(x for p in ps for x in (p.get("is") or [])))
+            print("Elementtypen/-zustaende:", Counter(
+                (e.get("type"), e.get("state"), "orgId" in e) for p in ps for e in (p.get("elements") or [])
+                if isinstance(e, dict)))
+            print("Texte vorhanden (lesson/substitution/info):", Counter(
+                tuple(bool((p.get("text") or {}).get(k)) for k in ("lesson", "substitution", "info")) for p in ps))
             return 0
         print(f"Versuch {i}:", json.dumps(t)[:200])
     print("Kein Aufbau hat funktioniert — schick mir die obigen Zeilen.")
