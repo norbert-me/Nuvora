@@ -1966,6 +1966,7 @@ export default {
   "orga.noStudents": "This class has no students.",
   "orga.spalteLoeschen": "Delete column “{{name}}” with all its ticks?",
   "orga.spalteLoeschenHinweis": "Click to delete the column",
+  "orga.umbenennen": "Rename column",
   "orga.noItems": "No item yet. Add one above.",
   "orga.delConfirm": "Delete this item?",
   "orga.done": "Done",

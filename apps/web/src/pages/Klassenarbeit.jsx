@@ -1779,7 +1779,7 @@ export default function Klassenarbeit() {
             const noten = notenAusArbeit(students, wk, effScale);
             return <NotenUebernahme titel={t("klassenarbeit.toNoten")}
               classId={classId} kursId={kursId} grades={noten}
-              quelle="klassenarbeit" notiz={t("klassenarbeit.title")} spalte={work.name || t("klassenarbeit.newName")} workId={work.id}
+              quelle="klassenarbeit" notiz="" spalte={work.name || t("klassenarbeit.newName")} workId={work.id}
               onClose={() => setNotenModal(false)} />;
           })()}
           </>)}

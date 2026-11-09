@@ -2121,6 +2121,7 @@ export default {
   "orga.noStudents": "Diese Klasse hat keine Schüler.",
   "orga.spalteLoeschen": "Spalte „{{name}}“ mit allen Häkchen löschen?",
   "orga.spalteLoeschenHinweis": "Anklicken löscht die Spalte",
+  "orga.umbenennen": "Spalte umbenennen",
   "orga.noItems": "Noch kein Orga-Punkt. Lege oben einen an.",
   "orga.delConfirm": "Diesen Punkt löschen?",
   "orga.done": "Erledigt",

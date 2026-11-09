@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { undoDelete } from "../core/undo.jsx";
-import { askConfirm } from "../core/dialog.jsx";
+import { askChoice, askConfirm, askPrompt } from "../core/dialog.jsx";
 import { AddButton, COLORS as C, CONTROL_R, cardStyle, klebtLinks, pageApp, td, th as thBase, toolbarInput } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
@@ -123,6 +123,22 @@ export default function Orga() {
       commit: async () => { await fetch(`${API}/item/${id}`, { method: "DELETE" }).catch(() => {}); },
     });
   };
+  // Klick auf den Spaltenkopf: umbenennen (Hauptweg) oder löschen.
+  const spalteAnfassen = async (it) => {
+    const wahl = await askChoice(it.name, [
+      { key: "rename", label: t("orga.umbenennen") },
+      { key: "del", label: t("common.delete"), danger: true },
+    ]);
+    if (wahl === "del") {
+      if (await askConfirm(t("orga.spalteLoeschen", { name: it.name }), { danger: true, ok: t("common.delete") })) loeschen(it.id);
+    } else if (wahl === "rename") {
+      const neu = await askPrompt(t("orga.umbenennen"), { initial: it.name, ok: t("common.save") });
+      const name = (neu || "").trim();
+      if (!name || name === it.name) return;
+      const r = await fetch(`${API}/item/${it.id}`, alsJson("PUT", { name })).catch(() => null);
+      if (r && r.ok) { frisch.current = true; setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, name: name.slice(0, 160) } : x))); }
+    }
+  };
   // Das Häkchen sammelt nur — zum Server geht es mit „Speichern".
   const toggle = (item, sid) => e.setz({ [`${item.id}:${sid}`]: !e.wert[`${item.id}:${sid}`] });
 
@@ -163,7 +179,7 @@ export default function Orga() {
                   // Mülleimer im Dialog, damit klar ist, worauf man geklickt hat.
                   <th key={it.id} style={{ ...th, minWidth: 90, cursor: "pointer" }}
                     title={t("orga.spalteLoeschenHinweis")}
-                    onClick={async () => { if (await askConfirm(t("orga.spalteLoeschen", { name: it.name }), { danger: true, ok: t("common.delete") })) loeschen(it.id); }}>
+                    onClick={() => spalteAnfassen(it)}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                       <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</span>
                       {/* Zähler zählt den ENTWURF mit — sonst widerspräche er

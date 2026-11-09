@@ -1967,6 +1967,7 @@ export default {
   "orga.noStudents": "Esta clase no tiene alumnos.",
   "orga.spalteLoeschen": "¿Eliminar la columna «{{name}}» con todas sus marcas?",
   "orga.spalteLoeschenHinweis": "Haz clic para eliminar la columna",
+  "orga.umbenennen": "Renombrar columna",
   "orga.noItems": "Aún no hay ningún punto. Crea uno arriba.",
   "orga.delConfirm": "¿Eliminar este punto?",
   "orga.done": "Hecho",
