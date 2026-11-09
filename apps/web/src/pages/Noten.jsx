@@ -477,8 +477,12 @@ export default function Noten() {
     fn();
   };
   // Anzeige liest den ENTWURF: Reihenfolge, Note, Kommentar, gesetzte Note.
-  const secListe = (entwurf.wert.os || sections.map((x) => x.id)).map((id) => sections.find((x) => x.id === id)).filter(Boolean);
-  const catsVon = (sec) => (entwurf.wert[`oc:${sec.id}`] || (sec.categories || []).map((c) => c.id))
+  // Neu angelegte Abschnitte und Spalten stehen NICHT in einer vorher gezogenen
+  // Reihenfolge — sie kommen hinten dazu, statt bis zum Speichern unsichtbar
+  // zu bleiben.
+  const mitNeuen = (reihenfolge, alle) => (reihenfolge ? [...reihenfolge, ...alle.filter((id) => !reihenfolge.includes(id))] : alle);
+  const secListe = mitNeuen(entwurf.wert.os, sections.map((x) => x.id)).map((id) => sections.find((x) => x.id === id)).filter(Boolean);
+  const catsVon = (sec) => mitNeuen(entwurf.wert[`oc:${sec.id}`], (sec.categories || []).map((c) => c.id))
     .map((id) => (sec.categories || []).find((c) => c.id === id)).filter(Boolean);
   const noteVon = (sid, cid) => entwurf.wert[`n:${sid}:${cid}`] ?? null;
   const kommentarVon = (sid, cid) => entwurf.wert[`k:${sid}:${cid}`] || "";
@@ -488,6 +492,15 @@ export default function Noten() {
   const istEndOverride = (s) => entwurf.wert[`to:${s.student_id}`] != null;
 
   const allCats = sections.flatMap((s) => s.categories || []);
+  // Fehlende Note: in einer Spalte, in der andere schon eine haben, hat das Kind
+  // keine — und war an dem Tag nicht abwesend und hat keinen Kommentar dort.
+  // (Eine ganz leere Spalte ist Zukunft, kein Fehlen.)
+  const spaltenMitNoten = new Set(summary ? summary.flatMap((r) => Object.keys(r.per_category || {})).map(Number) : []);
+  const notenFehlen = (sid) => allCats.some((c) => {
+    if (!spaltenMitNoten.has(c.id) || noteVon(sid, c.id) != null || kommentarVon(sid, c.id)) return false;
+    const stat = statusVon(sid, c);
+    return stat !== "fehlt" && stat !== "entsch";
+  });
 
   const gewichtSumme = sections.reduce((n, s) => n + (s.weight || 0), 0);
   const notenVon = (sid, cid) => entries.filter((e) => e.student_id === sid && e.category_id === cid && e.kind === "grade");
@@ -830,7 +843,8 @@ export default function Noten() {
                       {/* Nummer in fester Breite, rechtsbuendig: sonst faengt
                           „10. Jamiro" weiter rechts an als „7. Selina" und die
                           Namensspalte franst aus. */}
-                      <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span>{s.name}{s.le && <span title={t("kurse.leHint")} style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: C.warning }}>LE</span>}
+                      <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span><span title={notenFehlen(s.student_id) ? t("noten.notenFehlen") : undefined}
+                        style={notenFehlen(s.student_id) ? { background: `${C.warning}33`, borderRadius: 6, padding: "1px 6px", margin: "0 -6px" } : undefined}>{s.name}</span>{s.le && <span title={t("kurse.leHint")} style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: C.warning }}>LE</span>}
                     </button>
                   </td>
                   {secListe.map((sec) => {

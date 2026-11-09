@@ -2512,6 +2512,7 @@ export default {
   "noten.stellen": "Decimal places",
   "noten.stellen2": "2 (3.25)",
   "noten.stellen1": "1 (3.3)",
+  "noten.notenFehlen": "At least one grade is missing (not absent, no comment)",
   "noten.suche": "Find student",
   "noten.susModus": "Student mode",
   "noten.susModusHint": "Hides all grades, only names stay",
