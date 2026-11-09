@@ -26,6 +26,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 
 import { COLORS as C, CONTROL_R, Icon, ICONS, Modal, Segment, Toggle, btnPrimary, btnSecondary, segmentBtn } from "./Icons.jsx";
+import { wertLabel } from "../core/grades.js";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "./Latex.jsx";
 import { lokal, sichern } from "../core/ansichten.js";
@@ -39,13 +40,13 @@ const PAPIER = { background: "#fff", color: "#111" };
 // Rückmeldung mit Note und Unterschrift, für die Wiederholung nur die
 // Aufgaben. Bausteine statt fester Fassungen — die Vorlagen setzen nur
 // Häkchen, jedes lässt sich danach einzeln umlegen.
-export const BOGEN_TEILE = ["note", "themen", "rat", "wdh", "notiz", "unterschrift"];
+export const BOGEN_TEILE = ["note", "stand", "themen", "rat", "wdh", "notiz", "unterschrift"];
 export const BOGEN_VORLAGEN = {
   wdh: ["wdh"],
-  rueckmeldung: ["note", "themen", "rat", "notiz", "unterschrift"],
+  rueckmeldung: ["note", "stand", "themen", "rat", "notiz", "unterschrift"],
   alles: BOGEN_TEILE,
 };
-const ALTE_TEILE = BOGEN_VORLAGEN.rueckmeldung;
+const ALTE_TEILE = ["note", "themen", "rat", "notiz", "unterschrift"];
 const SPEICHER = "nuvora_bogen_teile";
 
 // Die zuletzt gewählten Bausteine — am KONTO (core/ansichten.js), damit die
@@ -73,6 +74,15 @@ const noteText = (b, form) => {
   if (form === "wert" && b.noteWert != null) return String(b.noteWert).replace(".", ",");
   if (form === "ganz") return b.note || null;
   return b.noteTendenz || b.note || null;
+};
+
+// Eine berechnete Note (Zwischenstand): „2− (2,46)", „2,5" oder ganz — nach der
+// gewaehlten Notenform. Der Zwischenstand ist kein Zeugnis, deshalb mit Zahl.
+const stufenText = (wert, form) => {
+  const zahl = String(Math.round(wert * 100) / 100).replace(".", ",");
+  if (form === "ganz") return String(Math.round(wert));
+  if (form === "wert") return zahl;
+  return `${wertLabel(wert)} (${zahl})`;
 };
 
 export function BogenWahl({ onDrucken, onClose, mitWdh = true, wdhFehlt = [] }) {
@@ -184,6 +194,32 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
             {t("bogen.punkte", { p: halbe(b.punkte), max: halbe(b.max) })}
             {noteText(b, notenform) ? <> · <strong>{t("bogen.note", { n: noteText(b, notenform) })}</strong></> : null}
           </div>
+          )}
+
+          {/* Zwischenstand der Gesamtnote aus dem Notenbuch: je Bereich die
+              Note und das Gewicht, darunter der Stand insgesamt. Nur das eigene
+              Kind — kein Vergleich mit der Klasse. */}
+          {an("stand") && b.stand && b.stand.bereiche.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, margin: "0 0 6px" }}>{t("bogen.standTitel")}</div>
+              <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 14 }}>
+                <tbody>
+                  {b.stand.bereiche.map((x) => (
+                    <tr key={x.name} style={{ borderBottom: "1px solid #ddd" }}>
+                      <td style={{ padding: "4px 0" }}>{x.name}</td>
+                      <td style={{ padding: "4px 8px", color: "#555", textAlign: "right", width: 56 }}>{x.gewicht} %</td>
+                      <td style={{ padding: "4px 0", textAlign: "right", width: 90, fontWeight: 600 }}>{x.wert != null ? stufenText(x.wert, notenform) : "·"}</td>
+                    </tr>
+                  ))}
+                  {b.stand.gesamt != null && (
+                    <tr>
+                      <td style={{ padding: "6px 0", fontWeight: 700 }} colSpan={2}>{t("bogen.standGesamt")}</td>
+                      <td style={{ padding: "6px 0", textAlign: "right", fontWeight: 700 }}>{stufenText(b.stand.gesamt, notenform)}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {an("themen") && (<>

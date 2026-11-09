@@ -23,6 +23,7 @@ import { rememberClass } from "../core/cache.js";
 import { gradeFromPct, gradeDetailed, quantile, stdev, DEFAULT_SCALE } from "../core/grades.js";
 import { useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import { alsJson, hol } from "../core/melden.js";
+import { ymd } from "../core/datum.js";
 import NotenUebernahme from "../components/NotenUebernahme.jsx";
 import { konfidenzProzent, mittel, streuung, trennschaerfe } from "../core/aufgabenstatistik.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
@@ -1140,6 +1141,7 @@ export default function Klassenarbeit() {
   const [bogenWahl, setBogenWahl] = useState(false);
   const [bogenTeile, setBogenTeile] = useState(undefined);
   const [bogenNotenform, setBogenNotenform] = useState("tendenz");
+  const [standDaten, setStandDaten] = useState(null);   // Zwischenstand je Kind aus dem Notenbuch
   const [wdhPool, setWdhPool] = useState(null);
   // Der Pool wird beim OEFFNEN des Dialogs geholt: dann steht dort schon,
   // zu welchen Themen der Lernpfad nichts hat — als Hinweis, nicht als
@@ -1162,6 +1164,31 @@ export default function Klassenarbeit() {
     const kopf = tp ? [tp.fach || ober?.fach, (tp.jahrgang || ober?.jahrgang) ? `Kl. ${tp.jahrgang || ober?.jahrgang}` : ""].filter(Boolean).join(" · ") : "";
     return { kopf, pfad: tp ? (ober ? `${mitNummer(ober)} › ${mitNummer(tp)}` : mitNummer(tp)) : f.thema };
   }), [poolVorab, druckBogenRoh, topics]);
+  // Zwischenstand der Gesamtnote je Kind: Bereiche (Name, Gewicht, Note) und
+  // Gesamtnote aus dem Notenbuch — Halbjahr nach dem Schuljahr des Kontos.
+  const standHolen = async () => {
+    if (!classId) return null;
+    let term = "1";
+    try { const u = JSON.parse(localStorage.getItem("user")); if (u && u.hj2_start && String(u.hj2_start) <= ymd(new Date())) term = "2"; } catch { /* Halbjahr 1 */ }
+    const kp = kursId != null ? `&kurs_id=${kursId}` : "";
+    const heute = async (tm) => {
+      const [secs, sum] = await Promise.all([
+        hol(`/api/noten/classes/${classId}/sections?term=${tm}${kp}`, []),
+        hol(`/api/noten/classes/${classId}/summary?term=${tm}${kp}`, []),
+      ]);
+      return { secs: Array.isArray(secs) ? secs : [], sum: Array.isArray(sum) ? sum : [] };
+    };
+    let d = await heute(term);
+    if (!d.sum.some((r) => r.weighted != null)) d = await heute(term === "1" ? "2" : "1");
+    const karte = new Map();
+    d.sum.forEach((r) => {
+      if (r.le) return;                             // LE: keine Gesamtnote
+      const bereiche = d.secs.filter((x) => r.section_effective && r.section_effective[String(x.id)] != null)
+        .map((x) => ({ name: x.name, gewicht: x.weight, wert: r.section_effective[String(x.id)] }));
+      karte.set(r.student_id, { bereiche, gesamt: r.total_override ?? r.weighted ?? null });
+    });
+    return karte;
+  };
   const bogenDrucken = async (teile, max, notenform) => {
     setBogenWahl(false);
     setBogenNotenform(notenform || "tendenz");
@@ -1169,11 +1196,15 @@ export default function Klassenarbeit() {
     const pool = teile.includes("wdh") && lernpfadAktiv ? (poolVorab || []) : null;
     setWdhPool(pool);
     setBogenTeile(teile);
+    setStandDaten(teile.includes("stand") ? await standHolen() : null);
     // KaTeX zeichnet die Aufgabentexte nachgeladen — kurz warten, sonst steht
     // im Ausdruck der Quelltext.
     setTimeout(() => window.print(), pool ? 900 : 100);
   };
-  const druckBogen = useMemo(() => (wdhPool ? wdhZuteilen(druckBogenRoh, wdhPool, themen.byId, wdhMax) : druckBogenRoh), [druckBogenRoh, wdhPool, topics, wdhMax]);
+  const druckBogen = useMemo(() => {
+    const basisListe = wdhPool ? wdhZuteilen(druckBogenRoh, wdhPool, themen.byId, wdhMax) : druckBogenRoh;
+    return standDaten ? basisListe.map((b) => ({ ...b, stand: standDaten.get(b.student_id) || null })) : basisListe;
+  }, [druckBogenRoh, wdhPool, topics, wdhMax, standDaten]);
 
   // Aus den zentralen Tabellenstilen abgeleitet, nicht daneben neu gebaut: nur
   // die kraeftigere Kopf-Trennlinie und die polsterlose Zelle (die Eingabefelder
