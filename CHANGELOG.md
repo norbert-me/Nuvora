@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Untis-Import überschreibt keinen Kurs mehr:** eine Stunde, die schon einem
+  Kurs oder einer Klasse gehört, bleibt unberührt, wenn der Import keine
+  Zuordnung mitbringt (vorher wurden Kurs und Farbe durch reinen Text ersetzt).
 - **Untis ohne Betreff:** liefert der Abo-Link nur Zeiten (Schule hat Fach, Klasse
   und Raum im Export abgeschaltet), zeigt der Kalender Termine, die zu einer
   Uhrzeit zusätzlich zu den Stunden des eigenen Plans stehen, als „Zusätzlicher

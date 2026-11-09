@@ -2920,10 +2920,24 @@ async def untis_uebernehmen(body: UntisUebernahmeIn, user: User = Depends(requir
         neue_kurse += 1
 
     gesetzt = 0
+    bewahrt = 0
     for s in body.slots[:200]:
         if not 0 <= s.weekday <= 6 or not stunde_gueltig(s.period):
             continue
         kurs_id = s.kurs_id or nach_name.get((s.kurs_neu or "").strip().lower())
+        # Eine Stunde, die schon einem Kurs oder einer Klasse gehoert, wird von
+        # einem Import OHNE Zuordnung nicht angefasst: reiner Text aus Untis
+        # („INF 6.4") wuerde sonst Kurs, Farbe und Verknuepfungen wegnehmen —
+        # genau so ging ein gepflegter Plan verloren.
+        if not kurs_id and not s.class_id:
+            heute_d = date.today()
+            alt = (await db.execute(select(TimetableSlot).where(
+                TimetableSlot.owner_id == user.id, TimetableSlot.weekday == s.weekday,
+                TimetableSlot.period == s.period,
+                or_(TimetableSlot.valid_to.is_(None), TimetableSlot.valid_to >= heute_d)))).scalars().all()
+            if any(a.kurs_id or a.class_id for a in alt if _slot_active_on(a, heute_d)):
+                bewahrt += 1
+                continue
         await upsert_slot(SlotIn(weekday=s.weekday, period=s.period, title=(s.title or "")[:200],
                                  kurs_id=kurs_id, class_id=s.class_id, topic_id=None), user, db)
         gesetzt += 1
@@ -2955,4 +2969,5 @@ async def untis_uebernehmen(body: UntisUebernahmeIn, user: User = Depends(requir
         frei += 1
 
     await db.commit()
-    return {"slots": gesetzt, "ausfaelle": entfallen, "ferien": frei, "kurse": neue_kurse}
+    return {"slots": gesetzt, "ausfaelle": entfallen, "ferien": frei, "kurse": neue_kurse,
+            "bewahrt": bewahrt}

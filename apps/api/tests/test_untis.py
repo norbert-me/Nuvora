@@ -270,3 +270,30 @@ def test_ics_text_rechnet_utc_um():
             "SUMMARY:M 7.5\nEND:VEVENT\nEND:VCALENDAR\n")
     s = U.stunden_aus_ics_text(text, date(2026, 9, 1), date(2026, 9, 30))
     assert s[0]["start"] == "08:00" and s[0]["datum"] == "2026-09-21"
+
+
+@pytest.mark.asyncio
+async def test_import_ohne_zuordnung_ueberschreibt_keinen_kurs(s):
+    """Reiner Text aus Untis darf eine Stunde mit Kurs nicht entkoppeln."""
+    from sqlalchemy import select
+
+    from app.models import Kurs, User, UserModule
+    from app.routers import kalender as K
+
+    u = User(email="untis3@b.de", password_hash="x", name="L")
+    s.add(u)
+    await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    k = Kurs(owner_id=u.id, name="6.4 Informatik")
+    s.add(k)
+    await s.commit()
+    await K.upsert_slot(K.SlotIn(weekday=0, period=1, title="", kurs_id=k.id), user=u, db=s)
+
+    d = await K.untis_uebernehmen(K.UntisUebernahmeIn(slots=[
+        K.UntisSlotIn(weekday=0, period=1, title="INF 6.4"),   # ohne Kurs
+        K.UntisSlotIn(weekday=1, period=1, title="M 8.3"),     # leerer Platz: wird gesetzt
+    ]), user=u, db=s)
+    assert d["bewahrt"] == 1 and d["slots"] == 1
+    slots = (await s.execute(select(K.TimetableSlot).where(
+        K.TimetableSlot.owner_id == u.id, K.TimetableSlot.weekday == 0))).scalars().all()
+    assert [x.kurs_id for x in slots] == [k.id]
