@@ -10,6 +10,7 @@ import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLOR
 import { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson, hol } from "../core/melden.js";
 import { WIDGETS } from "../components/Widgets.jsx";
+import { BEAMER_MODULE, useBeamer } from "../core/beamer.js";
 import { ZIELE } from "../core/ziele.js";
 import { hmToMin, ymd } from "../core/datum.js";
 import { stundenZeit, slotGiltAm, stundenRang, stundeKurz, tagesStand, eintragFenster } from "../core/stunden";
@@ -392,6 +393,7 @@ export default function NuvoraHome({ user }) {
   // den Titel darueber) und der Marktplatz (der gehoert dem Kern, das Modul
   // verlinkt ihn nur).
   const zielDa = useZielFilter();
+  const beamer = useBeamer();
   const teile = (m) => ZIELE
     .filter((z) => z.modul === m.key && z.pfad !== m.path && !z.pfad.startsWith("/marktplatz"))
     // Abgeschaltete Teile stehen nicht auf der Kachel: sonst zaehlt sie
@@ -552,7 +554,7 @@ export default function NuvoraHome({ user }) {
           {/* Nicht nur „laeuft das Modul?", sondern auch „ist dieser TEIL an?"
               — dieselbe Frage wie in Navigation, Suche und Modul-Kachel, und
               deshalb dieselbe Funktion (useZielFilter). */}
-          {!edit && WIDGETS.filter((w) => kacheln.wert.widgets.includes(w.key) && zielDa({ modul: w.modul, option: w.option })).map((w) => {
+          {!edit && WIDGETS.filter((w) => kacheln.wert.widgets.includes(w.key) && zielDa({ modul: w.modul, option: w.option }) && !(beamer.aktiv && BEAMER_MODULE.includes(w.modul))).map((w) => {
             if (w.key === "heute") return <HeutePanel key={w.key} t={t} />;
             if (w.key === "schwach") {
               return <SchwacheWoche key={w.key} t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} />;

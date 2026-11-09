@@ -298,6 +298,7 @@ import { OutboxHost } from "./core/OutboxHost.jsx";
 import Fehlermelder from "./components/Fehlermelder.jsx";
 import InstallHinweis from "./components/InstallHinweis.jsx";
 import { sparsamAn, setzeSparsam } from "./core/sparsam.js";
+import { BEAMER_MODULE, beamerFreigeben, useBeamer } from "./core/beamer.js";
 import AppUpdate from "./components/AppUpdate.jsx";
 import WasIstNeu from "./components/WasIstNeu.jsx";
 import { notiereAufruf, notiereSeite, protokollStarten } from "./core/protokoll.js";
@@ -617,6 +618,7 @@ const getModuleNavItems = (t, location, user) => {
 // haben, landet bei der Modulauswahl statt auf einer kaputten Seite.
 function ModuleGate({ moduleKey, children }) {
   const { modules, loading, bekannt } = useModules();
+  const beamer = useBeamer();
   // Beim ersten Besuch (noch kein Modul-Cache) und auf langsamer Verbindung
   // stand hier ein leerer Bereich unter der Navigation. Dieselben Ladebalken wie
   // beim Nachladen der Seite: die Lehrkraft sieht, dass etwas kommt.
@@ -628,6 +630,17 @@ function ModuleGate({ moduleKey, children }) {
   if (!bekannt) return <ModulstandUnklar />;
   const mod = modules.find((m) => m.key === moduleKey);
   if (!mod?.active) return <Navigate to="/modules" replace />;
+  // Beamer-Modus: Kalender und Noten zeigen sich nicht, solange andere
+  // mitsehen. Ein Klick holt sie bis zum Neuladen zurück.
+  if (beamer.aktiv && BEAMER_MODULE.includes(moduleKey)) {
+    return (
+      <div style={{ ...pageForm, textAlign: "center", padding: "40px 0" }}>
+        <h1 style={{ ...pageTitle, marginBottom: 10 }}>{uebersetze("beamer.title")}</h1>
+        <p style={{ ...pageIntro, marginBottom: 18 }}>{uebersetze("beamer.text")}</p>
+        <button onClick={beamerFreigeben} style={btnPrimary}>{uebersetze("beamer.zeigen")}</button>
+      </div>
+    );
+  }
   return children;
 }
 

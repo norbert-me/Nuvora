@@ -4,6 +4,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
 import { sparsamAn, setzeSparsam } from "../core/sparsam.js";
+import { beamerWahl, setzeBeamerWahl } from "../core/beamer.js";
 import { beobachteMelderKnopf, melderKnopfAus, setzeMelderKnopf } from "../core/melderKnopf.js";
 import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, Toggle, InfoDot, linkBtn,
   sectionLabel, Tabs, th as thBasis, td as tdBasis, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
@@ -117,6 +118,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   });
   const { t, lang, setLang } = useLanguage();
   const [sparsam, setSparsam] = useState(sparsamAn());
+  const [beamer, setBeamer] = useState(() => beamerWahl());
   const [melderKnopf, setMelderKnopf] = useState(() => !melderKnopfAus());
   useEffect(() => beobachteMelderKnopf(() => setMelderKnopf(!melderKnopfAus())), []);
   const [oldPw, setOldPw] = useState("");
@@ -439,6 +441,14 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         </Zeile>
         {/* Derselbe Fall: ein Umschalter ohne zweiten Wert, Einstellung des
             Geräts (am Beamer aus, am eigenen Rechner an). */}
+        {/* Gerätewahl wie der Melde-Knopf: wirkt sofort, kein zweiter Wert. */}
+        <Zeile label={t("profile.beamer")} hint={t("profile.beamerHint")}>
+          <select value={beamer} onChange={(e) => { setBeamer(e.target.value); setzeBeamerWahl(e.target.value); }} style={{ ...selectStyle, minWidth: 160 }}>
+            <option value="auto">{t("profile.beamerAuto")}</option>
+            <option value="an">{t("profile.beamerAn")}</option>
+            <option value="aus">{t("profile.beamerAus")}</option>
+          </select>
+        </Zeile>
         <Zeile label={t("profile.melderKnopf")}>
           <Toggle checked={melderKnopf} onChange={(v) => { setMelderKnopf(v); setzeMelderKnopf(v); }} label="" />
         </Zeile>
