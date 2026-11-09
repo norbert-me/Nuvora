@@ -190,7 +190,10 @@ function HeutePanel({ t }) {
       // stand der Tag der Deutschen Einheit hier am 2. Oktober.
       const freiHeute = (Array.isArray(breaks) ? breaks : []).find((b) => ymd(heute) >= ymd(new Date(b.start_date)) && ymd(heute) <= ymd(new Date(b.end_date)));
       if (!ab) setData({ slots: (tt?.slots || []), times: (tt?.times || []), zero: (tt?.zero || null), entries: Array.isArray(entries) ? entries : [], fremd,
-                        classes, kurse: Array.isArray(kurse) ? kurse : [], frei: freiHeute,
+                        classes, kurse: Array.isArray(kurse) ? kurse : [],
+                        // Am Wochenende ist ohnehin frei: „Unterrichtsfrei: Allerheiligen“ am
+                        // Sonntag sagt nichts (und liess das Widget fuer nichts stehen).
+                        frei: (heute.getDay() === 0 || heute.getDay() === 6) ? null : freiHeute,
                         entfallen: (Array.isArray(cancels) ? cancels : [])
                           .filter((c) => c.date && ymd(new Date(c.date)) === ymd(heute)).map((c) => c.period) });
     })();
