@@ -88,6 +88,8 @@ export default function Noten() {
   const [loading, setLoading] = useState(true);
   const loadedOnce = useRef(false); // Skeleton nur beim allerersten Laden, nicht bei Reloads
   const [entries, setEntries] = useState([]);
+  const [suche, setSuche] = useState("");          // Kinder in der Tabelle suchen
+  const [susModus, setSusModus] = useState(false);  // alle Noten verbergen (SuS schauen mit)
   const [summary, setSummary] = useState([]);
   const [error, setError] = useState("");
   const [zelle, setZelle] = useState(null);
@@ -510,6 +512,7 @@ export default function Noten() {
   }
 
   const cls = classes.find((c) => c.id === classId);
+  const suchTreffer = (s) => !suche.trim() || String(s.name || "").toLowerCase().includes(suche.trim().toLowerCase());
 
   return (
     <div>
@@ -526,6 +529,8 @@ export default function Noten() {
             <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />
           </span>
           {/* Kurze Beschriftungen („1. HJ"), die lange Form im title. */}
+          <input type="search" value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("noten.suche")} aria-label={t("noten.suche")}
+            style={{ ...toolbarInput, width: 140, minWidth: 0 }} />
           <span title={t("noten.term")}>
             <Tabs value={term} onChange={(v) => wechseln(() => setTerm(v))}
               options={[["1", t("noten.term1Short")], ["2", t("noten.term2Short")], ["year", t("noten.year")]]} />
@@ -533,6 +538,9 @@ export default function Noten() {
         </>}
         ansicht={
           <ViewMenu title={t("noten.ansicht")} items={[{
+            key: "sus", label: t("noten.susModus"), hint: t("noten.susModusHint"),
+            value: susModus, onChange: setSusModus,
+          }, {
             key: "agg", art: "wahl",
             label: t("noten.agg"),
             hint: t("noten.aggHint"),
@@ -644,7 +652,7 @@ export default function Noten() {
           <div style={{ marginBottom: 16 }}><Empty title={t("noten.noSections")} hint={t("noten.noSectionsHint")} /></div>
           {(summary || []).length > 0 && (
             <div style={{ ...panelStyle, overflow: "hidden" }}>
-              {summary.map((s, i) => (
+              {summary.filter(suchTreffer).map((s, i) => (
                 <div key={s.student_id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderTop: i === 0 ? "none" : "1px solid var(--border)" }}>
                   <button onClick={() => setInfoFuer(s.student_id)} title={t("noten.studentInfo")}
                     style={{ flex: 1, minWidth: 0, minHeight: 32, textAlign: "left", padding: "2px 0", border: "none", background: "none", color: "var(--text)", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
@@ -672,7 +680,10 @@ export default function Noten() {
               Tabelle, nicht den Zellen, und ein `position: sticky` an einer
               Kopfzelle bleibt in Chrome wirkungslos: der Kopf scrollte trotz
               aller Angaben weg. */}
-          <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 14, minWidth: "100%" }}>
+          {/* SuS-Modus: alle Zellen ausser dem Namen bleiben leer — Platz und
+              Raster bleiben, nur die Zahlen sind weg. */}
+          {susModus && <style>{".sus-modus tbody td:not(:first-child) > * { visibility: hidden; }"}</style>}
+          <table className={susModus ? "sus-modus" : undefined} style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 14, minWidth: "100%" }}>
             <thead>
               <tr ref={kopf1Ref}>
                 <th style={{ ...th, ...stickyLh, whiteSpace: "nowrap", textAlign: "left", fontWeight: 400, fontSize: 13, color: gewichtSumme === 100 ? "var(--text3)" : C.warning }}>
@@ -796,7 +807,7 @@ export default function Noten() {
               </tr>
             </thead>
             <tbody>
-              {summary.map((s, si) => (
+              {summary.map((s, si) => !suchTreffer(s) ? null : (
                 <tr key={s.student_id} style={fokusKind === String(s.student_id) ? { background: FOKUS_TON } : undefined}>
                   <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0,
                     ...(fokusKind === String(s.student_id) ? { background: FOKUS_TON_DECKEND, boxShadow: "inset 3px 0 0 var(--accent)" } : null) }}>
