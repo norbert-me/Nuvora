@@ -362,6 +362,7 @@ const Pap = React.lazy(() => import("./pages/Pap.jsx"));
 const Personen = React.lazy(() => import("./pages/Personen.jsx"));
 const PapFrei = React.lazy(() => import("./pages/PapFrei.jsx"));
 const Waage = React.lazy(() => import("./pages/Waage.jsx"));
+const Reihen = React.lazy(() => import("./pages/Reihen.jsx"));
 const WaageFrei = React.lazy(() => import("./pages/WaageFrei.jsx"));
 const Rennen = React.lazy(() => import("./pages/Rennen.jsx"));
 const NichtGefunden = React.lazy(() => import("./pages/NichtGefunden.jsx"));
@@ -431,6 +432,7 @@ function helpArea(pathname) {
   // Nicht startsWith("/waage") — das faengt auch /waage-frei (oeffentlich).
   if (pathname === "/waage" || pathname.startsWith("/waage/")) return "waage";
   if (pathname.startsWith("/rennen")) return "rennen";
+  if (pathname.startsWith("/reihen")) return "reihen";
   return "core";
 }
 const LP = "/lernpfad";
@@ -446,6 +448,7 @@ const PAP = "/pap";
 const MATHEF = "/mathespiele";
 const KOERPER = "/koerper";
 const WAAGE = "/waage";
+const REIHEN = "/reihen";
 const RENNEN = "/rennen";
 const TAFEL = "/tafel";
 
@@ -468,6 +471,7 @@ const getModuleNavItems = (t, location, user) => {
     : pathname.startsWith(KOERPER) ? "koerper"
     : (pathname === WAAGE || pathname.startsWith(`${WAAGE}/`)) ? "waage"
     : pathname.startsWith(RENNEN) ? "rennen"
+    : pathname.startsWith(REIHEN) ? "reihen"
     : pathname.startsWith(TAFEL) ? "tafel"
     // Nicht startsWith("/pap") — das faengt auch /papierkorb (Kern).
     : (pathname === PAP || pathname.startsWith(`${PAP}?`) || pathname.startsWith(`${PAP}/`)) ? "pap"
@@ -548,6 +552,7 @@ const getModuleNavItems = (t, location, user) => {
       { to: `${WAAGE}?tab=aufgaben`, label: t("waage.tabAufgaben"), active: cur === "aufgaben" },
     ];
   }
+  if (area === "reihen") return [{ to: REIHEN, label: t("reihen.title") }];
   if (area === "tafel") return [{ to: TAFEL, label: t("tafel.title") }];
   if (area === "pap") {
     const cur = params.get("tab");
@@ -1226,6 +1231,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathespiele"><Mathefussball /></ModuleGate> : <Landing />} />
           <Route path={KOERPER} element={user ? <ModuleGate moduleKey="koerper"><Koerper /></ModuleGate> : <Landing />} />
           <Route path={WAAGE} element={user ? <ModuleGate moduleKey="waage"><Waage /></ModuleGate> : <Landing />} />
+          <Route path={REIHEN} element={user ? <ModuleGate moduleKey="reihen"><Reihen /></ModuleGate> : <Landing />} />
           <Route path={RENNEN} element={user ? <ModuleGate moduleKey="rennen"><Rennen /></ModuleGate> : <Landing />} />
           <Route path={TAFEL} element={user ? <ModuleGate moduleKey="tafel"><Tafel /></ModuleGate> : <Landing />} />
           <Route path={PAP} element={user ? <ModuleGate moduleKey="pap"><Pap /></ModuleGate> : <Landing />} />

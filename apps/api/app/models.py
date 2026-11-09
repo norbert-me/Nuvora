@@ -1597,6 +1597,53 @@ class SegelStatus(Base):
     stage: Mapped[str] = mapped_column(String(10), default="", server_default="")  # hafen|kueste|meer|welt
 
 
+class Reihe(Base):
+    """Modul Reihen: eine Unterrichtsreihe als Vorlage — Folge von Stunden mit
+    Thema, Ablauf, Material und Notizen fuers naechste Mal. Gehoert der Lehrkraft,
+    nicht einem Kurs oder einem Jahr: gespielt wird sie in einen Kurs ueber den
+    Kalender (optional, Regel 3). Weich geloescht (Papierkorb)."""
+    __tablename__ = "reihen"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    fach: Mapped[str] = mapped_column(String(60), default="", server_default="")
+    jahrgang: Mapped[str] = mapped_column(String(20), default="", server_default="")
+    beschreibung: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Was beim naechsten Mal anders werden soll — die Rueckmeldung an sich selbst.
+    naechstes_mal: Mapped[str] = mapped_column(Text, default="", server_default="")
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Herkunft: aus welchem Kurs wurde sie gespeichert (reine Anzeige, kein FK).
+    quelle: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ReiheStunde(Base):
+    """Eine Stunde (oder Doppelstunde) einer Reihe. Verweise auf Quiz, Stapel,
+    Lernleiter und Einstieg ohne Fremdschluessel — Module haengen nicht
+    voneinander ab (Regel 3), die Vorlage zeigt nur hin."""
+    __tablename__ = "reihen_stunden"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reihe_id: Mapped[int] = mapped_column(ForeignKey("reihen.id", ondelete="CASCADE"), index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    titel: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    # Wie viele Unterrichtsstunden die Stunde belegt (Doppelstunde = 2).
+    dauer: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    topic_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    notizen: Mapped[str] = mapped_column(Text, default="", server_default="")
+    naechstes_mal: Mapped[str] = mapped_column(Text, default="", server_default="")
+    verlaufsplan: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    cardvote_set_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    karten_deck_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    lernpfad_ladder_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    method_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+
 class Material(Base):
     """Datei-/Materialablage der Lehrkraft, an ein Thema und/oder eine Stunde
     (Kalender-Eintrag) gehaengt. Beides optional und ON DELETE SET NULL (Regel 3:
@@ -1615,6 +1662,8 @@ class Material(Base):
     # Erwartungshorizont. Wie die anderen Bindungen optional und SET NULL — die
     # Datei ueberlebt das Loeschen der Auswertung und bleibt in der Ablage.
     work_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
+    # ... und an eine Stunde einer Reihe (Modul Reihen) — dieselbe Regel.
+    reihe_stunde_id: Mapped[Optional[int]] = mapped_column(ForeignKey("reihen_stunden.id", ondelete="SET NULL"), nullable=True, index=True)
     # Wozu die Datei gehoert: "arbeit" | "erwartung" | "" (sonstiger Anhang).
     # Zwei benannte Plaetze statt einer namenlosen Liste — beim Nachkorrigieren
     # sucht niemand, welche der vier PDFs der Erwartungshorizont war. Mehrere je

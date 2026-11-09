@@ -33,6 +33,7 @@ const JE_MODUL = {
   "code-detektiv": ["/api/codedetektiv/puzzles"],
   pap: ["/api/pap/aufgaben"],
   waage: ["/api/waage/aufgaben"],
+  reihen: ["/api/reihen"],
   tafel: ["/api/tafel"],
 };
 

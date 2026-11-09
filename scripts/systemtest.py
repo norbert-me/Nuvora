@@ -215,6 +215,9 @@ def endpunkte(u):
         "waage": [
             ("GET", "/api/waage/aufgaben"),
         ],
+        "reihen": [
+            ("GET", "/api/reihen"),
+        ],
         "rennen": [],
     }
 
@@ -248,6 +251,7 @@ def tore(u):
         "mathespiele": [],
         "koerper": [],
         "waage": [("GET", "/api/waage/aufgaben")],
+        "reihen": [("GET", "/api/reihen")],
         "rennen": [],
     }
 
@@ -1325,6 +1329,37 @@ def inhalt_pap(api, u, spuren):
 
 
 
+def inhalt_reihen(api, u, spuren):
+    """Reihen: Stunden mit Notizen fuers naechste Mal schreiben, NEU LESEN und
+    vergleichen; Reihenfolge und Kopie halten die Werte."""
+    r = api.call("POST", "/api/reihen", {
+        "name": f"{PRAEFIX} Reihe", "fach": "Mathematik", "jahrgang": "7",
+        "naechstes_mal": "Statt der Hausaufgabe ein Quiz"}, erwartet=(201,))
+    spuren.append(("Reihe", lambda: api.call("DELETE", f"/api/reihen/{r['id']}", erwartet=(204, 404))))
+    a = api.call("POST", f"/api/reihen/{r['id']}/stunden", {
+        "titel": "Brueche kuerzen", "dauer": 1, "notizen": "AB 3 verteilen",
+        "verlaufsplan": [{"phase": "Einstieg", "dauer": "5", "text": "Blitzlicht"}]}, erwartet=(201,))
+    b = api.call("POST", f"/api/reihen/{r['id']}/stunden", {
+        "titel": "Brueche erweitern", "dauer": 2, "naechstes_mal": "Kuerzer halten"}, erwartet=(201,))
+    api.call("PUT", f"/api/reihen/{r['id']}/reihenfolge", {"ids": [b["id"], a["id"]]}, erwartet=(204,))
+    d = api.call("GET", f"/api/reihen/{r['id']}", erwartet=(200,))
+    if d["naechstes_mal"] != "Statt der Hausaufgabe ein Quiz":
+        raise AssertionError("Notiz zur Reihe nicht gespeichert")
+    if [s["titel"] for s in d["stunden"]] != ["Brueche erweitern", "Brueche kuerzen"]:
+        raise AssertionError("Reihenfolge nicht gespeichert")
+    erste, zweite = d["stunden"]
+    if erste["dauer"] != 2 or erste["naechstes_mal"] != "Kuerzer halten":
+        raise AssertionError(f"Stunde 1 falsch gelesen: {erste}")
+    if zweite["notizen"] != "AB 3 verteilen" or zweite["verlaufsplan"][0]["text"] != "Blitzlicht":
+        raise AssertionError(f"Stunde 2 falsch gelesen: {zweite}")
+    if d["unterrichtsstunden"] != 3:
+        raise AssertionError(f"Summe der Unterrichtsstunden {d['unterrichtsstunden']} statt 3")
+    k = api.call("POST", f"/api/reihen/{r['id']}/kopie", erwartet=(201,))
+    spuren.append(("Reihen-Kopie", lambda: api.call("DELETE", f"/api/reihen/{k['id']}", erwartet=(204, 404))))
+    if len(k["stunden"]) != 2 or k["naechstes_mal"] != d["naechstes_mal"]:
+        raise AssertionError("Kopie weicht ab")
+
+
 def inhalt_waage(api, u, spuren):
     """Waage: Blatt anlegen, das Kind loest ueber seinen Zugang, die Lehrkraft
     findet den Weg wieder — und „geloest" rechnet der SERVER nach: ein Weg,
@@ -1390,6 +1425,7 @@ INHALT = {
     "mathespiele": None,
     "koerper": None,
     "waage": inhalt_waage,
+    "reihen": inhalt_reihen,
     "rennen": None,
 }
 

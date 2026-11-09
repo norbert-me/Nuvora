@@ -1346,6 +1346,23 @@ def probe_waage(api, u):
     return f"Blatt anlegen (falsche Gleichung abgelehnt), {len(liste)} Kinder in der Liste, aendern, loeschen"
 
 
+def probe_reihen(api, u):
+    # Reihe anlegen, zwei Stunden, Reihenfolge, Kopie, loeschen. Der Weg zum
+    # Kalender (aus-kalender / ausspielen) laeuft im Systemtest (Modul-Bruecke).
+    r = api.call("POST", "/api/reihen", {"name": f"{PRAEFIX} Reihe", "fach": "Mathematik"}, erwartet=(201,))
+    a = api.call("POST", f"/api/reihen/{r['id']}/stunden", {"titel": "Einstieg", "dauer": 1}, erwartet=(201,))
+    b = api.call("POST", f"/api/reihen/{r['id']}/stunden", {"titel": "Vertiefung", "dauer": 2,
+                 "naechstes_mal": "Mehr Zeit fuer Beispiele"}, erwartet=(201,))
+    api.call("PUT", f"/api/reihen/{r['id']}/reihenfolge", {"ids": [b["id"], a["id"]]}, erwartet=(204,))
+    d = api.call("GET", f"/api/reihen/{r['id']}", erwartet=(200,))
+    if [s["titel"] for s in d["stunden"]] != ["Vertiefung", "Einstieg"]:
+        raise AssertionError(f"Reihenfolge nicht gespeichert: {[s['titel'] for s in d['stunden']]}")
+    k = api.call("POST", f"/api/reihen/{r['id']}/kopie", erwartet=(201,))
+    api.call("DELETE", f"/api/reihen/{k['id']}", erwartet=(204,))
+    api.call("DELETE", f"/api/reihen/{r['id']}", erwartet=(204,))
+    return "Reihe mit zwei Stunden, Reihenfolge gemerkt, Kopie, Papierkorb"
+
+
 def probe_unterrichtsplanung(api, u):
     # Das Modul ist die Einstiegs-/Methodensammlung. Die frueher hier gepruefte
     # Wochenplanung (/api/planung) gibt es nicht mehr: die Jahresplanung liegt
@@ -1415,6 +1432,7 @@ PROBEN = {
     "mathespiele": None,
     "koerper": None,
     "waage": probe_waage,
+    "reihen": probe_reihen,
     "rennen": None,
 }
 

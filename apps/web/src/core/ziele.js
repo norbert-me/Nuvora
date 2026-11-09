@@ -93,6 +93,7 @@ export const ZIELE = [
   { pfad: "/pap", key: "pap.tabZeichnen", modul: "pap", worte: ["pap", "ablaufplan", "flussdiagramm", "programmablaufplan", "struktogramm", "informatik", "zeichnen"] },
   { pfad: "/pap?tab=aufgaben", key: "pap.tabAufgaben", modul: "pap", worte: ["pap aufgabe", "abgabe", "flussdiagramm aufgabe"] },
   { pfad: "/mathespiele", key: "mathefussball.title", modul: "mathespiele", worte: ["spiel", "fußball", "üben"] },
+  { pfad: "/reihen", key: "reihen.title", modul: "reihen", worte: ["reihe", "unterrichtsreihe", "stundenplanung", "vorlage", "nächstes jahr", "wiederverwenden", "stunden", "bibliothek"] },
   { pfad: "/waage", key: "waage.tabUeben", modul: "waage", worte: ["waage", "gleichung", "äquivalenzumformung", "umformen", "balkenwaage", "variable", "algebra", "lösen"] },
   { pfad: "/waage?tab=aufgaben", key: "waage.tabAufgaben", modul: "waage", worte: ["waage aufgabe", "gleichungen aufgabe", "abgabe"] },
   { pfad: "/rennen", key: "rennen.titel", modul: "rennen", worte: ["rennen", "auto", "ki", "künstliche intelligenz", "neuronales netz", "evolution", "mutation", "maschinelles lernen", "informatik"] },

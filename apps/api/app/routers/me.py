@@ -173,6 +173,8 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
         # ueber die Schueler-IDs, wie der Karten-Fortschritt.
         "pap_abgaben": await _rows(db, m.PapAbgabe, in_(m.PapAbgabe, "student_id", student_ids)),
         "waage_aufgaben": await _rows(db, m.WaageAufgabe, m.WaageAufgabe.owner_id == uid),
+        "reihen": await _rows(db, m.Reihe, m.Reihe.owner_id == uid),
+        "reihen_stunden": await _rows(db, m.ReiheStunde, m.ReiheStunde.owner_id == uid),
         "waage_abgaben": await _rows(db, m.WaageAbgabe, in_(m.WaageAbgabe, "student_id", student_ids)),
         "zufall_ziehungen": await _rows(db, m.ZufallDraw, m.ZufallDraw.owner_id == uid),
         "code_sessions": await _rows(db, m.CodeSession, m.CodeSession.owner_id == uid),

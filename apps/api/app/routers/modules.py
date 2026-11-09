@@ -406,6 +406,23 @@ REGISTRY: List[ModuleDef] = [
         stage="beta",
     ),
     ModuleDef(
+        key="reihen",
+        group="unterricht",
+        name="Reihen",
+        description=(
+            "Unterrichtsreihen als Vorlage, die man Jahr für Jahr wieder einsetzt: "
+            "je Reihe eine Folge von Stunden mit Thema, Ablauf, Notizen, "
+            "Verweisen auf Quiz, Karteikarten und Lernleiter und angehängten "
+            "Dateien (PDFs, Arbeitsblätter). Zu jeder Stunde und zur ganzen "
+            "Reihe gibt es Notizen fürs nächste Mal. Mit dem Kalender: gehaltene "
+            "Stunden eines Kurses als Reihe speichern — oder eine Reihe in einen "
+            "Kurs spielen, die Stunden landen der Reihe nach auf den "
+            "tatsächlichen Unterrichtsstunden (Ferien und Ausfälle übersprungen)."
+        ),
+        path="/reihen",
+        stage="beta",
+    ),
+    ModuleDef(
         key="rennen",
         group="unterricht",
         name="KI-Rennen",

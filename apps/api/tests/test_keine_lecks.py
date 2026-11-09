@@ -471,6 +471,13 @@ async def _daten_anlegen(Sitzung, user_id: int) -> dict:
                                                  "class_id": ids["class_id"]})
     if r.status in (200, 201):
         ids["aufgabe_id"] = r.json().get("id")
+    # Eine Reihe samt Stunde (Notizen fuers naechste Mal): ohne ID liefen
+    # `/api/reihen/{reihe_id}` und die Vorschau nie durch den Rundlauf.
+    r = await _ruf("POST", "/api/reihen", {"name": "ZZ-Leck Reihe", "fach": "Mathematik"})
+    if r.status in (200, 201):
+        ids["reihe_id"] = r.json().get("id")
+        await _ruf("POST", f"/api/reihen/{ids['reihe_id']}/stunden",
+                   {"titel": "ZZ-Leck Stunde", "notizen": "x", "naechstes_mal": "y"})
     # Material laedt per multipart hoch — hier direkt in die Datenbank, das
     # Hochladen selbst prueft `test_material.py`.
     if ids.get("topic_id"):
@@ -490,7 +497,7 @@ async def _daten_anlegen(Sitzung, user_id: int) -> dict:
     # statt einen halben Rundlauf als Erfolg zu melden.
     fehlt = [name for name in ("topic_id", "folder_id", "deck_id", "token", "ladder_id",
                                "method_id", "category_id", "work_id", "cd_code", "ics_token",
-                               "tafel_id", "aufgabe_id", "material_id")
+                               "tafel_id", "aufgabe_id", "material_id", "reihe_id")
              if not ids.get(name)]
     assert not fehlt, f"Aufbau unvollständig, diese Testdaten fehlen: {fehlt}"
     assert len(veroeffentlicht) == 4, (
@@ -554,6 +561,7 @@ def _routen():
 # Zusätzliche Abfrageparameter, ohne die eine Route nur mit 422 antwortet —
 # eine 422 prüft nichts.
 QUERY = {
+    "/api/reihen/{reihe_id}/vorschau": "kurs_id={kurs_id}&ab=2026-11-16",
     "/api/kalender/entries": "von=2020-01-01&bis=2030-01-01",
     "/api/kalender/external-events": "von=2020-01-01&bis=2030-01-01",
     "/api/anwesenheit/{class_id}": "date=2026-01-15",
