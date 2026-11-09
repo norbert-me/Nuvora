@@ -2596,6 +2596,7 @@ export default {
   "lernen.noResultTitle": "No results yet",
   "lernen.noResultHint": "Your test results appear here as soon as the first test has been evaluated.",
   "lernen.resultsTitle": "Your results",
+  "lernen.aktuelleNote": "Current grade",
   "lernen.footerHint": "Your practice progress is stored under your name and visible to your teacher.",
   "lernen.sass": "This worked",
   "lernen.offen": "You still need to practise this",

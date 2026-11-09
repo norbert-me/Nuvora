@@ -249,6 +249,15 @@ function Ergebnisse({ results, t }) {
   return (
     <div>
       <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 12, textAlign: "center" }}>{t("lernen.resultsTitle")}</h2>
+      {/* Übersicht: die Note des neuesten Tests, mit Tendenz. Quizze vor der
+          letzten Klassenarbeit liefert der Server gar nicht mehr aus. */}
+      {results[0]?.note && (
+        <div style={{ ...cardStyle, padding: "16px", textAlign: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: "var(--text3)" }}>{t("lernen.aktuelleNote")}</div>
+          <div style={{ fontSize: 36, fontWeight: 800, color: results[0].pct >= 50 ? C.success : C.danger }}>{results[0].note.replace("-", "−")}</div>
+          <div style={{ fontSize: 12, color: "var(--text3)" }}>{results[0].name}</div>
+        </div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {results.map((r, idx) => (
           <div key={idx} style={{ ...cardStyle, padding: "12px 16px" }}>
@@ -257,7 +266,8 @@ function Ergebnisse({ results, t }) {
                 <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
                 <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.date ? new Date(r.date).toLocaleDateString() : ""}</div>
               </div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: r.pct >= 50 ? C.success : C.danger }}>{r.pct}%</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: r.pct >= 50 ? C.success : C.danger }}>{r.note ? r.note.replace("-", "−") : `${r.pct}%`}</div>
+              <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.pct}%</div>
               <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.score}/{r.total}</div>
             </div>
             {/* Was aus der Zahl folgt. Ohne das ist eine Prozentangabe nur eine

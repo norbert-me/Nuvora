@@ -202,3 +202,9 @@ def test_e_modus_von_liest_die_konfiguration():
     assert e_modus_von({"e_modus": "unsinn"}) == "bonus"
     assert e_modus_von({}) == "bonus"
     assert e_modus_von(None) == "bonus"
+
+
+def test_note_mit_tendenz_spiegelt_das_frontend():
+    from app.scoring import note_mit_tendenz as n
+    assert [n(p) for p in (95, 87, 80, 73, 60, 50, 10, 0)] == ["1", "1", "2", "2-", "3-", "4", "6", "6"]
+    assert n(85) == "2+" and n(70) == "3+"

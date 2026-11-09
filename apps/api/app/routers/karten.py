@@ -39,7 +39,7 @@ from ..uploads import anhang_kopf, bildtyp
 from ..versionierung import VersionOut, pruefe, stand
 from sqlalchemy.orm import selectinload
 from ..models import (Card, CardDeck, CardDeckKurs, CardFolder, CardReview, Kurs,
-                      SchoolClass, Student, User, Session)
+                      SchoolClass, Student, User, Session, ExamDate)
 from .auth import get_current_user, rate_limit
 from .modules import is_active, modul_pflicht
 
@@ -1685,11 +1685,24 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
     # Testergebnisse gehoeren CardVote — sie bleiben also erreichbar, wenn nur
     # das Kartenmodul abgeschaltet ist, und verschwinden mit CardVote.
     st = await _student_by_token(db, token, modul="cardvote")
+    # Stichtag: die zuletzt geschriebene Klassenarbeit. Quizze davor sind
+    # erledigter Stoff und stehen dem Kind nicht mehr im Weg. Der Termin kommt
+    # aus dem Kalender (Regel 3: ohne das Modul gibt es keinen Stichtag).
+    owner_id = (await db.execute(select(SchoolClass.owner_id).where(SchoolClass.id == st.class_id))).scalar()
+    stichtag = None
+    if owner_id and await is_active(db, owner_id, "kalender"):
+        kurs_ids = await class_kurs_ids(db, st.class_id)
+        stichtag = (await db.execute(select(sa_func.max(ExamDate.date)).where(
+            ExamDate.owner_id == owner_id, ExamDate.date <= _now(),
+            or_(ExamDate.class_id == st.class_id, ExamDate.kurs_id.in_(kurs_ids)),
+        ))).scalar()
     sessions = (await db.execute(
         select(Session).where(Session.class_id == st.class_id).order_by(Session.created_at.desc())
     )).scalars().all()
     out = []
     for sess in sessions:
+        if stichtag and sess.created_at and als_utc(sess.created_at) < als_utc(stichtag):
+            continue
         zeilen = await rueckmeldung.quiz(db, sess, nur_card_id=st.card_id)
         if not zeilen:
             continue                      # nicht teilgenommen oder nichts erfasst
@@ -1698,6 +1711,7 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
             "name": sess.name or "Test",
             "date": sess.created_at.isoformat() if sess.created_at else None,
             "score": r["punkte"], "total": r["max"], "pct": r["pct"],
+            "note": r["note_tendenz"],
             # Was das Kind aus der Zahl machen soll — ohne das ist eine Prozent-
             # angabe nur eine Zahl. Kein Vergleich mit der Klasse.
             "sass": r["sass"], "offen": r["offen"],

@@ -2586,6 +2586,7 @@ export default {
   "lernen.noResultTitle": "Noch kein Ergebnis",
   "lernen.noResultHint": "Deine Testergebnisse erscheinen hier, sobald der erste Test ausgewertet wurde.",
   "lernen.resultsTitle": "Deine Ergebnisse",
+  "lernen.aktuelleNote": "Aktuelle Note",
   "lernen.footerHint": "Dein Übungsstand wird unter deinem Namen gespeichert und ist für deine Lehrkraft sichtbar.",
   "lernen.sass": "Das saß",
   "lernen.offen": "Das musst du noch üben",

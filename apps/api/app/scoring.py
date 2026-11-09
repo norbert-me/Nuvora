@@ -80,6 +80,23 @@ def note_aus_pct(pct: float, scale: Optional[dict] = None) -> float:
     return 6.0
 
 
+def note_mit_tendenz(pct: float, scale: Optional[dict] = None) -> str:
+    """Prozent -> Note mit Tendenz („3+", „4-"), Spiegel von gradeDetailed in
+    core/grades.js: im Band oberes Drittel „+", unteres „-"; kein „1-", kein 6+/-."""
+    try:
+        s = {int(k): float(v) for k, v in (scale or {}).items()}
+        s = {g: s[g] for g in (1, 2, 3, 4, 5, 6)}
+    except (ValueError, TypeError, KeyError):
+        s = {int(k): float(v) for k, v in DEFAULT_SCALE.items()}
+    for grade, lower, upper in [(1, s[1], 100), (2, s[2], s[1]), (3, s[3], s[2]), (4, s[4], s[3]), (5, s[5], s[4])]:
+        if pct >= lower:
+            span = upper - lower
+            pos = (pct - lower) / span if span > 0 else 1
+            suffix = "+" if pos >= 2 / 3 else "-" if pos < 1 / 3 else ""
+            return str(grade) if grade == 1 else f"{grade}{suffix}"
+    return "6"
+
+
 def status_of(card_id: int, has_any_scan: bool, config: Optional[dict]) -> str:
     """"anwesend" oder "krank". Ohne jede Antwort gilt krank — es sei denn, die
     Lehrkraft hat das Kind ausdrücklich auf anwesend gestellt (dann zählt die 0)."""
