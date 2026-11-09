@@ -1,8 +1,7 @@
-"""Nach draussen (ICS-Feed, CalDAV) geht nur, was im Kalender SICHTBAR ist.
-
-Die Schalter fuer fremde Kalender (alle an/aus, einzelne aus) liegen am Konto
-(`users.ansichten["kal_ext"]`); `ext_weitergeben` ist die eine Stelle, an der
-beide Wege fragen.
+"""Ausblenden im Kalender ist eine ANSICHT und sperrt nichts: nach draussen (ICS-Feed,
+CalDAV) geht auch, was in Nuvora weggeschaltet ist. Nur der einzeln ausgeblendete
+fremde Termin bleibt draussen (er ist das „Loeschen" aus dem Handy).
+`ext_weitergeben` ist die eine Stelle, an der beide Wege fragen.
 """
 from types import SimpleNamespace
 
@@ -24,15 +23,14 @@ def test_einzeln_ausgeblendeter_termin_bleibt_draussen():
     assert not ext_weitergeben(_u(), {**SCHULE, "hidden": True})
 
 
-def test_ausgeschalteter_kalender_bleibt_draussen():
+def test_ausgeschalteter_kalender_geht_trotzdem_hinaus():
     u = _u({"an": True, "aus": [FAMILIE["cal"]]})
-    assert ext_weitergeben(u, SCHULE)
-    assert not ext_weitergeben(u, FAMILIE)
+    assert ext_weitergeben(u, SCHULE) and ext_weitergeben(u, FAMILIE)
 
 
-def test_alle_fremden_aus_heisst_keiner_geht_hinaus():
+def test_alle_fremden_ausgeblendet_aendert_den_export_nicht():
     u = _u({"an": False, "aus": []})
-    assert not ext_weitergeben(u, SCHULE) and not ext_weitergeben(u, FAMILIE)
+    assert ext_weitergeben(u, SCHULE) and ext_weitergeben(u, FAMILIE)
 
 
 def test_kaputte_einstellung_versteckt_nichts():
@@ -47,8 +45,8 @@ def test_ganztaegig_geht_hinaus_solange_nichts_eingestellt_ist():
     assert ganztaegig_weitergeben(SimpleNamespace(ansichten={"kal_allday": {"an": True}}))
 
 
-def test_im_kalender_ausgeblendet_heisst_nicht_ans_handy():
-    assert not ganztaegig_weitergeben(SimpleNamespace(ansichten={"kal_allday": {"an": False}}))
+def test_ganztaegig_ausgeblendet_geht_trotzdem_ans_handy():
+    assert ganztaegig_weitergeben(SimpleNamespace(ansichten={"kal_allday": {"an": False}}))
 
 
 def test_ganztaegig_heisst_ohne_stunde_und_ohne_uhrzeit():

@@ -1782,38 +1782,23 @@ def ext_kurz(key: str) -> str:
 
 
 def ext_weitergeben(user, ev: dict) -> bool:
-    """Geht dieser fremde Termin nach draussen (ICS-Feed, CalDAV)? Nur, was im
-    Kalender SICHTBAR ist.
+    """Geht dieser fremde Termin nach draussen (ICS-Feed, CalDAV)?
 
-    Zwei Schalter kommen aus der Kalenderansicht und liegen am Konto
-    (`users.ansichten["kal_ext"]`, core/ansichten.js): alle fremden Kalender
-    an/aus (`an`) und einzelne Kalender aus (`aus`, ihre URLs). Vorher lagen
-    beide nur im Browser — ein in Nuvora weggeschalteter Kalender stand im
-    Handy trotzdem, weil der Server ihn nie kannte. Einzeln ausgeblendete
-    Termine (`hidden`) fallen wie bisher heraus. Fehlt die Einstellung, ist
-    alles sichtbar (so zeigt es auch die Ansicht).
+    Die Ansicht-Schalter des Kalenders (fremde Kalender an/aus, einzelne
+    Kalender, Ganztaegiges) blenden nur AUS — sie sperren nichts: wer in Nuvora
+    etwas wegschaltet, damit der Tag uebersichtlich bleibt, will es meist nicht
+    auch im Handy loswerden (geaendert 09.11.2026; vorher war es umgekehrt).
+    Nur der einzeln ausgeblendete Termin (`hidden`) bleibt draussen: er ist das
+    „Loeschen" aus dem Handy (CalDAV DELETE) — kaeme er wieder, stuende er beim
+    naechsten Abgleich erneut da.
     """
-    if ev.get("hidden"):
-        return False
-    stand = (getattr(user, "ansichten", None) or {}).get("kal_ext") or {}
-    if not isinstance(stand, dict):
-        return True
-    if stand.get("an") is False:
-        return False
-    aus = stand.get("aus") or []
-    return not (isinstance(aus, list) and (ev.get("cal") or "") in aus)
+    return not ev.get("hidden")
 
 
 def ganztaegig_weitergeben(user) -> bool:
-    """Gehen GANZTAEGIGE Termine nach draussen (ICS-Feed, CalDAV)?
-
-    Der Kalender kann sie ausblenden (Auge-Menue „Ganztaegig"); was dort nicht
-    zu sehen ist, soll auch nicht im Handy stehen. Der Schalter liegt am Konto
-    (`users.ansichten["kal_allday"] = {"an": bool}`, core/ansichten.js),
-    sonst kennte ihn nur der Browser. Fehlt er, gilt an — wie in der Ansicht.
-    """
-    stand = (getattr(user, "ansichten", None) or {}).get("kal_allday")
-    return not (isinstance(stand, dict) and stand.get("an") is False)
+    """Gehen GANZTAEGIGE Termine nach draussen? Immer — das Ausblenden im
+    Kalender ist eine Ansicht (siehe `ext_weitergeben`)."""
+    return True
 
 
 def ist_ganztaegig(e) -> bool:
