@@ -2,7 +2,7 @@
 # Builds vom selben Commit unterschiedliche Images. Tag bleibt zur Lesbarkeit.
 # Neu holen (Index-Digest, gilt fuer amd64 UND arm64):
 #   N=python T=3.14-slim; TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/$N:pull" | python3 -c "import json,sys;print(json.load(sys.stdin)['token'])"); curl -sI -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json" "https://registry-1.docker.io/v2/library/$N/manifests/$T" | grep -i docker-content-digest
-FROM python:3.14-slim@sha256:a7fb1e634c4a578f9e0bd6327f11a3cde11b7a9395f48e24360c0988bcc5c2bc
+FROM python:3.15-slim@sha256:94d3426f1def7db4a106a232ac121bfd975393e5dfd40a619b955fae45fe7913
 WORKDIR /app
 # libgl1/libglib: OpenCV (Scan). libreoffice-writer + -calc + -impress: Office-
 # Dateien im Browser ansehen — der Server wandelt docx/xlsx/pptx einmalig nach
