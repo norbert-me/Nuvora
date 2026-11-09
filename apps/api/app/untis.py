@@ -251,12 +251,18 @@ def _stunde_aus_api(z: dict, stamm: dict) -> dict:
     faecher = namen("su", "faecher")
     raeume = namen("ro", "raeume")
     d = _datum(z.get("date"))
+    # Stundeninfo und Vertretungstext stehen oft als einziges, wo ein Name steht;
+    # `orgid` nennt das urspruengliche Fach, wenn Untis es ersetzt hat.
+    info = " · ".join(x for x in ((z.get(k) or "").strip() for k in ("lstext", "substText", "info")) if x)
+    orig = [t for t in ((stamm.get("faecher") or {}).get(x.get("orgid"), "")
+                        for x in (z.get("su") or []) if isinstance(x, dict) and x.get("orgid")) if t]
     titel = " ".join(x for x in [", ".join(faecher), ", ".join(klassen)] if x) or (z.get("lstext") or "").strip()
     return {
         "datum": d.isoformat() if d else "",
         "start": _zeit(z.get("startTime")), "ende": _zeit(z.get("endTime")),
         "titel": titel[:200], "klassen": klassen, "faecher": faecher,
         "raum": ", ".join(raeume)[:60],
+        "info": info[:300], "orig": ", ".join(orig)[:60],
         "faellt_aus": (z.get("code") or "") == "cancelled",
         "vertretung": (z.get("code") or "") == "irregular",
     }

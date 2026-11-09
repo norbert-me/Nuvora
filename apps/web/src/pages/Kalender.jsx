@@ -1022,7 +1022,7 @@ export default function Kalender() {
       {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} onCancelSlot={cancelSlot} frei={frei} className={className} slotName={slotName} eintragName={eintragName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {untisOffen && (
         <UntisImport onClose={() => setUntisOffen(false)} kurse={kurse} klassen={classes} periods={tt.periods}
-          onFertig={() => { loadTt(); loadBreaks(); loadCancels(); }} />
+          onFertig={() => { loadTt(); loadBreaks(); loadCancels(); loadExt(true); }} />
       )}
       {view === "timetable" && <TimetableView tt={tt} bearbeiten={bearbeiten} entwurfRef={ttEntwurf} onOffen={setTtOffen} stichtag={stichtag} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 

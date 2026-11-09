@@ -297,3 +297,58 @@ async def test_import_ohne_zuordnung_ueberschreibt_keinen_kurs(s):
     slots = (await s.execute(select(K.TimetableSlot).where(
         K.TimetableSlot.owner_id == u.id, K.TimetableSlot.weekday == 0))).scalars().all()
     assert [x.kurs_id for x in slots] == [k.id]
+
+
+# ─── Vertretungen per Anmeldung holen: Titel, Stand, Entdoppeln ───
+
+class _FakeSitzung:
+    def __init__(self, *a, **k):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def stundenplan(self, von, bis):
+        from datetime import date, timedelta
+        d = (date.today() + timedelta(days=1)).isoformat()
+        return [
+            {"datum": d, "start": "08:00", "ende": "08:50", "titel": "M 8.3", "raum": "A1",
+             "info": "Aufgaben im Buch", "orig": "D", "faellt_aus": False, "vertretung": True},
+            {"datum": d, "start": "09:00", "ende": "09:50", "titel": "E 7a", "raum": "",
+             "info": "", "orig": "", "faellt_aus": True, "vertretung": False},
+            {"datum": d, "start": "10:00", "ende": "10:50", "titel": "Frei", "raum": "",
+             "info": "", "orig": "", "faellt_aus": False, "vertretung": False},
+        ]
+
+
+@pytest.mark.asyncio
+async def test_vertretungen_holen_speichert_titel_und_zeigt_sie(s, monkeypatch):
+    from datetime import date, timedelta
+
+    from app import untis as U
+    from app.models import User, UserModule
+    from app.routers import kalender as K
+
+    monkeypatch.setattr(U, "UntisSitzung", _FakeSitzung)
+    u = User(email="untis4@b.de", password_hash="x", name="L",
+             timetable_times=[{"start": "08:00", "end": "08:50"}, {"start": "09:00", "end": "09:50"},
+                              {"start": "10:00", "end": "10:50"}])
+    s.add(u)
+    await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    await s.commit()
+
+    d = await K.untis_vertretungen_holen(K.UntisAbrufIn(passwort="geheim"), user=u, db=s)
+    assert d["ok"] and d["anzahl"] == 3          # Vertretung, Entfall und die Stunde ohne eigenen Plan (Zusatz)
+    assert "geheim" not in str(u.untis_stand), "das Passwort wird nie gespeichert"
+
+    cal = K._untis_kalender(u)
+    assert cal, "ein Stand allein macht den Untis-Kalender (auch ohne Abo-Link)"
+    heute = date.today()
+    zeilen = await K._untis_vertretungen(u, s, "", cal, heute, heute + timedelta(days=30))
+    titel = sorted(z["title"] for z in zeilen)
+    assert titel == ["Entfall: E 7a", "Vertretung: M 8.3 (statt D)", "Zusatz: Frei"]
+    assert [z for z in zeilen if z["title"].startswith("Vertretung")][0]["description"] == "Aufgaben im Buch"

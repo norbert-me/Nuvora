@@ -122,6 +122,10 @@ class User(Base):
     # laesst sich in WebUntis jederzeit neu erzeugen; dieselbe Art Adresse wie
     # in external_calendars.
     untis_ics_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Der zuletzt per Anmeldung geholte Stand der Abweichungen (Vertretung, Entfall,
+    # Zusatz) mit echten Titeln: {"stand","von","bis","stunden":[…]}. Das Passwort
+    # bleibt ungespeichert — der Stand ist ein Abbild, kein laufender Abgleich.
+    untis_stand: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     # Was ein Kalender-Client am Kalender einstellt: Farbe, Reihenfolge, Name.
     #
     # Apple schreibt das nach dem Einrichten mit PROPPATCH — und bricht den

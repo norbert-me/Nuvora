@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Untis: „Vertretungen holen“.** Im Untis-Dialog holt ein Knopf mit deiner Anmeldung
+  die nächsten Wochen und zeigt Vertretung, Entfall und Zusatz im Kalender mit Fach,
+  Klasse, Raum und Info-Text (das Passwort wird nicht gespeichert; der Stand gilt
+  bis zum nächsten Abruf). Nötig, weil der Abo-Link bei manchen Schulen keine Titel liefert.
 - **Untis-Import überschreibt keinen Kurs mehr:** eine Stunde, die schon einem
   Kurs oder einer Klasse gehört, bleibt unberührt, wenn der Import keine
   Zuordnung mitbringt (vorher wurden Kurs und Farbe durch reinen Text ersetzt).

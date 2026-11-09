@@ -53,6 +53,7 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
   const [wahl, setWahl] = useState({});
   const [mitAusfaellen, setMitAusfaellen] = useState(true);
   const [mitFerien, setMitFerien] = useState(true);
+  const [vertr, setVertr] = useState("");          // Ergebnis des Vertretungsabrufs
 
   // Server, Schulkennung und Benutzername sind gemerkt; das Passwort nie —
   // ein WebUntis-Zugang ist das ganze Schulkonto der Lehrkraft.
@@ -88,6 +89,24 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
       vor[k] = treffer ? `k${treffer.id}` : (name ? `n${name}` : "");
     }
     setWahl(vor);
+  };
+
+  // Nur die Abweichungen (Vertretung, Entfall, Zusatz) mit Titel holen. Das
+  // Passwort geht auch hier nur an Untis und wird nicht gespeichert — der Stand
+  // ist ein Abbild vom Zeitpunkt des Abrufs.
+  const vertretungenHolen = async () => {
+    setLaeuft(true); setFehler(null); setVertr("");
+    await fetch("/api/kalender/untis", alsJson("PUT", konto)).catch(() => null);
+    const res = await fetch("/api/kalender/untis/vertretungen", alsJson("POST", { ...konto, passwort }))
+      .catch(() => null);
+    setLaeuft(false);
+    const d = res && res.ok ? await res.json().catch(() => null) : null;
+    if (!d) { setFehler({ grund: "unbekannt", meldung: "" }); return; }
+    if (!d.ok) { setFehler({ grund: GRUENDE.includes(d.grund) ? d.grund : "unbekannt", meldung: d.meldung || "" }); return; }
+    setPasswort("");
+    setKonto((k) => ({ ...k, stand: d.stand, stand_anzahl: d.anzahl }));
+    setVertr(t("untis.vertrFertig", { n: d.anzahl, gesamt: d.gesamt }));
+    onFertig && onFertig({ vertretungen: d.anzahl });
   };
 
   const felder = useMemo(() => {
@@ -211,8 +230,22 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
             </div>
           )}
 
+          {quelle === "api" && (
+            <div style={{ marginTop: 12, fontSize: 12, color: "var(--text2)" }}>
+              {vertr || (konto.stand
+                ? t("untis.vertrStand", { wann: new Date(konto.stand).toLocaleString(), n: konto.stand_anzahl || 0 })
+                : "")}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
             <button onClick={onClose} style={btnSecondary}>{t("common.cancel")}</button>
+            {quelle === "api" && (
+              <button onClick={vertretungenHolen} disabled={laeuft} title={t("untis.vertrTitel")}
+                style={{ ...btnSecondary, opacity: laeuft ? 0.6 : 1 }}>
+                {t("untis.vertrHolen")}
+              </button>
+            )}
             <button onClick={abrufen} disabled={laeuft} style={{ ...btnPrimary, opacity: laeuft ? 0.6 : 1 }}>
               {laeuft ? t("untis.laeuft") : t("untis.abrufen")}
             </button>
