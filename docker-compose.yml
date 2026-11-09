@@ -116,7 +116,7 @@ services:
   proxy:
     # Digest festgenagelt, siehe Kopf der Datei. Gleiche Fassung wie in
     # apps/web/Dockerfile — beide zusammen aktualisieren.
-    image: nginx:alpine@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2
+    image: nginx:alpine@sha256:713fc2ebfd92e8217db451477182ee91944b123d2b1ee9fd5a8c6e91ca6c3a11
     restart: unless-stopped
     logging: *logs
     ports:
