@@ -3103,6 +3103,12 @@ export default {
   "untis.vertrTitel": "Holt die nächsten Wochen mit Fach, Klasse, Raum und Info-Text und zeigt nur, was abweicht. Der Stand gilt bis zum nächsten Abruf — das Passwort wird nicht gespeichert.",
   "untis.vertrStand": "Stand: {{wann}} · {{n}} Abweichungen",
   "untis.vertrFertig": "{{n}} Abweichungen aus {{gesamt}} Stunden geholt.",
+  "untis.mobilTitel": "Untis-Mobile-Schlüssel (empfohlen)",
+  "untis.mobilHinweis": "In WebUntis: Mein Profil → Freigaben → „Untis Mobile“ → QR-Code. Mit dem Handy scannen und den Link hier einfügen. Der Schlüssel gilt nur für Apps, ist in WebUntis jederzeit widerrufbar und wird verschlüsselt gespeichert — das Passwort bleibt draußen.",
+  "untis.mobilVerbinden": "Verbinden",
+  "untis.mobilVerbunden": "Verbunden. Nuvora holt Vertretungen und Entfälle beim Öffnen des Kalenders selbst (höchstens alle 30 Minuten).",
+  "untis.mobilJetzt": "Jetzt aktualisieren",
+  "untis.mobilTrennen": "Trennen",
   "untis.abrufen": "Abrufen",
   "untis.laeuft": "Läuft …",
   "untis.zuIcs": "Stattdessen den Abo-Link versuchen",
@@ -3143,7 +3149,7 @@ export default {
   "untis.grund.unbekannt": "Abruf nicht möglich",
   "untis.rat.unbekannt": "Wenn es sich wiederholt, nimm den Abo-Link — der geht auch ohne freigeschalteten Zugang.",
   "help.kal.untisT": "Stundenplan aus WebUntis",
-  "help.kal.untis": "Steht dein Stundenplan schon in WebUntis, holt Nuvora ihn: im ⋯-Menü der Kalenderansicht → „Aus WebUntis übernehmen“. Mit dabei sind Ausfälle und Ferien. Übernommen wird, was sich über mehrere Wochen wiederholt — eine einzelne Vertretung färbt den Plan nicht ein. Du ordnest jede Stunde selbst einem Kurs zu, bevor etwas geschrieben wird; fehlende Kurse legt der Import auf Wunsch an. Dein Untis-Plan wird nie verändert. Zwei Wege: mit deinen Zugangsdaten (mehr Angaben, aber viele Schulen haben den Zugang für andere Programme gar nicht freigeschaltet) oder mit dem persönlichen Abo-Link aus WebUntis (weniger Angaben, geht immer). Das Passwort wird nicht gespeichert. Ist der Abo-Link gespeichert, zeigt der Kalender Vertretungen und Zusatzstunden von selbst (orange, alle 10 Minuten neu) — nur angezeigt, nicht angelegt.",
+  "help.kal.untis": "Steht dein Stundenplan schon in WebUntis, holt Nuvora ihn: im ⋯-Menü der Kalenderansicht → „Aus WebUntis übernehmen“. Mit dabei sind Ausfälle und Ferien. Übernommen wird, was sich über mehrere Wochen wiederholt — eine einzelne Vertretung färbt den Plan nicht ein. Du ordnest jede Stunde selbst einem Kurs zu, bevor etwas geschrieben wird; fehlende Kurse legt der Import auf Wunsch an. Dein Untis-Plan wird nie verändert. Zwei Wege: mit deinen Zugangsdaten (mehr Angaben, aber viele Schulen haben den Zugang für andere Programme gar nicht freigeschaltet) oder mit dem persönlichen Abo-Link aus WebUntis (weniger Angaben, geht immer). Das Passwort wird nicht gespeichert. Ist der Abo-Link gespeichert, zeigt der Kalender Vertretungen und Zusatzstunden von selbst (orange, alle 10 Minuten neu) — nur angezeigt, nicht angelegt. Sendet deine Schule im Abo-Link keine Titel, trägst du im Untis-Dialog den Untis-Mobile-Schlüssel ein (QR-Code in WebUntis unter Freigaben): dann holt Nuvora Vertretungen mit Fach, Klasse, Raum und Info-Text beim Öffnen des Kalenders selbst — ohne dein Passwort.",
 
   // ── CalDAV (components/CaldavZugaenge.jsx) ──
   // Das Abo darueber ist einseitig: der Kalender HOLT eine Datei und bietet gar

@@ -126,6 +126,10 @@ class User(Base):
     # Zusatz) mit echten Titeln: {"stand","von","bis","stunden":[…]}. Das Passwort
     # bleibt ungespeichert — der Stand ist ein Abbild, kein laufender Abgleich.
     untis_stand: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Untis-Mobile-Zugang (Host, Schule, Benutzer, Schluessel) VERSCHLUESSELT
+    # (app/geheimnis.py) — kein Passwort. Der Schluessel gilt nur fuer Apps und
+    # laesst sich in WebUntis widerrufen. Wird nie zurueckgegeben.
+    untis_mobil: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Was ein Kalender-Client am Kalender einstellt: Farbe, Reihenfolge, Name.
     #
     # Apple schreibt das nach dem Einrichten mit PROPPATCH — und bricht den

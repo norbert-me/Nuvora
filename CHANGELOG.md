@@ -16,6 +16,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Untis automatisch, ohne Passwort.** Im Untis-Dialog verbindest du den Untis-Mobile-Schlüssel
+  (QR-Code aus WebUntis, gilt nur für Apps und ist dort widerrufbar). Nuvora holt dann
+  Vertretungen, Entfälle und Zusatzstunden mit Fach, Klasse, Raum, Info-Text und dem
+  ursprünglichen Lehrer beim Öffnen des Kalenders selbst (höchstens alle 30 Minuten).
+  Der Schlüssel liegt verschlüsselt auf dem Server und lässt sich mit „Trennen“ löschen.
 - **Untis: „Vertretungen holen“.** Im Untis-Dialog holt ein Knopf mit deiner Anmeldung
   die nächsten Wochen und zeigt Vertretung, Entfall und Zusatz im Kalender mit Fach,
   Klasse, Raum und Info-Text (das Passwort wird nicht gespeichert; der Stand gilt

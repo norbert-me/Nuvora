@@ -276,6 +276,7 @@ def _ensure_columns(sync_conn):
         ("users", "untis_benutzer", "VARCHAR(120)"),
         ("users", "untis_ics_url", "TEXT"),
         ("users", "untis_stand", "JSON"),
+        ("users", "untis_mobil", "TEXT"),
         ("users", "caldav_props", "JSON"),          # Farbe/Reihenfolge aus der Kalender-App
         ("calendar_entries", "caldav_uid", "VARCHAR(200)"),  # UID des Clients (Apple/Outlook)
         ("users", "external_ics_color", "VARCHAR(9) DEFAULT '' NOT NULL"),

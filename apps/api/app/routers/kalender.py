@@ -5,7 +5,9 @@ dem Kern. Ein Eintrag kann optional an eine Klasse und ein Thema haengen; das
 Thema ist ON DELETE SET NULL, damit das Loeschen eines Themas keinen Eintrag
 mitreisst.
 """
+import json
 import re
+import time
 from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional
 
@@ -2370,6 +2372,12 @@ async def externe_ereignisse(user: User, refresh: bool = False,
     if not isinstance(db, AsyncSession):
         db = None          # direkter Aufruf ohne Sitzung (Depends-Platzhalter)
     cals = _ext_calendars(user)
+    if db is not None and _stand_faellig(user, time.time()):
+        import asyncio
+        _STAND_VERSUCH[user.id] = time.time()
+        t = asyncio.ensure_future(_stand_im_hintergrund(user.id))
+        _STAND_TASKS.add(t)
+        t.add_done_callback(_STAND_TASKS.discard)
     # Die Vertretungen aus dem Untis-Abo stehen als eigener Kalender daneben —
     # nicht in der Liste der Abos (die zeigte sonst den ganzen Stundenplan
     # doppelt), sondern hier angehaengt, damit Ausblenden, Archiv, Suche und
@@ -2810,7 +2818,8 @@ async def untis_konto(user: User = Depends(require_module)):
     st = user.untis_stand if isinstance(user.untis_stand, dict) else {}
     return {"server": user.untis_server or "", "schule": user.untis_schule or "",
             "benutzer": user.untis_benutzer or "", "ics_url": user.untis_ics_url or "",
-            "stand": st.get("stand") or "", "stand_anzahl": len(st.get("stunden") or [])}
+            "stand": st.get("stand") or "", "stand_anzahl": len(st.get("stunden") or []),
+            "mobil": bool(user.untis_mobil)}
 
 
 @router.put("/untis")
@@ -2837,42 +2846,63 @@ def _untis_zeiten(user: User) -> list:
     return [(z or {}).get("start", "") for z in (user.timetable_times or []) if isinstance(z, dict)]
 
 
-@router.post("/untis/vertretungen")
-async def untis_vertretungen_holen(body: UntisAbrufIn, user: User = Depends(require_module),
-                                   db: AsyncSession = Depends(get_db)):
-    """Abweichungen (Vertretung, Entfall, Zusatz) MIT Titel per Anmeldung holen.
+class UntisMobilIn(BaseModel):
+    link: str = ""
 
-    Der Abo-Link kennt bei manchen Schulen nur Uhrzeiten. Die Anmeldung kennt
-    Fach, Klasse, Raum und den Info-Text der Stunde — also holt sie die
-    naechsten Wochen und merkt sich NUR, was abweicht. Das Passwort wird nicht
-    gespeichert: der Stand ist ein Abbild vom Zeitpunkt des Abrufs, kein
-    laufender Abgleich (der braeuchte das Passwort dauerhaft).
-    """
-    from .. import untis as U
+
+def _mobil_zugang(user: User):
+    """Der entschluesselte Untis-Mobile-Zugang, oder None (nicht eingerichtet,
+    oder der Server-Schluessel hat gewechselt)."""
+    from ..geheimnis import entschluesseln
+    roh = entschluesseln(user.untis_mobil or "")
+    try:
+        z = json.loads(roh) if roh else None
+    except ValueError:
+        return None
+    return z if isinstance(z, dict) and z.get("key") else None
+
+
+@router.put("/untis/mobil")
+async def untis_mobil_setzen(body: UntisMobilIn, user: User = Depends(require_module),
+                             db: AsyncSession = Depends(get_db)):
+    """Den Untis-Mobile-Link (QR-Code aus WebUntis) pruefen und verschluesselt merken.
+
+    Der Schluessel gilt nur fuer Apps und ist in WebUntis widerrufbar — das
+    Schulpasswort bleibt draussen. Er wird nie wieder ausgegeben."""
+    from .. import untis as U, untis_mobile as M
+    from ..geheimnis import verschluesseln
     rate_limit("untis", f"u{user.id}", 10, 300, "Zu viele Untis-Abrufe. Bitte kurz warten.")
-    wochen = max(1, min(int(body.wochen or 4), 8))
-    von = date.today()
-    bis = von + timedelta(weeks=wochen)
-
-    def _abrufen():
-        with U.UntisSitzung(body.server or user.untis_server or "",
-                            body.schule or user.untis_schule or "",
-                            body.benutzer or user.untis_benutzer or "",
-                            body.passwort) as sitzung:
-            return sitzung.stundenplan(von, bis)
-
+    try:
+        z = M.link_lesen(body.link)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     import asyncio
     try:
-        stunden = await asyncio.get_event_loop().run_in_executor(None, _abrufen)
+        await asyncio.get_event_loop().run_in_executor(None, M.MobileSitzung(z).pruefen)
     except U.UntisFehler as e:
         return {"ok": False, "grund": e.grund, "meldung": e.text[:300]}
+    user.untis_mobil = verschluesseln(json.dumps(z))
+    await db.commit()
+    return {"ok": True}
 
+
+@router.delete("/untis/mobil", status_code=204)
+async def untis_mobil_trennen(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Zugang UND geholten Stand loeschen: wer trennt, will nichts davon behalten."""
+    user.untis_mobil = None
+    user.untis_stand = None
+    await db.commit()
+    _EXT_CACHE.pop(user.id, None)
+
+
+async def _stand_speichern(user: User, db, stunden: list, von, bis) -> dict:
+    """Aus den Stunden die Abweichungen filtern und als Stand am Konto merken."""
     regulaer = await _regulaer_aus_plan(user, db)
     treffer = [x for x in stunden if x.get("faellt_aus") or x.get("vertretung")]
     if regulaer:
         # Eine Stunde, die der eigene Plan zu dieser Zeit nicht kennt (oder
         # mehrfach, als er Stunden hat), ist Zusatz — z.B. eine Fremdvertretung,
-        # die Untis nicht als „irregular" fuehrt.
+        # die Untis nicht als „irregular“ fuehrt.
         gruppen = {}
         for x in stunden:
             if x.get("faellt_aus") or x.get("vertretung"):
@@ -2893,6 +2923,87 @@ async def untis_vertretungen_holen(body: UntisAbrufIn, user: User = Depends(requ
     _EXT_CACHE.pop(user.id, None)
     return {"ok": True, "anzahl": len(treffer), "gesamt": len(stunden), "stand": jetzt,
             "mit_info": sum(1 for x in treffer if x.get("info"))}
+
+
+@router.post("/untis/vertretungen")
+async def untis_vertretungen_holen(body: UntisAbrufIn, user: User = Depends(require_module),
+                                   db: AsyncSession = Depends(get_db)):
+    """Abweichungen (Vertretung, Entfall, Zusatz) MIT Titel holen.
+
+    Zwei Wege: mit dem gemerkten Untis-Mobile-Schluessel (kein Passwort noetig),
+    sonst mit Benutzername und Passwort fuer diesen einen Abruf. Der Abo-Link
+    kennt bei manchen Schulen nur Uhrzeiten; hier kommen Fach, Klasse, Raum,
+    Info-Text und der urspruengliche Lehrer dazu. Das Passwort wird nie
+    gespeichert; der Stand ist ein Abbild vom Zeitpunkt des Abrufs.
+    """
+    from .. import untis as U, untis_mobile as M
+    rate_limit("untis", f"u{user.id}", 10, 300, "Zu viele Untis-Abrufe. Bitte kurz warten.")
+    wochen = max(1, min(int(body.wochen or 4), 8))
+    von = date.today()
+    bis = von + timedelta(weeks=wochen)
+    zugang = None if body.passwort else _mobil_zugang(user)
+    if not body.passwort and not zugang:
+        return {"ok": False, "grund": "zugangsdaten",
+                "meldung": "Weder Passwort noch Untis-Mobile-Schlüssel angegeben"}
+
+    def _abrufen():
+        if zugang:
+            return M.MobileSitzung(zugang).stundenplan(von, bis)
+        with U.UntisSitzung(body.server or user.untis_server or "",
+                            body.schule or user.untis_schule or "",
+                            body.benutzer or user.untis_benutzer or "",
+                            body.passwort) as sitzung:
+            return sitzung.stundenplan(von, bis)
+
+    import asyncio
+    try:
+        stunden = await asyncio.get_event_loop().run_in_executor(None, _abrufen)
+    except U.UntisFehler as e:
+        return {"ok": False, "grund": e.grund, "meldung": e.text[:300]}
+    return await _stand_speichern(user, db, stunden, von, bis)
+
+
+# ─── Automatisch auffrischen (nur mit Untis-Mobile-Schluessel) ───
+#
+# Geholt wird beim Lesen des Kalenders, nicht nach Uhr: es gibt keinen Takt, der
+# fuer eine Lehrkraft laeuft, die nie hineinsieht. Hoechstens alle 30 Minuten je
+# Konto — auch nach einem Fehlschlag, damit ein widerrufener Schluessel nicht
+# im Minutentakt gegen Untis laeuft.
+_STAND_VERSUCH: dict = {}
+_STAND_TASKS: set = set()
+STAND_ALTER_S = 30 * 60
+
+
+def _stand_faellig(user: User, jetzt: float) -> bool:
+    if not user.untis_mobil or jetzt - _STAND_VERSUCH.get(user.id, 0) < STAND_ALTER_S:
+        return False
+    st = user.untis_stand if isinstance(user.untis_stand, dict) else {}
+    try:
+        alt = datetime.fromisoformat(st.get("stand", "")).timestamp()
+    except ValueError:
+        return True
+    return jetzt - alt >= STAND_ALTER_S
+
+
+async def _stand_im_hintergrund(user_id: int):
+    from .. import untis as U, untis_mobile as M
+    from ..database import async_session
+    import asyncio
+    try:
+        async with async_session() as db:
+            user = await db.get(User, user_id)
+            zugang = _mobil_zugang(user) if user else None
+            if not zugang or not await is_active(db, user.id, "kalender"):
+                return
+            von = date.today()
+            bis = von + timedelta(weeks=4)
+            stunden = await asyncio.get_event_loop().run_in_executor(
+                None, M.MobileSitzung(zugang).stundenplan, von, bis)
+            await _stand_speichern(user, db, stunden, von, bis)
+    except Exception as e:
+        # Ein Fehlschlag ist hier kein Befund fuer die Seite: der alte Stand bleibt.
+        import logging
+        logging.getLogger("nuvora.untis").info("Untis-Auffrischen fehlgeschlagen: %s", type(e).__name__)
 
 
 @router.post("/untis/vorschau")

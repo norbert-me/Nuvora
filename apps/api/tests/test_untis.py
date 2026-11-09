@@ -4,6 +4,8 @@ Geprueft wird das, was ohne Netz pruefbar ist und wo es wehtut, wenn es kippt:
 die Umrechnung Untis -> Nuvora und die Uebersetzung der Fehlschlaege. Der
 Netzabruf selbst wird nicht nachgebaut — er gehoert in den Systemtest.
 """
+import json
+
 import pytest
 
 from app import untis as U
@@ -360,3 +362,118 @@ def test_stunde_ohne_namen_nennt_ihre_art():
                            stamm)["titel"] == "Veranstaltung"
     assert _stunde_aus_api({"date": 20261111, "startTime": 1145, "lstype": "oh"},
                            stamm)["titel"] == "Sprechstunde"
+
+
+# ─── Untis Mobile: Schluessel statt Passwort ───
+
+def test_geheimnis_rundlauf_und_manipulation(monkeypatch):
+    from app import geheimnis as G
+    monkeypatch.setenv("TOKEN_SECRET", "abc" * 20)
+    t = G.verschluesseln('{"key": "JBSWY3DPEHPK3PXP"}')
+    assert "JBSWY" not in t, "der Klartext steht nicht im Ablageformat"
+    assert G.entschluesseln(t) == '{"key": "JBSWY3DPEHPK3PXP"}'
+    assert G.verschluesseln("x") != G.verschluesseln("x"), "jedes Mal ein anderer Nonce"
+    assert G.entschluesseln(t[:-3] + "AAA") is None, "verändert -> kein Klartext"
+    monkeypatch.setenv("TOKEN_SECRET", "andere" * 10)
+    assert G.entschluesseln(t) is None, "anderer Server-Schlüssel -> getrennt statt Müll"
+    assert G.entschluesseln("") is None and G.entschluesseln("v1.kaputt") is None
+
+
+def test_totp_rfc_wert():
+    from app.untis_mobile import totp
+    assert totp("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", 59) == "287082"
+
+
+def test_link_lesen():
+    from app.untis_mobile import link_lesen
+    z = link_lesen("untis://setschool?url=ges-hurth.webuntis.com&school=ges-hurth&user=VANO"
+                   "&key=JBSWY3DPEHPK3PXP&schoolNumber=1")
+    assert z["host"] == "ges-hurth.webuntis.com" and z["benutzer"] == "VANO"
+    for kaputt in ("", "untis://setschool?url=x", "https://example.com/?key=1",
+                   "untis://setschool?url=a.b.c&school=s&user=u&key=!!!!!!!!"):
+        with pytest.raises(ValueError):
+            link_lesen(kaputt)
+
+
+def test_perioden_werden_zu_stunden():
+    from app.untis_mobile import stunden_aus_perioden
+    md = {"klassen": [{"id": 1, "name": "8.3"}], "subjects": [{"id": 2, "name": "M"}, {"id": 3, "name": "D"}],
+          "rooms": [{"id": 4, "name": "A1"}], "teachers": [{"id": 5, "lastName": "Ich"}, {"id": 6, "lastName": "Muster"}],
+          "timeGrid": {"days": [{"day": "MON", "units": [{"startTime": "08:10"}, {"startTime": "11:45"}]}]}}
+
+    def p(start, ende, kennz, text=None, tid=5, torg=5):
+        return {"startDateTime": start, "endDateTime": ende, "is": kennz, "text": text or {},
+                "elements": [{"type": "CLASS", "id": 1, "orgId": 1}, {"type": "SUBJECT", "id": 2, "orgId": 3},
+                             {"type": "ROOM", "id": 4, "orgId": 4}, {"type": "TEACHER", "id": tid, "orgId": torg}]}
+
+    st = stunden_aus_perioden([
+        p("2026-11-11T10:45Z", "2026-11-11T11:35Z", ["IRREGULAR"], {"substitution": "Aufgaben", "info": ""}, torg=6),
+        p("2026-11-12T08:10", "2026-11-12T09:00", ["CANCELLED"]),
+        p("2026-11-13T08:10", "2026-11-13T09:00", ["REGULAR"]),
+    ], md)
+    v, c, r = st
+    assert v["datum"] == "2026-11-11" and v["start"] == "11:45", "UTC wird in Schulzeit umgerechnet, wo das Raster es bestätigt"
+    assert v["titel"] == "M 8.3" and v["raum"] == "A1" and v["vertretung"] is True
+    assert "D" in v["orig"] and "Muster" in v["orig"] and v["info"] == "Aufgaben"
+    assert c["faellt_aus"] is True and c["start"] == "08:10", "Ortszeit mit Z wird nicht doppelt umgerechnet"
+    assert r["vertretung"] is False and r["faellt_aus"] is False
+
+
+@pytest.mark.asyncio
+async def test_mobil_verbinden_holen_und_trennen(s, monkeypatch):
+    from datetime import date, timedelta
+
+    from app import untis as U, untis_mobile as M
+    from app.models import User, UserModule
+    from app.routers import kalender as K
+
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 40)
+    tag = (date.today() + timedelta(days=1)).isoformat()
+
+    class Fake:
+        def __init__(self, z):
+            self.z = z
+
+        def pruefen(self):
+            return {}
+
+        def stundenplan(self, von, bis):
+            return [{"datum": tag, "start": "08:00", "ende": "08:50", "titel": "M 8.3", "raum": "",
+                     "info": "", "orig": "Muster", "faellt_aus": False, "vertretung": True}]
+
+    monkeypatch.setattr(M, "MobileSitzung", Fake)
+    u = User(email="untis5@b.de", password_hash="x", name="L")
+    s.add(u)
+    await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    await s.commit()
+
+    link = "untis://setschool?url=ges.webuntis.com&school=ges&user=VANO&key=JBSWY3DPEHPK3PXP"
+    assert (await K.untis_mobil_setzen(K.UntisMobilIn(link=link), user=u, db=s))["ok"]
+    assert "JBSWY3DPEHPK3PXP" not in (u.untis_mobil or ""), "der Schlüssel liegt nur verschlüsselt in der Datenbank"
+    assert (await K.untis_konto(user=u))["mobil"] is True
+    assert "JBSWY" not in json.dumps(await K.untis_konto(user=u)), "und kommt nie wieder heraus"
+
+    d = await K.untis_vertretungen_holen(K.UntisAbrufIn(), user=u, db=s)    # ohne Passwort
+    assert d["ok"] and d["anzahl"] == 1
+    assert u.untis_stand["stunden"][0]["orig"] == "Muster"
+
+    await K.untis_mobil_trennen(user=u, db=s)
+    assert u.untis_mobil is None and u.untis_stand is None
+    assert (await K.untis_vertretungen_holen(K.UntisAbrufIn(), user=u, db=s))["ok"] is False
+
+
+def test_stand_wird_hoechstens_alle_30_minuten_geholt(monkeypatch):
+    import time as _t
+
+    from app.models import User
+    from app.routers import kalender as K
+
+    u = User(email="u@b.de", password_hash="x", name="L")
+    u.id = 4711
+    assert K._stand_faellig(u, _t.time()) is False, "ohne Zugang nie"
+    u.untis_mobil = "v1.x"
+    K._STAND_VERSUCH.pop(4711, None)
+    assert K._stand_faellig(u, _t.time()) is True, "Zugang, noch nie geholt"
+    K._STAND_VERSUCH[4711] = _t.time()
+    assert K._stand_faellig(u, _t.time()) is False, "gerade erst versucht (auch nach Fehlschlag)"

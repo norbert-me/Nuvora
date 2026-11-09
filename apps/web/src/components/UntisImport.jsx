@@ -54,6 +54,7 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
   const [mitAusfaellen, setMitAusfaellen] = useState(true);
   const [mitFerien, setMitFerien] = useState(true);
   const [vertr, setVertr] = useState("");          // Ergebnis des Vertretungsabrufs
+  const [mobilLink, setMobilLink] = useState("");  // QR-Link aus WebUntis; wird nie gespeichert, nur verschluesselt am Server
 
   // Server, Schulkennung und Benutzername sind gemerkt; das Passwort nie —
   // ein WebUntis-Zugang ist das ganze Schulkonto der Lehrkraft.
@@ -107,6 +108,32 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
     setKonto((k) => ({ ...k, stand: d.stand, stand_anzahl: d.anzahl }));
     setVertr(t("untis.vertrFertig", { n: d.anzahl, gesamt: d.gesamt }));
     onFertig && onFertig({ vertretungen: d.anzahl });
+  };
+
+  // Untis-Mobile-Schluessel: gilt nur fuer Apps und laesst sich in WebUntis
+  // widerrufen — das Schulpasswort bleibt draussen. Ab dann holt Nuvora die
+  // Vertretungen beim Oeffnen des Kalenders selbst.
+  const mobilVerbinden = async () => {
+    setLaeuft(true); setFehler(null); setVertr("");
+    const res = await fetch("/api/kalender/untis/mobil", alsJson("PUT", { link: mobilLink })).catch(() => null);
+    const d = res && res.ok ? await res.json().catch(() => null) : null;
+    if (res && res.status === 400) {
+      setLaeuft(false);
+      setFehler({ grund: "unbekannt", meldung: (await res.json().catch(() => ({}))).detail || "" });
+      return;
+    }
+    if (!d) { setLaeuft(false); setFehler({ grund: "unbekannt", meldung: "" }); return; }
+    if (!d.ok) { setLaeuft(false); setFehler({ grund: GRUENDE.includes(d.grund) ? d.grund : "unbekannt", meldung: d.meldung || "" }); return; }
+    setMobilLink("");
+    setKonto((k) => ({ ...k, mobil: true }));
+    await vertretungenHolen();          // gleich einmal holen, damit man sieht, dass es geht
+  };
+
+  const mobilTrennen = async () => {
+    await fetch("/api/kalender/untis/mobil", { method: "DELETE" }).catch(() => null);
+    setKonto((k) => ({ ...k, mobil: false, stand: "", stand_anzahl: 0 }));
+    setVertr("");
+    onFertig && onFertig({});
   };
 
   const felder = useMemo(() => {
@@ -192,6 +219,33 @@ export default function UntisImport({ onClose, onFertig, kurse = [], klassen = [
               <p style={{ fontSize: 12, color: "var(--text3)", margin: 0, borderLeft: `3px solid ${C.warning}`, paddingLeft: 8 }}>
                 {t("untis.passwortHinweis")}
               </p>
+              <div style={{ ...panelStyle, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{t("untis.mobilTitel")}</div>
+                {konto.mobil ? (
+                  <>
+                    <div style={{ fontSize: 12, color: "var(--text2)" }}>{t("untis.mobilVerbunden")}</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={vertretungenHolen} disabled={laeuft} style={{ ...btnSecondary, ...btnSmall }}>
+                        {t("untis.mobilJetzt")}
+                      </button>
+                      <button onClick={mobilTrennen} disabled={laeuft} style={{ ...btnSecondary, ...btnSmall }}>
+                        {t("untis.mobilTrennen")}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>{t("untis.mobilHinweis")}</p>
+                    <input type="password" value={mobilLink} onChange={(e) => setMobilLink(e.target.value)}
+                      placeholder="untis://setschool?url=…" name="untis-mobil" autoComplete="off"
+                      style={{ ...inputStyle, width: "100%" }} />
+                    <button onClick={mobilVerbinden} disabled={laeuft || !mobilLink.trim()}
+                      style={{ ...btnSecondary, ...btnSmall, alignSelf: "flex-start", opacity: laeuft || !mobilLink.trim() ? 0.6 : 1 }}>
+                      {t("untis.mobilVerbinden")}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
