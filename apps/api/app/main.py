@@ -363,6 +363,7 @@ def _ensure_columns(sync_conn):
         ("calendar_entries", "method_id", "INTEGER"),
         ("calendar_entries", "kurs_id", "INTEGER"),
         ("calendar_entries", "verlaufsplan", "JSON"),
+        ("calendar_entries", "topic_ids", "JSON"),     # weitere Themen der Stunde
         ("exam_dates", "entry_id", "INTEGER"),
         ("exam_dates", "work_id", "INTEGER"),
         ("exam_dates", "period", "INTEGER"),

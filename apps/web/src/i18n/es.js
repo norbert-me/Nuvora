@@ -1199,6 +1199,7 @@ export default {
   "kalender.serieGanze": "Toda la serie",
   "kalender.noClass": "sin clase",
   "kalender.topic": "Tema",
+  "kalender.moreTopics": "Más temas",
   "kalender.noTopic": "sin tema",
   "kalender.verlauf": "Plan de la clase",
   "kalender.verlaufAdd": "Añadir fase",

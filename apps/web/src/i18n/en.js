@@ -1198,6 +1198,7 @@ export default {
   "kalender.serieGanze": "The whole series",
   "kalender.noClass": "no class",
   "kalender.topic": "Topic",
+  "kalender.moreTopics": "More topics",
   "kalender.noTopic": "no topic",
   "kalender.verlauf": "Lesson plan",
   "kalender.verlaufAdd": "Add phase",

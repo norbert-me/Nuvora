@@ -112,6 +112,7 @@ class EntryIn(BaseModel):
     class_id: Optional[int] = None
     kurs_id: Optional[int] = None   # gewaehlter Kurs (Fach) — Anzeige beim Bearbeiten
     topic_id: Optional[int] = None
+    topic_ids: Optional[List[int]] = None   # weitere Themen der Stunde
     method_id: Optional[int] = None
     period: Optional[int] = None
     start_time: str = ""   # optionale freie Uhrzeit "HH:MM"
@@ -436,7 +437,9 @@ async def create_entry(body: EntryIn, user: User = Depends(require_module), db: 
     await _check_kurs(db, user, body.kurs_id)
     await _check_topic(db, user, body.topic_id)
     await _check_verknuepfungen(db, user, body)
-    e = CalendarEntry(owner_id=user.id, **body.model_dump())
+    daten = body.model_dump()
+    daten["topic_ids"] = await _check_topics(db, user, daten.get("topic_ids"))
+    e = CalendarEntry(owner_id=user.id, **daten)
     db.add(e)
     await db.commit()
     await db.refresh(e)
@@ -454,7 +457,9 @@ async def update_entry(entry_id: int, body: EntryIn, request: Request = None, us
     await _check_kurs(db, user, body.kurs_id)
     await _check_topic(db, user, body.topic_id)
     await _check_verknuepfungen(db, user, body)
-    for k, v in body.model_dump().items():
+    daten = body.model_dump()
+    daten["topic_ids"] = await _check_topics(db, user, daten.get("topic_ids"))
+    for k, v in daten.items():
         setattr(e, k, v)
     await db.commit()
     await db.refresh(e)
@@ -794,7 +799,7 @@ async def serien_ausnahme(entry_id: int, body: AusnahmeIn,
     kopie = None
     if body.loesen:
         felder = {k: getattr(e, k) for k in (
-            "class_id", "kurs_id", "topic_id", "method_id", "period", "title", "notes",
+            "class_id", "kurs_id", "topic_id", "topic_ids", "method_id", "period", "title", "notes",
             "location", "start_time", "end_time", "verlaufsplan",
             "cardvote_set_id", "karten_deck_id", "lernpfad_ladder_id", "codedetektiv_puzzle")}
         # Ohne caldav_uid und ohne rrule: die Kopie ist ein eigener Termin, kein
@@ -1435,11 +1440,12 @@ async def zeitleiste(kurs_id: int, term: str = "", user: User = Depends(require_
                                "titel": e.title or wort, "sub": wort, "modul": modul, "id": e.id})
         # Ein Thema erscheint einmal je Tag: mehrere Stunden am selben Tag sind
         # dasselbe Thema, keine zwei Punkte.
-        lab = thema_label(e.topic_id) if e.topic_id else None
-        if lab and (d, e.topic_id) not in gesehen:
-            gesehen.add((d, e.topic_id))
-            punkte.append({"art": "thema", "date": d.isoformat(), "period": e.period,
-                           "titel": lab, "sub": ""})
+        for tid in [e.topic_id, *(e.topic_ids or [])]:
+            lab = thema_label(tid) if tid else None
+            if lab and (d, tid) not in gesehen:
+                gesehen.add((d, tid))
+                punkte.append({"art": "thema", "date": d.isoformat(), "period": e.period,
+                               "titel": lab, "sub": ""})
 
     # Nach Tag, dann nach Stunde: an einem Tag steht die 1. Stunde ueber der 5.
     punkte.sort(key=lambda p: (p["date"], stunden_rang(p["period"]) if p.get("period") is not None else 999))

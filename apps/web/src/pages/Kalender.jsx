@@ -572,7 +572,7 @@ export default function Kalender() {
       if (!kopie || !kopie.id) return;
       e = { ...e, id: kopie.id, rrule: "", exdate: [], occ: "" };
     }
-    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", location: e.location || "", rrule: e.rrule || "", exdate: Array.isArray(e.exdate) ? e.exdate : [], verlaufsplan: Array.isArray(e.verlaufsplan) ? e.verlaufsplan : [], class_id: e.class_id || null, kurs_id: e.kurs_id ?? null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, start_time: e.start_time || "", end_time: e.end_time || "", cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
+    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", location: e.location || "", rrule: e.rrule || "", exdate: Array.isArray(e.exdate) ? e.exdate : [], verlaufsplan: Array.isArray(e.verlaufsplan) ? e.verlaufsplan : [], class_id: e.class_id || null, kurs_id: e.kurs_id ?? null, topic_id: e.topic_id || null, topic_ids: Array.isArray(e.topic_ids) ? e.topic_ids : [], method_id: e.method_id || null, period: e.period ?? null, start_time: e.start_time || "", end_time: e.end_time || "", cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, alsJson(e.id ? "PUT" : "POST", body)).catch(() => null);
     // Lehnte der Server ab, passierte bisher NICHTS: das Modal blieb offen, der
     // getippte Verlaufsplan stand noch da, und nur ein späterer Blick auf den
@@ -2449,6 +2449,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], 
   const [classId, setClassId] = useState(entry.class_id || "");
   const [kursId, setKursId] = useState(entry.kurs_id ?? null); // gewaehlter Kurs — richtige Auflösung beim Bearbeiten
   const [topicId, setTopicId] = useState(entry.topic_id || "");
+  const [weitereThemen, setWeitereThemen] = useState(Array.isArray(entry.topic_ids) ? entry.topic_ids : []);
   const [methodId, setMethodId] = useState(entry.method_id || "");
   const [quizId, setQuizId] = useState(entry.cardvote_set_id || "");
   const [ladderId, setLadderId] = useState(entry.lernpfad_ladder_id || "");
@@ -2909,6 +2910,12 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], 
         <SuchSelect value={topicId} onChange={setTopicId} style={{ width: "100%" }}
           leerLabel={`– ${t("kalender.noTopic")} –`}
           optionen={themenFuerKurs(themen, kurse.find((k) => k.id === kursId), topicId ? [topicId] : []).map((tp) => ({ wert: tp.id, label: themen.auswahlLabel(tp) }))} />
+        {topicId && (
+          <>
+            <div style={lbl}>{t("kalender.moreTopics")}</div>
+            <ThemenWahl topics={topics} value={weitereThemen} onChange={setWeitereThemen} kurs={kurse.find((k) => k.id === kursId) || null} />
+          </>
+        )}
         {aktiv.unterrichtsplanung && (
           <>
             <div style={lbl}>{t("kalender.method")}</div>
@@ -3026,7 +3033,7 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], 
         {entry.id && <div style={{ marginTop: 16 }}><MaterialPanel entryId={entry.id} /></div>}
 
         </>)}
-        <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, end_date: mehrtaegig ? (() => { const [y, m, d] = endVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : null, title, notes, start_time: mehrtaegig ? "" : (startTime || ""), end_time: mehrtaegig ? "" : (endTime || ""), location: ort, rrule: rruleBauen(), exdate: Array.isArray(entry.exdate) ? entry.exdate : [], verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>
+        <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, end_date: mehrtaegig ? (() => { const [y, m, d] = endVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : null, title, notes, start_time: mehrtaegig ? "" : (startTime || ""), end_time: mehrtaegig ? "" : (endTime || ""), location: ort, rrule: rruleBauen(), exdate: Array.isArray(entry.exdate) ? entry.exdate : [], verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, topic_ids: topicId ? weitereThemen.filter((x) => x !== Number(topicId)) : [], method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>
           {entry.id && <button onClick={() => onDelete(entry.id, entry)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         </DialogFuss>
         </>)}

@@ -966,6 +966,9 @@ class CalendarEntry(Versioniert, Base):
     exdate: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Verlaufsplan: einfache Phasenliste [{phase, dauer, text}] für die Stunde.
     verlaufsplan: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Weitere Themen der Stunde (neben `topic_id`, dem ersten): ohne FK wie bei
+    # exam_dates.topic_ids — der Kalender besitzt keine Taxonomie, er zeigt hin.
+    topic_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Verknuepfte Modul-Objekte (Regel 3: alle optional, ON DELETE SET NULL —
     # der Eintrag bleibt ohne das jeweilige Modul voll nutzbar). CardVote-Quiz,
     # Karten-Deck (wird am Kalendertag freigeschaltet), Lernpfad-Lernleiter.
