@@ -73,7 +73,11 @@ function parseNote(text) {
 }
 // Deutsche Schreibweise aus core/zahl.js — dieselbe Regel wie in der
 // Klassenarbeit und im Boxplot, wo sie je eigen nachgebaut war.
-const de = (n) => komma(n);
+// Nachkommastellen der Noten (Schnitte, Endnoten): 1 oder 2. Gewaehlt wird in der
+// Ansicht des Notenbuchs; hier steht der Stand, den die Seite beim Zeichnen setzt
+// — `de` wird in vielen Teilkomponenten gerufen, die ihn nicht durchgereicht bekaemen.
+let STELLEN = 2;
+const de = (n) => kommaRund(n, STELLEN);
 
 export default function Noten() {
   const { t } = useLanguage();
@@ -246,6 +250,9 @@ export default function Noten() {
   const setAggPersist = (m) => { setAgg(m); try { localStorage.setItem("noten_agg", m); } catch { /* egal */ } };
   // Statistik auf ganze, halbe oder Teilnoten — eine Ansicht wie Mittel/Median,
   // deshalb derselbe Ort (localStorage je Gerät) und sofort wirksam.
+  const [stellen, setStellen] = useState(() => { try { return localStorage.getItem("noten_stellen") === "1" ? 1 : 2; } catch { return 2; } });
+  const setStellenPersist = (v) => { const n = v === "1" ? 1 : 2; setStellen(n); try { localStorage.setItem("noten_stellen", String(n)); } catch { /* egal */ } };
+  STELLEN = stellen;
   const [stufung, setStufung] = useState(() => { try { const v = localStorage.getItem("noten_stufen"); return v === "halb" || v === "teil" ? v : "ganz"; } catch { return "ganz"; } });
   const setStufungPersist = (v) => { setStufung(v); try { localStorage.setItem("noten_stufen", v); } catch { /* egal */ } };
 
@@ -549,6 +556,12 @@ export default function Noten() {
             value: agg === "median" ? "median" : "",
             onChange: (v) => setAggPersist(v || "mean"),
             optionen: [{ wert: "", label: t("noten.aggMean") }, { wert: "median", label: t("noten.aggMedian") }],
+          }, {
+            key: "stellen", art: "wahl",
+            label: t("noten.stellen"),
+            value: stellen === 2 ? "" : "1",
+            onChange: setStellenPersist,
+            optionen: [{ wert: "", label: t("noten.stellen2") }, { wert: "1", label: t("noten.stellen1") }],
           }, {
             key: "stufen", art: "wahl",
             label: t("noten.stufen"),
