@@ -2562,6 +2562,7 @@ export default {
   "noten.stellen": "Nachkommastellen",
   "noten.stellen2": "2 (3,25)",
   "noten.stellen1": "1 (3,3)",
+  "noten.formTitel": "Notenanzeige: Zahl oder Tendenz mit Zahl",
   "noten.notenFehlen": "Es fehlt mindestens eine Note (nicht abwesend, kein Kommentar)",
   "noten.suche": "Kind suchen",
   "noten.susModus": "SuS-Modus",

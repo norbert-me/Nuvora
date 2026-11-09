@@ -197,3 +197,12 @@ describe("datumKurz", () => {
     expect(datumKurz("2026-2-9")).toBe("");     // unvollstaendig
   });
 });
+
+
+import { wertLabel } from "./grades.js";
+describe("wertLabel", () => {
+  it("Tendenz aus dem Notenwert", () => {
+    expect([1.0, 1.7, 2.0, 2.3, 2.46, 2.7, 3.0, 5.7, 6.0].map(wertLabel)).toEqual(["1", "2+", "2", "2−", "2−", "3+", "3", "6", "6"]);
+  });
+  it("leer bleibt leer", () => { expect(wertLabel(null)).toBe(""); });
+});

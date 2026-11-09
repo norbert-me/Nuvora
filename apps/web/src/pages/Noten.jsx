@@ -11,7 +11,7 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
-import { Boxplot, COLORS as C, CONTROL_R, DialogKopf, Empty, FOKUS_TON, FOKUS_TON_DECKEND, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { Boxplot, COLORS as C, CONTROL_R, DialogKopf, Empty, FOKUS_TON, FOKUS_TON_DECKEND, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Segment, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, segmentBtn, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import { themenFuerKurs, themenIndex, useThemen } from "../core/topics.js";
 import { useKurs } from "../core/kurs.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -22,7 +22,7 @@ import SuchSelect from "../components/SuchSelect.jsx";
 import { DialogFuss, nurGeaendertIn, useAutoSpeichern, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useAktiv, useZielFilter } from "../core/modules.js";
-import { datumKurz } from "../core/grades.js";
+import { datumKurz, wertLabel } from "../core/grades.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import { useEinfuegen } from "../core/ziehsortieren.js";
@@ -78,6 +78,11 @@ function parseNote(text) {
 // — `de` wird in vielen Teilkomponenten gerufen, die ihn nicht durchgereicht bekaemen.
 let STELLEN = 2;
 const de = (n) => kommaRund(n, STELLEN);
+// Notenanzeige der BERECHNETEN Noten (Bereichs-, End-, Gesamtnote): „2,46" oder
+// „2− (2,46)". Schalter in der Leiste — wer die Noten zeigt, muss sonst das
+// Komma erklaeren. Eingabefelder bleiben bei der Zahl (`de`).
+let NOTENFORM = "wert";
+const deAnz = (n) => (n == null ? "" : NOTENFORM === "tendenz" ? `${wertLabel(n)} (${de(n)})` : de(n));
 
 export default function Noten() {
   const { t } = useLanguage();
@@ -253,6 +258,9 @@ export default function Noten() {
   const [stellen, setStellen] = useState(() => { try { return localStorage.getItem("noten_stellen") === "1" ? 1 : 2; } catch { return 2; } });
   const setStellenPersist = (v) => { const n = v === "1" ? 1 : 2; setStellen(n); try { localStorage.setItem("noten_stellen", String(n)); } catch { /* egal */ } };
   STELLEN = stellen;
+  const [form, setForm] = useState(() => { try { return localStorage.getItem("noten_form") === "tendenz" ? "tendenz" : "wert"; } catch { return "wert"; } });
+  const setFormPersist = (v) => { setForm(v); try { localStorage.setItem("noten_form", v); } catch { /* egal */ } };
+  NOTENFORM = form;
   const [stufung, setStufung] = useState(() => { try { const v = localStorage.getItem("noten_stufen"); return v === "halb" || v === "teil" ? v : "ganz"; } catch { return "ganz"; } });
   const setStufungPersist = (v) => { setStufung(v); try { localStorage.setItem("noten_stufen", v); } catch { /* egal */ } };
 
@@ -551,6 +559,14 @@ export default function Noten() {
           {/* Kurze Beschriftungen („1. HJ"), die lange Form im title. */}
           <input type="search" value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("noten.suche")} aria-label={t("noten.suche")}
             style={{ ...toolbarInput, width: 140, minWidth: 0 }} />
+          <span title={t("noten.formTitel")}>
+            <Segment>
+              <button onClick={() => setFormPersist("wert")} aria-pressed={form === "wert"}
+                style={{ ...segmentBtn, fontWeight: form === "wert" ? 700 : 500, color: form === "wert" ? "var(--accent)" : "var(--text2)" }}>2,5</button>
+              <button onClick={() => setFormPersist("tendenz")} aria-pressed={form === "tendenz"}
+                style={{ ...segmentBtn, fontWeight: form === "tendenz" ? 700 : 500, color: form === "tendenz" ? "var(--accent)" : "var(--text2)" }}>2+ (2,3)</button>
+            </Segment>
+          </span>
           <span title={t("noten.term")}>
             <Tabs value={term} onChange={(v) => wechseln(() => setTerm(v))}
               options={[["1", t("noten.term1Short")], ["2", t("noten.term2Short")], ["year", t("noten.year")]]} />
@@ -1138,7 +1154,7 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, minHeight: 32 }}>
       <button onClick={onEdit} title={t("noten.overrideHint")}
         style={{ border: "none", background: "none", cursor: "pointer", color: isOverride ? "var(--accent)" : "var(--text)", fontWeight: bold ? 700 : 600, fontSize: 14, padding: "0 2px" }}>
-        {value != null ? de(value) : <span style={{ color: "var(--border2)" }}>·</span>}
+        {value != null ? deAnz(value) : <span style={{ color: "var(--border2)" }}>·</span>}
       </button>
       <TrendPfeil t={t} trend={trend} />
       {isOverride && (
@@ -1821,7 +1837,7 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
                   </span>
                   <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
                     <TrendPfeil t={t} trend={notenTrend(einzeln(sec.id).map((p) => p.value))} />
-                    <strong>{v !== undefined ? de(v) : "·"}</strong>
+                    <strong>{v !== undefined ? deAnz(v) : "·"}</strong>
                   </span>
                 </div>
               );
@@ -1831,7 +1847,7 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
                 cursor: "pointer", borderRadius: CONTROL_R, background: bereich === "gesamt" ? "var(--bg2)" : "transparent",
                 boxShadow: bereich === "gesamt" ? "inset 3px 0 0 var(--accent)" : undefined }}>
               <span>{t("noten.total")}</span>
-              <span><TrendPfeil t={t} trend={notenTrend(alleEinzeln.map((p) => p.value))} />{" "}{summary.weighted !== null ? de(summary.weighted) : "·"}{summary.unweighted_fallback ? ` (${t("noten.unweighted")})` : ""}</span>
+              <span><TrendPfeil t={t} trend={notenTrend(alleEinzeln.map((p) => p.value))} />{" "}{summary.weighted !== null ? deAnz(summary.weighted) : "·"}{summary.unweighted_fallback ? ` (${t("noten.unweighted")})` : ""}</span>
             </div>
           </div>
         )}

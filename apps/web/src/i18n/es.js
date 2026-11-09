@@ -2573,6 +2573,7 @@ export default {
   "noten.stellen": "Decimales",
   "noten.stellen2": "2 (3,25)",
   "noten.stellen1": "1 (3,3)",
+  "noten.formTitel": "Mostrar notas: número o tendencia con número",
   "noten.notenFehlen": "Falta al menos una nota (ni ausente ni comentario)",
   "noten.suche": "Buscar alumno",
   "noten.susModus": "Modo alumnado",

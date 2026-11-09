@@ -95,3 +95,16 @@ export function datumKurz(iso) {
   const [j, m, tg] = iso.split("-");
   return `${tg}.${m}.${j.slice(2)}`;
 }
+
+/**
+ * Notenwert -> Note mit Tendenz („2,3" -> „2+", „2,7" -> „3−"). Spiegel von
+ * note_label in app/scoring.py: kein „1−", kein „6+/−".
+ */
+export function wertLabel(wert) {
+  if (wert == null || !Number.isFinite(Number(wert))) return "";
+  const w = Number(wert);
+  const g = Math.min(6, Math.max(1, Math.round(w)));
+  if (g === 1 || g === 6) return String(g);
+  const d = w - g;
+  return d <= -0.15 ? `${g}+` : d >= 0.15 ? `${g}−` : String(g);
+}
