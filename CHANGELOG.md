@@ -14,7 +14,31 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.5.0 — 09.11.2026
+
+- **Notenbuch: Trend-Pfeil** (↗ besser, ↘ schlechter, → gleich) je Teilnote
+  und bei der Endnote, auch in der Übersicht eines Kindes (ab zwei Noten).
+- **Notenbuch:** Kinder suchen; **SuS-Modus** blendet alle Noten aus;
+  Nachkommastellen der Schnitte wählbar (1 oder 2); die Spalten-Auswertung
+  steht vor unscharfem Hintergrund.
+- **Beamer-Modus** (Profil): blendet Kalender und Noten aus — automatisch bei
+  zweitem Bildschirm, sonst von Hand.
+- **Kinder-Seite:** Noten mit Tendenz (3+, 4−), dazu die **aktuelle Note aus
+  dem Notenbuch** je Kurs mit Trend-Pfeil; Quizze vor der letzten
+  Klassenarbeit entfallen.
+- **Rückmeldebogen:** Notenform wählbar (4+, 3,7 oder 4), Gesamtpunkte auf
+  halbe Punkte gerundet.
+- **CardVote:** Bonus der E-Aufgaben einstellbar (je Auswertung, Vorgabe im
+  Profil); Fragenzahl je Sammlung in der Liste.
+- **Karteikarten je Kurs** an/aus (Kurs bearbeiten); auch Stapel, die nur an
+  der Klasse hängen, folgen dem Schalter. Kartenliste nennt den Kurs.
+- **Kalender:** mehrere Themen je Stunde; Untis-Entfall wird angezeigt und bei
+  einer Vertretung ausgeblendet.
+- **Sitzplan:** alle Förderschwerpunkte eines Kindes markiert, beim Öffnen
+  eingepasst, Namen auf Wunsch ganz statt gekürzt.
+- Klick auf ein Kind im Kurs öffnet es unter **Personen**; Checklisten-Spalten
+  per Klick umbenennen; Klassenarbeiten alphabetisch; Spalte aus der
+  Klassenarbeit ohne überflüssige Notiz.
 
 - **Neues Modul KI-Rennen (Beta).** Ein Autorennen von oben: mit den
   Pfeiltasten (am Tablet mit Tasten unter der Strecke) Runden drehen, die
