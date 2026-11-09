@@ -1434,7 +1434,8 @@ export default function Klassenarbeit() {
           links={(
             <SuchSelect value={auswahlWert ? String(auswahlWert) : ""} style={{ minWidth: 0, maxWidth: 320 }}
               onChange={(v) => { const w = works.find((x) => String(x.id) === v) || null; if (w) waehleAusListe(w); else wechseln(() => zeigeArbeit(null)); }}
-              optionen={auswahl.map((w) => ({ wert: String(w.id), label: auswahlLabel(w) }))} />
+              optionen={auswahl.map((w) => ({ wert: String(w.id), label: auswahlLabel(w) }))
+                .sort((a, b) => a.label.localeCompare(b.label, "de", { numeric: true, sensitivity: "base" }))} />
           )}
           mehr={work ? [{ key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true, onClick: loeschen }] : []}>
           {/* E | G: zwei Blaetter einer Arbeit. Fehlt eins, legt der Knopf es an. */}
