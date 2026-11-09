@@ -652,7 +652,7 @@ export default function Noten() {
       {loading && !loadedOnce.current && term !== "year" ? (
         <Skeleton rows={6} height={38} />
       ) : term === "year" ? (
-        <YearTable t={t} data={yearData} cls={cls}
+        <YearTable t={t} data={yearData} cls={cls} suche={suche}
           onSet={(sid, txt) => overrideSetzen(sid, null, txt)}
           onReset={(sid) => overrideReset(sid, null)}
           editing={zelle} setEditing={setZelle} onInfo={setInfoFuer} />
@@ -1871,7 +1871,7 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
 
 // Jahresuebersicht: Bereichsnoten beider Halbjahre, die zwei Halbjahresnoten
 // und die Jahresnote (Mittel der beiden, per Klick ueberschreibbar).
-function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }) {
+function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo, suche = "" }) {
   const { sections = [], rows = [] } = data || {};
   // Derselbe Kopf-Mechanismus wie in der Halbjahres-Tabelle: eigener
   // Scrollrahmen, zweite Kopfzeile klebt um die gemessene Hoehe der ersten
@@ -1904,7 +1904,7 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, ri) => (
+          {rows.map((r, ri) => (suche.trim() && !String(r.name || "").toLowerCase().includes(suche.trim().toLowerCase())) ? null : (
             <tr key={r.student_id}>
               <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0 }}>
                 <button onClick={() => onInfo(r.student_id)} title={t("noten.studentInfo")}
