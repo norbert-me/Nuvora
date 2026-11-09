@@ -7,6 +7,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, cardStyle, sectionLabel, pageApp } from "../components/Icons.jsx";
+import { kursLabel } from "../core/kurslabel.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { hol } from "../core/melden.js";
 
@@ -52,10 +53,11 @@ export default function Cards() {
       )}
 
       {(() => {
-        const row = (cls) => (
+        const row = (cls, kursName = "") => (
           <div key={cls.id} style={{ ...cardStyle, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", marginBottom: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <strong style={{ fontSize: 16, color: "var(--text)" }}>{cls.name}</strong>
+              {kursName && <span style={{ color: "var(--text2)", fontSize: 14 }}>{kursName}</span>}
               <span style={{ color: "var(--text3)", fontSize: 13 }}>{cls.students.length} {t("classes.learners")}</span>
             </div>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -67,7 +69,7 @@ export default function Cards() {
         );
         const groups = kurse.map((k) => {
           const ids = new Set((k.classes || []).map((c) => c.id));
-          return { name: k.name, list: classes.filter((c) => ids.has(c.id)) };
+          return { name: kursLabel(k), list: classes.filter((c) => ids.has(c.id)) };
         }).filter((g) => g.list.length);
         const grouped = new Set(groups.flatMap((g) => g.list.map((c) => c.id)));
         const rest = classes.filter((c) => !grouped.has(c.id));
@@ -75,7 +77,9 @@ export default function Cards() {
         return groups.map((g, gi) => (
           <div key={gi}>
             {g.name && g.list.length > 1 && <div style={{ ...sectionLabel, margin: "8px 0" }}>{g.name}</div>}
-            {g.list.map(row)}
+            {/* Eine Klasse allein im Kurs: der Kurs steht in der Zeile selbst —
+                drei Zeilen „7.5" sind sonst nicht zu unterscheiden. */}
+            {g.list.map((c) => row(c, g.name && g.list.length === 1 ? g.name : ""))}
           </div>
         ));
       })()}
