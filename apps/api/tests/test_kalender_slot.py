@@ -116,14 +116,19 @@ async def test_ics_freie_uhrzeit(s):
 
 
 @pytest.mark.asyncio
-async def test_external_calendars_and_hide(s):
+async def test_external_calendars_and_hide(s, monkeypatch):
     """Mehrere externe Kalender speichern (webcal→https, Hex-Farbe validiert),
     Altbestand migriert, und einzelne Ereignisse aus-/wieder einblenden."""
+    # Fehlende Namen holt der Server aus dem Kalender — im Test ohne Netz.
+    def _kein_netz(url):
+        raise OSError("kein Netz im Test")
+    monkeypatch.setattr(KAL, "_fetch_ics", _kein_netz)
     u = User(email="x@y.de", password_hash="p", name="L"); s.add(u); await s.flush()
     # Altbestand (Einzel-URL) wird als erster Kalender migriert.
     u.external_ics_url = "https://old.example.com/f.ics"; u.external_ics_color = "#123456"; await s.commit()
     got = await KAL.get_external(user=u)
-    assert got["calendars"] == [{"url": "https://old.example.com/f.ics", "color": "#123456", "name": ""}]
+    assert got["calendars"] == [{"url": "https://old.example.com/f.ics", "color": "#123456", "name": "",
+                                 "export": False}]
 
     # Zwei Kalender setzen: webcal→https, ungültige Farbe wird geleert.
     body = KAL.ExtCalsIn(calendars=[
@@ -135,6 +140,7 @@ async def test_external_calendars_and_hide(s):
     assert [c["url"] for c in out["calendars"]] == ["https://a.example.com/x.ics", "https://b.example.com/y.ics"]
     assert out["calendars"][0]["color"] == "#ff8800" and out["calendars"][1]["color"] == ""
     assert u.external_ics_url == "https://a.example.com/x.ics"  # Altfeld mitgezogen
+    assert out["calendars"][1]["name"] == "b.example.com", "ohne Namen und ohne Netz: der Rechnername"
 
     # Ungültige URL -> Fehler.
     with pytest.raises(Exception):
