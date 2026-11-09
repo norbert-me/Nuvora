@@ -2749,6 +2749,8 @@ export default {
   "cv.boxplot": "Box plot",
   "cv.eModusTitle": "Higher-level tasks in the standard course",
   "cv.eModusBonus": "As bonus",
+  "cv.eModusAusgleich": "As compensation",
+  "cv.eModusAusgleichText": "For a child in the G course, the G tasks are the 100 %. Correct E tasks make up for missed G points: 5 of 6 G tasks plus both E tasks correct gives 6 of 6. There is no more than 100 %. Wrong E answers only use up the compensation.",
   "cv.eModusKeine": "Do not count",
   "cv.eModusAlle": "Everyone, everything",
   "cv.eModusBonusText": "For a standard-course student the standard tasks are the 100 %. Correct higher-level tasks add on top: proportionally from the first correct one (at most half a grade step if there is only one), capped at one grade step. Wrong answers only eat into the bonus, never the base points.",

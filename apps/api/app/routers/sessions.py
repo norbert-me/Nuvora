@@ -291,7 +291,7 @@ class EvalConfigIn(BaseModel):
     # Wie zaehlen Anforderungsfragen fuer ein Kind im G-Kurs? Siehe
     # app/scoring.e_modus_von — Unbekanntes gilt dort als "bonus", deshalb
     # genuegt hier die Form.
-    e_modus: Optional[Literal["bonus", "keine", "alle"]] = None
+    e_modus: Optional[Literal["bonus", "ausgleich", "keine", "alle"]] = None
     model_config = {"extra": "allow"}
 
     @field_validator("grade_scale")

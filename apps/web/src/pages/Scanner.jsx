@@ -39,6 +39,7 @@ export default function Scanner() {
   const [classStudents, setClassStudents] = useState([]);
   const [recentlyScanned, setRecentlyScanned] = useState([]);
   const [hostRevealed, setHostRevealed] = useState(false);
+  const [hostSkip, setHostSkip] = useState(false);   // Test: Weiter geht auch ohne Aufdecken
   const [hostIsLast, setHostIsLast] = useState(false);
   const [sessionFinished, setSessionFinished] = useState(false);
   // Erkennt das Geraet selbst? Erst wenn opencv.js wirklich laeuft (siehe
@@ -141,6 +142,7 @@ export default function Scanner() {
         if (msg.type === "host_state") {
           setHostRevealed(!!msg.revealed);
           setHostIsLast(!!msg.is_last);
+          setHostSkip(!!msg.skip);
         }
         if (msg.type === "session_finished") {
           scanLoopActive.current = false;
@@ -560,7 +562,7 @@ export default function Scanner() {
             style={hostRevealed ? { ...toolbarBtn, flex: 1, minWidth: 0 } : { ...toolbarBtnPrimary, flex: 1, minWidth: 0 }}>
             <span style={kuerzen}>{hostRevealed ? t("scanner.hide") : t("scanner.reveal")}</span>
           </button>
-          {hostRevealed && (
+          {(hostRevealed || hostSkip) && (
             hostIsLast ? (
               <button onClick={() => sendRemote("finish")}
                 style={{ ...toolbarBtnPrimary, flex: 1, minWidth: 0, background: C.danger, color: C.aufAkzent }}>

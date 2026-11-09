@@ -2739,6 +2739,8 @@ export default {
   "cv.boxplot": "Boxplot",
   "cv.eModusTitle": "Anforderungsaufgaben (E) im G-Kurs",
   "cv.eModusBonus": "Als Bonus",
+  "cv.eModusAusgleich": "Als Ausgleich",
+  "cv.eModusAusgleichText": "Für ein Kind im G-Kurs sind die 100 % die G-Aufgaben. Richtige E-Aufgaben gleichen verpasste G-Punkte aus: 5 von 6 G-Aufgaben plus beide E richtig ergibt 6 von 6. Mehr als 100 % gibt es nicht. Falsche E-Antworten zehren nur den Ausgleich auf.",
   "cv.eModusKeine": "Zählen nicht",
   "cv.eModusAlle": "Alle rechnen alles",
   "cv.eModusBonusText": "Für ein Kind im G-Kurs sind die 100 % die G-Aufgaben. Richtige E-Aufgaben kommen obendrauf: anteilig ab der ersten richtigen (bei nur einer E-Aufgabe höchstens eine halbe Notenstufe), zusammen höchstens eine Notenstufe. Falsche E-Antworten zehren nur den Bonus auf, nie die Punkte aus dem G-Teil.",

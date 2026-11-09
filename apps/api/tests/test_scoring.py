@@ -237,3 +237,35 @@ def test_bonus_regel_vorgabe_und_einstellbar():
     falsch = {1: "A", 3: "B", 2: "B"}
     assert bewerte(_qs(), falsch, **kw, regel={"falsch_zehrt": True})["bonus_pct"] == 0
     assert bewerte(_qs(), falsch, **kw, regel={"falsch_zehrt": False})["bonus_pct"] == 0  # keine richtige E: nichts zu holen
+
+
+# ─── E-Modus „ausgleich": richtige E-Fragen gleichen verpasste G-Fragen aus ───
+
+def _sechs_g_zwei_e():
+    qs = [{"id": i, "correct_answer": "A", "niveau": "", "topic_id": None} for i in range(1, 7)]
+    qs += [{"id": 7, "correct_answer": "A", "niveau": "E", "topic_id": None},
+           {"id": 8, "correct_answer": "A", "niveau": "E", "topic_id": None}]
+    return qs
+
+
+def test_ausgleich_5_von_6_plus_beide_e_ist_100_prozent():
+    from app.scoring import bewerte
+    antw = {1: "A", 2: "A", 3: "A", 4: "A", 5: "A", 6: "B", 7: "A", 8: "A"}
+    w = bewerte(_sechs_g_zwei_e(), antw, niveau="G", niveau_aktiv=True, e_modus="ausgleich")
+    assert w["score"] == 5 and w["max_score"] == 6
+    assert w["pct"] == 100.0, "die Luecke von einer Frage ist ausgeglichen"
+    b = bewerte(_sechs_g_zwei_e(), antw, niveau="G", niveau_aktiv=True, e_modus="bonus")
+    assert b["pct"] < 100, "der Bonus hebt nur um eine Notenstufe, der Ausgleich fuellt die Luecke"
+
+
+def test_ausgleich_gibt_nie_mehr_als_100_und_falsche_zehren_auf():
+    from app.scoring import bewerte
+    voll = {i: "A" for i in range(1, 9)}
+    assert bewerte(_sechs_g_zwei_e(), voll, niveau="G", niveau_aktiv=True, e_modus="ausgleich")["pct"] == 100.0
+    # Eine E richtig, eine falsch: der Ausgleich ist aufgezehrt.
+    antw = {1: "A", 2: "A", 3: "A", 4: "A", 5: "A", 6: "B", 7: "A", 8: "B"}
+    w = bewerte(_sechs_g_zwei_e(), antw, niveau="G", niveau_aktiv=True, e_modus="ausgleich")
+    assert w["bonus_pct"] == 0 and round(w["pct"], 1) == 83.3
+    # Ein E-Kind rechnet ohnehin alles regulaer.
+    e = bewerte(_sechs_g_zwei_e(), voll, niveau="E", niveau_aktiv=True, e_modus="ausgleich")
+    assert e["pct"] == 100.0 and e["bonus_pct"] == 0

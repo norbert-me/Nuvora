@@ -2750,6 +2750,8 @@ export default {
   "cv.boxplot": "Diagrama de caja",
   "cv.eModusTitle": "Tareas de nivel E en el curso G",
   "cv.eModusBonus": "Como bonificación",
+  "cv.eModusAusgleich": "Como compensación",
+  "cv.eModusAusgleichText": "Para un niño del curso G, el 100 % son las tareas G. Las tareas E correctas compensan puntos G perdidos: 5 de 6 tareas G más las dos E correctas dan 6 de 6. No hay más del 100 %. Las respuestas E erróneas solo consumen la compensación.",
   "cv.eModusKeine": "No cuentan",
   "cv.eModusAlle": "Todos, todo",
   "cv.eModusBonusText": "Para un alumno del curso G, el 100 % son las tareas G. Las tareas E correctas suman por encima: proporcionalmente desde la primera correcta (media nota como máximo si solo hay una), con un tope de un nivel de nota. Las respuestas erróneas solo reducen la bonificación.",

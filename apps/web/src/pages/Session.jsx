@@ -347,7 +347,8 @@ export default function Session() {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       const isLast = isLastOverride !== undefined ? isLastOverride : questionIndex + 1 >= questions.length;
-      ws.send(JSON.stringify({ type: "host_state", revealed: revealedState, is_last: isLast }));
+      // `skip`: im Test darf man auch ohne Aufdecken weiter (am Handy gleich).
+      ws.send(JSON.stringify({ type: "host_state", revealed: revealedState, is_last: isLast, skip: !gameMode }));
     }
   };
 
@@ -359,9 +360,13 @@ export default function Session() {
   const hideRef = useRef();
   const finishRef = useRef();
   revealRef.current = () => { if (!revealed) revealResults(); };
-  nextRef.current = () => { if (revealed && questionIndex + 1 < questions.length) nextQuestion(); };
+  // Im Test geht es auch ohne Aufdecken weiter — nicht jede Frage soll vor der
+  // Klasse aufgelöst werden. Im Spielmodus entstehen die Punkte beim Aufdecken,
+  // dort bleibt es Pflicht.
+  const darfWeiter = revealed || !gameMode;
+  nextRef.current = () => { if (darfWeiter && questionIndex + 1 < questions.length) nextQuestion(); };
   hideRef.current = () => { if (revealed) hideResults(); };
-  finishRef.current = () => { if (revealed && questionIndex + 1 >= questions.length) finishSession(); };
+  finishRef.current = () => { if (darfWeiter && questionIndex + 1 >= questions.length) finishSession(); };
 
   const finishSession = () => {
     saveQuestionTime();
@@ -777,12 +782,15 @@ export default function Session() {
                 {revealed ? t("scanner.hide") : t("scanner.reveal")}
               </button>
             )}
-            {question && revealed && !isLastQuestion && (
-              <button onClick={nextQuestion} style={{ ...toolbarBtn, fontWeight: 700, background: "var(--text)", color: "var(--bg)", borderColor: "var(--text)" }}>
+            {question && darfWeiter && !isLastQuestion && (
+              <button onClick={nextQuestion}
+                style={revealed
+                  ? { ...toolbarBtn, fontWeight: 700, background: "var(--text)", color: "var(--bg)", borderColor: "var(--text)" }
+                  : { ...toolbarBtn, fontWeight: 700 }}>
                 {t("scanner.next")}
               </button>
             )}
-            {question && revealed && isLastQuestion && (
+            {question && darfWeiter && isLastQuestion && (
               <button onClick={finishSession} style={{ ...toolbarBtn, fontWeight: 700, background: C.danger, color: C.aufAkzent, borderColor: C.danger, display: "inline-flex", alignItems: "center", gap: 6 }}>
                 {gameMode ? <><Icon d={ICONS.trophy} size={15} color={C.aufAkzent} /> {t("session.endGame")}</> : t("scanner.finishTest")}
               </button>

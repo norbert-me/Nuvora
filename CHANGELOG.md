@@ -16,6 +16,11 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote: E-Aufgaben als Ausgleich.** Neue Wertungsart „Als Ausgleich“ (Auswertung → Anforderungsaufgaben):
+  richtige E-Aufgaben gleichen verpasste G-Punkte aus — 5 von 6 plus beide E richtig ergibt 6 von 6 (100 %),
+  nie darüber. „Als Bonus“ bleibt die Vorgabe (hebt höchstens um eine Notenstufe).
+- **CardVote: Weiter ohne Aufdecken.** Im Testmodus geht „Weiter“ / „Test beenden“ auch, ohne die Frage
+  vorher aufzudecken (am Rechner und am Handy). Im Spielmodus bleibt das Aufdecken Pflicht, dort entstehen die Punkte.
 - **Abonnierte Kalender:** „Exportieren“ jetzt je Kalender statt für alle, mit Name und Farbe;
   die Adresse steht nur noch beim Hinzufügen. Fehlende Namen holt Nuvora aus dem Kalender selbst.
 - **CardVote-Auswertung:** die Dezimalnote in der Tabelle wird aus dem genauen Prozentwert

@@ -170,7 +170,7 @@ export default function Evaluation() {
         gefehlt: (config && config.gefehlt && typeof config.gefehlt === "object") ? config.gefehlt : {},
         // Fehlt der Schluessel (jede Auswertung vor dieser Fassung), gilt
         // „bonus" — sonst aenderte sich ueber Nacht jede alte Note.
-        eModus: ["bonus", "keine", "alle"].includes(config && config.e_modus) ? config.e_modus : "bonus",
+        eModus: ["bonus", "ausgleich", "keine", "alle"].includes(config && config.e_modus) ? config.e_modus : "bonus",
         // Ohne eigene Regel an dieser Auswertung gilt die Vorgabe aus dem Profil,
         // sonst die eingebaute. Bestandsauswertungen behalten damit ihre Zahlen,
         // solange im Profil nichts steht.
@@ -666,14 +666,15 @@ const gradeDistribution = (() => {
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
             <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{t("cv.eModusTitle")}</h4>
             <Tabs value={eModus} onChange={(v) => eConf.setz({ eModus: v })} style={{ marginLeft: "auto" }}
-              options={[["bonus", t("cv.eModusBonus")], ["keine", t("cv.eModusKeine")], ["alle", t("cv.eModusAlle")]]} />
+              options={[["bonus", t("cv.eModusBonus")], ["ausgleich", t("cv.eModusAusgleich")], ["keine", t("cv.eModusKeine")], ["alle", t("cv.eModusAlle")]]} />
           </div>
           <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6 }}>
             {eModus === "bonus" ? t("cv.eModusBonusText")
+              : eModus === "ausgleich" ? t("cv.eModusAusgleichText")
               : eModus === "keine" ? t("cv.eModusKeineText")
               : t("cv.eModusAlleText")}
           </p>
-          {eModus === "bonus" && <BonusRegel wert={bonus} onChange={(b) => eConf.setz({ bonus: b })} t={t} />}
+          {(eModus === "bonus" || eModus === "ausgleich") && <BonusRegel wert={bonus} onChange={(b) => eConf.setz({ bonus: b })} t={t} />}
         </div>
       )}
 
