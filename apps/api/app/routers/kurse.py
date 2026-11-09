@@ -363,6 +363,10 @@ class KindOut(BaseModel):
     # etwas beachten?"), ohne Art-9-Inhalte in eine Uebersicht zu ziehen — der
     # Text steht weiter nur im Dialog des einzelnen Kindes.
     nta: bool = False
+    # Nur die zwei Sonderfaelle, die die Benotung betreffen: „LRS" (Rechtschreibung
+    # zaehlt nicht) und „LE" (= Foerderschwerpunkt Lernen: keine Noten). Kuerzel
+    # statt Freitext, wie `nta` ein blosses Ja/Nein — mehr gehoert nicht in eine Liste.
+    sonder: List[str] = []
 
 
 async def _traegerklasse(db: AsyncSession, user: User, kurs: Kurs) -> SchoolClass:
@@ -396,8 +400,10 @@ async def list_kinder(kurs_id: int, user: User = Depends(get_current_user), db: 
         # Gilt fuer DIESEN Kurs: fachbezogene Massnahmen tragen ihre kurs_id,
         # aeltere ohne gelten ueberall.
         nta = any(m.get("kurs_id") in (None, kurs_id) for m in (z.massnahmen or []))
+        foerder = set((p.foerder if p and p.foerder else None) or z.foerder or [])
+        sonder = [k for w, k in (("LRS", "LRS"), ("Lernen", "LE")) if w in foerder]
         out.append(KindOut(student_id=z.id, person_id=z.person_id, name=z.name,
-                           card_id=z.card_id, position=z.position or 0,
+                           card_id=z.card_id, position=z.position or 0, sonder=sonder,
                            niveau=(p.niveau if p else z.niveau) or "",
                            has_photo=bool((p and p.has_photo) or z.has_photo),
                            nta=nta))

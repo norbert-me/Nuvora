@@ -782,7 +782,7 @@ export default function Noten() {
                         cursor: "grab", opacity: ziehCol.zieht === c.id ? 0.4 : 1,
                         borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
                         boxShadow: colSeite === "vor" ? "inset 3px 0 0 var(--accent)" : colSeite === "nach" ? "inset -3px 0 0 var(--accent)" : undefined,
-                        ...(fokusSpalte === String(c.id) ? { background: FOKUS_TON, color: "var(--accent)" } : null) }}>
+                        ...(fokusSpalte === String(c.id) ? { background: FOKUS_TON_DECKEND, color: "var(--accent)" } : null) }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center", position: "relative" }}>
                         <button onClick={() => setRenameCol(renameCol === c.id ? null : c.id)} title={t("noten.colOverview")}
                           style={{ width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: "8px 6px" }}>{c.name}</button>

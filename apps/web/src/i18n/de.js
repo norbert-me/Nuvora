@@ -219,6 +219,8 @@ export default {
   "kurse.empty": "Noch keine Klasse in diesem Kurs.",
   "kurse.niveauToggle": "E-/G-Niveau in diesem Kurs nutzen",
   "kurse.kartenToggle": "Karteikarten in diesem Kurs nutzen",
+  "kurse.leHint": "Förderschwerpunkt Lernen — keine Noten",
+  "kurse.lrsHint": "Lese-Rechtschreib-Schwäche",
   "kurse.niveauNoStudents": "Noch keine Schüler im Kurs.",
   "kurse.editName": "Name",
   "kurse.editClasses": "Klassen im Kurs",

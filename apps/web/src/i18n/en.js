@@ -217,6 +217,8 @@ export default {
   "kurse.empty": "No class in this course yet.",
   "kurse.niveauToggle": "Use E/G levels in this course",
   "kurse.kartenToggle": "Use flashcards in this course",
+  "kurse.leHint": "Learning support — no grades",
+  "kurse.lrsHint": "Dyslexia",
   "kurse.niveauNoStudents": "No students in the course yet.",
   "kurse.editName": "Name",
   "kurse.editClasses": "Classes in this course",

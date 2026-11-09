@@ -79,6 +79,11 @@ ERLAUBT = {
         "vereinbarten Nachteilsausgleiche. Angemeldet, eigene Klasse.",
     "/api/kurse/{kurs_id}/massnahmen":
         "dito für den Kurs.",
+    "/api/kurse/{kurs_id}/kinder":
+        "Die Kursliste der Lehrkraft zeigt zwei Kuerzel, die die Benotung "
+        "veraendern: LRS (Rechtschreibung zaehlt nicht) und LE (Foerderschwerpunkt "
+        "Lernen, keine Noten) — Wunsch des Nutzers 09.11.2026. Nur diese zwei, "
+        "als Kuerzel; alles andere bleibt im Dialog des einzelnen Kindes.",
     "/api/personen/{person_id}/auswertung":
         "Die Einzelsicht auf EIN Kind — dieselbe Entscheidung wie bei "
         "/api/classes/students/{student_id}: dort werden die Angaben gezeigt "

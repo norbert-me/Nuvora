@@ -218,6 +218,8 @@ export default {
   "kurse.empty": "Aún no hay clases en este curso.",
   "kurse.niveauToggle": "Usar niveles E/G en este curso",
   "kurse.kartenToggle": "Usar tarjetas en este curso",
+  "kurse.leHint": "Apoyo al aprendizaje — sin notas",
+  "kurse.lrsHint": "Dislexia",
   "kurse.niveauNoStudents": "Aún no hay alumnos en el curso.",
   "kurse.editName": "Nombre",
   "kurse.editClasses": "Clases del curso",

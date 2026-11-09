@@ -164,6 +164,9 @@ export default function KursKinder({ kursId, t: tProp }) {
               {k.name}
             </button>
             {k.niveau && <span style={badge(k.niveau === "E" ? C.info : C.success)}>{k.niveau}</span>}
+            {/* LRS und LE verändern die Benotung (LE: keine Noten) — deshalb als
+                Kürzel in der Liste, sonst nur im Dialog des Kindes. */}
+            {(k.sonder || []).map((x) => <span key={x} style={badge(C.warning)} title={x === "LE" ? text("kurse.leHint") : text("kurse.lrsHint")}>{x}</span>)}
             {/* Nur DASS etwas vereinbart ist. Was genau, steht im Dialog des
                 Kindes — eine Kursliste ist kein Ort fuer Art-9-Angaben. */}
             {k.nta && <span style={badge(C.warning)} title={text("kurse.ntaHint")}>{text("kurse.nta")}</span>}
