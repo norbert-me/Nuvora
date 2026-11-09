@@ -242,10 +242,56 @@ async def _student_deck_where(db, st):
     if not kurse and await _student_kurs_alle(db, st):
         return sa_false()
     alt = and_(CardDeck.class_id == st.class_id, CardDeck.kurs_id.is_(None))
+    # Bestandsstapel der Klasse ohne Kurs: sie gehoeren keinem Kurs ausdruecklich,
+    # sind aber meist EIN Fach. Ist der Karteikarten-Schalter eines Kurses aus,
+    # fallen sie heraus, wenn ihr Thema zu dessen Fach gehoert — oder, ohne
+    # Fach am Thema, sobald irgendein Kurs des Kindes aus ist (sonst bliebe der
+    # Schalter wirkungslos: der Stapel haengt an der Klasse, nicht am Kurs).
+    aus_kurse = (await _student_kurs_alle(db, st)) - set(kurse)
+    if aus_kurse:
+        verstecken = await _bestandsstapel_aus(db, st, aus_kurse, kurse)
+        if verstecken:
+            alt = and_(alt, ~CardDeck.id.in_(verstecken))
     if kurse:
         alt = or_(CardDeck.kurs_id.in_(kurse), alt)
         return or_(_zugewiesen(kurse), and_(_ohne_zuweisung(), alt))
     return and_(_ohne_zuweisung(), alt)
+
+
+async def _bestandsstapel_aus(db, st, aus_kurse, aktive_kurse) -> list:
+    """IDs der Klassen-Stapel (ohne Kurs), die wegen abgeschalteter Kurse
+    nicht an dieses Kind gehen."""
+    from ..models import Topic
+    def norm(x):
+        return (x or "").strip().casefold()
+    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
+        Kurs.id.in_(set(aus_kurse) | set(aktive_kurse))))).scalars().all()}
+    aus_faecher = {norm(kurse[k].fach) for k in aus_kurse if k in kurse and norm(kurse[k].fach)}
+    aktive_faecher = {norm(kurse[k].fach) for k in aktive_kurse if k in kurse and norm(kurse[k].fach)}
+    decks = (await db.execute(select(CardDeck.id, CardDeck.topic_id).where(
+        CardDeck.class_id == st.class_id, CardDeck.kurs_id.is_(None), CardDeck.deleted_at.is_(None)))).all()
+    if not decks:
+        return []
+    topics = {}
+    tids = {tid for _, tid in decks if tid}
+    if tids:
+        tp = {t.id: t for t in (await db.execute(select(Topic).where(Topic.id.in_(tids)))).scalars().all()}
+        eltern = {t.parent_id for t in tp.values() if t.parent_id}
+        if eltern:
+            tp.update({t.id: t for t in (await db.execute(select(Topic).where(Topic.id.in_(eltern)))).scalars().all()})
+        topics = tp
+    out = []
+    for did, tid in decks:
+        t = topics.get(tid)
+        fach = norm(t.fach) if t and norm(t.fach) else (norm(topics[t.parent_id].fach) if t and t.parent_id in topics else "")
+        if fach:
+            # Fach bekannt: nur verstecken, wenn ein Kurs dieses Fachs aus ist und
+            # kein anderer Kurs desselben Fachs noch an.
+            if fach in aus_faecher and fach not in aktive_faecher:
+                out.append(did)
+        else:
+            out.append(did)
+    return out
 
 
 def _niveau_where(st):
