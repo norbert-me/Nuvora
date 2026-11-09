@@ -532,9 +532,9 @@ export default {
   "profile.deleteConfirm": "Permanently delete your account? All data will be lost.",
 
   // Questions page (dashboard)
-  "dash.newFolder": "+ New folder",
+  "dash.newFolder": "New folder",
   "dash.folderName": "Folder name",
-  "dash.newSet": "+ New question set",
+  "dash.newSet": "New question set",
   "dash.setName": "Question set name",
   "dash.setNamePrompt": "Question set name:",
   "dash.importJsonItem": "Import folder/set (JSON)",

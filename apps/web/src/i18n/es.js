@@ -533,9 +533,9 @@ export default {
   "profile.deleteConfirm": "¿Eliminar tu cuenta de forma permanente? Se perderán todos los datos.",
 
   // Página de preguntas
-  "dash.newFolder": "+ Nueva carpeta",
+  "dash.newFolder": "Nueva carpeta",
   "dash.folderName": "Nombre de la carpeta",
-  "dash.newSet": "+ Nuevo banco de preguntas",
+  "dash.newSet": "Nuevo banco de preguntas",
   "dash.setName": "Nombre del banco de preguntas",
   "dash.setNamePrompt": "Nombre del banco de preguntas:",
   "dash.importJsonItem": "Importar carpeta/banco (JSON)",

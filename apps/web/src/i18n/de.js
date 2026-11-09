@@ -534,9 +534,9 @@ export default {
   "profile.deleteConfirm": "Konto wirklich unwiderruflich löschen? Alle Daten gehen verloren.",
 
   // Fragen-Seite (Dashboard)
-  "dash.newFolder": "+ Neuer Ordner",
+  "dash.newFolder": "Neuer Ordner",
   "dash.folderName": "Ordnername",
-  "dash.newSet": "+ Neues Frageset",
+  "dash.newSet": "Neues Frageset",
   "dash.setName": "Name des Fragesets",
   "dash.setNamePrompt": "Name des Fragesets:",
   "dash.importJsonItem": "Ordner/Set importieren (JSON)",

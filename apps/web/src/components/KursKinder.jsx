@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AddButton, Icon, ICONS, COLORS as C, CONTROL_R, badge, btnPrimary, btnSecondary, btnSmall,
   dateiWaehlen, iconBtn, inputStyle, sectionLabel, toolbarIconBtn, toolbarInput,
@@ -24,6 +25,7 @@ export default function KursKinder({ kursId, t: tProp }) {
   const [liste, setListe] = useState([]);
   const [neu, setNeu] = useState("");
   const [offen, setOffen] = useState(null);
+  const navigate = useNavigate();
   const [zieht, setZieht] = useState(null);
   const [ueber, setUeber] = useState(null);
   const [zuschnitt, setZuschnitt] = useState(null);   // { personId, datei }
@@ -153,7 +155,7 @@ export default function KursKinder({ kursId, t: tProp }) {
                 Nachteilsausgleich FUER DIESEN KURS beieinander. Umbenannt wird
                 mit dem Stift daneben: das ist der seltenere Handgriff, und als
                 Klick auf den Namen verdeckte er den haeufigen. */}
-            <button onClick={() => setOffen(offen === k.student_id ? null : k.student_id)}
+            <button onClick={() => (k.person_id ? navigate(`/personen?person=${k.person_id}`) : setOffen(offen === k.student_id ? null : k.student_id))}
               title={text("kurse.kindAngaben")}
               style={{ flex: 1, minWidth: 0, fontSize: 14, textAlign: "left", border: "none", background: "none", cursor: "pointer", color: "var(--text)",
                 // Wie linkBtn: Polster fuer die Trefferflaeche, negativer Rand
