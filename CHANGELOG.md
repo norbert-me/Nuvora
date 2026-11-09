@@ -16,6 +16,10 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Untis ohne Betreff:** liefert der Abo-Link nur Zeiten (Schule hat Fach, Klasse
+  und Raum im Export abgeschaltet), zeigt der Kalender Termine, die zu einer
+  Uhrzeit zusätzlich zu den Stunden des eigenen Plans stehen, als „Zusätzlicher
+  Termin“ — etwa eine Fremdvertretung.
 - **Rückmeldebogen:** Baustein „Zwischenstand Gesamtnote“ (Bereiche mit Gewicht
   und Note, darunter der Stand insgesamt).
 - **Notenbuch:** schneller Schalter in der Leiste — berechnete Noten als Zahl

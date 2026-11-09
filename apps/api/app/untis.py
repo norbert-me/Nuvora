@@ -397,13 +397,15 @@ def abweichungen(stunden: list, regulaer=None) -> list:
         muster.setdefault((wt, s.get("start", "")), Counter())[norm(s.get("titel"))] += 1
 
     out = []
+    ohne = {}
     for s in stunden:
         titel = norm(s.get("titel"))
-        if not titel:
-            continue
         try:
             d = date.fromisoformat(s["datum"])
         except (KeyError, ValueError):
+            continue
+        if not titel:
+            ohne.setdefault((d, s.get("start", "")), []).append(s)
             continue
         haeufig = (muster.get((d.weekday(), s.get("start", ""))) or Counter()).most_common(2)
         erster = haeufig[0] if haeufig else ("", 0)
@@ -415,6 +417,16 @@ def abweichungen(stunden: list, regulaer=None) -> list:
         if regulaer and titel in {norm(t) for t in (regulaer(d, s.get("start", "")) or ())}:
             continue
         out.append(s)
+    # Ein Export ohne Betreff (manche Schulen schalten Fach/Klasse/Raum ab) kennt
+    # nur Zeiten. Was dort ZUSAETZLICH zu Nuvoras eigenem Plan steht — mehr
+    # Termine zur selben Zeit, als der Plan Stunden hat —, ist keine regulaere
+    # Stunde: eine Fremdvertretung, Veranstaltung oder Zusatzstunde. Ohne
+    # eigenen Plan (`regulaer` fehlt) laesst sich das nicht beurteilen.
+    if regulaer:
+        for (d, start), liste in ohne.items():
+            eigene = len(regulaer(d, start) or ())
+            for s in liste[eigene:]:
+                out.append({**s, "titel": "Zusätzlicher Termin"})
     return out
 
 

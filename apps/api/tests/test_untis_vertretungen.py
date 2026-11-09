@@ -88,3 +88,25 @@ def test_ics_ausfall_nur_auf_wunsch_und_mit_flag():
     assert [s["datum"] for s in U.stunden_aus_ics_text(ics, von, bis)] == ["2026-01-06"]
     mit = U.stunden_aus_ics_text(ics, von, bis, mit_ausfall=True)
     assert [(s["datum"], s["faellt_aus"]) for s in mit] == [("2026-01-05", True), ("2026-01-06", False)]
+
+
+def test_export_ohne_betreff_zeigt_ueberzaehlige_termine():
+    """Ohne SUMMARY (Schule schaltet Betreff ab): zwei Termine zur selben Zeit,
+    der Plan hat eine Stunde -> der zweite ist Fremdvertretung/Zusatz."""
+    from datetime import date
+    from app import untis as U
+    ics = "\n".join([
+        "BEGIN:VCALENDAR",
+        "BEGIN:VEVENT", "UID:a", "STATUS:CONFIRMED",
+        "DTSTART;TZID=Europe/Vienna:20261111T114500", "DTEND;TZID=Europe/Vienna:20261111T124500", "END:VEVENT",
+        "BEGIN:VEVENT", "UID:b", "STATUS:CONFIRMED",
+        "DTSTART;TZID=Europe/Vienna:20261111T114500", "DTEND;TZID=Europe/Vienna:20261111T124500", "END:VEVENT",
+        "BEGIN:VEVENT", "UID:c", "STATUS:CONFIRMED",
+        "DTSTART;TZID=Europe/Vienna:20261111T104000", "DTEND;TZID=Europe/Vienna:20261111T114000", "END:VEVENT",
+        "END:VCALENDAR"])
+    st = U.stunden_aus_ics_text(ics, date(2026, 11, 1), date(2026, 11, 30))
+    plan = {"11:45": ["Mathe"], "10:40": ["Deutsch"]}
+    out = U.abweichungen(st, lambda d, start: plan.get(start, []))
+    assert [(x["datum"], x["start"]) for x in out] == [("2026-11-11", "11:45")]
+    # ohne eigenen Plan: nichts raten
+    assert U.abweichungen(st, None) == []
