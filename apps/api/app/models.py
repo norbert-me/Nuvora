@@ -223,9 +223,6 @@ class QuestionSet(Base):
     # erst in der Auswertung (G zaehlt nur G-Fragen als 100 %, E-Fragen geben
     # Bonus). Aus = ein Quiz wie bisher.
     niveau_aktiv: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    # Karteikarten fuer diesen Kurs an/aus: aus heisst, die Kinder bekommen ueber
-    # diesen Kurs keine Stapel (Anzeige-Schalter der Lehrkraft, Daten bleiben).
-    karten_aktiv: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     # Minuspunkte: falsche Antwort = -1 (Gesamtpunktzahl nie unter 0). Wer die
     # Karte unten laesst, antwortet nicht: 0 Punkte, kein Abzug.
     minuspunkte: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
@@ -322,6 +319,9 @@ class Kurs(Versioniert, Base):
     # bei Kursen ohne Niveau-Differenzierung nervt sie sonst. E/G wird im Kurs
     # gepflegt (nicht je Fach-Klasse), weil es die Person betrifft.
     niveau_aktiv: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Karteikarten fuer diesen Kurs an/aus: aus heisst, die Kinder bekommen ueber
+    # diesen Kurs keine Stapel (Anzeige-Schalter der Lehrkraft, Daten bleiben).
+    karten_aktiv: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     # Fach des Kurses — das Gegenstueck zu `topics.fach`. Erst dadurch ist
     # „die Themen dieses Kurses" eine Abfrage und kein Namensraten (der Name
     # ist frei, „Mathe 7.5" genauso wie „M7b" oder „Mathe Gruppe rot").
