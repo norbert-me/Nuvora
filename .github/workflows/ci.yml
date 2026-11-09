@@ -12,6 +12,19 @@ permissions:
   contents: read
 
 jobs:
+  # Slopsquatting: jede neue direkte Abhaengigkeit braucht eine Freigabe in
+  # scripts/abhaengigkeiten.freigegeben.json, muss es in der Registry geben und
+  # darf nicht frisch angemeldet sein; die Lock-Dateien muessen lueckenlos sein.
+  abhaengigkeiten:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Paketnamen und Lock-Dateien pruefen
+        run: python3 scripts/pruefe_abhaengigkeiten.py --netz
+
   api-tests:
     runs-on: ubuntu-latest
     defaults:

@@ -1,0 +1,56 @@
+{
+  "python": [
+    "aiosqlite",
+    "argon2-cffi",
+    "asyncpg",
+    "defusedxml",
+    "fastapi",
+    "greenlet",
+    "numpy",
+    "opencv-contrib-python-headless",
+    "openpyxl",
+    "pillow",
+    "pydantic",
+    "pytest",
+    "pytest-asyncio",
+    "python-multipart",
+    "qrcode",
+    "reportlab",
+    "sqlalchemy",
+    "uvicorn",
+    "websockets"
+  ],
+  "npm": {
+    "apps/web": [
+      "@dnd-kit/core",
+      "@dnd-kit/sortable",
+      "@dnd-kit/utilities",
+      "@fontsource/inter",
+      "@types/react",
+      "@vitejs/plugin-react",
+      "eslint",
+      "eslint-plugin-react",
+      "globals",
+      "katex",
+      "lzma",
+      "react",
+      "react-dom",
+      "react-router-dom",
+      "vite",
+      "vitest"
+    ],
+    "apps/desktop": [
+      "electron",
+      "electron-builder"
+    ],
+    "apps/ios": [
+      "@capacitor/app",
+      "@capacitor/cli",
+      "@capacitor/core",
+      "@capacitor/ios"
+    ],
+    "scripts": [
+      "playwright"
+    ]
+  }
+}
