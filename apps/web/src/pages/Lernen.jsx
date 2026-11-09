@@ -254,7 +254,7 @@ function Ergebnisse({ results, t }) {
       {results[0]?.note && (
         <div style={{ ...cardStyle, padding: "16px", textAlign: "center", marginBottom: 12 }}>
           <div style={{ fontSize: 12, color: "var(--text3)" }}>{t("lernen.aktuelleNote")}</div>
-          <div style={{ fontSize: 36, fontWeight: 800, color: results[0].pct >= 50 ? C.success : C.danger }}>{results[0].note.replace("-", "−")}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: results[0].pct >= 50 ? C.success : C.danger }}>{results[0].note.replace("-", "−")}</div>
           <div style={{ fontSize: 12, color: "var(--text3)" }}>{results[0].name}</div>
         </div>
       )}

@@ -280,6 +280,7 @@ def _ensure_columns(sync_conn):
         ("methods", "topic_id", "INTEGER"),
         ("methods", "folder_id", "INTEGER"),
         ("kurse", "niveau_aktiv", "BOOLEAN DEFAULT false NOT NULL"),
+        ("kurse", "karten_aktiv", "BOOLEAN DEFAULT true NOT NULL"),
         ("kurse", "color", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("seating_plans", "kurs_id", "INTEGER"),
         ("orga_items", "kurs_id", "INTEGER"),

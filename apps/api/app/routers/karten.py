@@ -215,8 +215,13 @@ async def _class_all_decks_where(db, class_id):
 
 async def _student_kurs_ids(db, st) -> list:
     """Die Kurse dieses Kindes: die seiner Klasse UND die Teilkurse, in denen es
-    einzeln Mitglied ist (Kurse aus Teilen von Klassen)."""
-    return list(set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id))
+    einzeln Mitglied ist (Kurse aus Teilen von Klassen). Kurse, in denen die
+    Lehrkraft die Karteikarten abgeschaltet hat, zaehlen nicht mit."""
+    ids = set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id)
+    if not ids:
+        return []
+    aus = set((await db.execute(select(Kurs.id).where(Kurs.id.in_(ids), Kurs.karten_aktiv.is_(False)))).scalars().all())
+    return list(ids - aus)
 
 
 async def _student_deck_where(db, st):

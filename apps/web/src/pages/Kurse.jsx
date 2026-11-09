@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { liegtDavor, nachJahrAbsteigend } from "../core/schuljahr.js";
 import KursKinder from "../components/KursKinder.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { useAktiv } from "../core/modules.js";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { alsJson, hol, sende } from "../core/melden.js";
@@ -47,7 +48,8 @@ export default function Kurse() {
   // Jahresfolge: Schuljahr und der Kurs des Vorjahres. Die Daten bleiben
   // getrennt (Zeugnisnoten gelten je Schuljahr) — verbunden wird nur die Kette,
   // damit „6.5 Mathe" und „7.5 Mathe" nicht als zwei fremde Gruppen dastehen.
-  const LEER = { name: "", jahr: "", fach: "", stufe: "", raum: "", vorgaenger: "", niveauAktiv: false, archiviert: false, klassen: [] };
+  const aktiv = useAktiv();
+  const LEER = { name: "", jahr: "", fach: "", stufe: "", raum: "", vorgaenger: "", niveauAktiv: false, kartenAktiv: true, archiviert: false, klassen: [] };
   const [kursBasis, setKursBasis] = useState(LEER);
   const kurs = useEntwurf(kursBasis, (w) => kursSpeichern(w));
   const kursUebernehmen = (stand) => { setKursBasis(stand); kurs.setz(stand); };
@@ -93,7 +95,7 @@ export default function Kurse() {
     kursUebernehmen({
       name: k.name, jahr: k.schuljahr || "", fach: k.fach || "", stufe: k.jahrgang || "", raum: k.raum || "",
       vorgaenger: k.vorgaenger_id ? String(k.vorgaenger_id) : "",
-      niveauAktiv: !!k.niveau_aktiv, archiviert: archiv, klassen: k.classes.map((c) => c.id),
+      niveauAktiv: !!k.niveau_aktiv, kartenAktiv: k.karten_aktiv !== false, archiviert: archiv, klassen: k.classes.map((c) => c.id),
     });
     // Auswahl fuer „Vorjahr": aktive UND archivierte Kurse. Nach dem
     // Schuljahresende steht der Vorgaenger im Archiv, und genau dann braucht
@@ -111,7 +113,7 @@ export default function Kurse() {
     if (!k) return false;
     const name = w.name.trim();
     if (!name) return false;
-    const koerper = { name, schuljahr: w.jahr === NEU ? "" : w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv,
+    const koerper = { name, schuljahr: w.jahr === NEU ? "" : w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv, karten_aktiv: w.kartenAktiv,
                       fach: (w.fach || "").trim(), jahrgang: (w.stufe || "").trim(),
                       raum: (w.raum || "").trim() };
     if (!(await sende(`${API}/kurse/${k.id}`, alsJson("PUT", koerper), t("kurse.editName")))) return false;
@@ -323,6 +325,12 @@ export default function Kurse() {
                     <div style={editLabel}>{t("kurse.editLevels")}</div>
                     <Toggle checked={kurs.wert.niveauAktiv} onChange={(v) => kurs.setz({ niveauAktiv: v })} label={t("kurse.niveauToggle")} />
                 </div>
+                {/* Regel 3: ohne das Kartenmodul gibt es nichts abzuschalten. */}
+                {aktiv("karten") && (
+                  <div>
+                    <Toggle checked={kurs.wert.kartenAktiv} onChange={(v) => kurs.setz({ kartenAktiv: v })} label={t("kurse.kartenToggle")} />
+                  </div>
+                )}
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
                   <button onClick={() => delKurs(k)} className="icon-btn" style={{ ...iconBtn }} title={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")} aria-label={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")}>
                     <Icon d={ICONS.trash} size={16} color={C.danger} />

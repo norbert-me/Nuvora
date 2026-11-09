@@ -218,6 +218,7 @@ export default {
   "kurse.add": "Kurs anlegen",
   "kurse.empty": "Noch keine Klasse in diesem Kurs.",
   "kurse.niveauToggle": "E-/G-Niveau in diesem Kurs nutzen",
+  "kurse.kartenToggle": "Karteikarten in diesem Kurs nutzen",
   "kurse.niveauNoStudents": "Noch keine Schüler im Kurs.",
   "kurse.editName": "Name",
   "kurse.editClasses": "Klassen im Kurs",

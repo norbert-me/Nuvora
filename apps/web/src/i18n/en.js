@@ -216,6 +216,7 @@ export default {
   "kurse.add": "Create course",
   "kurse.empty": "No class in this course yet.",
   "kurse.niveauToggle": "Use E/G levels in this course",
+  "kurse.kartenToggle": "Use flashcards in this course",
   "kurse.niveauNoStudents": "No students in the course yet.",
   "kurse.editName": "Name",
   "kurse.editClasses": "Classes in this course",

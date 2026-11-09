@@ -45,6 +45,7 @@ router = APIRouter(prefix="/api/kurse", tags=["kurse"])
 class KursIn(BaseModel):
     name: str
     niveau_aktiv: Optional[bool] = None
+    karten_aktiv: Optional[bool] = None
     schuljahr: Optional[str] = None      # "2025/26" — Beschriftung, kein Zeitraum
     vorgaenger_id: Optional[int] = None  # dieselbe Lerngruppe im Vorjahr (0/None = keiner)
     # Fach — das Gegenstueck zu `topics.fach`. Erst dadurch ist „die Themen
@@ -80,6 +81,7 @@ class KursOut(VersionOut):
     name: str
     classes: List[ClassRef] = []
     niveau_aktiv: bool = False
+    karten_aktiv: bool = True
     color: str = ""
     member_count: int = 0    # einzeln hinzugefügte SuS (Kurs aus Teilen von Klassen)
     schuljahr: str = ""
@@ -189,7 +191,7 @@ async def list_kurse(archiviert: bool = False, user: User = Depends(get_current_
     for k2 in (await db.execute(select(Kurs.id, Kurs.name, Kurs.vorgaenger_id).where(
             Kurs.owner_id == user.id, Kurs.deleted_at.is_(None), Kurs.vorgaenger_id.is_not(None)))).all():
         nachfolger[k2[2]] = (k2[0], k2[1])
-    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv,
+    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv,
                     color=k.color, member_count=int(mc.get(k.id, 0)),
                     schuljahr=k.schuljahr, fach=k.fach or "", jahrgang=k.jahrgang or "",
                     raum=k.raum or "", vorgaenger_id=k.vorgaenger_id,
@@ -215,14 +217,14 @@ async def archive_kurs(kurs_id: int, mit_klassen: bool = True, user: User = Depe
             c.archived_at = jetzt
     await db.commit()
     await db.refresh(k)
-    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color)
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv, color=k.color)
 
 
 @router.get("/trash", response_model=List[KursOut])
 async def list_kurs_trash(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     kurse = (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id, Kurs.deleted_at.is_not(None)).order_by(Kurs.deleted_at.desc()))).scalars().all()
-    return [KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color) for k in kurse]
+    return [KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv, color=k.color) for k in kurse]
 
 
 @router.post("", response_model=KursOut, status_code=201)
@@ -257,7 +259,7 @@ async def create_kurs(body: KursIn, user: User = Depends(get_current_user), db: 
 
     await db.commit()
     await db.refresh(k)
-    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color,
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv, color=k.color,
                    member_count=uebernommen)
 
 
@@ -270,6 +272,8 @@ async def rename_kurs(kurs_id: int, body: KursIn, request: Request = None, user:
         k.name = name[:100]
     if body.niveau_aktiv is not None:
         k.niveau_aktiv = bool(body.niveau_aktiv)
+    if body.karten_aktiv is not None:
+        k.karten_aktiv = bool(body.karten_aktiv)
     if body.schuljahr is not None:
         k.schuljahr = (body.schuljahr or "").strip()[:9]
     if body.vorgaenger_id is not None:
@@ -284,7 +288,7 @@ async def rename_kurs(kurs_id: int, body: KursIn, request: Request = None, user:
     if body.raum is not None:
         k.raum = (body.raum or "").strip()[:60]
     await db.commit()
-    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color,
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv, color=k.color,
                    schuljahr=k.schuljahr, fach=k.fach or "", jahrgang=k.jahrgang or "",
                    raum=k.raum or "", vorgaenger_id=k.vorgaenger_id, **stand(k))
 
@@ -300,7 +304,7 @@ async def set_kurs_color(kurs_id: int, body: ColorIn, user: User = Depends(get_c
     c = (body.color or "").strip()[:9]
     k.color = c if (c.startswith("#") and len(c) in (4, 7, 9)) else ""
     await db.commit()
-    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color)
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv, color=k.color)
 
 
 @router.post("/{kurs_id}/classes/{class_id}", status_code=204)
@@ -721,7 +725,7 @@ async def restore_kurs(kurs_id: int, user: User = Depends(get_current_user), db:
     k.deleted_members = None
     await db.commit()
     by = await _classes_by_kurs(db, user, [k])
-    return KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv, color=k.color)
+    return KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv, color=k.color)
 
 
 @router.delete("/{kurs_id}/purge", status_code=204)
