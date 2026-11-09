@@ -2394,6 +2394,7 @@ export default {
   "bogen.wdhBis": "Hand in by:",
   "bogen.wdhKeine": "No revision needed.",
   "bogen.wdhMax": "At most per topic:",
+  "bogen.notenform": "Show grade as:",
   "bogen.wdhFehltTitel": "No task in Lernpfad for:",
   "bogen.wdhFehltFolge": "These topics get no revision task on the sheet.",
   "bogen.printHint": "One sheet per student: what worked, what is still missing, what to do now. No comparison with the class.",

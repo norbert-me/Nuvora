@@ -2395,6 +2395,7 @@ export default {
   "bogen.wdhBis": "Entregar antes del:",
   "bogen.wdhKeine": "No hace falta repasar.",
   "bogen.wdhMax": "Como máximo por tema:",
+  "bogen.notenform": "Mostrar la nota como:",
   "bogen.wdhFehltTitel": "Sin tarea en Lernpfad para:",
   "bogen.wdhFehltFolge": "Estos temas quedan sin tarea de repaso en la hoja.",
   "bogen.printHint": "Una hoja por alumno: qué salió bien, qué falta, qué hacer ahora. Sin comparación con la clase.",

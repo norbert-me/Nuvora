@@ -2384,6 +2384,7 @@ export default {
   "bogen.wdhBis": "Abgeben bis:",
   "bogen.wdhKeine": "Keine Wiederholung nötig.",
   "bogen.wdhMax": "Höchstens je Thema:",
+  "bogen.notenform": "Note als:",
   "bogen.wdhFehltTitel": "Keine Aufgabe im Lernpfad zu:",
   "bogen.wdhFehltFolge": "Diese Themen bleiben auf dem Bogen ohne Wiederholungsaufgabe.",
   "bogen.printHint": "Ein Blatt je Kind: was saß, was noch fehlt, was jetzt zu tun ist. Ohne Vergleich mit der Klasse.",

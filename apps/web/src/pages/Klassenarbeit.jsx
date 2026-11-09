@@ -429,6 +429,10 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
     return {
       student_id: s.id, name: s.name, punkte: rund(w.erreicht, 2), max: tm, pct: Math.round(w.pct),
       note: tm ? gradeFromPct(w.pct, effScale) : null,
+      // Dieselbe Note mit Tendenz („4+") und als Wert („3,7") — welche aufs
+      // Blatt kommt, wählt die Lehrkraft vor dem Druck.
+      noteTendenz: tm ? gradeDetailed(w.pct, effScale).note : null,
+      noteWert: tm ? gradeDetailed(w.pct, effScale).wert : null,
       // ≥ 75 % sass, < 50 % ist Baustelle. Dazwischen steht bewusst nichts:
       // ein Blatt, auf dem jedes Thema kommentiert ist, liest niemand.
       sass: themen.filter((x) => x.pct >= 75),
@@ -1132,6 +1136,7 @@ export default function Klassenarbeit() {
   // es den Baustein nicht (Regel 3).
   const [bogenWahl, setBogenWahl] = useState(false);
   const [bogenTeile, setBogenTeile] = useState(undefined);
+  const [bogenNotenform, setBogenNotenform] = useState("tendenz");
   const [wdhPool, setWdhPool] = useState(null);
   // Der Pool wird beim OEFFNEN des Dialogs geholt: dann steht dort schon,
   // zu welchen Themen der Lernpfad nichts hat — als Hinweis, nicht als
@@ -1154,8 +1159,9 @@ export default function Klassenarbeit() {
     const kopf = tp ? [tp.fach || ober?.fach, (tp.jahrgang || ober?.jahrgang) ? `Kl. ${tp.jahrgang || ober?.jahrgang}` : ""].filter(Boolean).join(" · ") : "";
     return { kopf, pfad: tp ? (ober ? `${mitNummer(ober)} › ${mitNummer(tp)}` : mitNummer(tp)) : f.thema };
   }), [poolVorab, druckBogenRoh, topics]);
-  const bogenDrucken = async (teile, max) => {
+  const bogenDrucken = async (teile, max, notenform) => {
     setBogenWahl(false);
+    setBogenNotenform(notenform || "tendenz");
     setWdhMax(max);
     const pool = teile.includes("wdh") && lernpfadAktiv ? (poolVorab || []) : null;
     setWdhPool(pool);
@@ -1846,7 +1852,7 @@ export default function Klassenarbeit() {
           haengt sich per Portal an den <body> — der Rahmen hier gaebe ihr sonst
           seinen Platz im Fluss, und der Drucker zaehlte danach die Seiten. */}
       {work && druckBogen.length > 0 && (
-        <Rueckmeldebogen titel={work.name} bogen={druckBogen} teile={bogenTeile}
+        <Rueckmeldebogen titel={work.name} bogen={druckBogen} notenform={bogenNotenform} teile={bogenTeile}
           fehlerLabel={(k) => t(`klassenarbeit.fehler.${k}`)} />
       )}
       {bogenWahl && <BogenWahl mitWdh={lernpfadAktiv} wdhFehlt={wdhFehlt} onClose={() => setBogenWahl(false)} onDrucken={bogenDrucken} />}

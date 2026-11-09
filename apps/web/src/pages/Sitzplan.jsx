@@ -155,6 +155,16 @@ export default function Sitzplan() {
 
   // Farbe eines Platzes — eine Stelle fuer alle drei Arten, damit Legende und
   // Platz nie auseinanderlaufen.
+  // Alle Farben eines Platzes: bei Foerderschwerpunkten einer je Schwerpunkt
+  // (ein Kind kann mehrere haben), sonst die eine von farbeFuer.
+  const farbenFuer = (st) => {
+    if (st && hervor === "foerder") {
+      const eigene = (st.foerder || []).filter((f) => !foerderArt || f === foerderArt);
+      return [...new Set(eigene.map((f) => HERVOR_FARBEN[vorhandeneFoerder.indexOf(f) % HERVOR_FARBEN.length]))];
+    }
+    const f = farbeFuer(st);
+    return f ? [f] : [];
+  };
   const farbeFuer = (st) => {
     if (!st) return null;
     if (hervor === "mark") {
@@ -903,7 +913,8 @@ export default function Sitzplan() {
             {seats.map((seat) => {
               const s = byId(seat.sid);
               if (!seat.empty && !s) return null;   // verwaister Platz (Schüler gelöscht) bleibt versteckt
-              const hf = seat.empty ? null : farbeFuer(s);
+              const hfs = seat.empty ? [] : farbenFuer(s);
+              const hf = hfs[0] || null;
               const anw = seat.empty ? null : anwFuer(s);
               const anwKey = anw ? anwesenheit[String(s.id)]?.status : "";
               const mitFoto = !seat.empty && fotosOn && !!s?.has_photo;
@@ -931,8 +942,11 @@ export default function Sitzplan() {
                     {hf && (
                       // Der Balken traegt die Farbe da, wo sie auch bei
                       // uebereinanderliegenden Tischen sichtbar bleibt: an der
-                      // Kante.
-                      <span aria-hidden style={{ width: 5, flexShrink: 0, background: hf }} />
+                      // Kante. Mehrere Schwerpunkte: ein Streifen je Farbe,
+                      // uebereinander.
+                      <span aria-hidden style={{ width: 5, flexShrink: 0, display: "flex", flexDirection: "column" }}>
+                        {hfs.map((c) => <span key={c} style={{ flex: 1, background: c }} />)}
+                      </span>
                     )}
                     {mitFoto && (
                       // `pointerEvents: none`: sonst faengt das Bild den Zug ab
