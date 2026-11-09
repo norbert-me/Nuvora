@@ -14,6 +14,15 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- **Rückmeldebogen:** Baustein „Zwischenstand Gesamtnote“ (Bereiche mit Gewicht
+  und Note, darunter der Stand insgesamt).
+- **Notenbuch:** schneller Schalter in der Leiste — berechnete Noten als Zahl
+  oder als Tendenz mit Zahl in Klammern („2− (2,46)“).
+- **CardVote:** ein Test lässt sich nachträglich einem anderen Kurs derselben
+  Klasse zuweisen (Auswertung, Auswahl „Kurs“).
+
 ## 4.5.1 — 09.11.2026
 
 - **Neues Modul Reihen (Beta):** Unterrichtsreihen als Vorlage — Stunden mit
@@ -33,8 +42,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
   Jahresansicht; neue Spalten sind nach dem Umsortieren gleich sichtbar;
   markierte Spaltenüberschrift deckend; Details-Dialog vor unscharfem
   Hintergrund.
-- **Kurse:** „LRS“ und „LE“ als Kürzel in der Kinderliste; Karteikarten
-  abgeschaltet gilt auch für Stapel, die nur an der Klasse hängen.
+- **Kurse:** Kürzel für die zwei Sonderfälle der Benotung in der Kinderliste;
+  Karteikarten abgeschaltet gilt auch für Stapel, die nur an der Klasse hängen.
 - **Waage:** die Zehner-Stange greift zehn; Doppelklick zerlegt sie in zehn
   Einer und bündelt zurück; beide Seiten durch eine Zahl teilen; Gleichung auf
   Wunsch unter der Waage.

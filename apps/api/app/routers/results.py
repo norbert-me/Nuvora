@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from ..besitz import oder_403
 from ..database import get_db
 from ..nebenlauf import mit_wiederholung
-from ..kursmitglieder import sibling_class_ids
+from ..kursmitglieder import class_kurs_ids, sibling_class_ids
 from ..schueler import roster_klasse
 from ..models import Scan, Session, SchoolClass, Student, QuestionSet, QuestionSetItem, Question, User, Topic
 from .auth import get_current_user
@@ -262,13 +262,20 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
 
     students = []
     kurs_id = None
+    kurse_der_klasse = []
     if session.class_id:
+        from ..models import Kurs
+        ids = await class_kurs_ids(db, session.class_id)
+        if ids:
+            kurse_der_klasse = [{"id": k.id, "name": k.name, "fach": k.fach or ""} for k in (await db.execute(
+                select(Kurs).where(Kurs.id.in_(ids), Kurs.owner_id == user.id).order_by(Kurs.name))).scalars().all()]
         # Roster kursweit (gleichnamige Fach-Klassen-SuS = eine Person). Die
         # Kartennummern (card_id) sind bei gleicher Lerngruppe deckungsgleich.
         students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""}
                     for s in await _kurs_roster(db, session.class_id)]
         sc = await db.get(SchoolClass, session.class_id)
-        kurs_id = sc.kurs_id if sc else None
+        # Der Kurs, dem die Session zugewiesen ist — ohne Zuweisung der der Klasse.
+        kurs_id = session.kurs_id or (sc.kurs_id if sc else None)
 
     # E/G-Differenzierung und Minuspunkte haengen am Quiz, nicht an der Session.
     niveau_aktiv = False
@@ -352,6 +359,8 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
         # Notenbuch die Abschnitte ALLER Faecher dieser Klasse vor — und die
         # Spalte landete im Notenbuch eines anderen Fachs, wo sie niemand sucht.
         "kurs_id": kurs_id,
+        # Die Kurse dieser Klasse: wohin sich die Session umhaengen laesst.
+        "kurse": kurse_der_klasse,
         "niveau_aktiv": niveau_aktiv,
         "minuspunkte": minuspunkte,
         "questions": questions,

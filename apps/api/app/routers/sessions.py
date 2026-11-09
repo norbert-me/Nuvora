@@ -247,6 +247,32 @@ async def get_eval_config(session_id: int, user: User = Depends(get_current_user
     return s.eval_config or {}
 
 
+class KursIn(BaseModel):
+    kurs_id: Optional[int] = None
+
+
+@router.put("/{session_id}/kurs")
+async def session_kurs(session_id: int, body: KursIn, user: User = Depends(get_current_user),
+                       db: AsyncSession = Depends(get_db)):
+    """Die Session nachtraeglich einem anderen Kurs DERSELBEN Klasse zuweisen.
+
+    Dieselbe Klasse sitzt oft in mehreren Kursen (Mathe, Lernzeit …); ein Test
+    wird im falschen angelegt, und die Noten landeten im falschen Notenbuch.
+    Erlaubt sind nur Kurse, in denen die Klasse Mitglied ist; leer = zurueck auf
+    den Kurs der Klasse."""
+    from ..kursmitglieder import class_kurs_ids
+    from ..models import Kurs
+    s = await nur_eigenes(db, Session, session_id, user)
+    if body.kurs_id is not None:
+        erlaubt = await class_kurs_ids(db, s.class_id) if s.class_id else set()
+        k = await db.get(Kurs, body.kurs_id)
+        if not k or k.owner_id != user.id or k.id not in erlaubt:
+            raise HTTPException(400, "Dieser Kurs gehört nicht zur Klasse der Session")
+    s.kurs_id = body.kurs_id
+    await db.commit()
+    return {"kurs_id": s.kurs_id}
+
+
 class EvalConfigIn(BaseModel):
     """Auswertungs-Einstellungen einer Session.
 

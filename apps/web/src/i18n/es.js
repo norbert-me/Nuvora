@@ -2747,6 +2747,7 @@ export default {
   "cv.eModusBonusText": "Para un alumno del curso G, el 100 % son las tareas G. Las tareas E correctas suman por encima: proporcionalmente desde la primera correcta (media nota como máximo si solo hay una), con un tope de un nivel de nota. Las respuestas erróneas solo reducen la bonificación.",
   "cv.eModusKeineText": "Para un alumno del curso G, el 100 % son las tareas G; las tareas E no cuentan en absoluto.",
   "cv.eModusAlleText": "Sin diferenciación: todos se miden con todas las tareas — solo para esta evaluación.",
+  "cv.kursZuweisen": "Curso:",
   "cv.bonusMax": "Bonus total como máximo (niveles de nota)",
   "cv.bonusNenner": "Con una sola pregunta E como máximo",
   "cv.bonusNennerVoll": "1",

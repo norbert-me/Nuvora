@@ -4,7 +4,7 @@ import { useAktiv } from "../core/modules.js";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, linkBtn, pageApp, panelStyle, quoteFarbe, quoteFlaeche, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
+import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, linkBtn, pageApp, panelStyle, quoteFarbe, quoteFlaeche, selectStyle, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
@@ -585,6 +585,21 @@ const gradeDistribution = (() => {
         />
       )}
       <h2 style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{session_name || t("cv.sessionFallback", { id })}</h2>
+      {/* Derselbe Test in einem anderen Kurs der Klasse? Umhängen ist eine
+          Handlung (wie Archivieren), keine Einstellung — sie gilt sofort. */}
+      {(data.kurse || []).length > 1 && (
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)", margin: "4px 0 8px" }}>
+          {t("cv.kursZuweisen")}
+          <select value={data.kurs_id ?? ""} style={{ ...selectStyle, minWidth: 160 }}
+            onChange={async (ev) => {
+              const neu = ev.target.value ? Number(ev.target.value) : null;
+              const r = await fetch(`/api/sessions/${id}/kurs`, alsJson("PUT", { kurs_id: neu })).catch(() => null);
+              if (r && r.ok) setData((d) => ({ ...d, kurs_id: neu }));
+            }}>
+            {data.kurse.map((k) => <option key={k.id} value={k.id}>{k.fach ? `${k.fach} · ` : ""}{k.name}</option>)}
+          </select>
+        </label>
+      )}
 
       {/* Eine Werkzeugleiste wie ueberall: der eine Alltagsgriff (Note
           uebernehmen) sichtbar, die drei Exporte im Menue. Vorher standen hier

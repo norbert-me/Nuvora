@@ -2736,6 +2736,7 @@ export default {
   "cv.eModusBonusText": "Für ein Kind im G-Kurs sind die 100 % die G-Aufgaben. Richtige E-Aufgaben kommen obendrauf: anteilig ab der ersten richtigen (bei nur einer E-Aufgabe höchstens eine halbe Notenstufe), zusammen höchstens eine Notenstufe. Falsche E-Antworten zehren nur den Bonus auf, nie die Punkte aus dem G-Teil.",
   "cv.eModusKeineText": "Für ein Kind im G-Kurs sind die 100 % die G-Aufgaben; die E-Aufgaben zählen gar nicht — weder dafür noch dagegen. Für Arbeiten, in denen die Anforderung erkennbar Zusatz ist und die Note allein aus der Grundlage kommt.",
   "cv.eModusAlleText": "Keine Unterscheidung: alle werden an allen Aufgaben gemessen, E-Kurs wie G-Kurs. Dasselbe, als wäre E/G am Quiz nicht eingeschaltet — nur für diese Auswertung.",
+  "cv.kursZuweisen": "Kurs:",
   "cv.bonusMax": "Bonus insgesamt höchstens (Notenstufen)",
   "cv.bonusNenner": "Bei nur einer E-Aufgabe höchstens",
   "cv.bonusNennerVoll": "1",

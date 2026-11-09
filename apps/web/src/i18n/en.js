@@ -2746,6 +2746,7 @@ export default {
   "cv.eModusBonusText": "For a standard-course student the standard tasks are the 100 %. Correct higher-level tasks add on top: proportionally from the first correct one (at most half a grade step if there is only one), capped at one grade step. Wrong answers only eat into the bonus, never the base points.",
   "cv.eModusKeineText": "For a standard-course student the standard tasks are the 100 %; higher-level tasks do not count at all — neither for nor against. For tests where the extra tasks are clearly optional.",
   "cv.eModusAlleText": "No differentiation: everyone is measured on every task. The same as if the level flag were off — for this evaluation only.",
+  "cv.kursZuweisen": "Course:",
   "cv.bonusMax": "Bonus in total at most (grade steps)",
   "cv.bonusNenner": "With only one E question at most",
   "cv.bonusNennerVoll": "1",
