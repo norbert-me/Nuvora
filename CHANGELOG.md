@@ -14,6 +14,34 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## 4.5.1 — 09.11.2026
+
+- **Neues Modul Reihen (Beta):** Unterrichtsreihen als Vorlage — Stunden mit
+  Thema, Ablauf, Notizen, Verweisen auf Quiz/Karten/Lernleiter/Einstieg,
+  Dateien (PDFs, Arbeitsblätter) und **Notizen fürs nächste Mal**. Mit dem
+  Kalender: gehaltene Stunden als Reihe speichern oder eine Reihe in einen Kurs
+  spielen (Ferien und Ausfälle übersprungen, Vorschau vorher).
+- **Kalender:** mehrere Themen und mehrere Karteikarten-Stapel je Stunde;
+  Ausblenden ist nur Ansicht und sperrt den Export an geteilte Kalender nicht;
+  Untis-Entfall wird angezeigt (bei Vertretung ausgeblendet); kein
+  „Unterrichtsfrei“ am Wochenende auf der Startseite.
+- **CalDAV:** eine gültige Anmeldung wird nie mehr wegen einer Bremse
+  abgelehnt — Apple fragt das Passwort nicht mehr neu ab.
+- **Notenbuch:** fehlende Noten markieren den Namen (nicht bei Abwesenheit oder
+  Kommentar); LE-Kinder haben keine Gesamtnote und zählen nicht in den
+  Klassenwerten (auch in der Klassenarbeit); Suche filtert auch die
+  Jahresansicht; neue Spalten sind nach dem Umsortieren gleich sichtbar;
+  markierte Spaltenüberschrift deckend; Details-Dialog vor unscharfem
+  Hintergrund.
+- **Kurse:** „LRS“ und „LE“ als Kürzel in der Kinderliste; Karteikarten
+  abgeschaltet gilt auch für Stapel, die nur an der Klasse hängen.
+- **Waage:** die Zehner-Stange greift zehn; Doppelklick zerlegt sie in zehn
+  Einer und bündelt zurück; beide Seiten durch eine Zahl teilen; Gleichung auf
+  Wunsch unter der Waage.
+- **Kartenliste (CardVote)** nennt den Kurs in der Zeile.
+- **Schutz vor „Slopsquatting“:** neue Paketnamen brauchen eine Freigabe,
+  Lock-Dateien müssen lückenlos sein, die CI prüft Alter und Existenz.
+
 ## 4.5.0 — 09.11.2026
 
 - **Notenbuch: Trend-Pfeil** (↗ besser, ↘ schlechter, → gleich) je Teilnote
