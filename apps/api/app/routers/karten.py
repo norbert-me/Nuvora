@@ -213,11 +213,16 @@ async def _class_all_decks_where(db, class_id):
     return CardDeck.class_id == class_id
 
 
+async def _student_kurs_alle(db, st) -> set:
+    """Alle Kurse des Kindes, auch die mit abgeschalteten Karteikarten."""
+    return set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id)
+
+
 async def _student_kurs_ids(db, st) -> list:
     """Die Kurse dieses Kindes: die seiner Klasse UND die Teilkurse, in denen es
     einzeln Mitglied ist (Kurse aus Teilen von Klassen). Kurse, in denen die
     Lehrkraft die Karteikarten abgeschaltet hat, zaehlen nicht mit."""
-    ids = set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id)
+    ids = await _student_kurs_alle(db, st)
     if not ids:
         return []
     aus = set((await db.execute(select(Kurs.id).where(Kurs.id.in_(ids), Kurs.karten_aktiv.is_(False)))).scalars().all())
@@ -232,6 +237,10 @@ async def _student_deck_where(db, st):
     Fremde Kurse bleiben aussen vor: gefragt wird nur nach den Kursen dieses
     Kindes, und der Herkunfts-Zweig haengt weiterhin an seiner eigenen class_id."""
     kurse = await _student_kurs_ids(db, st)
+    # Gehoert das Kind nur Kursen mit abgeschalteten Karteikarten an, bekommt es
+    # gar nichts — auch nicht die Bestandsstapel seiner Klasse ohne Zuweisung.
+    if not kurse and await _student_kurs_alle(db, st):
+        return sa_false()
     alt = and_(CardDeck.class_id == st.class_id, CardDeck.kurs_id.is_(None))
     if kurse:
         alt = or_(CardDeck.kurs_id.in_(kurse), alt)
