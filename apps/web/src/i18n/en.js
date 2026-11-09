@@ -1557,6 +1557,8 @@ export default {
   "waage.fertig": "Solved! Check: {{probe}}",
   "waage.zahl": "Number",
   "waage.zurueck": "Undo",
+  "waage.teilen": "Divide both sides by",
+  "waage.termZeigen": "Show equation",
   "waage.freiHinweis": "Different things were removed on each side — the scale balances, but it wasn't “the same on both sides”.",
   "waage.stufe": "Level {{n}}",
   "waage.stufe1": "Level 1: x + b = d",

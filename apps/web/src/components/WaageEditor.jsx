@@ -33,10 +33,12 @@ const SCHALE_R = 105;
 
 // Was auf einer Schale liegt, als Teile: Päckchen, Zehner-Stangen, Einer.
 // Zehner nur ab 20 Einern — bei 14 will man die Einzelnen sehen und zählen.
-function teile(seite) {
+// `modus`: "auto" (ab 20 Einern), "zehner" (immer bündeln, ab 10) oder "einzeln"
+// (nie) — per Doppelklick auf eine Zehner-Stange bzw. einen Einer umgeschaltet.
+function teile(seite, modus = "auto") {
   const out = [];
   for (let i = 0; i < seite.x; i++) out.push({ art: "x", n: 1 });
-  const zehner = seite.e >= 20 ? Math.floor(seite.e / 10) : 0;
+  const zehner = modus === "einzeln" ? 0 : modus === "zehner" ? Math.floor(seite.e / 10) : (seite.e >= 20 ? Math.floor(seite.e / 10) : 0);
   for (let i = 0; i < zehner; i++) out.push({ art: "e", n: 10 });
   for (let i = 0; i < seite.e - zehner * 10; i++) out.push({ art: "e", n: 1 });
   return out;
@@ -58,8 +60,8 @@ function TeilBild({ art, n, g }) {
   </>);
 }
 
-function Schale({ seite, cx, cy, lesen, onGreifen, t }) {
-  const liste = teile(seite);
+function Schale({ seite, modus, cx, cy, lesen, onGreifen, t }) {
+  const liste = teile(seite, modus);
   const breite = 200;
   const spalten = 6;
   const zeilen = Math.max(1, Math.ceil(liste.length / spalten));
@@ -74,13 +76,14 @@ function Schale({ seite, cx, cy, lesen, onGreifen, t }) {
         const sp = i % spalten, ze = Math.floor(i / spalten);
         const x = (sp - (Math.min(liste.length, spalten) - 1) / 2) * zelle;
         const y = -zelle / 2 - 2 - ze * zelle;
-        // Gezogen wird immer EIN Teil — auch von der Zehner-Stange (sie bricht
-        // auf). Sonst liesse sich rechts keine einzelne 1 abziehen, wenn dort
-        // nur Zehner liegen, und die Waage kaeme nie ins Lot.
+        // Gezogen wird, was man anfasst: eine Zehner-Stange nimmt zehn mit, ein
+        // Einer einen. Eine einzelne 1 neben lauter Zehnern geht ueber einen
+        // Doppelklick auf die Stange (sie zerfaellt in zehn Einer) — und
+        // umgekehrt buendelt ein Doppelklick auf einen Einer.
         return (
           <g key={i} transform={`translate(${x} ${y})`} style={{ cursor: lesen ? "default" : "grab", touchAction: "none" }}
-            onPointerDown={lesen ? undefined : (e) => onGreifen(e, it.art, g, [cx + x, cy + y])}>
-            <title>{it.art === "x" ? t("waage.nimmX") : t("waage.nimmE", { n: 1 })}</title>
+            onPointerDown={lesen ? undefined : (e) => onGreifen(e, it.art, g, [cx + x, cy + y], it.n)}>
+            <title>{it.art === "x" ? t("waage.nimmX") : t("waage.nimmE", { n: it.n })}</title>
             <rect x={-zelle / 2} y={-zelle / 2} width={zelle} height={zelle} fill="transparent" />
             <TeilBild art={it.art} n={it.n} g={g} />
           </g>
@@ -99,6 +102,10 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
   // jemand von einer Seite etwas genommen hat und die Waage schief hängt.
   const [arbeit, setArbeit] = useState(null);
   const [fehler, setFehler] = useState("");
+  const [buendel, setBuendel] = useState({ l: "auto", r: "auto" });
+  // Gleichung unter der Waage zeigen? Gemerkt je Geraet.
+  const [termZeigen, setTermZeigen] = useState(() => { try { return localStorage.getItem("waage_term") === "1"; } catch { return false; } });
+  const termUmschalten = (v) => { setTermZeigen(v); try { localStorage.setItem("waage_term", v ? "1" : "0"); } catch { /* egal */ } };
   // Laufender Zug: { typ: "teil", seite, art, g } oder { typ: "teiler", n },
   // dazu die Zeigerlage (Bildschirm und SVG) und ob gerade abgelegt wuerde.
   const [zug, setZug] = useState(null);
@@ -109,11 +116,11 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
 
   // Vorschau: was waere, wenn jetzt losgelassen wuerde? `ziel` ist "muell",
   // die andere Schale ("l"/"r") oder null (zurueck an den Platz).
-  const ohne = (st) => { const neu = kopie(st); if (zug && neu[zug.seite][zug.art] > 0) neu[zug.seite][zug.art] -= 1; return neu; };
+  const ohne = (st) => { const neu = kopie(st); const n = (zug && zug.n) || 1; if (zug && neu[zug.seite][zug.art] >= n) neu[zug.seite][zug.art] -= n; return neu; };
   const ergebnis = (z) => {
     if (!z) return basis;
     if (z.ziel === "muell") return ohne(basis);
-    if (z.ziel === "l" || z.ziel === "r") { const neu = ohne(basis); neu[z.ziel][z.art] += 1; return neu; }
+    if (z.ziel === "l" || z.ziel === "r") { const neu = ohne(basis); neu[z.ziel][z.art] += (z.n || 1); return neu; }
     return basis;
   };
   // Angezeigt wird beim Ziehen der Stand OHNE das Teil (es hängt am Finger),
@@ -202,8 +209,21 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
     };
   }, [aktiv]);
 
-  const greifenTeil = (seite) => (e, art, g, [mx, my]) => {
+  // Doppelklick/-tipp: Zehner-Stange <-> zehn Einer. Selbst erkannt statt ueber
+  // `dblclick` — unter iOS kommt das bei `touch-action: none` nicht zuverlaessig.
+  const letzterTipp = useRef({ t: 0, key: "" });
+  const greifenTeil = (seite) => (e, art, g, [mx, my], n = 1) => {
     e.preventDefault();
+    const key = `${seite}${art}${n}`;
+    const jetzt = performance.now();
+    if (art === "e" && letzterTipp.current.key === key && jetzt - letzterTipp.current.t < 350) {
+      letzterTipp.current = { t: 0, key: "" };
+      setZug(null);
+      if (n === 10) setBuendel((b) => ({ ...b, [seite]: "einzeln" }));
+      else if ((basis[seite].e || 0) >= 10) setBuendel((b) => ({ ...b, [seite]: "zehner" }));
+      return;
+    }
+    letzterTipp.current = { t: jetzt, key };
     const [sx, sy] = svgPunkt(e.clientX, e.clientY);
     // Wo im Teil gegriffen wurde: das Teil haengt an DIESER Stelle am Zeiger
     // (nicht mit seiner Mitte), und abgelegt wird nach der Lage des TEILS —
@@ -212,7 +232,7 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
     // Die Mitte kommt aus der Geometrie der Schale (SVG-Koordinaten), nicht
     // aus getBoundingClientRect — das lag unter WebKit gut 40 px daneben.
     setFehler("");
-    setZug({ typ: "teil", seite, art, g, id: e.pointerId, cx: e.clientX, cy: e.clientY, dx: mx - sx, dy: my - sy, sx: mx, sy: my, ziel: null });
+    setZug({ typ: "teil", seite, art, n, g, id: e.pointerId, cx: e.clientX, cy: e.clientY, dx: mx - sx, dy: my - sy, sx: mx, sy: my, ziel: null });
   };
 
   const zurueck = () => {
@@ -250,8 +270,8 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
           <rect x={76} y={55} width={448} height={10} rx={5} fill="#4b5563" />
         </g>
         <circle cx={300} cy={60} r={9} fill="#374151" />
-        <Schale seite={anzeige.l} cx={lx} cy={ly + 150} lesen={!bedienbar} onGreifen={greifenTeil("l")} t={t} />
-        <Schale seite={anzeige.r} cx={rx} cy={ry + 150} lesen={!bedienbar} onGreifen={greifenTeil("r")} t={t} />
+        <Schale seite={anzeige.l} modus={buendel.l} cx={lx} cy={ly + 150} lesen={!bedienbar} onGreifen={greifenTeil("l")} t={t} />
+        <Schale seite={anzeige.r} modus={buendel.r} cx={rx} cy={ry + 150} lesen={!bedienbar} onGreifen={greifenTeil("r")} t={t} />
         {/* Das gezogene Teil unter dem Finger — blass, solange es noch über
             seiner Schale ist (Loslassen legt es zurück). */}
         {/* Waehrend des Ziehens: die andere Schale leuchtet als Ziel, darunter
@@ -275,16 +295,40 @@ export default function WaageEditor({ start, wert, onChange, lesen = false }) {
         })()}
         {zug && (
           <g transform={`translate(${zug.sx} ${zug.sy})`} opacity={zug.ziel ? 1 : 0.6} pointerEvents="none">
-            <TeilBild art={zug.art} n={1} g={zug.g} />
+            <TeilBild art={zug.art} n={zug.n || 1} g={zug.g} />
           </g>
         )}
       </svg>
 
+      {bedienbar && termZeigen && (
+        <div style={{ textAlign: "center", fontSize: 22, fontWeight: 700, margin: "0 0 8px", fontVariantNumeric: "tabular-nums" }}>{gleichungText(basis)}</div>
+      )}
+
       {bedienbar && (
         <>
+          {/* Beide Seiten durch dieselbe Zahl teilen — ein Griff statt Teile von
+              Hand wegzunehmen. Angeboten werden nur Zahlen, durch die jede Sorte
+              aufgeht. */}
+          {!arbeit && !zug && (() => {
+            const teiler = [2, 3, 4, 5, 6, 7, 8, 9, 10].filter((k) => [basis.l.x, basis.l.e, basis.r.x, basis.r.e].every((v) => v % k === 0)
+              && (basis.l.x + basis.l.e + basis.r.x + basis.r.e) > 0);
+            if (!teiler.length) return null;
+            return (
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, color: "var(--text2)" }}>{t("waage.teilen")}</span>
+                {teiler.map((k) => (
+                  <button key={k} onClick={() => aendern({ l: { x: basis.l.x / k, e: basis.l.e / k }, r: { x: basis.r.x / k, e: basis.r.e / k } })}
+                    style={{ ...btnSecondary, ...btnSmall }}>: {k}</button>
+                ))}
+              </div>
+            );
+          })()}
           {fehler && <div style={{ fontSize: 13, color: C.danger, textAlign: "center", marginBottom: 8 }}>{fehler}</div>}
           <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 8 }}>
             <button onClick={zurueck} disabled={!arbeit && !schritte.length} style={{ ...btnSecondary, ...btnSmall }}>{t("waage.zurueck")}</button>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)", cursor: "pointer" }}>
+              <input type="checkbox" checked={termZeigen} onChange={(e) => termUmschalten(e.target.checked)} /> {t("waage.termZeigen")}
+            </label>
           </div>
         </>
       )}

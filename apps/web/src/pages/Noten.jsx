@@ -1225,8 +1225,8 @@ function NotenStatistik({ noten, stufung, t }) {
 }
 
 // Einfaches modales Popup fuer die Anlage-Formulare (Abschnitt/Spalte).
-function Modal({ title, onClose, children }) {
-  return <UiModal onClose={onClose} width={400} title={title}>{children}</UiModal>;
+function Modal({ title, onClose, children, overlayStyle }) {
+  return <UiModal onClose={onClose} width={400} title={title} overlayStyle={overlayStyle}>{children}</UiModal>;
 }
 
 function SectionForm({ t, onSave, onCancel, initial }) {

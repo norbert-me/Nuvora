@@ -1558,6 +1558,8 @@ export default {
   "waage.fertig": "¡Resuelto! Comprobación: {{probe}}",
   "waage.zahl": "Número",
   "waage.zurueck": "Deshacer",
+  "waage.teilen": "Dividir ambos lados entre",
+  "waage.termZeigen": "Mostrar ecuación",
   "waage.freiHinweis": "Se quitaron cosas distintas en cada lado: la balanza está equilibrada, pero no fue «lo mismo en ambos lados».",
   "waage.stufe": "Nivel {{n}}",
   "waage.stufe1": "Nivel 1: x + b = d",

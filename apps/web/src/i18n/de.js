@@ -1540,6 +1540,8 @@ export default {
   "waage.fertig": "Gelöst! Probe: {{probe}}",
   "waage.zahl": "Zahl",
   "waage.zurueck": "Rückgängig",
+  "waage.teilen": "Beide Seiten teilen durch",
+  "waage.termZeigen": "Gleichung anzeigen",
   "waage.freiHinweis": "Hier wurde auf den Seiten Verschiedenes weggenommen — die Waage stimmt, aber es war nicht „auf beiden Seiten dasselbe“.",
   "waage.stufe": "Stufe {{n}}",
   "waage.stufe1": "Stufe 1: x + b = d",
