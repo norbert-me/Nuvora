@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aufgabe, bereich, berechne, leseZahl, rastern, regel, schreibe, termText } from "./zahlenstrahl.js";
+import { achsenRadius, aufgabe, begrenze, berechne, leseZahl, phasen, rastern, regel, schreibe, termText } from "./zahlenstrahl.js";
 
 describe("Zahlenstrahl: Pfeile und Ergebnis", () => {
   it("plus und minus mit positiven Zahlen", () => {
@@ -53,17 +53,46 @@ describe("Zahlenstrahl: Schreibweise und Eingabe", () => {
   it("Einrasten auf das Raster und in die Grenzen", () => {
     expect(rastern(2.26, 0.5)).toBe(2.5);
     expect(rastern(0.34, 0.1)).toBe(0.3);
-    expect(rastern(99, 1)).toBe(20);
+    expect(rastern(99, 1)).toBe(10);
+    expect(rastern(-99, 1, 2)).toBe(-2);
     expect(schreibe(-0.1)).toBe("−0,1");
   });
-  it("Bereich enthaelt jeden Punkt samt Rand", () => {
-    const b = bereich(0, [{ op: "+", zahl: 15 }]);
-    expect(b.bis).toBeGreaterThanOrEqual(16);
-    expect(b.von).toBeLessThanOrEqual(-6);
+  it("feste Achse: ganze Zahlen ±10, Zehntel ±2", () => {
+    expect(achsenRadius(1)).toBe(10);
+    expect(achsenRadius(0.5)).toBe(10);
+    expect(achsenRadius(0.1)).toBe(2);
+  });
+  it("begrenze: jede Spitze bleibt auf der Achse, auch der Pfeil der Zahl bei minus", () => {
+    const g = begrenze(8, [{ op: "+", zahl: 9 }], 10);
+    expect(berechne(g.start, g.schritte).ergebnis).toBe(10);
+    const m = begrenze(8, [{ op: "-", zahl: -9 }], 10);        // 8 − (−9) = 17: zu weit
+    const w = berechne(m.start, m.schritte);
+    expect(Math.abs(w.ergebnis)).toBeLessThanOrEqual(10);
+    expect(Math.abs(w.pfeile[0].eigenBis)).toBeLessThanOrEqual(10);
+    const k = begrenze(1, [{ op: "+", zahl: 0.5 }], 2);          // passt: bleibt unveraendert
+    expect(k.schritte[0].zahl).toBe(0.5);
+  });
+  it("Phasen: plus ist ein Schritt, minus erst erzeugen, dann umdrehen", () => {
+    const w = berechne(0, [{ op: "+", zahl: 2 }, { op: "-", zahl: -3 }, { op: "-", zahl: 0 }]);
+    expect(phasen(w.pfeile).map((p) => `${p.i}:${p.art}`)).toEqual(["0:erzeugen", "1:erzeugen", "1:drehen", "2:erzeugen"]);
   });
 });
 
 describe("Zahlenstrahl: Aufgaben", () => {
+  it("Aufgaben bleiben auf der festen Achse (alle Arten, beide Raster)", () => {
+    for (const raster of [1, 0.5, 0.1]) {
+      const R = achsenRadius(raster);
+      for (const art of ["ganz", "dezimal", "minusMinus"]) {
+        for (let i = 0; i < 60; i++) {
+          const a = aufgabe(art, Math.random, raster);
+          const w = berechne(a.start, a.schritte);
+          const pts = [a.start, ...w.pfeile.flatMap((p) => [p.bis, p.eigenBis])];
+          pts.forEach((x) => expect(Math.abs(x)).toBeLessThanOrEqual(R + 1e-9));
+          if (raster <= 0.1) pts.forEach((x) => expect(Math.round(x * 10) / 10).toBeCloseTo(x, 6));
+        }
+      }
+    }
+  });
   it("minusMinus ist immer „minus eine negative Zahl“", () => {
     for (let i = 0; i < 30; i++) {
       const a = aufgabe("minusMinus");

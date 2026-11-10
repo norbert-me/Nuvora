@@ -746,10 +746,12 @@ const bedienung = (td) => [
     // Reines Werkzeug ohne Daten. Die Voreinstellung ist „minus eine negative
     // Zahl“: ein Klick legt den Pfeil, der Pfeil der Zahl steht gestrichelt
     // darunter, und aus dem Fragezeichen wird das Ergebnis.
-    beweis: "Pfeil gelegt, Pfeil der Zahl sichtbar, Ergebnis statt „?“",
+    beweis: "Pfeil der Zahl gelegt, umgedreht, Ergebnis statt „?“",
     async eigen(seite) {
       await seite.getByRole("button", { name: "Nächster Pfeil" }).first().click({ timeout: 8000 });
       await seite.getByText(/Pfeil für/).first().waitFor({ timeout: 8000 });
+      // Bei „minus“ ist das erst der Pfeil der Zahl selbst; das Ergebnis steht noch aus.
+      await seite.getByRole("button", { name: "Pfeil umdrehen" }).first().click({ timeout: 8000 });
       const text = await seite.locator("body").innerText();
       return text.includes("= ?") ? "nach dem Pfeil steht noch ein Fragezeichen statt des Ergebnisses" : "";
     },
