@@ -83,7 +83,7 @@ const de = (n) => kommaRund(n, STELLEN);
 // „2− (2,46)". Schalter in der Leiste — wer die Noten zeigt, muss sonst das
 // Komma erklaeren. Eingabefelder bleiben bei der Zahl (`de`).
 let NOTENFORM = "wert";
-const deAnz = (n) => (n == null ? "" : NOTENFORM === "tendenz" ? `${wertLabel(n)} (${de(n)})` : de(n));
+const deAnz = (n) => (n == null ? "" : NOTENFORM === "tendenz" ? wertLabel(n) : de(n));   // Tendenz: nur 2−, ohne Kommazahl
 
 export default function Noten() {
   const { t } = useLanguage();

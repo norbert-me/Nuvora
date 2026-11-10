@@ -163,13 +163,18 @@ export default function KursKinder({ kursId, t: tProp }) {
                 padding: "7px 0", margin: "-7px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {k.name}
             </button>
-            {k.niveau && <span style={badge(k.niveau === "E" ? C.info : C.success)}>{k.niveau}</span>}
             {/* LRS und LE verändern die Benotung (LE: keine Noten) — deshalb als
-                Kürzel in der Liste, sonst nur im Dialog des Kindes. */}
+                Kürzel in der Liste, sonst nur im Dialog des Kindes. Links vom
+                Niveau; das Niveau steht in fester Breite rechtsbündig, damit
+                E/G untereinander eine Spalte bilden. */}
             {(k.sonder || []).map((x) => <span key={x} style={badge(C.warning)} title={x === "LE" ? text("kurse.leHint") : text("kurse.lrsHint")}>{x}</span>)}
-            {/* Nur DASS etwas vereinbart ist. Was genau, steht im Dialog des
-                Kindes — eine Kursliste ist kein Ort fuer Art-9-Angaben. */}
-            {k.nta && <span style={badge(C.warning)} title={text("kurse.ntaHint")}>{text("kurse.nta")}</span>}
+            {/* Nur DASS etwas vereinbart ist; was genau, steht im Dialog des
+                Kindes. Bei LRS entfällt es: der Nachteilsausgleich steckt darin,
+                zwei Kürzel für dasselbe wären doppelt. */}
+            {k.nta && !(k.sonder || []).includes("LRS") && <span style={badge(C.warning)} title={text("kurse.ntaHint")}>{text("kurse.nta")}</span>}
+            <span style={{ width: 28, display: "inline-flex", justifyContent: "flex-end", flexShrink: 0 }}>
+              {k.niveau && <span style={badge(k.niveau === "E" ? C.info : C.success)}>{k.niveau}</span>}
+            </span>
             {/* Umbenennen stand hier und ist entfernt: der Name gehoert der
                 PERSON und wandert beim Aendern auf alle Kurse mit — im Kurs
                 sah er wie eine Angabe DIESES Kurses aus. Gepflegt wird er

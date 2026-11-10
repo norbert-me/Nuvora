@@ -1357,6 +1357,10 @@ export default function Klassenarbeit() {
                 {/* Statistik-Kacheln (Anwesend … 95%-KI) — wie CardVote. */}
                 <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
                   <StatCard label={t("klassenarbeit.attendance")} value={`${A.noten.present} / ${A.noten.total}`} />
+                  {(() => {
+                    const nE = alleStudents.filter((s) => s.niveau === "E").length, nG = alleStudents.filter((s) => s.niveau === "G").length;
+                    return nE + nG > 0 ? <StatCard label={t("klassenarbeit.egAnzahl")} value={`${nE} / ${nG}`} /> : null;
+                  })()}
                   <StatCard label={t("klassenarbeit.avgGrade")} value={komma(A.noten.avg)} />
                   {A.noten.avgPct != null && <StatCard label={t("klassenarbeit.avgPct")} value={`${A.noten.avgPct}%`} />}
                   {A.noten.medPct != null && <StatCard label={t("klassenarbeit.median")} value={`${A.noten.medPct}%`} />}
