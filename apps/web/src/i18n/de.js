@@ -1982,6 +1982,8 @@ export default {
   "klassenarbeit.ciHint": "95%-Konfidenzintervall der mittleren Trefferquote dieser Aufgabe.",
   "klassenarbeit.attendance": "Anwesend",
   "klassenarbeit.egAnzahl": "SuS E / G",
+  "klassenarbeit.egAnzahlE": "SuS E",
+  "klassenarbeit.egAnzahlG": "SuS G",
   "klassenarbeit.avgGrade": "Ø Note",
   "klassenarbeit.avgPct": "Ø Prozent",
   "klassenarbeit.distGrades": "Notenverteilung",

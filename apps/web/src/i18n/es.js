@@ -2000,6 +2000,8 @@ export default {
   "klassenarbeit.ciHint": "Intervalo de confianza del 95% de la tasa media de acierto de esta tarea.",
   "klassenarbeit.attendance": "Presentes",
   "klassenarbeit.egAnzahl": "Alumnado E / G",
+  "klassenarbeit.egAnzahlE": "Alumnado E",
+  "klassenarbeit.egAnzahlG": "Alumnado G",
   "klassenarbeit.avgGrade": "Ø Nota",
   "klassenarbeit.avgPct": "Ø Porcentaje",
   "klassenarbeit.distGrades": "Distribución de notas",

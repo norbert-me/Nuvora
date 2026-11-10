@@ -162,6 +162,8 @@ async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = 
     def _tag(w):
         d = termine.get(w.id) or w.created_at
         return d.date().isoformat() if d else None
+    # Nach Datum der Arbeit, neueste zuerst; gleicher Tag nach Anlage (E/G-Paare bleiben beieinander).
+    rows = sorted(rows, key=lambda w: (_tag(w) or "", w.id), reverse=True)
     return [WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "", datum=_tag(w)) for w in rows]
 
 

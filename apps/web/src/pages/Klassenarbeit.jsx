@@ -921,7 +921,9 @@ export default function Klassenarbeit() {
   const [alleTeil, setAlleTeil] = useState("alle");   // welche Auswertung oben steht
   // In der Auswahl steht ein Paar EINMAL: das G-Blatt faellt heraus, wenn sein
   // E-Blatt daneben steht.
-  const auswahl = works.filter((w) => !(w.niveau === "G" && partnerVon(w)));
+  // Nach Datum der Arbeit, neueste zuerst (ohne Datum nach Anlage = hoechste id).
+  const auswahl = works.filter((w) => !(w.niveau === "G" && partnerVon(w)))
+    .sort((a, b) => (b.datum || "").localeCompare(a.datum || "") || b.id - a.id);
   const auswahlLabel = (w) => {
     const basis = partnerVon(w) ? `${w.name} (E/G)` : w.niveau ? `${w.name} (${w.niveau})` : w.name;
     const tag = datumKurz(w.datum);
@@ -1363,7 +1365,11 @@ export default function Klassenarbeit() {
                   <StatCard label={t("klassenarbeit.attendance")} value={`${A.noten.present} / ${A.noten.total}`} />
                   {(() => {
                     const nE = alleStudents.filter((s) => s.niveau === "E").length, nG = alleStudents.filter((s) => s.niveau === "G").length;
-                    return nE + nG > 0 ? <StatCard label={t("klassenarbeit.egAnzahl")} value={`${nE} / ${nG}`} /> : null;
+                    // Gemeinsame Auswertung: je nach gewaehltem Blatt nur E, nur G oder beide.
+                    if (nE + nG === 0) return null;
+                    if (schluessel === "E") return <StatCard label={t("klassenarbeit.egAnzahlE")} value={String(nE)} />;
+                    if (schluessel === "G") return <StatCard label={t("klassenarbeit.egAnzahlG")} value={String(nG)} />;
+                    return <StatCard label={t("klassenarbeit.egAnzahl")} value={`${nE} / ${nG}`} />;
                   })()}
                   <StatCard label={t("klassenarbeit.avgGrade")} value={komma(A.noten.avg)} />
                   {A.noten.avgPct != null && <StatCard label={t("klassenarbeit.avgPct")} value={`${A.noten.avgPct}%`} />}
