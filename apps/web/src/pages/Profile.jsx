@@ -1,3 +1,4 @@
+import { LetzteAenderungen } from "../components/WasIstNeu.jsx";
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
@@ -130,6 +131,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     }
   });
   const { t, lang, setLang } = useLanguage();
+  const [neuOffen, setNeuOffen] = useState(false);
   const [sparsam, setSparsam] = useState(sparsamAn());
   const [beamer, setBeamer] = useState(() => beamerWahl());
   const [melderKnopf, setMelderKnopf] = useState(() => !melderKnopfAus());
@@ -327,6 +329,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   return (
     <div style={{ ...pageForm }}>
       <h1 style={pageTitle}>{t("nav.profile")}</h1>
+      {neuOffen && <LetzteAenderungen onClose={() => setNeuOffen(false)} />}
 
       {/* Sprungleiste: die Abschnitte sind zugeklappt, und wer etwas sucht, soll
           nicht vier Pfeile durchprobieren. */}
@@ -529,7 +532,10 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             Nachlesen und der Neustart der eingeblendeten Führung. Der Weg zur
             Seite hing bisher in der Fußzeile — dort sucht ihn niemand, und
             neben dem Neustart steht er bei der Frage, zu der er gehört. */}
-        <Zeile label={t("profile.tutorialTitle")} erste>
+        <Zeile label={t("profile.letzteAenderungen")} erste>
+          <button type="button" onClick={() => setNeuOffen(true)} style={btnSecondary}>{t("profile.letzteAenderungenOeffnen")}</button>
+        </Zeile>
+        <Zeile label={t("profile.tutorialTitle")}>
           <Link to="/tutorial" style={{ ...btnSecondary, display: "inline-block", textDecoration: "none", marginRight: 8 }}>
             {t("profile.tutorialOpen")}
           </Link>

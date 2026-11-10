@@ -72,6 +72,34 @@ function Zeilen({ text }) {
   );
 }
 
+// Zum Nachlesen: die letzten Fassungen, ohne den „gesehen"-Stand zu veraendern.
+export function LetzteAenderungen({ onClose }) {
+  const { t } = useLanguage();
+  const [daten, setDaten] = useState(null);
+  const [fehler, setFehler] = useState(false);
+  useEffect(() => {
+    fetch("/api/changelog?letzte=5").then((r) => (r.ok ? r.json() : null)).then((d) => (d ? setDaten(d) : setFehler(true))).catch(() => setFehler(true));
+  }, []);
+  return (
+    <Modal onClose={onClose} width={560} labelledby="letzte-aenderungen-titel">
+      <DialogKopf id="letzte-aenderungen-titel" titel={t("neu.letzte")} onClose={onClose}
+        schliessenLabel={t("common.close")} style={{ marginBottom: 12 }} />
+      {fehler && <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("neu.fehler")}</p>}
+      {daten && daten.abschnitte.map((a) => (
+        <div key={a.version} style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}>{a.version}{a.datum ? ` — ${a.datum}` : ""}</div>
+          <Zeilen text={a.inhalt} />
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+        <a href="https://github.com/norbert-me/Nuvora/releases" target="_blank" rel="noreferrer"
+          style={{ ...btnSecondary, textDecoration: "none" }}>{t("neu.alle")}</a>
+        <button onClick={onClose} style={btnPrimary}>{t("neu.ok")}</button>
+      </div>
+    </Modal>
+  );
+}
+
 export default function WasIstNeu() {
   const { t } = useLanguage();
   const [daten, setDaten] = useState(null);

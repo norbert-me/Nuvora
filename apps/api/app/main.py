@@ -1616,11 +1616,19 @@ async def apps(user=Depends(get_current_user)):
 # Fassungen ist fuer ein neues Konto keine Neuigkeit, sondern eine Wand aus Text.
 # Deshalb setzt schon die Registrierung den Stand auf die laufende Fassung.
 @app.get("/api/changelog")
-async def changelog_neu(user=Depends(get_current_user)):
-    """Die Fassungen, die seit dem letzten Blick dieser Lehrkraft dazukamen."""
+async def changelog_neu(letzte: int = 0, user=Depends(get_current_user)):
+    """Die Fassungen, die seit dem letzten Blick dieser Lehrkraft dazukamen.
+
+    Mit `letzte=N`: die letzten N Fassungen bis zur laufenden, unabhaengig vom
+    gemerkten Stand — zum Nachlesen (Profil), ohne den Stand anzufassen."""
     from . import changelog as _cl
     pfad = _cl.datei()
     text = pfad.read_text(encoding="utf-8") if pfad else ""
+    if letzte > 0:
+        o = _cl.version_tupel(APP_VERSION)
+        alle = [a for a in _cl.abschnitte(text) if _cl.version_tupel(a["version"]) <= o]
+        return {"version": APP_VERSION, "gesehen": (getattr(user, "changelog_seen", "") or "").strip(),
+                "abschnitte": alle[:min(letzte, 10)]}
     gesehen = (getattr(user, "changelog_seen", "") or "").strip()
     return {
         "version": APP_VERSION,

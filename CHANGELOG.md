@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Profil:** unter „Hilfe und App“ lassen sich die letzten Änderungen jederzeit nachlesen.
 - **Profil:** Optionen neu geordnet — Konto, Unterricht, Teile der Module, „Dieses Gerät“ (Sprache, Beamer, Datensparen, Melde-Knopf), „Hilfe und App“; mit Sprungleiste oben. Der Bonus für E-Aufgaben erscheint nur noch mit CardVote.
 - **iPhone/iPad-App entfernt:** die Capacitor-Hülle, ihr Profil-Eintrag und der Release-Job sind weg; für iPhone und iPad bleibt der Weg über Safari („Zum Home-Bildschirm“).
 - **Klassenarbeit:** Auswahl nach Datum sortiert, die gemeinsame Auswertung nennt die Zahl der E- und G-Kinder.
