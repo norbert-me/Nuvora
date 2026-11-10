@@ -563,14 +563,6 @@ export default function Noten() {
           {/* Kurze Beschriftungen („1. HJ"), die lange Form im title. */}
           <input type="search" value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("noten.suche")} aria-label={t("noten.suche")}
             style={{ ...toolbarInput, width: 140, minWidth: 0 }} />
-          <span title={t("noten.formTitel")}>
-            <Segment>
-              <button onClick={() => setFormPersist("wert")} aria-pressed={form === "wert"}
-                style={{ ...segmentBtn, fontWeight: form === "wert" ? 700 : 500, color: form === "wert" ? "var(--accent)" : "var(--text2)" }}>2,5</button>
-              <button onClick={() => setFormPersist("tendenz")} aria-pressed={form === "tendenz"}
-                style={{ ...segmentBtn, fontWeight: form === "tendenz" ? 700 : 500, color: form === "tendenz" ? "var(--accent)" : "var(--text2)" }}>2+ (2,3)</button>
-            </Segment>
-          </span>
           <span title={t("noten.term")}>
             <Tabs value={term} onChange={(v) => wechseln(() => setTerm(v))}
               options={[["1", t("noten.term1Short")], ["2", t("noten.term2Short")], ["year", t("noten.year")]]} />
@@ -1049,7 +1041,7 @@ export default function Noten() {
       <SpeicherBalken entwurf={entwurf} zeigen={autoSpeichern.zeigen} />
 
       {infoFuer && (
-        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} classId={classId} kursId={kursId} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} />
+        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} classId={classId} kursId={kursId} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} form={form} setForm={setFormPersist} />
       )}
     </div>
   );
@@ -1743,7 +1735,7 @@ function Fehlzeiten({ classId, studentId, t }) {
 // Der Name im Dialog folgt derselben Option (ausserhalb des Hooks gelesen).
 const kurzNameOrt = (n) => (kurzNameAn() ? kurzName(n) : n);
 
-function StudentInfo({ t, student, summary, sections, entries = [], classId = null, kursId = null, onZeugnis, onClose }) {
+function StudentInfo({ t, student, summary, sections, entries = [], classId = null, kursId = null, onZeugnis, onClose, form, setForm }) {
   // Hook vor jedem fruehen Ausstieg: sonst haengt die Hook-Reihenfolge daran,
   // ob gerade ein Kind gewaehlt ist.
   const [bereich, setBereich] = useState("gesamt");
@@ -1822,6 +1814,19 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
             gibt. Was leer ist, faellt weg — eine Ueberschrift ohne Inhalt sagt
             nichts und kostet die halbe Maske. Geaendert wird im Kurs und auf der
             Personenseite; dieselbe Komponente, nur ohne Felder. */}
+        {/* Notenform (Tendenz oder Zahl): gilt fuer die ganze Tabelle, wird aber hier eingestellt. */}
+        {setForm && (
+          <div style={{ marginBottom: 12 }}>
+            <span title={t("noten.formTitel")}>
+              <Segment>
+                <button onClick={() => setForm("wert")} aria-pressed={form === "wert"}
+                  style={{ ...segmentBtn, fontWeight: form === "wert" ? 700 : 500, color: form === "wert" ? "var(--accent)" : "var(--text2)" }}>2,5</button>
+                <button onClick={() => setForm("tendenz")} aria-pressed={form === "tendenz"}
+                  style={{ ...segmentBtn, fontWeight: form === "tendenz" ? 700 : 500, color: form === "tendenz" ? "var(--accent)" : "var(--text2)" }}>2+</button>
+              </Segment>
+            </span>
+          </div>
+        )}
         <Fehlzeiten classId={classId} studentId={student.id} t={t} />
         <SchuelerAngaben studentId={student.id} kursId={kursId} nurLesen t={t} />
 

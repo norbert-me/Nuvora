@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigationType, useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
@@ -396,17 +396,65 @@ export default function Dashboard() {
   const isTouch = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
   const setZieh = useZiehVorschau(currentSets, setzeSetReihenfolge, !isTouch);
 
+  // Ordner und geoeffnetes Quiz stehen in der Adresse (?ordner=, ?quiz=): jeder
+  // Schritt ist ein Verlaufseintrag, damit der Zurueck-Knopf (Safari, Maus,
+  // Wischgeste) eine Ebene hoch geht statt die ganze Seite zu verlassen.
+  const urlSetzen = (aendern, ersetzen = false) => {
+    const next = new URLSearchParams(params);
+    aendern(next);
+    setParams(next, { replace: ersetzen });
+  };
   const openFolder = (folder) => {
     setPath([...path, { id: folder.id, name: folder.name }]);
     setCurrentFolder(folder.id);
     setEditingSet(null);
+    urlSetzen((p) => { p.set("ordner", String(folder.id)); p.delete("quiz"); });
   };
 
   const goToPath = (idx) => {
     if (idx < 0) { setPath([]); setCurrentFolder(null); }
     else { setPath(path.slice(0, idx + 1)); setCurrentFolder(path[idx].id); }
     setEditingSet(null);
+    urlSetzen((p) => { if (idx < 0) p.delete("ordner"); else p.set("ordner", String(path[idx].id)); p.delete("quiz"); });
   };
+  const oeffneSet = (qs) => {
+    setEditingSet(qs);
+    urlSetzen((p) => p.set("quiz", String(qs.id)));
+  };
+  const schliesseSet = () => {
+    setEditingSet(null);
+    urlSetzen((p) => p.delete("quiz"), true);
+  };
+
+  // Zurueck/Vor des Browsers: Ordner und Quiz aus der Adresse uebernehmen. Nur
+  // bei POP und nur, wenn sich die Adresse wirklich geaendert hat — unsere
+  // eigenen Schritte (PUSH) stehen schon im Zustand.
+  const navTyp = useNavigationType();
+  const letzteUrl = useRef(null);
+  useEffect(() => {
+    const key = params.toString();
+    if (navTyp !== "POP") { letzteUrl.current = key; return; }
+    if (letzteUrl.current === key) return;
+    if (folders.length === 0 && rootSets.length === 0) return;   // noch nicht geladen
+    letzteUrl.current = key;
+    const qz = Number(params.get("quiz")) || null;
+    if (qz) { if (!editingSet || editingSet.id !== qz) sammlungOeffnen(qz); return; }
+    setEditingSet(null);
+    const ord = Number(params.get("ordner")) || null;
+    if (!ord) { setPath([]); setCurrentFolder(null); return; }
+    const gehe = (nodes, spur) => {
+      for (const n of nodes) {
+        const hier = [...spur, { id: n.id, name: n.name }];
+        if (n.id === ord) return hier;
+        const tiefer = gehe(n.children || [], hier);
+        if (tiefer) return tiefer;
+      }
+      return null;
+    };
+    const spur = gehe(folders, []);
+    if (spur) { setPath(spur); setCurrentFolder(ord); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, folders, rootSets, navTyp]);
 
   const createFolder = async (nm) => {
     const name = (nm ?? newFolderName).trim();
@@ -597,7 +645,7 @@ export default function Dashboard() {
   };
 
   if (editingSet) {
-    return <QuestionSetEditor questionSet={editingSet} allQuestions={allQuestions} onBack={() => { setEditingSet(null); load(); }} onDelete={() => deleteSet(editingSet.id)} onQuestionsChange={load} />;
+    return <QuestionSetEditor questionSet={editingSet} allQuestions={allQuestions} onBack={() => { schliesseSet(); load(); }} onDelete={() => deleteSet(editingSet.id)} onQuestionsChange={load} />;
   }
 
   // Collect all valid move targets (excluding the folder being moved and its descendants)
@@ -832,7 +880,7 @@ export default function Dashboard() {
             <div key={qs.id} {...setZieh.props(idx)}
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...cardStyle, marginBottom: 8, cursor: "pointer",
                 opacity: setZieh.vorschau ? 0.92 : 1, transition: "opacity 0.15s" }}>
-              <span onClick={() => setEditingSet(qs)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+              <span onClick={() => oeffneSet(qs)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                 {!isTouch && (
                   <span className="drag-handle" style={{ color: "var(--text3)", display: "inline-flex", cursor: "grab", flexShrink: 0 }}
                     title={t("dash.dragSets")} aria-hidden="true"><Icon d={ICONS.grip} size={15} /></span>
