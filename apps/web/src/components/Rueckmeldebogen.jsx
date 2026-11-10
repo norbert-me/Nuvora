@@ -76,13 +76,13 @@ const noteText = (b, form) => {
   return b.noteTendenz || b.note || null;
 };
 
-// Eine berechnete Note (Zwischenstand): „2− (2,46)", „2,5" oder ganz — nach der
-// gewaehlten Notenform. Der Zwischenstand ist kein Zeugnis, deshalb mit Zahl.
+// Eine berechnete Note (Zwischenstand): „2−", „2,5" oder ganz — nach der
+// gewaehlten Notenform. 
 const stufenText = (wert, form) => {
   const zahl = String(Math.round(wert * 100) / 100).replace(".", ",");
   if (form === "ganz") return String(Math.round(wert));
   if (form === "wert") return zahl;
-  return `${wertLabel(wert)} (${zahl})`;
+  return wertLabel(wert);   // Tendenz gewaehlt: keine Kommazahl daneben
 };
 
 export function BogenWahl({ onDrucken, onClose, mitWdh = true, wdhFehlt = [] }) {
@@ -303,12 +303,18 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
               Linie schreibt die Unterschrift jemand quer ueber die Notiz — und
               die Lehrkraft sieht spaeter nicht, ob es je jemand gelesen hat.
               Datum daneben, weil „unterschrieben" ohne Tag nichts belegt. */}
-          {an("unterschrift") && <div style={{ marginTop: 28, display: "flex", gap: 24, alignItems: "flex-end" }}>
-            <div style={{ width: 120 }}>
-              <div style={{ borderBottom: "1px solid #999", height: 22 }} />
-              <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>{t("bogen.datum")}</div>
+          {an("unterschrift") && <div style={{ marginTop: 28 }}>
+            <div style={{ display: "flex", gap: 24, alignItems: "flex-end" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ borderBottom: "1px solid #999", height: 22 }} />
+                <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>{t("bogen.lehrkraft")}</div>
+              </div>
+              <div style={{ width: 120 }}>
+                <div style={{ borderBottom: "1px solid #999", height: 22 }} />
+                <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>{t("bogen.datum")}</div>
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ marginTop: 24 }}>
               <div style={{ borderBottom: "1px solid #999", height: 22 }} />
               <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>{t("bogen.unterschrift")}</div>
             </div>
