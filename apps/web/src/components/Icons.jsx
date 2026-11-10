@@ -45,6 +45,8 @@ export const MODULE_ICONS = {
   mathespiele: ["M10 3a7 7 0 100 14 7 7 0 000-14z", "M10 6.5l2.5 1.8-1 3h-3l-1-3z"],
   // Koerper: ein Quader in Schraegansicht.
   koerper: ["M4 7l6-3 6 3v7l-6 3-6-3z", "M4 7l6 3 6-3", "M10 10v7"],
+  // Zahlenstrahl: Achse mit Teilstrichen und einem Bogenpfeil.
+  zahlenstrahl: ["M2.5 14h15", "M5 12v4M10 12v4M15 12v4", "M5 11c0-5 5-5 5 0", "M9 9.5l1 1.5 1.3-1.6"],
   reihen: ["M4 4h12", "M4 8h12", "M4 12h8", "M4 16h5", "M14 13l2 2 3-3.5"],
   waage: ["M10 3v13", "M6 17h8", "M3 6h14", "M5 6l-2.5 5h5z", "M15 6l-2.5 5h5z"],
   rennen: ["M3 13l1.5-4.5A2 2 0 016.4 7h7.2a2 2 0 011.9 1.5L17 13", "M2.5 13h15v3h-15z", "M5.5 16v1.5M14.5 16v1.5", "M6 13.2h.01M14 13.2h.01"],

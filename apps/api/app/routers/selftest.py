@@ -93,6 +93,7 @@ MODUL_PREFIX = {
     "tafel": "/api/tafel",
     "mathespiele": None,
     "koerper": None,
+    "zahlenstrahl": None,
 }
 
 # Betreiberdaten: ohne diese Felder ist das Impressum unvollstaendig.

@@ -357,6 +357,7 @@ const KlassenarbeitVergleich = React.lazy(() => import("./pages/Klassenarbeit.js
 const Notizbrett = React.lazy(() => import("./pages/Notizbrett.jsx"));
 const Mathefussball = React.lazy(() => import("./pages/Mathefussball.jsx"));
 const Koerper = React.lazy(() => import("./pages/Koerper.jsx"));
+const Zahlenstrahl = React.lazy(() => import("./pages/Zahlenstrahl.jsx"));
 const Tafel = React.lazy(() => import("./pages/Tafel.jsx"));
 const Pap = React.lazy(() => import("./pages/Pap.jsx"));
 const Personen = React.lazy(() => import("./pages/Personen.jsx"));
@@ -429,6 +430,7 @@ function helpArea(pathname) {
   if (pathname === "/pap" || pathname.startsWith("/pap/")) return "pap";
   if (pathname.startsWith("/mathespiele")) return "mathespiele";
   if (pathname.startsWith("/koerper")) return "koerper";
+  if (pathname.startsWith("/zahlenstrahl")) return "zahlenstrahl";
   // Nicht startsWith("/waage") — das faengt auch /waage-frei (oeffentlich).
   if (pathname === "/waage" || pathname.startsWith("/waage/")) return "waage";
   if (pathname.startsWith("/rennen")) return "rennen";
@@ -447,6 +449,7 @@ const NOTIZBRETT = "/notizbrett";
 const PAP = "/pap";
 const MATHEF = "/mathespiele";
 const KOERPER = "/koerper";
+const ZAHLENSTRAHL = "/zahlenstrahl";
 const WAAGE = "/waage";
 const REIHEN = "/reihen";
 const RENNEN = "/rennen";
@@ -469,6 +472,7 @@ const getModuleNavItems = (t, location, user) => {
     : pathname.startsWith(NOTIZBRETT) ? "notizbrett"
     : pathname.startsWith(MATHEF) ? "mathespiele"
     : pathname.startsWith(KOERPER) ? "koerper"
+    : pathname.startsWith(ZAHLENSTRAHL) ? "zahlenstrahl"
     : (pathname === WAAGE || pathname.startsWith(`${WAAGE}/`)) ? "waage"
     : pathname.startsWith(RENNEN) ? "rennen"
     : pathname.startsWith(REIHEN) ? "reihen"
@@ -544,6 +548,7 @@ const getModuleNavItems = (t, location, user) => {
   }
   if (area === "mathespiele") return [{ to: MATHEF, label: t("mathefussball.title") }];
   if (area === "koerper") return [{ to: KOERPER, label: t("koerper.title") }];
+  if (area === "zahlenstrahl") return [{ to: ZAHLENSTRAHL, label: t("zahlenstrahl.title") }];
   if (area === "rennen") return [{ to: RENNEN, label: t("rennen.titel") }];
   if (area === "waage") {
     const cur = params.get("tab");
@@ -1236,6 +1241,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={NOTIZBRETT} element={user ? <ModuleGate moduleKey="notizbrett"><Notizbrett /></ModuleGate> : <Landing />} />
           <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathespiele"><Mathefussball /></ModuleGate> : <Landing />} />
           <Route path={KOERPER} element={user ? <ModuleGate moduleKey="koerper"><Koerper /></ModuleGate> : <Landing />} />
+          <Route path={ZAHLENSTRAHL} element={user ? <ModuleGate moduleKey="zahlenstrahl"><Zahlenstrahl /></ModuleGate> : <Landing />} />
           <Route path={WAAGE} element={user ? <ModuleGate moduleKey="waage"><Waage /></ModuleGate> : <Landing />} />
           <Route path={REIHEN} element={user ? <ModuleGate moduleKey="reihen"><Reihen /></ModuleGate> : <Landing />} />
           <Route path={RENNEN} element={user ? <ModuleGate moduleKey="rennen"><Rennen /></ModuleGate> : <Landing />} />

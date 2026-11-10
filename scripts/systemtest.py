@@ -212,6 +212,7 @@ def endpunkte(u):
         ],
         "mathespiele": [],
         "koerper": [],
+        "zahlenstrahl": [],
         "waage": [
             ("GET", "/api/waage/aufgaben"),
         ],
@@ -250,6 +251,7 @@ def tore(u):
         "tafel": [("GET", "/api/tafel")],
         "mathespiele": [],
         "koerper": [],
+        "zahlenstrahl": [],
         "waage": [("GET", "/api/waage/aufgaben")],
         "reihen": [("GET", "/api/reihen")],
         "rennen": [],
@@ -1424,6 +1426,7 @@ INHALT = {
     "tafel": inhalt_tafel,
     "mathespiele": None,
     "koerper": None,
+    "zahlenstrahl": None,
     "waage": inhalt_waage,
     "reihen": inhalt_reihen,
     "rennen": None,

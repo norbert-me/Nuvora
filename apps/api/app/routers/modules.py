@@ -388,6 +388,21 @@ REGISTRY: List[ModuleDef] = [
         stage="beta",
     ),
     ModuleDef(
+        key="zahlenstrahl",
+        group="unterricht",
+        name="Zahlenstrahl",
+        description=(
+            "Rechnen mit Pfeilen auf dem Zahlenstrahl: ganze Zahlen und "
+            "Dezimalzahlen addieren und subtrahieren. Bei einer Aufgabe liegen "
+            "die Pfeile fest und erscheinen Schritt für Schritt; im freien "
+            "Modus ohne Aufgabe lassen sich Start und Pfeile ziehen, und der "
+            "Term entsteht daraus. Zeigt, warum „minus eine negative Zahl“ plus "
+            "ist: der Pfeil der Zahl wird umgedreht. Reines Werkzeug, ohne Daten."
+        ),
+        path="/zahlenstrahl",
+        stage="beta",
+    ),
+    ModuleDef(
         key="waage",
         group="unterricht",
         name="Waage",

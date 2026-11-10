@@ -14,6 +14,10 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- **Neues Modul Zahlenstrahl (Beta):** Rechnen mit Pfeilen, auch mit negativen und Dezimalzahlen. Bei einer Aufgabe liegen die Pfeile fest und erscheinen Schritt für Schritt; im freien Modus ohne Aufgabe lassen sich Start und Pfeile ziehen. Zeigt, warum „minus eine negative Zahl“ plus ist.
+
 ## 4.5.2 — 10.11.2026
 
 - **Eingebaute App (Vorarbeit):** die API läuft jetzt auch auf SQLite und liefert die Oberfläche selbst aus (`NUVORA_LOKAL=1`) — Grundlage für Nuvora ohne Server auf Mac und Windows. Plan: `docs/eingebaute-app.md`.

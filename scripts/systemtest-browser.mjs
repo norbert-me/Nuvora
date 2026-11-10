@@ -740,6 +740,21 @@ const bedienung = (td) => [
     },
   },
   {
+    modul: "zahlenstrahl",
+    name: "Pfeil legen und Ergebnis sehen (/zahlenstrahl)",
+    pfad: "/zahlenstrahl",
+    // Reines Werkzeug ohne Daten. Die Voreinstellung ist „minus eine negative
+    // Zahl“: ein Klick legt den Pfeil, der Pfeil der Zahl steht gestrichelt
+    // darunter, und aus dem Fragezeichen wird das Ergebnis.
+    beweis: "Pfeil gelegt, Pfeil der Zahl sichtbar, Ergebnis statt „?“",
+    async eigen(seite) {
+      await seite.getByRole("button", { name: "Nächster Pfeil" }).first().click({ timeout: 8000 });
+      await seite.getByText(/Pfeil für/).first().waitFor({ timeout: 8000 });
+      const text = await seite.locator("body").innerText();
+      return text.includes("= ?") ? "nach dem Pfeil steht noch ein Fragezeichen statt des Ergebnisses" : "";
+    },
+  },
+  {
     modul: "mathespiele",
     name: "Mathefußball spielen (/mathespiele)",
     pfad: "/mathespiele",

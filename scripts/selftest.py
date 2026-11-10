@@ -1431,6 +1431,7 @@ PROBEN = {
     "tafel": probe_tafel,
     "mathespiele": None,
     "koerper": None,
+    "zahlenstrahl": None,
     "waage": probe_waage,
     "reihen": probe_reihen,
     "rennen": None,
