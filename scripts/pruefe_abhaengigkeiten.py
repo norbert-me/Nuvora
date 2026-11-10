@@ -28,7 +28,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FREIGABE = ROOT / "scripts" / "abhaengigkeiten.freigegeben.json"
-NPM_PROJEKTE = ["apps/web", "apps/desktop", "apps/ios", "scripts"]
+NPM_PROJEKTE = ["apps/web", "apps/desktop", "scripts"]
 PY_MANIFESTE = ["apps/api/requirements.txt", "apps/api/requirements-dev.txt"]
 MINDESTALTER_TAGE = 60
 
@@ -92,11 +92,7 @@ def dev_namen() -> set:
 def pruefe_npm_lock(projekt: str, befunde: list):
     datei = ROOT / projekt / "package-lock.json"
     if not datei.exists():
-        # apps/ios hat bewusst keine Lock-Datei (siehe release.yml: `npm install`,
-        # Capacitor-Fassungen werden dort frisch aufgeloest); die NAMEN bleiben
-        # trotzdem freigabepflichtig.
-        if projekt != "apps/ios":
-            befunde.append(f"{projekt}: package-lock.json fehlt")
+        befunde.append(f"{projekt}: package-lock.json fehlt")
         return
     lock = json.loads(datei.read_text(encoding="utf-8"))
     for pfad, info in (lock.get("packages") or {}).items():

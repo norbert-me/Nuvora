@@ -555,11 +555,8 @@ Vorwärts stehen im Menü *Verlauf*.
 
 ### iPhone und iPad
 
-`apps/ios` — dieselbe Hülle mit Capacitor statt Electron: Serveradresse beim
-ersten Start eintragen, danach die gewohnte Oberfläche. Das Xcode-Projekt
-entsteht auf einem Mac (`npm install`, `npx cap add ios`); die Schritte stehen
-in `apps/ios/README.md`. Ohne eigene App bleibt der Weg über Safari: *Teilen* →
-*Zum Home-Bildschirm* — dort räumt Safari den Offline-Speicher allerdings nach
+Es gibt dafür keine eigene App. Der Weg ist Safari: *Teilen* → *Zum
+Home-Bildschirm* — dort räumt Safari den Offline-Speicher allerdings nach
 einigen Tagen ohne Besuch auf.
 
 ### Fehler melden
@@ -664,7 +661,6 @@ mit dem Web-Build und einem `docker compose build` in der CI.
 | `apps/web/src` | React 18 · Vite · react-router · i18n (de vollständig, en/es weitgehend) |
 | `apps/web/public/lp` | Lernpfad-Statik (Vanilla JS), in-page gemountet |
 | `apps/desktop` | Electron-Hülle (macOS) |
-| `apps/ios` | Capacitor-Hülle (iPhone/iPad) |
 | `scripts/` | Selbsttest, Systemtest, Aufräumen, Backup-Cron, Lasttest |
 | `docs/` | Architektur, neues Modul, Selbsttest, Datenschutz, Entwicklung |
 | `nginx.conf`, `docker-compose.yml` | Proxy und Stack — eine Domain, alle Teile |

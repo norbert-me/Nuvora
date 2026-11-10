@@ -1557,7 +1557,6 @@ APP_PLATTFORMEN = [
     ("windows", "Windows", lambda n: n.endswith((".exe", ".msi"))),
     ("linux", "Linux", lambda n: n.endswith((".AppImage", ".deb"))),
     ("android", "Android", lambda n: n.endswith(".apk")),
-    ("ios", "iPhone / iPad", lambda n: n.endswith(".ipa")),
 ]
 
 
