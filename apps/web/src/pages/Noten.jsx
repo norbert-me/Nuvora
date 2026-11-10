@@ -950,7 +950,10 @@ export default function Noten() {
                                       window.addEventListener("pointermove", aus);
                                     }}
                                     style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 14, fontWeight: wert != null ? 600 : 400 }}>
-                                    {wert != null ? de(wert) : <span style={{ color: "var(--border2)" }}>·</span>}
+                                    {wert != null ? de(wert) : (s.le && c.source_work_id
+                                      // LE-Kind in einer Klassenarbeits-Spalte: nicht benotet, nicht „leer".
+                                      ? <span title={t("kurse.leHint")} style={{ color: "var(--text3)", fontSize: 12, fontWeight: 700 }}>UB</span>
+                                      : <span style={{ color: "var(--border2)" }}>·</span>)}
                                   </button>
                                   {/* Ecke oben rechts. Die Trefferflaeche ist 20 px
                                       gross, das Dreieck darin nur 9 — vorher war der

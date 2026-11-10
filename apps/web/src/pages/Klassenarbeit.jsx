@@ -1688,8 +1688,8 @@ export default function Klassenarbeit() {
                     // die Klassenstatistik unten rechnet sie raus. Anzeige umschaltbar:
                     // Tendenznote (2+) oder Notenwert in 0,3-Schritten (2,3).
                     const gd = (erfasst && tm) ? gradeDetailed(wt.pct, effScale) : null;
-                    // LE (Foerderschwerpunkt Lernen): nicht bewertet — „NB“ statt Note.
-                    const note = leIst(s) ? "NB" : gd ? (gradeMode === "wert" ? komma(gd.wert) : gd.note) : "";
+                    // LE (Foerderschwerpunkt Lernen): nicht bewertet — „UB“ statt Note.
+                    const note = leIst(s) ? "UB" : gd ? (gradeMode === "wert" ? komma(gd.wert) : gd.note) : "";
                     return (
                       <tr key={s.id} style={{ ...(abw ? { opacity: 0.5 } : {}), ...(fokus && fokus.sid === s.id ? { background: FOKUS_TON } : {}) }}>
                         <td style={{ ...td, ...klebtLinks, textAlign: "left", padding: "4px 8px", fontWeight: 500, whiteSpace: "nowrap",
