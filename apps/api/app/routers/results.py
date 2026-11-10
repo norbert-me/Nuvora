@@ -280,11 +280,13 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
     # E/G-Differenzierung und Minuspunkte haengen am Quiz, nicht an der Session.
     niveau_aktiv = False
     minuspunkte = False
+    unbenotet = False
     if session.question_set_id:
         qs = await db.get(QuestionSet, session.question_set_id)
         if qs:
             niveau_aktiv = bool(qs.niveau_aktiv)
             minuspunkte = bool(qs.minuspunkte)
+            unbenotet = bool(qs.unbenotet)
 
     questions = []
     if session.question_set_id:
@@ -363,6 +365,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
         "kurse": kurse_der_klasse,
         "niveau_aktiv": niveau_aktiv,
         "minuspunkte": minuspunkte,
+        "unbenotet": unbenotet,
         "questions": questions,
         "students": rows,
     }

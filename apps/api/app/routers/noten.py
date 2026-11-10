@@ -34,7 +34,7 @@ from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
 from ..importe import geprueft
 from ..models import (
     GradeCategory, GradeEntry, GradeSection, GradeOverride, QuartalDivider,
-    Session as TestSession, Student, User, CodeSession, WorkAnalysis,
+    Session as TestSession, Student, User, CodeSession, WorkAnalysis, QuestionSet,
 )
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
@@ -975,6 +975,11 @@ async def import_session(body: ImportBody, user: User = Depends(require_module),
         raise HTTPException(404, "Session nicht gefunden")
     if not sess.class_id:
         raise HTTPException(400, "Diese Session hat keine Klasse — keine Zuordnung möglich")
+
+    if sess.question_set_id:
+        quiz = await db.get(QuestionSet, sess.question_set_id)
+        if quiz and quiz.unbenotet:
+            raise HTTPException(409, "Dieses Quiz ist als nicht benotet markiert — es lässt sich nicht ins Notenbuch übernehmen.")
 
     sec = await _owned_section(db, user, body.section_id)
     if sec.class_id != sess.class_id:

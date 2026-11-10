@@ -1772,6 +1772,7 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
             "date": sess.created_at.isoformat() if sess.created_at else None,
             "score": r["punkte"], "total": r["max"], "pct": r["pct"],
             "note": r["note_tendenz"],
+            "unbenotet": bool(r.get("unbenotet")),
             # Was das Kind aus der Zahl machen soll — ohne das ist eine Prozent-
             # angabe nur eine Zahl. Kein Vergleich mit der Klasse.
             "sass": r["sass"], "offen": r["offen"],

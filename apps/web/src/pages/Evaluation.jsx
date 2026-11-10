@@ -584,7 +584,8 @@ const gradeDistribution = (() => {
           onClose={() => setNotenDialog(false)}
         />
       )}
-      <h2 style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{session_name || t("cv.sessionFallback", { id })}</h2>
+      <h2 style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{session_name || t("cv.sessionFallback", { id })}
+        {data.unbenotet && <span style={{ ...chipStyle, marginLeft: 10, fontSize: 12, verticalAlign: "middle" }}>{t("dash.unbenotetToggle")}</span>}</h2>
       {/* Derselbe Test in einem anderen Kurs der Klasse? Umhängen ist eine
           Handlung (wie Archivieren), keine Einstellung — sie gilt sofort. */}
       {(data.kurse || []).length > 1 && (
@@ -614,7 +615,7 @@ const gradeDistribution = (() => {
       >
         {/* Nur sichtbar, wenn das Notenmodul aktiv ist — sonst fuehrt der
             Knopf ins Leere (Regel 3: CardVote haengt nicht von Noten ab). */}
-        {notenAktiv && data.class_id && (
+        {notenAktiv && data.class_id && !data.unbenotet && (
           <button onClick={() => setNotenDialog(true)} style={toolbarBtn}>
             {t("notenimp.button")}
           </button>

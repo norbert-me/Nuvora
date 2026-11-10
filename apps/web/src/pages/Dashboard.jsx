@@ -1004,6 +1004,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
     shuffleA: !!qs.shuffle_answers,
     niveauAktiv: !!qs.niveau_aktiv,
     minuspunkte: !!qs.minuspunkte,
+    unbenotet: !!qs.unbenotet,
     eFragen: Object.entries(qs.niveaus || {}).filter(([, v]) => v === "E").map(([k]) => Number(k)).sort((a, b) => a - b),
   });
   const [gespeichert, setGespeichert] = useState(() => alsEntwurf(questionSet));
@@ -1017,6 +1018,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         shuffle_answers: wert.shuffleA,
         niveau_aktiv: wert.niveauAktiv,
         minuspunkte: wert.minuspunkte,
+        unbenotet: wert.unbenotet,
         // Immer die VOLLE Zuordnung schicken: fehlt eine Frage im Objekt,
         // behaelt der Server ihr altes Niveau — ein Zurueckstellen auf G waere
         // dann wirkungslos.
@@ -1027,7 +1029,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
     onQuestionsChange();
   });
 
-  const { name, shuffleQ, shuffleA, niveauAktiv, minuspunkte } = e.wert;
+  const { name, shuffleQ, shuffleA, niveauAktiv, minuspunkte, unbenotet } = e.wert;
   // Fragen in der Reihenfolge des Entwurfs.
   const questions = e.wert.ids.map((qid) => qMap[qid]).filter(Boolean);
 
@@ -1114,6 +1116,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         <Toggle checked={shuffleA} onChange={(v) => e.setz({ shuffleA: v })} label={t("dash.shuffleA")} />
         <Toggle checked={niveauAktiv} onChange={(v) => e.setz({ niveauAktiv: v })} label={t("dash.niveauToggle")} />
         <Toggle checked={minuspunkte} onChange={(v) => e.setz({ minuspunkte: v })} label={t("dash.minusToggle")} />
+        <Toggle checked={!!unbenotet} onChange={(v) => e.setz({ unbenotet: v })} label={t("dash.unbenotetToggle")} />
       </div>
       {(niveauAktiv || minuspunkte) && (
         <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px", lineHeight: 1.5 }}>

@@ -85,6 +85,7 @@ async def quiz(db: AsyncSession, session: Session, nur_card_id: Optional[int] = 
     qs = await db.get(QuestionSet, session.question_set_id)
     niveau_aktiv = bool(qs and qs.niveau_aktiv)
     minuspunkte = bool(qs and qs.minuspunkte)
+    unbenotet = bool(qs and qs.unbenotet)
     config = session.eval_config or {}
     qmap = session.question_map or {}
 
@@ -155,8 +156,10 @@ async def quiz(db: AsyncSession, session: Session, nur_card_id: Optional[int] = 
         out.append({
             "student_id": st.id, "card_id": st.card_id, "name": st.name,
             "punkte": w["score"], "max": w["max_score"], "pct": round(w["pct"]),
-            "note": note_aus_pct(w["pct"], config.get("grade_scale")),
-            "note_tendenz": note_mit_tendenz(w["pct"], config.get("grade_scale")),
+            # Nicht benotet: Prozent und Themen bleiben, die Note entfaellt.
+            "note": None if unbenotet else note_aus_pct(w["pct"], config.get("grade_scale")),
+            "note_tendenz": None if unbenotet else note_mit_tendenz(w["pct"], config.get("grade_scale")),
+            "unbenotet": unbenotet,
             "sass": [x for x in themen if x["pct"] >= SASS],
             "offen": [x for x in themen if x["pct"] < OFFEN],
         })

@@ -234,6 +234,10 @@ class QuestionSet(Base):
     # Minuspunkte: falsche Antwort = -1 (Gesamtpunktzahl nie unter 0). Wer die
     # Karte unten laesst, antwortet nicht: 0 Punkte, kein Abzug.
     minuspunkte: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Nicht benotet: das Quiz gibt Rueckmeldung (Prozent, Themen), aber keine
+    # Note. Die Zahlen bleiben, nur das Wort „Note" entfaellt — fuer Tests,
+    # die zum Ueben da sind und nicht ins Notenbuch gehoeren.
+    unbenotet: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Reihenfolge innerhalb des Ordners — von Hand gezogen. Vorher kamen die
     # Quizze in der Reihenfolge, in der die Datenbank sie gerade herausgab, und
     # das ist keine: wer zwanzig Quizze in einem Ordner hat, sucht das von

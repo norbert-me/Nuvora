@@ -280,7 +280,8 @@ function Ergebnisse({ results, noten = [], t }) {
                 <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.date ? new Date(r.date).toLocaleDateString() : ""}</div>
               </div>
               <div style={{ fontSize: 16, fontWeight: 800, color: r.pct >= 50 ? C.success : C.danger }}>{r.note ? r.note.replace("-", "−") : `${r.pct}%`}</div>
-              <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.pct}%</div>
+              {r.unbenotet ? <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)" }}>{t("lernen.unbenotet")}</div>
+                : <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.pct}%</div>}
               <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.score}/{r.total}</div>
             </div>
             {/* Was aus der Zahl folgt. Ohne das ist eine Prozentangabe nur eine
@@ -296,7 +297,7 @@ function Ergebnisse({ results, noten = [], t }) {
             {(r.offen || []).length > 0 && (
               <div style={{ fontSize: 13, marginTop: 4, color: "var(--text2)" }}>
                 <Icon d={ICONS.bulb} size={13} color={C.warning} />{" "}
-                {t("lernen.offen")}: {r.offen.map((x) => x.label).join(", ")}
+                {t(r.unbenotet ? "lernen.offenAnschauen" : "lernen.offen")}: {r.offen.map((x) => x.label).join(", ")}
               </div>
             )}
           </div>
