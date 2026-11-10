@@ -463,7 +463,7 @@ const gradeDistribution = (() => {
     const avgGrade = presentStudents.length > 0
       ? pcts.reduce((sum, p) => sum + gradeFromPct(p, gradeScale), 0) / presentStudents.length
       : 0;
-    if (avgGrade >= 4.5 && avgPct >= 40)
+    if (!data.unbenotet && avgGrade >= 4.5 && avgPct >= 40)
       tips.push(t("cv.tipGradeAvg", { avg: avgGrade.toFixed(1) }));
 
     return tips;
@@ -736,14 +736,14 @@ const gradeDistribution = (() => {
       <div style={{ ...panelStyle, padding: 16, marginBottom: 12 }}>
         {/* Reiter aus dem Kern (Tabs) statt vier nachgebauter Pillen. */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-          <Tabs value={gradeView} onChange={setGradeView}
-            options={[["bar", t("cv.gradeDistribution")], ["box", t("cv.boxplot")]]} />
-          {gradeView === "bar" && (
+          <Tabs value={data.unbenotet ? "box" : gradeView} onChange={setGradeView}
+            options={data.unbenotet ? [["box", t("cv.boxplot")]] : [["bar", t("cv.gradeDistribution")], ["box", t("cv.boxplot")]]} />
+          {gradeView === "bar" && !data.unbenotet && (
             <Tabs value={gradeMode} onChange={setGradeMode} style={{ marginLeft: "auto" }}
               options={[["whole", t("cv.wholeGrades")], ["tendency", t("cv.tendencyGrades")]]} />
           )}
         </div>
-        {gradeView === "bar" ? (
+        {gradeView === "bar" && !data.unbenotet ? (
           <div style={{ display: "flex", alignItems: "flex-end", gap: gradeMode === "tendency" ? 3 : 8 }}>
             {(gradeMode === "tendency" ? TENDENCY_GRADES : [1, 2, 3, 4, 5, 6]).map((g) => {
               const count = gradeDistribution[g];
@@ -791,7 +791,7 @@ const gradeDistribution = (() => {
               setShowWeights(v === "weights" && !showWeights);
               setShowFragen(v === "fragen" && !showFragen);
             }}
-            options={[["scale", t("cv.gradeScale")], ["weights", t("cv.weights")], ["fragen", t("cv.allQuestions")]]}
+            options={[...(data.unbenotet ? [] : [["scale", t("cv.gradeScale")]]), ["weights", t("cv.weights")], ["fragen", t("cv.allQuestions")]]}
           />
         }
       />
@@ -1022,7 +1022,7 @@ const gradeDistribution = (() => {
                     )}
                   </td>
                   <td style={{ ...td, textAlign: "center", fontWeight: 700, color: GRADE_COLORS[Math.round(grade)] }}>
-                    {student.ownMax > 0 ? grade.toFixed(1) : "–"}
+                    {student.ownMax > 0 && !data.unbenotet ? grade.toFixed(1) : "–"}
                   </td>
                 </tr>
               );

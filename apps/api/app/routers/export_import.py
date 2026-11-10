@@ -568,11 +568,12 @@ class ImportQuestionSetBody(BaseModel):
     # Fassung anders bewertet als das Original.
     niveau_aktiv: bool = False
     minuspunkte: bool = False
+    unbenotet: bool = False
     questions: List[ImportQuestion] = []
 
     _leer_text = field_validator("name", mode="before")(ohne_none(""))
     _leer_flag = field_validator("shuffle_questions", "shuffle_answers", "niveau_aktiv",
-                                 "minuspunkte", mode="before")(ohne_none(False))
+                                 "minuspunkte", "unbenotet", mode="before")(ohne_none(False))
     _leer_liste = field_validator("questions", mode="before")(ohne_none([]))
 
 
@@ -617,6 +618,7 @@ async def import_question_set(body: dict, user: User = Depends(get_current_user)
         shuffle_answers=daten.shuffle_answers,
         niveau_aktiv=daten.niveau_aktiv,
         minuspunkte=daten.minuspunkte,
+        unbenotet=daten.unbenotet,
     )
     db.add(qs)
     await db.flush()
@@ -683,11 +685,12 @@ class ImportFolderSet(BaseModel):
     shuffle_answers: bool = False
     niveau_aktiv: bool = False
     minuspunkte: bool = False
+    unbenotet: bool = False
     questions: List[ImportQuestion] = []
 
     _leer_text = field_validator("name", mode="before")(ohne_none(""))
     _leer_flag = field_validator("shuffle_questions", "shuffle_answers", "niveau_aktiv",
-                                 "minuspunkte", mode="before")(ohne_none(False))
+                                 "minuspunkte", "unbenotet", mode="before")(ohne_none(False))
     _leer_liste = field_validator("questions", mode="before")(ohne_none([]))
 
 
@@ -737,6 +740,7 @@ async def _import_folder_recursive(data: ImportFolderBody, parent_id, owner_id, 
             shuffle_answers=qs_data.shuffle_answers,
             niveau_aktiv=qs_data.niveau_aktiv,
             minuspunkte=qs_data.minuspunkte,
+            unbenotet=qs_data.unbenotet,
         )
         db.add(qs)
         await db.flush()

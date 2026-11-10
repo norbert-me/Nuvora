@@ -433,6 +433,7 @@ async def copy_quiz(quiz_id: int, body: Optional[CopyBody] = None, user: User = 
         shuffle_answers=data.get("shuffle_answers", False),
         niveau_aktiv=bool(data.get("niveau_aktiv", False)),
         minuspunkte=bool(data.get("minuspunkte", False)),
+        unbenotet=bool(data.get("unbenotet", False)),
     )
     db.add(qs)
     await db.flush()

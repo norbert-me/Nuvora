@@ -16,6 +16,14 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote: Quiz „Nicht benotet“.** Schalter am Quiz: Rückmeldung mit Prozent und Themen, aber ohne Note;
+  die Schülerseite sagt „Übung“ und „Schau dir das nochmal an“. Keine Notenübernahme, keine Notenverteilung.
+- **Klassenarbeit:** LE-Kinder bekommen keine Note mehr (der Kursliste fehlte die Angabe); im Notenbuch steht „UB“.
+- **Rückmeldebogen:** Unterschrift der Lehrkraft mit Datum, darunter die Erziehungsberechtigten; „Tendenz“ ohne Kommazahl.
+- **Notenbuch:** Tendenz ohne Zahl in Klammern; „Details“ einer verknüpften Spalte öffnet die Klassenarbeit.
+- **Klassenarbeit-Auswertung:** Anzahl der E- und G-Kinder.
+- **Kurse:** E/G rechtsbündig, kein doppeltes NTA neben LRS; ein Klick auf ein Kind öffnet genau diese Person.
+- **Beamer-Modus:** Strg/Cmd + Umschalt + B als Schnellschalter (Apples Übertragung ist im Browser nicht erkennbar).
 - **CardVote: E-Aufgaben als Ausgleich.** Neue Wertungsart „Als Ausgleich“ (Auswertung → Anforderungsaufgaben):
   richtige E-Aufgaben gleichen verpasste G-Punkte aus — 5 von 6 plus beide E richtig ergibt 6 von 6 (100 %),
   nie darüber. „Als Bonus“ bleibt die Vorgabe (hebt höchstens um eine Notenstufe).
