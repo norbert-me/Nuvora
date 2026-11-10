@@ -21,7 +21,7 @@ from .. import arbeitswertung as aw
 # `roster_kurs` heisst hier unten schon ein Endpunkt — deshalb umbenannt
 # importiert, sonst ueberdeckt der Endpunkt den Helfer.
 from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
-from ..models import SchoolClass, WorkAnalysis, Student, Topic, User
+from ..models import Person, SchoolClass, WorkAnalysis, Student, Topic, User
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
 from .anwesenheit import get_day as _tag
@@ -115,12 +115,26 @@ def _keyw(user, class_id, kurs_id):
     return kurs_oder_klasse(WorkAnalysis, user, class_id, kurs_id)
 
 
+async def _le_ids(db, rows) -> set:
+    """Zeilen mit Foerderschwerpunkt Lernen (LE): keine Note. Die Angabe steht an
+    der Person, aelterer Bestand noch an der Zeile. Nach aussen geht nur dieses
+    eine Ja/Nein, nie die uebrigen Foerderangaben (Art. 9)."""
+    pids = {r.person_id for r in rows if r.person_id}
+    pers = {}
+    if pids:
+        pers = {p.id: p for p in (await db.execute(select(Person).where(Person.id.in_(pids)))).scalars().all()}
+    return {r.id for r in rows
+            if "Lernen" in (((pers.get(r.person_id).foerder if pers.get(r.person_id) else None) or r.foerder) or [])}
+
+
 @router.get("/classes/{class_id}/students")
 async def roster(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     # `niveau` gehoert dazu: eine E- oder G-Arbeit zeigt nur die Kinder, die
     # dieses Blatt geschrieben haben.
-    return [{"id": s.id, "name": s.name, "niveau": s.niveau or ""} for s in await _roster(db, class_id)]
+    rows = await _roster(db, class_id)
+    le = await _le_ids(db, rows)
+    return [{"id": s.id, "name": s.name, "niveau": s.niveau or "", "foerder": ["Lernen"] if s.id in le else []} for s in rows]
 
 
 @router.get("/kurse/{kurs_id}/students")
@@ -128,7 +142,9 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
     """SuS eines Kurses — inkl. der EINZELN hinzugefügten (Kurse aus Teilen von
     Klassen). Deduplikat per Name wie beim Klassen-Roster."""
     await eigener_kurs(db, user, kurs_id)
-    return [{"id": s.id, "name": s.name, "class_id": s.class_id, "niveau": s.niveau or ""} for s in await _kanon_kurs(db, kurs_id)]
+    rows = await _kanon_kurs(db, kurs_id)
+    le = await _le_ids(db, rows)
+    return [{"id": s.id, "name": s.name, "class_id": s.class_id, "niveau": s.niveau or "", "foerder": ["Lernen"] if s.id in le else []} for s in rows]
 
 
 @router.get("/classes/{class_id}/works", response_model=List[WorkOut])
