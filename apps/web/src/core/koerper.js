@@ -178,7 +178,7 @@ function kegel(r, h) {
 function kugel(r) {
   // Eine Kugel hat kein Netz — sie laesst sich nicht verzerrungsfrei in die
   // Ebene abwickeln (`faltbar: false`).
-  const B = 24, L = 12, fl = [];
+  const B = 36, L = 18, fl = [];
   const P = (i, j) => { const t = (Math.PI * j) / L, p = (2 * Math.PI * i) / B; return [r * Math.sin(t) * Math.cos(p), r * Math.sin(t) * Math.sin(p), r * Math.cos(t)]; };
   for (let j = 0; j < L; j++) for (let i = 0; i < B; i++) {
     const pts = [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1)].filter((p, k, a) => k === 0 || !gleich(p, a[k - 1]));
@@ -282,7 +282,12 @@ export function projiziere(flaechen, { gier, nick, breite, hoehe, rand = 70, zoo
     const nSicht = V.einheit(V.minus(nb, n0));
     const hell = 0.55 + 0.45 * Math.abs(V.dot(f.n, licht));
     return { ...f, bild, tiefe, hell, zugewandt: nSicht[2] < 0 };
-  }).sort((a, b) => b.tiefe - a.tiefe);
+  // Zuerst alles, was dem Betrachter den Ruecken zeigt, dann die zugewandten
+  // Flaechen; innerhalb jeder Gruppe von hinten nach vorn. Nur nach der mittleren
+  // Tiefe zu sortieren war falsch: bei einem hohen Quader oder Zylinder liegt der
+  // Mittelpunkt des Deckels „hinter" den Mantelstreifen am Rand, die Streifen
+  // wurden ueber den Deckel gemalt, und der Koerper sah leicht verformt aus.
+  }).sort((a, b) => (a.zugewandt === b.zugewandt ? b.tiefe - a.tiefe : (a.zugewandt ? 1 : -1)));
   // Dieselbe Abbildung fuer alles, was mit dem Koerper dreht (Bodenraster).
   out.abbild = abbild;
   out.mitte = c;
