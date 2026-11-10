@@ -61,4 +61,16 @@ describe("Körper: Maße", () => {
       p.slice(erste).forEach((f) => expect(f.zugewandt).toBe(true));
     });
   });
+  it("Perspektive: die hintere Kante des Deckels ist kürzer als die vordere", () => {
+    // Parallelprojektion zeigt beide gleich lang — das Auge liest das als
+    // „nach hinten breiter". Mit Blick von schräg oben auf einen Quader muss die
+    // weiter entfernte Kante kürzer erscheinen.
+    const k = baue("quader", { a: 6, b: 4, c: 3 });
+    const p = projiziere(gefaltet(k, 1), { gier: 0, nick: 0.6, breite: 900, hoehe: 560 });
+    const deckel = p.find((f) => f.gruppe === "deckel");
+    const kante = (i, j) => Math.hypot(deckel.bild[i][0] - deckel.bild[j][0], deckel.bild[i][1] - deckel.bild[j][1]);
+    const laengen = deckel.bild.map((_, i) => kante(i, (i + 1) % deckel.bild.length));
+    // Gegenueberliegende Kanten (0/2 bzw. 1/3) duerfen nicht gleich lang sein.
+    expect(Math.abs(laengen[0] - laengen[2]) + Math.abs(laengen[1] - laengen[3])).toBeGreaterThan(1);
+  });
 });

@@ -14,10 +14,10 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.5.2 — 10.11.2026
 
 - **Eingebaute App (Vorarbeit):** die API läuft jetzt auch auf SQLite und liefert die Oberfläche selbst aus (`NUVORA_LOKAL=1`) — Grundlage für Nuvora ohne Server auf Mac und Windows. Plan: `docs/eingebaute-app.md`.
-- **Körper:** Zeichenreihenfolge korrigiert (hohe Körper wirkten leicht verformt, weil Mantelstreifen über den Deckel gemalt wurden); die Kugel ist feiner unterteilt.
+- **Körper:** perspektivische Darstellung (die hintere Kante erscheint kürzer, statt nach hinten breiter zu wirken), richtige Zeichenreihenfolge, feinere Kugel.
 - **CardVote:** Ordner und geöffnetes Quiz stehen in der Adresse — der Zurück-Knopf (Safari, Maus, Wischgeste) geht eine Ebene hoch.
 - **Notenbuch:** die Notenform (2,5 / 2+) wird im Dialog des Kindes umgeschaltet statt in der Werkzeugleiste.
 - **Klassenarbeit:** die Auswahl nennt das Datum der Arbeit (Termin aus dem Kalender, sonst Anlegedatum).
@@ -30,7 +30,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 - **Rückmeldebogen:** Unterschrift der Lehrkraft mit Datum, darunter die Erziehungsberechtigten; „Tendenz“ ohne Kommazahl.
 - **Notenbuch:** Tendenz ohne Zahl in Klammern; „Details“ einer verknüpften Spalte öffnet die Klassenarbeit.
 - **Klassenarbeit-Auswertung:** Anzahl der E- und G-Kinder.
-- **Kurse:** E/G rechtsbündig, kein doppeltes NTA neben LRS; ein Klick auf ein Kind öffnet genau diese Person.
+- **Kurse:** E/G rechtsbündig, kein doppeltes NTA-Kürzel neben dem Förder-Kürzel; ein Klick auf ein Kind öffnet genau diese Person.
 - **Beamer-Modus:** Strg/Cmd + Umschalt + B als Schnellschalter (Apples Übertragung ist im Browser nicht erkennbar).
 - **CardVote: E-Aufgaben als Ausgleich.** Neue Wertungsart „Als Ausgleich“ (Auswertung → Anforderungsaufgaben):
   richtige E-Aufgaben gleichen verpasste G-Punkte aus — 5 von 6 plus beide E richtig ergibt 6 von 6 (100 %),
