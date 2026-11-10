@@ -14,13 +14,13 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.5.3 — 10.11.2026
 
+- **Neues Modul Zahlenstrahl (Beta):** Rechnen mit Pfeilen, auch mit negativen und Dezimalzahlen. Die Achse ist fest (−10 bis +10, mit Zehnteln −2 bis +2). Bei einer Aufgabe entstehen die Pfeile Schritt für Schritt; bei „minus“ zuerst der Pfeil der Zahl, im nächsten Schritt wird er umgedreht. Im freien Modus ohne Aufgabe lassen sich Start und Pfeile ziehen. Zeigt, warum „minus eine negative Zahl“ plus ist.
 - **Profil:** unter „Hilfe und App“ lassen sich die letzten Änderungen jederzeit nachlesen.
 - **Profil:** Optionen neu geordnet — Konto, Unterricht, Teile der Module, „Dieses Gerät“ (Sprache, Beamer, Datensparen, Melde-Knopf), „Hilfe und App“; mit Sprungleiste oben. Der Bonus für E-Aufgaben erscheint nur noch mit CardVote.
 - **iPhone/iPad-App entfernt:** die Capacitor-Hülle, ihr Profil-Eintrag und der Release-Job sind weg; für iPhone und iPad bleibt der Weg über Safari („Zum Home-Bildschirm“).
 - **Klassenarbeit:** Auswahl nach Datum sortiert, die gemeinsame Auswertung nennt die Zahl der E- und G-Kinder.
-- **Neues Modul Zahlenstrahl (Beta):** Rechnen mit Pfeilen, auch mit negativen und Dezimalzahlen. Bei einer Aufgabe liegen die Pfeile fest und erscheinen Schritt für Schritt; im freien Modus ohne Aufgabe lassen sich Start und Pfeile ziehen. Zeigt, warum „minus eine negative Zahl“ plus ist.
 
 ## 4.5.2 — 10.11.2026
 
