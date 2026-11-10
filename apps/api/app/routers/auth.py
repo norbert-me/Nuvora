@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..netz import client_ip as _client_ip
 from ..seed import seed_new_account
 from ..rollen import ist_admin
+from ..lokal import LOKAL
 from ..database import get_db
 from ..models import BugReport, BugReportAnhang, CaldavToken, SchoolClass, Session as CvSession, User, Question, MarketplaceQuiz
 from .. import mailer
@@ -746,7 +747,7 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
     # Fassungen sehen — fuer diese Person ist daran nichts neu.
     from ..admin import APP_VERSION as _fassung
     user = User(email=email, password_hash=_hash_pw(body.password), name=body.name,
-                salutation=body.salutation, email_verified=False, changelog_seen=_fassung)
+                salutation=body.salutation, email_verified=LOKAL, changelog_seen=_fassung)
     db.add(user)
     await db.commit()
     await db.refresh(user)
@@ -761,7 +762,9 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
         await db.rollback()
 
     # Bestätigungs-Mail (best-effort). Login erst nach Bestätigung möglich.
-    await _send_verify_mail(user)
+    # Lokale Installation: kein Mailserver, das Konto gilt sofort als bestaetigt.
+    if not LOKAL:
+        await _send_verify_mail(user)
     return {"ok": True}
 
 

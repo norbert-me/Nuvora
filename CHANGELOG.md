@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Eingebaute App (Vorarbeit):** die API läuft jetzt auch auf SQLite und liefert die Oberfläche selbst aus (`NUVORA_LOKAL=1`) — Grundlage für Nuvora ohne Server auf Mac und Windows. Plan: `docs/eingebaute-app.md`.
 - **Körper:** Zeichenreihenfolge korrigiert (hohe Körper wirkten leicht verformt, weil Mantelstreifen über den Deckel gemalt wurden); die Kugel ist feiner unterteilt.
 - **CardVote:** Ordner und geöffnetes Quiz stehen in der Adresse — der Zurück-Knopf (Safari, Maus, Wischgeste) geht eine Ebene hoch.
 - **Notenbuch:** die Notenform (2,5 / 2+) wird im Dialog des Kindes umgeschaltet statt in der Werkzeugleiste.

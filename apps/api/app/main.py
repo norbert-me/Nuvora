@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from .netz import client_ip
 from .uploads import anhang_kopf
 from .kursmitglieder import schuljahr_aus_name
-from .database import engine, async_session
+from .database import IST_SQLITE, async_session, engine, sql_jetzt, sql_vor
 from .models import AppSetting, Base, Kurs, Session as SessionModel, User
 # Admin-Pruefung und Programmfassung kommen aus app/admin.py — dem Blatt, das
 # den frueheren Ring main -> routers.backup -> main aufloest. Hier nur noch
@@ -36,6 +36,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 # --- Missbrauchsschutz: Body-Grösse + globaler Flood-Schutz pro IP ---
+def _sw(*a, **k):
+    """Warnung der Bestands-Migrationen. Sie sind Postgres-SQL fuer alte Server-
+    Datenbanken; eine frische SQLite-Datenbank (eingebaute App) hat nichts zu
+    migrieren, und die Meldung waere nur Laerm."""
+    if not IST_SQLITE:
+        print(*a, **k)
+
+
 MAX_BODY_BYTES = int(os.environ.get("MAX_BODY_BYTES", 24 * 1024 * 1024))
 # Grosszügig, da ganze Klassen/Schulen oft hinter EINER öffentlichen IP (NAT) hängen
 GLOBAL_RATE_MAX = int(os.environ.get("GLOBAL_RATE_MAX", 3000))
@@ -488,7 +496,7 @@ def _ensure_columns(sync_conn):
             # markieren. Laeuft nur beim erstmaligen Anlegen der Spalte, also
             # nicht wieder ueber spaeter angelegte Entwuerfe (released_at NULL).
             if (table, column) == ("card_decks", "released_at"):
-                sync_conn.execute(text("UPDATE card_decks SET released_at = now() WHERE released_at IS NULL"))
+                sync_conn.execute(text(f"UPDATE card_decks SET released_at = {sql_jetzt()} WHERE released_at IS NULL"))
 
     # Spalten, die von NOT NULL auf nullable wandern.
     #
@@ -718,7 +726,7 @@ async def startup():
     async with async_session() as db:
         await db.execute(text(
             "UPDATE users SET email_verified = true "
-            f"WHERE email_verified = false AND created_at < TIMESTAMPTZ '{VERIFY_CUTOFF}'"
+            f"WHERE email_verified = false AND created_at < {('' if IST_SQLITE else 'TIMESTAMPTZ ')}'{VERIFY_CUTOFF}'"
         ))
         await db.commit()
 
@@ -736,7 +744,7 @@ async def startup():
                     UNION ALL SELECT 1 FROM school_classes c WHERE c.owner_id = u.id
                     UNION ALL SELECT 1 FROM sessions s WHERE s.owner_id = u.id
               )
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+            ON CONFLICT DO NOTHING
         """))
         await db.execute(text("UPDATE users SET modules_initialized = true WHERE modules_initialized = false"))
         # Wer schon Einstiege hat, gilt als geseedet — sonst wuerde die
@@ -782,14 +790,14 @@ async def startup():
         await db.execute(text("""
             INSERT INTO user_modules (user_id, module_key)
             SELECT DISTINCT user_id, 'unterrichtsplanung' FROM user_modules WHERE module_key IN ('stoffplan', 'methoden')
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+            ON CONFLICT DO NOTHING
         """))
         await db.execute(text("DELETE FROM user_modules WHERE module_key IN ('stoffplan', 'methoden')"))
         # Mathefußball in das Sammelmodul „Mathespiele" umbenannt. Idempotent.
         await db.execute(text("""
             INSERT INTO user_modules (user_id, module_key)
             SELECT DISTINCT user_id, 'mathespiele' FROM user_modules WHERE module_key = 'mathefussball'
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+            ON CONFLICT DO NOTHING
         """))
         await db.execute(text("DELETE FROM user_modules WHERE module_key = 'mathefussball'"))
         # Noten + Klassenarbeit sind ins Modul „Auswertung" (Reiter) aufgegangen.
@@ -797,7 +805,7 @@ async def startup():
         await db.execute(text("""
             INSERT INTO user_modules (user_id, module_key)
             SELECT DISTINCT user_id, 'auswertung' FROM user_modules WHERE module_key IN ('noten', 'klassenarbeit')
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+            ON CONFLICT DO NOTHING
         """))
         await db.execute(text("DELETE FROM user_modules WHERE module_key IN ('noten', 'klassenarbeit')"))
         await db.commit()
@@ -815,7 +823,7 @@ async def startup():
             # Start darf daran nicht abbrechen — aber still bleiben auch nicht,
             # sonst sieht niemand, wenn es auf Postgres wirklich schiefgeht.
             await db.rollback()
-            print(f"[STARTUP-WARN] uq_attendance_student_date nicht entfernt: {type(e).__name__}: {e}", flush=True)
+            _sw(f"[STARTUP-WARN] uq_attendance_student_date nicht entfernt: {type(e).__name__}: {e}", flush=True)
 
     # Sitzplan hängt jetzt am Kurs (kurs_id); der alte Unique-Constraint auf
     # (owner, class_id) würde mehrere Fach-Kurse derselben Klasse blockieren.
@@ -826,7 +834,7 @@ async def startup():
         except Exception as e:
             # Wie oben: auf SQLite erwartbar, auf Postgres ein Befund.
             await db.rollback()
-            print(f"[STARTUP-WARN] uq_seating_owner_class nicht entfernt: {type(e).__name__}: {e}", flush=True)
+            _sw(f"[STARTUP-WARN] uq_seating_owner_class nicht entfernt: {type(e).__name__}: {e}", flush=True)
 
     # Bestandsnoten an den Kurs anschliessen: wo eine Klasse in GENAU EINEM Kurs
     # liegt, bekommen ihre Abschnitte/Endnoten-Overrides dessen kurs_id — sonst
@@ -871,7 +879,7 @@ async def startup():
             # Abbruch — aber sichtbar, sonst sucht niemand die Ursache dafuer,
             # dass Sitzplan/Orga/Decks „verschwunden" wirken.
             await db.rollback()
-            print(f"[STARTUP-WARN] Kurs-Backfill uebersprungen: {type(e).__name__}: {e}", flush=True)
+            _sw(f"[STARTUP-WARN] Kurs-Backfill uebersprungen: {type(e).__name__}: {e}", flush=True)
 
     # Kurs-Konzept, Phase 1: jede Klasse ohne Kurs bekommt ihren eigenen Kurs
     # (1:1, gleicher Name/Owner). Ändert nichts am Verhalten, legt nur die
@@ -905,7 +913,7 @@ async def startup():
             await db.execute(text(
                 "INSERT INTO kurs_tags (kurs_id, class_id) "
                 "SELECT kurs_id, id FROM school_classes WHERE kurs_id IS NOT NULL "
-                "ON CONFLICT ON CONSTRAINT uq_kurs_tag DO NOTHING"
+                "ON CONFLICT DO NOTHING"
             ))
             # Karten-Decks an den Kurs ihrer Klasse hängen (Decks gelten kursweit).
             await db.execute(text(
@@ -945,7 +953,7 @@ async def startup():
             await db.commit()
         except Exception as e:
             await db.rollback()
-            print(f"[STARTUP-WARN] E/G-Blaetter nicht verbunden: {e}", flush=True)
+            _sw(f"[STARTUP-WARN] E/G-Blaetter nicht verbunden: {e}", flush=True)
 
     # Besitzer nachtragen, wo er sich herleiten laesst.
     #
@@ -1010,7 +1018,7 @@ async def startup():
                     print(f"[STARTUP] Besitzer nachgetragen: {res.rowcount} {name}(e).", flush=True)
             except Exception as e:
                 await db.rollback()
-                print(f"[STARTUP-WARN] Besitzer-Nachtrag ({name}) uebersprungen: {type(e).__name__}: {e}", flush=True)
+                _sw(f"[STARTUP-WARN] Besitzer-Nachtrag ({name}) uebersprungen: {type(e).__name__}: {e}", flush=True)
 
     # Karteikarten: Bestandsstapel in die neue Kurs-Zuweisung heben (einmalig je
     # Konto, siehe karten.uebernahme_deck_kurse). Ohne das stuenden nach dem
@@ -1038,7 +1046,7 @@ async def startup():
             await db.commit()
         except Exception as e:
             await db.rollback()
-            print(f"[STARTUP-WARN] Defaults nicht gesetzt: {type(e).__name__}: {e}", flush=True)
+            _sw(f"[STARTUP-WARN] Defaults nicht gesetzt: {type(e).__name__}: {e}", flush=True)
 
     # Personen-Ebene: jede Listenzeile bekommt ihr Kind (siehe app/personen.py).
     # Idempotent und ohne Datenverlust — die alten Felder an `students` bleiben
@@ -1178,7 +1186,7 @@ async def _fehlermeldungen_aufraeumen():
     try:
         async with async_session() as db:
             await db.execute(text(
-                f"DELETE FROM bug_reports WHERE created_at < now() - interval '{BUGREPORT_TAGE} days'"
+                f"DELETE FROM bug_reports WHERE created_at < {sql_vor(f'{BUGREPORT_TAGE} days')}"
             ))
             await db.commit()
     except Exception as e:
@@ -1213,7 +1221,7 @@ async def _papierkorb_leeren(laut: bool = False):
             try:
                 res = await db.execute(text(
                     f"DELETE FROM {tbl} WHERE deleted_at IS NOT NULL "
-                    "AND deleted_at < now() - interval '30 days'"
+                    f"AND deleted_at < {sql_vor('30 days')}"
                 ))
                 await db.commit()
                 if res.rowcount and laut:
@@ -1263,8 +1271,8 @@ async def _codesessions_aufraeumen():
                 # Regel weiter ab.
                 await db.execute(text(
                     "DELETE FROM code_sessions WHERE "
-                    "(ended_at IS NOT NULL AND ended_at < now() - interval '1 day') "
-                    "OR created_at < now() - interval '7 days'"
+                    f"(ended_at IS NOT NULL AND ended_at < {sql_vor('1 day')}) "
+                    f"OR created_at < {sql_vor('7 days')}"
                 ))
                 await db.commit()
         except Exception as e:
@@ -1282,7 +1290,7 @@ async def _cleanup_unverified_loop():
             async with async_session() as db:
                 await db.execute(text(
                     "DELETE FROM users "
-                    "WHERE email_verified = false AND created_at < NOW() - INTERVAL '14 days'"
+                    f"WHERE email_verified = false AND created_at < {sql_vor('14 days')}"
                 ))
                 await db.commit()
         except Exception as e:
@@ -1980,3 +1988,9 @@ async def contact(body: ContactBody, request: Request):
     if not ok:
         raise HTTPException(503, "Nachricht konnte nicht gesendet werden")
     return {"ok": True}
+
+
+# Lokale Installation (eingebaute App): die Oberflaeche aus demselben Prozess
+# ausliefern. Als LETZTES, damit alle /api- und /ws-Routen davor greifen.
+from . import lokal as _lokal  # noqa: E402
+_lokal.einhaengen(app)
