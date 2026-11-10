@@ -1490,6 +1490,8 @@ export default {
   "common.done": "Hecho",
   "noten.fromCardvote": "Ver resultados de CardVote",
   "noten.colTopic": "Tema (para recuperación)",
+  "noten.colOptional": "Opcional (voluntario)",
+  "noten.colOptionalHint": "Las notas que faltan en esta columna no se resaltan.",
   "noten.colTopicNone": "— sin tema —",
   "noten.nachhol": "Recuperación: reactivar tarjetas",
   "noten.nachholDone": "{{weak}} alumnos por debajo del umbral · {{cards}} tarjetas reactivadas.",

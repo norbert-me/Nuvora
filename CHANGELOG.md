@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Notenbuch:** fehlende Noten leuchten jetzt in der Zelle selbst (nicht nur am Namen); Spalten lassen sich als „Optional (freiwillig)“ markieren (Raketenaufgaben) und werden dann nie hervorgehoben.
+- **Willkommen-Dialog:** wird am Konto gemerkt, nicht mehr in jedem Browser neu gezeigt.
 - **CardVote: Quiz „Nicht benotet“.** Schalter am Quiz: Rückmeldung mit Prozent und Themen, aber ohne Note;
   die Schülerseite sagt „Übung“ und „Schau dir das nochmal an“. Keine Notenübernahme, keine Notenverteilung.
 - **Klassenarbeit:** LE-Kinder bekommen keine Note mehr (der Kursliste fehlte die Angabe); im Notenbuch steht „UB“.

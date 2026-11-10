@@ -161,6 +161,7 @@ class CategoryOut(BaseModel):
     topic_id: Optional[int] = None
     # Tag der Leistung — Eigenschaft, kein Namensbestandteil (siehe models.py).
     date: Optional[str] = None
+    optional: bool = False
     created_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
@@ -335,6 +336,9 @@ class CategoryIn(BaseModel):
     position: int = 0
     topic_id: Optional[int] = None   # Thema der Spalte (z.B. was die Klassenarbeit abdeckt)
     date: Optional[str] = None       # "YYYY-MM-DD" — Tag der Leistung, optional
+    # Freiwillige Spalte (Raketenaufgabe): fehlende Noten werden nicht hervorgehoben.
+    # None = nicht angefasst (aeltere Clients schicken das Feld nicht mit).
+    optional: Optional[bool] = None
 
     name_ok = field_validator("name")(_pflichtname)
 
@@ -383,6 +387,8 @@ async def update_category(category_id: int, body: CategoryIn, user: User = Depen
     cat.class_id = sec.class_id
     cat.topic_id = await _check_topic(db, user.id, body.topic_id)
     cat.date = _parse_date(body.date)
+    if body.optional is not None:
+        cat.optional = bool(body.optional)
     await db.commit()
     await db.refresh(cat)
     return cat

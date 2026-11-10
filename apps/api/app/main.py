@@ -359,6 +359,7 @@ def _ensure_columns(sync_conn):
         ("grade_categories", "topic_id", "INTEGER"),
         # Tag der Leistung — Eigenschaft der Spalte, nicht Teil ihres Namens.
         ("grade_categories", "date", "DATE"),
+        ("grade_categories", "optional", "BOOLEAN DEFAULT FALSE NOT NULL"),
         # Kurs-Kette ueber Schuljahre (siehe Kurs in models.py).
         ("kurse", "schuljahr", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("kurse", "vorgaenger_id", "INTEGER"),

@@ -1472,6 +1472,8 @@ export default {
   "common.done": "Fertig",
   "noten.fromCardvote": "Zur CardVote-Auswertung",
   "noten.colTopic": "Thema (für Nachholbedarf)",
+  "noten.colOptional": "Optional (freiwillig)",
+  "noten.colOptionalHint": "Wer hier keine Note hat, wird nicht als „fehlt noch“ hervorgehoben.",
   "noten.colTopicNone": "— kein Thema —",
   "noten.nachhol": "Nachholbedarf: Karten wieder fällig",
   "noten.nachholDone": "{{weak}} SuS unter der Schwelle · {{cards}} Karten wieder fällig gesetzt.",

@@ -1489,6 +1489,8 @@ export default {
   "common.done": "Done",
   "noten.fromCardvote": "To CardVote results",
   "noten.colTopic": "Topic (for catch-up)",
+  "noten.colOptional": "Optional (voluntary)",
+  "noten.colOptionalHint": "Missing grades in this column are not highlighted.",
   "noten.colTopicNone": "— no topic —",
   "noten.nachhol": "Catch-up: re-queue cards",
   "noten.nachholDone": "{{weak}} students below the threshold · {{cards}} cards set due again.",

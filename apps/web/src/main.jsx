@@ -1144,11 +1144,17 @@ function FirstRun({ user }) {
 
   React.useEffect(() => {
     if (!user) return;
-    try { if (!localStorage.getItem(key)) setShow(true); } catch { /* egal */ }
+    // Gesehen steht am KONTO (tours_done), nicht nur im Browser: sonst kam das
+    // Willkommen in jedem weiteren Browser und nach jedem geleerten Speicher wieder.
+    if ((user.tours_done || []).includes("willkommen")) return;
+    try { if (!localStorage.getItem(key)) setShow(true); } catch { setShow(true); }
   }, [user, key]);
 
   const done = (go) => {
     try { localStorage.setItem(key, "1"); } catch { /* egal */ }
+    fetch("/api/auth/tour-done", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tour: "willkommen" }),
+    }).catch(() => { /* offline: der localStorage-Eintrag reicht bis zum naechsten Mal */ });
     setShow(false);
     if (go) navigate(go);
   };

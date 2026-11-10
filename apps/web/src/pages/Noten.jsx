@@ -506,11 +506,13 @@ export default function Noten() {
   // keine — und war an dem Tag nicht abwesend und hat keinen Kommentar dort.
   // (Eine ganz leere Spalte ist Zukunft, kein Fehlen.)
   const spaltenMitNoten = new Set(summary ? summary.flatMap((r) => Object.keys(r.per_category || {})).map(Number) : []);
-  const notenFehlen = (sid) => allCats.some((c) => {
-    if (!spaltenMitNoten.has(c.id) || noteVon(sid, c.id) != null || kommentarVon(sid, c.id)) return false;
+  // Freiwillige Spalten (Raketenaufgaben, c.optional) zaehlen nie als fehlend.
+  const noteFehltIn = (sid, c) => {
+    if (c.optional || !spaltenMitNoten.has(c.id) || noteVon(sid, c.id) != null || kommentarVon(sid, c.id)) return false;
     const stat = statusVon(sid, c);
     return stat !== "fehlt" && stat !== "entsch";
-  });
+  };
+  const notenFehlen = (sid) => allCats.some((c) => noteFehltIn(sid, c));
 
   const gewichtSumme = sections.reduce((n, s) => n + (s.weight || 0), 0);
   const notenVon = (sid, cid) => entries.filter((e) => e.student_id === sid && e.category_id === cid && e.kind === "grade");
@@ -837,7 +839,7 @@ export default function Noten() {
                         ) : null}
                         {renameCol === c.id && (
                           <ColMenu t={t} cat={c} classId={classId} kursId={kursId} topics={topics} kartenAktiv={kartenAktiv} cvAktiv={cvAktiv} kalenderAktiv={kalenderAktiv} onNachhol={runNachhol} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
-                            onRename={async (name, topicId, datum) => { if (await call(() => fetch(`${API}/categories/${c.id}`, alsJson("PUT", { name, section_id: sec.id, position: c.position ?? i, topic_id: topicId, date: datum })))) setRenameCol(null); }}
+                            onRename={async (name, topicId, datum, optional) => { if (await call(() => fetch(`${API}/categories/${c.id}`, alsJson("PUT", { name, section_id: sec.id, position: c.position ?? i, topic_id: topicId, date: datum, optional })))) setRenameCol(null); }}
                             onDelete={() => {
                               setRenameCol(null);
                               // Spalte sofort raus, 5 s Undo; erst dann Server-Delete.
@@ -902,7 +904,10 @@ export default function Noten() {
                             style={{ ...td, padding: 0, position: "relative", width: 56, minWidth: 56, maxWidth: 56, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
                                      // Die Spalte der offenen Zelle; die Abwesenheit geht vor (sie ist eine Aussage, die Toenung nur Orientierung).
                                      ...(fokusSpalte === String(c.id) ? { background: FOKUS_TON } : null),
-                                     ...(statFarbe ? { background: `${statFarbe}1f`, boxShadow: `inset 3px 0 0 ${statFarbe}` } : null) }}>
+                                     ...(statFarbe ? { background: `${statFarbe}1f`, boxShadow: `inset 3px 0 0 ${statFarbe}` } : null),
+                                     // Hier fehlt die Note: die Zelle selbst leuchtet, nicht nur der Name —
+                                     // sonst sucht man in einer breiten Tabelle die Luecke.
+                                     ...(!s.le && noteFehltIn(s.student_id, c) ? { background: `${C.warning}38`, boxShadow: `inset 0 0 0 2px ${C.warning}` } : null) }}>
                             {zelle === id
                               ? <Zelle initial={wert != null ? de(wert) : ""}
                                   onSave={(txt) => noteSetzen(s.student_id, c.id, txt)}
@@ -1375,6 +1380,7 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
   const [name, setName] = useState(cat.name);
   const [topicId, setTopicId] = useState(cat.topic_id ?? "");
   const [datum, setDatum] = useState(cat.date || "");
+  const [optional, setOptional] = useState(!!cat.optional);
   // Das Thema der Stunde steht im Kalender — es hier ein zweites Mal
   // auszuwählen ist Abtippen. Vorgeschlagen wird nur, was noch leer ist: eine
   // von Hand getroffene Wahl wird nie überschrieben, und ändern lässt sich der
@@ -1413,7 +1419,7 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
     const titel = name.trim() || datumKurz(datum);
     if (!titel) return;
     if (strich !== !!dividerOn) onToggleDivider && onToggleDivider();
-    onRename(titel, topicId === "" ? null : Number(topicId), datum || null);
+    onRename(titel, topicId === "" ? null : Number(topicId), datum || null, optional);
   };
   return (
     <>
@@ -1462,6 +1468,11 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
               optionen={themenFuerKurs(themen, kursObj, topicId ? [Number(topicId)] : []).map((tp) => ({ wert: String(tp.id), label: themen.label(tp) }))} />
           </div>
         )}
+        {/* Freiwillige Abgabe: fehlende Noten werden in dieser Spalte nicht hervorgehoben. */}
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 13, cursor: "pointer" }}>
+          <input type="checkbox" checked={optional} onChange={(e) => setOptional(e.target.checked)} />
+          <span title={t("noten.colOptionalHint")}>{t("noten.colOptional")}</span>
+        </label>
         {cat.topic_id && kartenAktiv && (
           <button onClick={() => { onNachhol(cat); onClose(); }}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: C.warning, cursor: "pointer" }}>

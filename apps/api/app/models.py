@@ -850,6 +850,9 @@ class GradeCategory(Base):
     # war „Klassenarbeit 02.03.2026" eine Zeichenkette, die niemand sortieren
     # oder auswerten kann. Optional — nicht jede Spalte hat einen Termin.
     date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # Freiwillige Abgabe (z. B. Raketenaufgaben): fehlt die Note, wird das Kind
+    # in dieser Spalte nicht als „fehlt noch" hervorgehoben. Zaehlt sonst wie jede Note.
+    optional: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     section: Mapped[Optional["GradeSection"]] = relationship(back_populates="categories")
