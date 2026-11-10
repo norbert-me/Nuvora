@@ -21,7 +21,7 @@ from .. import arbeitswertung as aw
 # `roster_kurs` heisst hier unten schon ein Endpunkt — deshalb umbenannt
 # importiert, sonst ueberdeckt der Endpunkt den Helfer.
 from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
-from ..models import Person, SchoolClass, WorkAnalysis, Student, Topic, User
+from ..models import ExamDate, Person, SchoolClass, WorkAnalysis, Student, Topic, User
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
 from .anwesenheit import get_day as _tag
@@ -102,6 +102,9 @@ class WorkOut(BaseModel):
     wechsel: dict = {}
     niveau: str = ""
     partner_id: Optional[int] = None
+    # Tag der Arbeit: der Termin aus dem Kalender (wenn verknuepft), sonst der
+    # Tag, an dem sie angelegt wurde. Nur zur Anzeige in der Auswahl.
+    datum: Optional[str] = None
     model_config = {"from_attributes": True}
 
 
@@ -151,7 +154,15 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
 async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     rows = (await db.execute(select(WorkAnalysis).where(*_keyw(user, class_id, kurs_id)).order_by(WorkAnalysis.created_at.desc()))).scalars().all()
-    return [WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "") for w in rows]
+    termine = {}
+    if rows:
+        for wid, tag in (await db.execute(select(ExamDate.work_id, ExamDate.date).where(
+                ExamDate.owner_id == user.id, ExamDate.work_id.in_([w.id for w in rows])))).all():
+            termine[wid] = tag
+    def _tag(w):
+        d = termine.get(w.id) or w.created_at
+        return d.date().isoformat() if d else None
+    return [WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "", datum=_tag(w)) for w in rows]
 
 
 @router.post("/works", response_model=WorkOut, status_code=201)

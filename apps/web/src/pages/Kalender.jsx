@@ -2617,7 +2617,14 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], 
   // steht die Phase trotzdem da, nur ohne Minutenangabe.
   const autoEinstieg = useRef(null);
   useEffect(() => {
-    if (!methodId) return;
+    if (!methodId) {
+      // Einstieg abgewaehlt: die davon angelegte Phase geht mit.
+      const alt = autoEinstieg.current;
+      autoEinstieg.current = null;
+      const am = alt != null ? methods.find((x) => x.id === alt) : null;
+      if (am) setVerlauf((v) => v.filter((p) => !((p.phase || "").trim().toLowerCase() === "einstieg" && (p.text || "").trim() === (am.title || "").trim())));
+      return;
+    }
     const m = methods.find((x) => x.id === Number(methodId));
     if (!m) return;
     if (autoEinstieg.current === m.id) return;

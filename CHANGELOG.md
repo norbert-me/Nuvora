@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Klassenarbeit:** die Auswahl nennt das Datum der Arbeit (Termin aus dem Kalender, sonst Anlegedatum).
+- **Einstiege:** Beim Löschen (oder Abwählen im Kalender-Eintrag) verschwindet auch die Phase „Einstieg“ aus dem Verlaufsplan.
 - **Notenbuch:** fehlende Noten leuchten jetzt in der Zelle selbst (nicht nur am Namen); Spalten lassen sich als „Optional (freiwillig)“ markieren (Raketenaufgaben) und werden dann nie hervorgehoben.
 - **Willkommen-Dialog:** wird am Konto gemerkt, nicht mehr in jedem Browser neu gezeigt.
 - **CardVote: Quiz „Nicht benotet“.** Schalter am Quiz: Rückmeldung mit Prozent und Themen, aber ohne Note;

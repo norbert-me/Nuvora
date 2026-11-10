@@ -20,7 +20,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { rememberClass } from "../core/cache.js";
-import { gradeFromPct, gradeDetailed, quantile, stdev, DEFAULT_SCALE } from "../core/grades.js";
+import { gradeFromPct, gradeDetailed, quantile, stdev, DEFAULT_SCALE, datumKurz } from "../core/grades.js";
 import { useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import { alsJson, hol } from "../core/melden.js";
 import { ymd } from "../core/datum.js";
@@ -922,7 +922,11 @@ export default function Klassenarbeit() {
   // In der Auswahl steht ein Paar EINMAL: das G-Blatt faellt heraus, wenn sein
   // E-Blatt daneben steht.
   const auswahl = works.filter((w) => !(w.niveau === "G" && partnerVon(w)));
-  const auswahlLabel = (w) => (partnerVon(w) ? `${w.name} (E/G)` : w.niveau ? `${w.name} (${w.niveau})` : w.name);
+  const auswahlLabel = (w) => {
+    const basis = partnerVon(w) ? `${w.name} (E/G)` : w.niveau ? `${w.name} (${w.niveau})` : w.name;
+    const tag = datumKurz(w.datum);
+    return tag ? `${basis} · ${tag}` : basis;
+  };
   const auswahlWert = work && work.niveau === "G" && partner ? partner.id : work?.id;
   // Ein Blatt zeigen, aber im Stand des SERVERS: die Liste `works` ist der
   // Stand vom letzten Laden — wer am anderen Blatt (oder an einem anderen
@@ -2062,7 +2066,7 @@ export function KlassenarbeitVergleich() {
         <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
         {works.length > 0 && (
           <SuchSelect value={workId ? String(workId) : ""} onChange={(v) => setWorkId(Number(v))} style={{ minWidth: 0, maxWidth: 320 }}
-            optionen={works.map((w) => ({ wert: String(w.id), label: w.niveau ? `${w.name} (${w.niveau})` : w.name }))} />
+            optionen={works.map((w) => ({ wert: String(w.id), label: `${w.niveau ? `${w.name} (${w.niveau})` : w.name}${datumKurz(w.datum) ? ` · ${datumKurz(w.datum)}` : ""}` }))} />
         )}
       </div>
 

@@ -221,6 +221,19 @@ async def import_einstiege(body: dict, user: User = Depends(require_module), db:
 @router.delete("/{method_id}", status_code=204)
 async def delete_method(method_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     m = await eigenes(db, Method, method_id, user, "Eintrag nicht gefunden")
+    # Der Einstieg steht als erste Phase „Einstieg" im Verlaufsplan der Stunden,
+    # an denen er haengt (Text = sein Titel). Mit ihm geht auch diese Phase —
+    # sonst bleibt ein Einstieg im Plan stehen, den es nicht mehr gibt. Eigene
+    # Phasen (anderer Text) bleiben unberuehrt.
+    eintraege = (await db.execute(select(CalendarEntry).where(
+        CalendarEntry.owner_id == user.id, CalendarEntry.method_id == method_id))).scalars().all()
+    for e in eintraege:
+        plan = list(e.verlaufsplan or [])
+        neu = [p for p in plan if not (
+            isinstance(p, dict) and (p.get("phase") or "").strip().lower() == "einstieg"
+            and (p.get("text") or "").strip() == (m.title or "").strip())]
+        if len(neu) != len(plan):
+            e.verlaufsplan = neu          # neue Liste: JSON-Spalten merken Aenderungen sonst nicht
     await db.delete(m)
     await db.commit()
 
