@@ -617,8 +617,8 @@ export default function Noten() {
           <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
             className="icon-btn" style={toolbarIconBtn}>
             <Icon d={ICONS.plus} size={20} color="var(--accent)" />
-          </button>
-        )}
+          </button>)
+        }
       </Werkzeugleiste>
 
       {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>}
@@ -1417,10 +1417,16 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
       <span onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
       <Popover align="center" onClick={(e) => e.stopPropagation()} style={{ zIndex: 10, top: 26, minWidth: 210, padding: 12, textAlign: "left", fontWeight: 400 }}>
         <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colCreated")}: {angelegt}</div>
-        {/* Auswertung: schlichter Details-Knopf, öffnet das zentrale Modal. */}
-        <button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
+        {/* Zu einer Klassenarbeit verknuepft: „Details" ist die Arbeit selbst. */}
+        {cat.source_work_id ? (
+          <Link to={`/auswertung?tab=klassenarbeit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}&work=${cat.source_work_id}`} onClick={onClose}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer", textDecoration: "none" }}>
+            <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
+          </Link>
+        ) : (<button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
           <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
         </button>
+        )}
         {/* Kein „Vergleichen" mehr an der Spalte. Es war für Klassenarbeiten
             gedacht („dieselbe Arbeit in den anderen Fach-Klassen") und stand
             trotzdem an jeder Spalte: für eine mündliche Note am 07.09. gibt es

@@ -105,13 +105,18 @@ export default function Personen() {
       setListe(liste);
       const ziel = Number(params.get("person"));
       const p = ziel && liste.find((x) => x.id === ziel);
-      if (p) zeigen(p);
+      if (p) {
+        // Aus einem Link: oeffnen (nie zuklappen) und ins Bild holen — in einer
+        // langen Liste stand die Person sonst aufgeklappt, aber ausser Sicht.
+        zeigen(p, true);
+        setTimeout(() => document.getElementById(`person-${p.id}`)?.scrollIntoView({ block: "start" }), 50);
+      }
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
 
-  const zeigen = async (p) => {
-    if (offen === p.id) { setOffen(null); return; }
+  const zeigen = async (p, nurOeffnen = false) => {
+    if (offen === p.id && !nurOeffnen) { setOffen(null); return; }
     setOffen(p.id);
     setStand(null);
     const d = await fetch(`/api/personen/${p.id}/auswertung`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -245,7 +250,7 @@ export default function Personen() {
       {liste.length === 0 && <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("personen.leer")}</p>}
 
       {gefiltert.map((p) => (
-        <div key={p.id} style={{ ...cardStyle, padding: 12, marginBottom: 8 }}>
+        <div key={p.id} id={`person-${p.id}`} style={{ ...cardStyle, padding: 12, marginBottom: 8, scrollMarginTop: 72 }}>
           {/* Name UND Bild öffnen dasselbe: die Person. Ein eigener Knopf
               „Auswertung" daneben war ein dritter Weg zum selben Ort — und die
               Zeile stand voller Angaben (Kurs, E/G), die man beim Suchen nicht

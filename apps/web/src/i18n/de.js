@@ -2581,7 +2581,7 @@ export default {
   "noten.susModus": "SuS-Modus",
   "noten.susModusHint": "Blendet alle Noten aus, nur die Namen bleiben",
   "beamer.title": "Im Beamer-Modus ausgeblendet",
-  "beamer.text": "Kalender und Noten sind verborgen, solange andere mitsehen können. Einstellen unter Profil.",
+  "beamer.text": "Kalender und Noten sind verborgen, solange andere mitsehen können. Einstellen unter Profil, Schnellschalter: Strg/Cmd + Umschalt + B.",
   "beamer.zeigen": "Trotzdem anzeigen",
   "profile.beamer": "Beamer-Modus",
   "profile.beamerHint": "Blendet Kalender und Noten aus. Automatisch nur bei erweitertem zweiten Bildschirm; Spiegelung und AirPlay erkennt der Browser nicht – dann „An“ wählen.",
