@@ -249,6 +249,9 @@
            Container ist. break-inside haelt zusammen, was zusammengehoert:
            lieber eine halb leere Seite als eine zerrissene Rueckmeldung. */
         .druck-seite { break-inside: avoid; page-break-inside: avoid; }
+        /* Ein fester Seitenrand: ohne ihn bestimmt jeder Browser den eigenen, und eine Seite, die auf
+           dem einen Gerät knapp passt, ragt auf dem anderen in die naechste — das ergab leere Blaetter. */
+        @page { margin: 10mm; }
         .druck-seite + .druck-seite { break-before: page; page-break-before: always; }
       }
 </style>

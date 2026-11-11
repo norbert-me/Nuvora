@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **QR-Zettel drucken (Karteikarten):** keine leeren Blätter mehr — 12 Zettel je Seite mit festem Seitenrand (10 mm), die Seite passt auf jedem Gerät.
+- **Handy:** Zahlenstrahl und KI-Rennen ragen nicht mehr aus dem Bild (Aufgabenart bzw. Betriebsart als Auswahl).
 - **Zahlenstrahl: Plättchenmethode (Guthaben und Schulden).** Eine zweite Ansicht im Modul: 5 − 3 heißt fünf Guthaben, drei abziehen; „minus eine Schuld“ heißt Schulden wegnehmen — wo keine liegen, erst Nullpaare dazulegen. Als Aufgabe Schritt für Schritt oder frei zum Selberlegen.
 
 ## 4.5.4 — 11.11.2026

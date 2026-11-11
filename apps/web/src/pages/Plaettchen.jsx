@@ -4,7 +4,7 @@
 // „Aufgabe" (Schritt fuer Schritt) und „Frei" (selbst legen und wegnehmen).
 // Reiner Client; gerechnet wird in core/plaettchen.js.
 import { useMemo, useState } from "react";
-import { COLORS as C, Segment, btnPrimary, btnSecondary, cardStyle, segmentBtn, toolbarBtn } from "../components/Icons.jsx";
+import { COLORS as C, Segment, btnPrimary, btnSecondary, cardStyle, segmentBtn, selectStyle, toolbarBtn } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { ARTEN, MAX, aufgabe, dazu, nullpaare, paarDazu, paareWeg, schritte, wert, weg } from "../core/plaettchen.js";
 import { schreibe, termText } from "../core/zahlenstrahl.js";
@@ -73,12 +73,9 @@ export default function Plaettchen() {
 
       {modus === "aufgabe" && (
         <div style={{ ...cardStyle, padding: 14, marginBottom: 12, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <Segment>
-            {ARTEN.map((a) => (
-              <button key={a} onClick={() => waehle(a)} aria-pressed={art === a}
-                style={{ ...segmentBtn, fontWeight: art === a ? 700 : 500, color: art === a ? "var(--accent)" : "var(--text2)" }}>{t(`plaettchen.art.${a}`)}</button>
-            ))}
-          </Segment>
+          <select value={art} onChange={(e) => waehle(e.target.value)} style={{ ...selectStyle, minWidth: 0, maxWidth: "100%" }} aria-label={t("zahlenstrahl.aufgabe")}>
+            {ARTEN.map((a) => <option key={a} value={a}>{t(`plaettchen.art.${a}`)}</option>)}
+          </select>
           <div style={{ flex: 1, minWidth: 160, fontSize: 22, fontWeight: 700, textAlign: "center" }}>
             {termText(aufg.a, [{ op: aufg.op, zahl: aufg.b }])} = {fertig ? <span style={{ color: "var(--accent)" }}>{schreibe(wert(sch[sch.length - 1].nach))}</span> : "?"}
           </div>

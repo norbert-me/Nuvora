@@ -1017,19 +1017,23 @@ def inhalt_kalender(api, u, spuren):
         "PUT", "/api/kalender/external",
         {"calendars": vorher_ext.get("calendars") or [],
          "mitschicken": bool(vorher_ext.get("mitschicken"))}, erwartet=(200, 404))))
-    an = api.call("PUT", "/api/kalender/external",
-                  {"calendars": vorher_ext.get("calendars") or [], "mitschicken": True},
-                  erwartet=(200,))
-    if an.get("mitschicken") is not True:
-        raise AssertionError(f"Schalter nicht gespeichert: {an}")
+    # „Exportieren" gilt JE KALENDER; der Gesamtschalter `mitschicken` heisst nur noch „mindestens
+    # einer exportiert" — ohne einen Kalender kann er nie an sein. Der Testkalender liegt auf einer
+    # reservierten Adresse (.invalid): der Namensabruf scheitert sofort, kein Testlauf haengt am Netz.
+    kal = {"url": "https://kalender.selbsttest.invalid/nuvora.ics", "color": "", "name": "ZZ-Selbsttest"}
+    an = api.call("PUT", "/api/kalender/external", {"calendars": [{**kal, "export": True}]}, erwartet=(200,))
+    if an.get("mitschicken") is not True or not an["calendars"] or an["calendars"][0].get("export") is not True:
+        raise AssertionError(f"Export je Kalender nicht gespeichert: {an}")
     if api.call("GET", "/api/kalender/external", erwartet=(200,)).get("mitschicken") is not True:
         raise AssertionError("Schalter kommt beim Lesen nicht zurueck")
-    # Ein alter Client schickt das Feld gar nicht mit — dann darf der Schalter
-    # nicht stillschweigend ausgehen.
-    ohne = api.call("PUT", "/api/kalender/external",
-                    {"calendars": vorher_ext.get("calendars") or []}, erwartet=(200,))
+    # Ein alter Client schickt `export` gar nicht mit — dann darf der Kalender nicht stillschweigend
+    # ausgehen (die Angabe von vorher bleibt).
+    ohne = api.call("PUT", "/api/kalender/external", {"calendars": [kal]}, erwartet=(200,))
     if ohne.get("mitschicken") is not True:
-        raise AssertionError(f"Schalter faellt ohne Feld um: {ohne}")
+        raise AssertionError(f"Export faellt ohne Feld um: {ohne}")
+    aus = api.call("PUT", "/api/kalender/external", {"calendars": [{**kal, "export": False}]}, erwartet=(200,))
+    if aus.get("mitschicken") is not False:
+        raise AssertionError(f"Gesamtschalter bleibt an, obwohl kein Kalender exportiert: {aus}")
     if not isinstance(api.call("GET", "/api/kalender/external-hidden", erwartet=(200,)), list):
         raise AssertionError("Ausgeblendet-Liste antwortet nicht als Liste")
     api.call("PUT", "/api/kalender/external",

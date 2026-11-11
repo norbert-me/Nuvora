@@ -11,7 +11,7 @@
 // Pfeilen waechst und schrumpft, wandert beim Ziehen unter dem Finger weg.
 // Reiner Client, keine Daten. Gerechnet wird in core/zahlenstrahl.js.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { COLORS as C, ICONS, Icon, Segment, btnPrimary, btnSecondary, cardStyle, pageApp, segmentBtn, toolbarBtn, toolbarInput } from "../components/Icons.jsx";
+import { COLORS as C, ICONS, Icon, Segment, btnPrimary, btnSecondary, cardStyle, pageApp, segmentBtn, selectStyle, toolbarBtn, toolbarInput } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Plaettchen from "./Plaettchen.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -139,12 +139,11 @@ function Strahl() {
 
       {modus === "aufgabe" && (
         <div style={{ ...cardStyle, padding: 14, marginBottom: 12, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <Segment>
-            {(raster <= 0.1 ? ARTEN_FEIN : ARTEN_GROB).map((a) => (
-              <button key={a} onClick={() => waehleArt(a)} aria-pressed={art === a}
-                style={{ ...segmentBtn, fontWeight: art === a ? 700 : 500, color: art === a ? "var(--accent)" : "var(--text2)" }}>{t(`zahlenstrahl.art.${a}`)}</button>
-            ))}
-          </Segment>
+          {/* Eine Auswahl statt einer Reihe breiter Knoepfe: „Minus eine negative Zahl" passt auf dem Handy
+              nicht neben die anderen. */}
+          <select value={art} onChange={(e) => waehleArt(e.target.value)} style={{ ...selectStyle, minWidth: 0, maxWidth: "100%" }} aria-label={t("zahlenstrahl.aufgabe")}>
+            {(raster <= 0.1 ? ARTEN_FEIN : ARTEN_GROB).map((a) => <option key={a} value={a}>{t(`zahlenstrahl.art.${a}`)}</option>)}
+          </select>
           <div style={{ flex: 1, minWidth: 160, fontSize: 22, fontWeight: 700, textAlign: "center" }}>
             {termText(aufg.start, aufg.schritte)} = {fertig ? <span style={{ color: "var(--accent)" }}>{schreibe(w.ergebnis)}</span> : "?"}
           </div>

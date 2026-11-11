@@ -1479,10 +1479,10 @@ function QrDruck({ tokens, api, basis }) {
   return createPortal(
     <div className="druck-huelle" style={{ background: "#fff", color: "#111" }}>
       {seiten.map((seite, k) => (
-        <div key={k} className="druck-seite" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gridAutoRows: "62mm", gap: "4mm", padding: "8mm", boxSizing: "border-box" }}>
+        <div key={k} className="druck-seite" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gridAutoRows: "54mm", gap: "4mm", padding: "4mm", boxSizing: "border-box" }}>
           {seite.map((s) => (
             <div key={s.student_id} style={{ border: "1px dashed #999", borderRadius: 6, padding: "3mm", textAlign: "center", breakInside: "avoid", overflow: "hidden" }}>
-              <img src={`${api}/qr/${s.token}.png?base=${encodeURIComponent(basis)}`} alt="" style={{ display: "block", margin: "0 auto 2mm", width: "38mm", height: "38mm" }} />
+              <img src={`${api}/qr/${s.token}.png?base=${encodeURIComponent(basis)}`} alt="" style={{ display: "block", margin: "0 auto 2mm", width: "34mm", height: "34mm" }} />
               <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{s.name}</div>
               <div style={{ fontSize: 11, color: "#555" }}>#{s.card_id}</div>
             </div>

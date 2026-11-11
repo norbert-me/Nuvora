@@ -11,7 +11,7 @@
 //     Mutationsstaerke, Anzahl und Tempo sind einstellbar.
 //   • Gegen die KI — selbst fahren gegen die beste bisher gelernte KI.
 import { useEffect, useRef, useState } from "react";
-import { CONTROL_R, Segment, segmentBtn, cardStyle, pageFull, toolbarBtn, toolbarBtnPrimary, panelStyle, COLORS as C } from "../components/Icons.jsx";
+import { CONTROL_R, Segment, segmentBtn, selectStyle, cardStyle, pageFull, toolbarBtn, toolbarBtnPrimary, panelStyle, COLORS as C } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import RennenExperiment from "../components/RennenExperiment.jsx";
 import RennenErklaerung from "../components/RennenErklaerung.jsx";
@@ -304,11 +304,27 @@ export default function Rennen() {
     : `${reihe.length > 1 ? (i / (reihe.length - 1)) * 280 : 0},${8 + ((z - zmin) / Math.max(0.01, zmax - zmin)) * 56}`)).filter(Boolean).join(" ");
   const geschafftJetzt = (hud.geschafft || []).slice(-1)[0];
   const hatKi = !!welt.current?.besteKi;
+  // Handybreite: die vier Betriebsarten passen nicht nebeneinander.
+  const [schmal, setSchmal] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 480px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 480px)");
+    const f = () => setSchmal(mq.matches);
+    mq.addEventListener("change", f);
+    return () => mq.removeEventListener("change", f);
+  }, []);
 
   return (
     <div style={pageFull}>
       <Werkzeugleiste style={{ marginBottom: 12 }}
         links={(
+          // Vier Betriebsarten nebeneinander sind auf dem Handy breiter als das Fenster: dort eine Auswahl.
+          schmal ? (
+            <select value={modus} onChange={(e) => setModus(e.target.value)} style={{ ...selectStyle, minWidth: 0, maxWidth: "100%" }} aria-label={t("rennen.titel")}>
+              {["selbst", "ki", "gegen", "experiment"].map((m) => (
+                <option key={m} value={m} disabled={m === "gegen" && !hatKi && modus !== "gegen"}>{t(`rennen.modus.${m}`)}</option>
+              ))}
+            </select>
+          ) : (
           <Segment>
             {["selbst", "ki", "gegen", "experiment"].map((m) => (
               <button key={m} onClick={() => setModus(m)} aria-pressed={modus === m} disabled={m === "gegen" && !hatKi && modus !== "gegen"}
@@ -318,6 +334,7 @@ export default function Rennen() {
               </button>
             ))}
           </Segment>
+          )
         )}>
         {modus !== "experiment" && (<>
           <button onClick={() => setLaeuft((x) => !x)} style={toolbarBtnPrimary}>{laeuft ? t("rennen.pause") : t("rennen.los")}</button>
