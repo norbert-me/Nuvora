@@ -267,15 +267,11 @@ function Ergebnisse({ results, noten = [], t }) {
                   <span title={t(n.trend > 0 ? "noten.trendBesser" : n.trend < 0 ? "noten.trendSchlechter" : "noten.trendGleich")}
                     style={{ marginLeft: 6, color: n.trend > 0 ? C.success : n.trend < 0 ? C.danger : "var(--text3)" }}>{n.trend > 0 ? "↗" : n.trend < 0 ? "↘" : "→"}</span>
                 )}</div>
-              {/* Die Teilnoten dahinter: woraus sich die Note zusammensetzt. */}
+              {/* Teilnoten = die Bereiche (Muendlich, Klassenarbeiten …), klein und in einer Zeile. */}
               {(n.teilnoten || []).length > 0 && (
-                <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 8, textAlign: "left" }}>
-                  <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("lernen.teilnoten")}</div>
-                  {[...n.teilnoten].reverse().map((x, k) => (
-                    <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, padding: "2px 0" }}>
-                      <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{x.name}{x.bereich ? <span style={{ color: "var(--text3)" }}> · {x.bereich}</span> : null}</span>
-                      <strong style={{ whiteSpace: "nowrap" }}>{String(x.note).replace("-", "−")}</strong>
-                    </div>
+                <div style={{ marginTop: 8, display: "flex", gap: "4px 14px", flexWrap: "wrap", justifyContent: "center", fontSize: 13, color: "var(--text2)" }}>
+                  {n.teilnoten.map((x, k) => (
+                    <span key={k}>{x.name} <strong style={{ color: "var(--text)" }}>{String(x.note).replace("-", "−")}</strong></span>
                   ))}
                 </div>
               )}
@@ -442,7 +438,6 @@ function Lernstand({ results, t }) {
     .sort((x, y) => x.pct - y.pct);
   if (!liste.length) return null;
   const offen = liste.filter((x) => x.pct < 50);
-  const fast = liste.filter((x) => x.pct >= 50 && x.pct < 75);
   const stufe = (pct) => (pct >= 75 ? { farbe: C.success, text: t("lernen.stand.sitzt") } : pct >= 50 ? { farbe: C.warning, text: t("lernen.stand.fast") } : { farbe: C.danger, text: t("lernen.stand.nochmal") });
   return (
     <div style={{ ...cardStyle, padding: 16, marginBottom: 12 }}>
@@ -453,14 +448,9 @@ function Lernstand({ results, t }) {
           <Icon d={ICONS.bulb} size={14} color={C.warning} />{" "}
           <strong>{t("lernen.stand.zuerst")}</strong> {offen.slice(0, 3).map((x) => x.label).join(", ")}
         </p>
-      ) : fast.length > 0 ? (
-        <p style={{ fontSize: 14, margin: "0 0 12px", color: "var(--text)" }}>
-          <Icon d={ICONS.bulb} size={14} color={C.warning} />{" "}
-          <strong>{t("lernen.stand.ueben")}</strong> {fast.slice(0, 3).map((x) => x.label).join(", ")}
-        </p>
-      ) : (
+      ) : liste.every((x) => x.pct >= 75) ? (
         <p style={{ fontSize: 14, margin: "0 0 12px", color: "var(--text2)" }}>{t("lernen.stand.allesGut")}</p>
-      )}
+      ) : null}
       <div style={{ display: "grid", gap: 8 }}>
         {liste.map((x) => {
           const st = stufe(x.pct);

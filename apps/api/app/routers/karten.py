@@ -1843,12 +1843,11 @@ async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
                     GradeCategory.section_id.in_([x.id for x in secs])))).scalars().all() if secs else []
                 cats.sort(key=lambda c: (str(c.date)[:10] if c.date else (c.created_at.date().isoformat() if c.created_at else ""), c.id))
                 reihe = [r.per_category.get(str(c.id)) for c in cats]
-                # Die Teilnoten: jede Spalte mit einer Note, in der Reihenfolge der Zeit. Nur Noten —
-                # Beobachtungen und Kommentare gehoeren der Lehrkraft.
-                bereich = {x.id: x.name for x in secs}
-                teil = [{"name": c.name, "bereich": bereich.get(c.section_id, ""), "note": note_label(v), "wert": round(v, 1),
-                         "datum": (str(c.date)[:10] if c.date else "")}
-                        for c in cats if (v := r.per_category.get(str(c.id))) is not None]
+                # Die Teilnoten sind die BEREICHSNOTEN („Mündlich", „Klassenarbeiten") — nicht
+                # die einzelnen Spaltennoten: das waere fuer ein Kind eine Wand aus Zahlen.
+                teil = [{"name": sec.name, "note": note_label(v), "wert": round(v, 1)}
+                        for sec in secs
+                        if (v := (r.section_effective or {}).get(str(sec.id))) is not None]
                 out.append({"kurs": name, "note": note_label(wert), "wert": round(wert, 1), "halbjahr": term,
                             "trend": noten_trend(reihe), "teilnoten": teil})
                 break
