@@ -1845,7 +1845,7 @@ async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
                 reihe = [r.per_category.get(str(c.id)) for c in cats]
                 # Die Teilnoten sind die BEREICHSNOTEN („Mündlich", „Klassenarbeiten") — nicht
                 # die einzelnen Spaltennoten: das waere fuer ein Kind eine Wand aus Zahlen.
-                teil = [{"name": sec.name, "note": note_label(v), "wert": round(v, 1)}
+                teil = [{"name": sec.name, "note": note_label(v), "wert": round(v, 1), "gewicht": round(sec.weight or 0)}
                         for sec in secs
                         if (v := (r.section_effective or {}).get(str(sec.id))) is not None]
                 out.append({"kurs": name, "note": note_label(wert), "wert": round(wert, 1), "halbjahr": term,

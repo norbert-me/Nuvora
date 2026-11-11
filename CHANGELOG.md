@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Zugang der Kinder:** die Teilnoten zeigen ihr Gewicht in Prozent („Klassenarbeiten 3 · 40 %“). Eine leere Seite hat keinen Scrollbalken mehr (die volle Fensterhöhe wurde durch den Seitenzoom um 6 % zu groß; gilt auch für die Code-Detektiv-Seiten der Kinder).
 - **Zugang der Kinder:** unter der aktuellen Note stehen die Teilnoten als Bereiche („Mündlich 2−  Klassenarbeiten 3+“); der Pfeil erscheint erst ab einer halben Note Unterschied (vorher schon bei 0,3) und gar nicht bei „gleich“; die Aussage im Lernstand passt zu den Balken („Alle Themen sitzen“ nur, wenn es stimmt; die Zeile „Hier fehlt noch etwas Sicherheit“ ist weg); das Fach steht ohne Klasse („Mathematik“ statt „7.5 Mathematik“).
 - **Notenbuch:** „UB“ in eine Zelle tippen setzt dieses Kind in dieser Spalte auf „nicht benotet“ (zählt nicht, gilt nicht als fehlend); LE-Kinder mit UB in der Klassenarbeit werden nicht mehr als „Note fehlt“ markiert; Tab/Enter überspringt Kinder, die an dem Tag gefehlt haben (und LE-Kinder in Klassenarbeits-Spalten).
 - **Zugang der Kinder:** die aktuelle Note nennt nur das Fach („Mathematik“), nicht „7.5 Mathematik“.

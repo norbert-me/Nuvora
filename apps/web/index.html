@@ -129,6 +129,10 @@
          einheitlicher Zoom vergrößert ALLE Module gleich (auch die eingebetteten
          Lernpfad-/Code-Detektiv-Ansichten liegen in #root). */
       #root { zoom: 1.06; }
+      /* Eine volle Fensterhoehe INNERHALB von #root: `100dvh` wird dort mit dem Zoom
+         mitgerechnet (×1,06) und ueberragt das Fenster — eine Scrollleiste an einer leeren
+         Seite. Seiten, die das Fenster fuellen, nehmen deshalb diese Groesse. */
+      :root { --voll: calc(100dvh / 1.06); }
       body {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         -webkit-font-smoothing: antialiased;

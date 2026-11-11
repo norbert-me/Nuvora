@@ -271,7 +271,8 @@ function Ergebnisse({ results, noten = [], t }) {
               {(n.teilnoten || []).length > 0 && (
                 <div style={{ marginTop: 8, display: "flex", gap: "4px 14px", flexWrap: "wrap", justifyContent: "center", fontSize: 13, color: "var(--text2)" }}>
                   {n.teilnoten.map((x, k) => (
-                    <span key={k}>{x.name} <strong style={{ color: "var(--text)" }}>{String(x.note).replace("-", "−")}</strong></span>
+                    <span key={k}>{x.name} <strong style={{ color: "var(--text)" }}>{String(x.note).replace("-", "−")}</strong>
+                      {x.gewicht > 0 && <span style={{ color: "var(--text3)", fontSize: 12 }}> · {x.gewicht} %</span>}</span>
                   ))}
                 </div>
               )}
@@ -311,7 +312,7 @@ function Ergebnisse({ results, noten = [], t }) {
 // Und der Inhalt steht OBEN statt senkrecht mittig: zentriert klaffte ueber den
 // Reitern eine leere Flaeche, waehrend die Karte nach unten rutschte.
 const Center = ({ children, hinweis }) => (
-  <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
+  <div style={{ minHeight: "var(--voll, 100dvh)", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
     <div style={{ flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px" }}>
       {children}
     </div>
