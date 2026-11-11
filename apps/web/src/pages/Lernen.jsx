@@ -286,22 +286,8 @@ function Ergebnisse({ results, noten = [], t }) {
                 : <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.pct}%</div>}
               <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.score}/{r.total}</div>
             </div>
-            {/* Was aus der Zahl folgt. Ohne das ist eine Prozentangabe nur eine
-                Zahl — und die Frage „was üb ich jetzt?" beantwortet sie nicht.
-                Nur die eigenen Themen: kein Rang, kein Klassenschnitt, kein
-                fremder Name. Das Kind sieht diese Seite allein. */}
-            {(r.sass || []).length > 0 && (
-              <div style={{ fontSize: 13, marginTop: 8, color: "var(--text2)" }}>
-                <Icon d={ICONS.check} size={13} color={C.success} />{" "}
-                {t("lernen.sass")}: {r.sass.map((x) => x.label).join(", ")}
-              </div>
-            )}
-            {(r.offen || []).length > 0 && (
-              <div style={{ fontSize: 13, marginTop: 4, color: "var(--text2)" }}>
-                <Icon d={ICONS.bulb} size={13} color={C.warning} />{" "}
-                {t(r.unbenotet ? "lernen.offenAnschauen" : "lernen.offen")}: {r.offen.map((x) => x.label).join(", ")}
-              </div>
-            )}
+            {/* Was aus den Themen folgt, steht NUR oben im Lernstand (ueber alle Tests) — je Test
+                dieselbe Aussage noch einmal war doppelt. */}
           </div>
         ))}
       </div>
