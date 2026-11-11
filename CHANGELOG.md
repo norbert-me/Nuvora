@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Zugang der Kinder:** die aktuelle Note nennt nur das Fach („Mathematik“), nicht „7.5 Mathematik“.
 - **Zugang der Kinder:** „Impressum & Datenschutz“ klebt am unteren Rand und ist ohne Scrollen sichtbar (auch bei Code-Detektiv); der Testname wird umgebrochen statt abgeschnitten und beginnt nicht mehr mit der Klasse.
 - **Ergebnisse (Zugang der Kinder):** der Lernstand steht nur noch oben, nicht mehr zusätzlich unter jedem einzelnen Test.
 - **CardVote-Sitzung am Beamer:** die Liste zeigt nur noch, auf wen noch gewartet wird — gescannte und abwesende Kinder verschwinden daraus (statt die Farbe zu wechseln). Beim Scannen poppt kurz der Name auf, bei einer Karte, die nochmal gescannt wurde, mit „nochmal gescannt“ bzw. „Antwort geändert“. Die Anwesenheit wird alle 45 Sekunden und beim Zurückkehren auf die Seite neu geholt.

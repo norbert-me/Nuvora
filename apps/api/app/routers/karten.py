@@ -1789,6 +1789,18 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
     return out
 
 
+def _kurs_ohne_klasse(kurs, klassenname: str) -> str:
+    """„7.5 Mathematik" -> „Mathematik": die Klasse kennen die Kinder selbst. Steht die Klasse
+    nicht vorn im Namen, gilt das Fach des Kurses, sonst der Name."""
+    name = (kurs.name or "").strip()
+    kn = (klassenname or "").strip()
+    if kn and name.lower().startswith(kn.lower()):
+        rest = name[len(kn):].strip(" -–—:·")
+        if rest:
+            return rest
+    return (kurs.fach or "").strip() or name
+
+
 @router.get("/lernen/{token}/aktuelle-note")
 async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
     """Oeffentlich (Token): die aktuelle Note des Kindes aus dem NOTENBUCH —
@@ -1807,7 +1819,8 @@ async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
     # Eine Note je Kurs des Kindes (Mathe, Deutsch …); Bestand ohne Kurs zaehlt als ein Eintrag.
     kurs_ids = sorted(set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id))
     kurse = {k.id: k for k in (await db.execute(select(Kurs).where(Kurs.id.in_(kurs_ids), Kurs.deleted_at.is_(None)))).scalars().all()} if kurs_ids else {}
-    ziele = [(kid, kurse[kid].name) for kid in kurs_ids if kid in kurse] or [(None, "")]
+    klasse = await db.get(SchoolClass, st.class_id)
+    ziele = [(kid, _kurs_ohne_klasse(kurse[kid], klasse.name if klasse else "")) for kid in kurs_ids if kid in kurse] or [(None, "")]
     out = []
     for kid, name in ziele:
         for term in termine:
