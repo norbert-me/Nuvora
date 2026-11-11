@@ -213,6 +213,11 @@ async def _class_all_decks_where(db, class_id):
     return CardDeck.class_id == class_id
 
 
+def _stapel_des_kurses(kurs_id):
+    """Stapel EINES Kurses: ihm zugewiesen — oder (noch ohne Zuweisung) von ihm herkommend."""
+    return or_(_zugewiesen([kurs_id]), and_(_ohne_zuweisung(), CardDeck.kurs_id == kurs_id))
+
+
 async def _student_kurs_alle(db, st) -> set:
     """Alle Kurse des Kindes, auch die mit abgeschalteten Karteikarten."""
     return set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id)
@@ -1357,7 +1362,7 @@ async def progress(class_id: int, kurs_id: Optional[int] = None, user: User = De
 
 
 async def themen_lernstand(db: AsyncSession, user: User, class_id: int, students,
-                           jetzt: Optional[datetime] = None) -> dict:
+                           jetzt: Optional[datetime] = None, kurs_id: Optional[int] = None) -> dict:
     """Kartenstand je Kind und Thema — die Kartenquelle des Themenstands.
 
     Kein Endpunkt, sondern eine Auskunft für `themenprofil` (Kern). Die
@@ -1368,6 +1373,9 @@ async def themen_lernstand(db: AsyncSession, user: User, class_id: int, students
 
     - nur ausgerollte, nicht gelöschte Stapel MIT Thema (ein Entwurf ist für
       niemanden fällig, ein Stapel ohne Thema gehört in keine Themenzeile),
+    - mit `kurs_id` nur die Stapel DIESES Kurses: dieselbe Klasse liegt oft in
+      mehreren Kursen (7.5 Mathe und 7.5 LZ), und Karteikarten, die nur in Mathe
+      geübt werden, gehören nicht in den Themenstand der LZ,
     - E/G auf beiden Ebenen (`_sichtbar_karte`) — ein G-Kind darf sich keinen
       Rückstand an E-Karten anrechnen lassen, die es nie zu sehen bekommt,
     - `Treffer = reps`, `Versuche = reps + lapses`. NICHT nach `reps > 0`
@@ -1387,7 +1395,7 @@ async def themen_lernstand(db: AsyncSession, user: User, class_id: int, students
         select(Card.id, Card.niveau, CardDeck.niveau, CardDeck.niveau_aktiv, CardDeck.topic_id)
         .join(CardDeck, Card.deck_id == CardDeck.id)
         .where(CardDeck.owner_id == user.id,
-               await _class_all_decks_where(db, class_id),
+               (_stapel_des_kurses(kurs_id) if kurs_id else await _class_all_decks_where(db, class_id)),
                CardDeck.topic_id.is_not(None),
                CardDeck.deleted_at.is_(None),
                CardDeck.released_at.is_not(None), CardDeck.released_at <= now,

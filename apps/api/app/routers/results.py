@@ -287,6 +287,9 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
             niveau_aktiv = bool(qs.niveau_aktiv)
             minuspunkte = bool(qs.minuspunkte)
             unbenotet = bool(qs.unbenotet)
+    quiz_unbenotet = unbenotet
+    # Auch die einzelne Auswertung kann „nicht benotet" sein (Schalter dort).
+    unbenotet = unbenotet or bool((session.eval_config or {}).get("unbenotet"))
 
     questions = []
     if session.question_set_id:
@@ -366,6 +369,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
         "niveau_aktiv": niveau_aktiv,
         "minuspunkte": minuspunkte,
         "unbenotet": unbenotet,
+        "unbenotet_quiz": quiz_unbenotet,
         "questions": questions,
         "students": rows,
     }
@@ -1202,7 +1206,7 @@ async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
 # haengen deshalb am Kern und pruefen je Quelle `is_active` (Regel 3).
 
 @kern_router.get("/classes/{class_id}/themenprofil")
-async def themenprofil(class_id: int, student_id: Optional[int] = None,
+async def themenprofil(class_id: int, student_id: Optional[int] = None, kurs_id: Optional[int] = None,
                        user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Je Kind je Thema: Gesamtstand in Prozent, Verlauf und Trend.
 
@@ -1285,7 +1289,7 @@ async def themenprofil(class_id: int, student_id: Optional[int] = None,
     karten_je_kind: dict[int, dict] = {}
     if await is_active(db, user.id, "karten"):
         quellen.append("karten")
-        karten_je_kind = await themen_lernstand(db, user, class_id, roster)
+        karten_je_kind = await themen_lernstand(db, user, class_id, roster, kurs_id=kurs_id)
 
     skala = user.grade_scale or None
     aus = []

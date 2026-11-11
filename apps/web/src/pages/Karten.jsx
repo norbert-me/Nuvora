@@ -1,6 +1,7 @@
 // Modul Karten (Lehrer): Stapel & Karten verwalten, QR-Tokens drucken,
 // Fortschritt sehen. Schüler lernen kontenlos über den Token (siehe Lernen.jsx).
 import { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
 import { AddButton, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_H, CONTROL_R, dateiWaehlen, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, menuRow, Modal as UiModal, modalOverlay, modalPanel, NiveauToggle, overlayGuard, pageApp, pageForm, panelStyle, Popover, REIFE_COLORS, selectStyle, Skeleton, td as tdBasis, th as thBasis, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
@@ -435,7 +436,7 @@ export default function Karten() {
       {/* Themenstand: wie sicher sitzt welches Thema — dieselbe Komponente wie
           in der Auswertung, damit es nicht zwei Rechnungen gibt. Sie holt sich
           alles selbst und zeigt nichts, wo nichts gemessen ist. */}
-      {view === "progress" && classId && <Themenstand classId={classId} />}
+      {view === "progress" && classId && <Themenstand classId={classId} kursId={kursId} />}
 
       {view === "progress" && (() => {
         // Die Kartenzahl gilt JE KIND: der Server filtert sie nach Niveau
@@ -508,6 +509,10 @@ export default function Karten() {
               ausgedruckt und ausgeschnitten. Papier ist immer weiss, die
               Schrift immer schwarz — im dunklen Design waeren sie sonst am
               Bildschirm richtig und auf dem Blatt unbrauchbar. */}
+          {/* Gedruckt wird NICHT dieses Raster, sondern eine eigene Fassung in Seiten
+              (QrDruck): ein Raster auf der Seite reisst am Seitenende mitten durch
+              einen Code, und ein zerschnittener QR-Code ist unbrauchbar. */}
+          <QrDruck tokens={tokens || []} api={API} basis={qrBasis} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
             {(tokens || []).map((s) => (
               <div key={s.student_id} style={{ ...panelStyle, textAlign: "center", padding: 12, background: "#fff" }}>
@@ -1461,3 +1466,30 @@ const krumeBtn = (ziel, aktuell) => ({
 // Aus dem Kern abgeleitet: nur Innenabstand und Kopflinie weichen ab.
 const th = { ...thBasis, padding: "8px 10px", borderBottom: "2px solid var(--border)" };
 const td = { ...tdBasis, padding: "7px 10px" };
+
+// Druckfassung der QR-Zettel: feste Seiten mit je 12 Zetteln (3 × 4), jede Seite
+// beginnt oben (`.druck-seite`, siehe index.html) und kein Zettel wird zerteilt.
+// Am Bildschirm unsichtbar (`.druck-huelle`); beim Drucken ersetzt sie die App.
+// Feste Papierfarben: Papier ist weiss, die Schrift schwarz.
+const QR_PRO_SEITE = 12;
+function QrDruck({ tokens, api, basis }) {
+  if (typeof document === "undefined" || !tokens.length) return null;
+  const seiten = [];
+  for (let i = 0; i < tokens.length; i += QR_PRO_SEITE) seiten.push(tokens.slice(i, i + QR_PRO_SEITE));
+  return createPortal(
+    <div className="druck-huelle" style={{ background: "#fff", color: "#111" }}>
+      {seiten.map((seite, k) => (
+        <div key={k} className="druck-seite" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gridAutoRows: "62mm", gap: "4mm", padding: "8mm", boxSizing: "border-box" }}>
+          {seite.map((s) => (
+            <div key={s.student_id} style={{ border: "1px dashed #999", borderRadius: 6, padding: "3mm", textAlign: "center", breakInside: "avoid", overflow: "hidden" }}>
+              <img src={`${api}/qr/${s.token}.png?base=${encodeURIComponent(basis)}`} alt="" style={{ display: "block", margin: "0 auto 2mm", width: "38mm", height: "38mm" }} />
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{s.name}</div>
+              <div style={{ fontSize: 11, color: "#555" }}>#{s.card_id}</div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>,
+    document.body,
+  );
+}

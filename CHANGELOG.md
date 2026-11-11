@@ -14,6 +14,12 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- **Themenstand je Kurs:** Karteikarten zählen nur noch im Kurs, dem der Stapel zugewiesen ist (7.5 LZ zeigte Karten aus 7.5 Mathe, weil beide dieselbe Klasse teilen).
+- **Karteikarten, QR-Zettel drucken:** feste Seiten mit je 12 Zetteln — kein QR-Code wird mehr in der Mitte durchgeschnitten.
+- **CardVote-Auswertung:** „Nicht benotet“ lässt sich auch an der einzelnen Auswertung setzen; die Kinder sehen an ihrem Zugang „Übung“.
+
 ## 4.5.3 — 10.11.2026
 
 - **Neues Modul Zahlenstrahl (Beta):** Rechnen mit Pfeilen, auch mit negativen und Dezimalzahlen. Die Achse ist fest (−10 bis +10, mit Zehnteln −2 bis +2). Bei einer Aufgabe entstehen die Pfeile Schritt für Schritt; bei „minus“ zuerst der Pfeil der Zahl, im nächsten Schritt wird er umgedreht. Im freien Modus ohne Aufgabe lassen sich Start und Pfeile ziehen. Zeigt, warum „minus eine negative Zahl“ plus ist.

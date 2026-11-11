@@ -4,7 +4,7 @@ import { useAktiv } from "../core/modules.js";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, linkBtn, pageApp, panelStyle, quoteFarbe, quoteFlaeche, selectStyle, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
+import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, linkBtn, pageApp, panelStyle, quoteFarbe, quoteFlaeche, selectStyle, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
@@ -102,7 +102,7 @@ export default function Evaluation() {
   // Vorher lief jede dieser Aenderungen nach 800 ms von selbst zum Server —
   // man sah nur ein kurzes „gespeichert" und hatte nichts in der Hand.
   const [gespeicherteConfig, setGespeicherteConfig] = useState({
-    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [], gefehlt: {}, eModus: "bonus", bonus: profilBonus(),
+    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [], gefehlt: {}, eModus: "bonus", unbenotet: false, bonus: profilBonus(),
   });
   // Was sonst noch in der Konfiguration steht (Zeiten aus der Live-Sitzung).
   // Die PUT ersetzt sie als Ganzes — ohne diese Kopie waeren sie nach dem
@@ -113,13 +113,15 @@ export default function Evaluation() {
         ...restConfig.current,
         weights: wert.weights, grade_scale: wert.gradeScale,
         krank: wert.krank, anwesend: wert.anwesend, gefehlt: wert.gefehlt,
-        e_modus: wert.eModus,
+        e_modus: wert.eModus, unbenotet: !!wert.unbenotet,
         bonus_regel: { max_stufen: wert.bonus.maxStufen, mindest_nenner: wert.bonus.mindestNenner, falsch_zehrt: wert.bonus.falschZehrt },
       })).catch(() => null);
     if (!r || !r.ok) return false;
     setGespeicherteConfig(wert);
   });
   const { weights, gradeScale, krank: krankListe, anwesend: anwesendListe, gefehlt: gefehltMap, eModus, bonus } = eConf.wert;
+  // Nicht benotet: am Quiz (vom Server) ODER an dieser Auswertung (live aus dem Entwurf).
+  const unbenotet = !!(data && data.unbenotet_quiz) || !!eConf.wert.unbenotet;
 
   // Nach dem Laden die Arbeitskopie auf den geladenen Stand setzen. `useEntwurf`
   // uebernimmt einen neuen Stand nur, wenn NICHTS offen ist — und beim ersten
@@ -152,7 +154,7 @@ export default function Evaluation() {
       clearTimeout(timer);
       if (weg.current) { navigate("/", { replace: true }); return; }
       if (evalData && evalData.questions && evalData.students) setData({ ...evalData, _evalConfig: config || {} });
-      const { weights: _w, grade_scale: _g, krank: _k, anwesend: _a, gefehlt: _f, ...rest } = config || {};
+      const { weights: _w, grade_scale: _g, krank: _k, anwesend: _a, gefehlt: _f, unbenotet: _u, ...rest } = config || {};
       restConfig.current = rest;
       let skala = (config && config.grade_scale) || null;
       if (!skala) {
@@ -171,6 +173,7 @@ export default function Evaluation() {
         // Fehlt der Schluessel (jede Auswertung vor dieser Fassung), gilt
         // „bonus" — sonst aenderte sich ueber Nacht jede alte Note.
         eModus: ["bonus", "ausgleich", "keine", "alle"].includes(config && config.e_modus) ? config.e_modus : "bonus",
+        unbenotet: !!(config && config.unbenotet),
         // Ohne eigene Regel an dieser Auswertung gilt die Vorgabe aus dem Profil,
         // sonst die eingebaute. Bestandsauswertungen behalten damit ihre Zahlen,
         // solange im Profil nichts steht.
@@ -463,7 +466,7 @@ const gradeDistribution = (() => {
     const avgGrade = presentStudents.length > 0
       ? pcts.reduce((sum, p) => sum + gradeFromPct(p, gradeScale), 0) / presentStudents.length
       : 0;
-    if (!data.unbenotet && avgGrade >= 4.5 && avgPct >= 40)
+    if (!unbenotet && avgGrade >= 4.5 && avgPct >= 40)
       tips.push(t("cv.tipGradeAvg", { avg: avgGrade.toFixed(1) }));
 
     return tips;
@@ -585,7 +588,14 @@ const gradeDistribution = (() => {
         />
       )}
       <h2 style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{session_name || t("cv.sessionFallback", { id })}
-        {data.unbenotet && <span style={{ ...chipStyle, marginLeft: 10, fontSize: 12, verticalAlign: "middle" }}>{t("dash.unbenotetToggle")}</span>}</h2>
+        {unbenotet && <span style={{ ...chipStyle, marginLeft: 10, fontSize: 12, verticalAlign: "middle" }}>{t("dash.unbenotetToggle")}</span>}</h2>
+      {/* Nicht benotet: diese Auswertung zaehlt nicht als Note. Die Kinder sehen es an ihrem Zugang
+          („Übung"), die Notenverteilung fällt weg. Ist schon das Quiz so markiert, steht es oben als Marke. */}
+      {!data.unbenotet_quiz && (
+        <div style={{ margin: "4px 0 8px" }}>
+          <Toggle checked={!!eConf.wert.unbenotet} onChange={(v) => eConf.setz({ unbenotet: v })} label={t("dash.unbenotetToggle")} />
+        </div>
+      )}
       {/* Derselbe Test in einem anderen Kurs der Klasse? Umhängen ist eine
           Handlung (wie Archivieren), keine Einstellung — sie gilt sofort. */}
       {(data.kurse || []).length > 1 && (
@@ -615,7 +625,7 @@ const gradeDistribution = (() => {
       >
         {/* Nur sichtbar, wenn das Notenmodul aktiv ist — sonst fuehrt der
             Knopf ins Leere (Regel 3: CardVote haengt nicht von Noten ab). */}
-        {notenAktiv && data.class_id && !data.unbenotet && (
+        {notenAktiv && data.class_id && !unbenotet && (
           <button onClick={() => setNotenDialog(true)} style={toolbarBtn}>
             {t("notenimp.button")}
           </button>
@@ -736,14 +746,14 @@ const gradeDistribution = (() => {
       <div style={{ ...panelStyle, padding: 16, marginBottom: 12 }}>
         {/* Reiter aus dem Kern (Tabs) statt vier nachgebauter Pillen. */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-          <Tabs value={data.unbenotet ? "box" : gradeView} onChange={setGradeView}
-            options={data.unbenotet ? [["box", t("cv.boxplot")]] : [["bar", t("cv.gradeDistribution")], ["box", t("cv.boxplot")]]} />
-          {gradeView === "bar" && !data.unbenotet && (
+          <Tabs value={unbenotet ? "box" : gradeView} onChange={setGradeView}
+            options={unbenotet ? [["box", t("cv.boxplot")]] : [["bar", t("cv.gradeDistribution")], ["box", t("cv.boxplot")]]} />
+          {gradeView === "bar" && !unbenotet && (
             <Tabs value={gradeMode} onChange={setGradeMode} style={{ marginLeft: "auto" }}
               options={[["whole", t("cv.wholeGrades")], ["tendency", t("cv.tendencyGrades")]]} />
           )}
         </div>
-        {gradeView === "bar" && !data.unbenotet ? (
+        {gradeView === "bar" && !unbenotet ? (
           <div style={{ display: "flex", alignItems: "flex-end", gap: gradeMode === "tendency" ? 3 : 8 }}>
             {(gradeMode === "tendency" ? TENDENCY_GRADES : [1, 2, 3, 4, 5, 6]).map((g) => {
               const count = gradeDistribution[g];
@@ -791,7 +801,7 @@ const gradeDistribution = (() => {
               setShowWeights(v === "weights" && !showWeights);
               setShowFragen(v === "fragen" && !showFragen);
             }}
-            options={[...(data.unbenotet ? [] : [["scale", t("cv.gradeScale")]]), ["weights", t("cv.weights")], ["fragen", t("cv.allQuestions")]]}
+            options={[...(unbenotet ? [] : [["scale", t("cv.gradeScale")]]), ["weights", t("cv.weights")], ["fragen", t("cv.allQuestions")]]}
           />
         }
       />
@@ -1022,7 +1032,7 @@ const gradeDistribution = (() => {
                     )}
                   </td>
                   <td style={{ ...td, textAlign: "center", fontWeight: 700, color: GRADE_COLORS[Math.round(grade)] }}>
-                    {student.ownMax > 0 && !data.unbenotet ? grade.toFixed(1) : "–"}
+                    {student.ownMax > 0 && !unbenotet ? grade.toFixed(1) : "–"}
                   </td>
                 </tr>
               );

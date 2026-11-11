@@ -292,6 +292,9 @@ class EvalConfigIn(BaseModel):
     # app/scoring.e_modus_von — Unbekanntes gilt dort als "bonus", deshalb
     # genuegt hier die Form.
     e_modus: Optional[Literal["bonus", "ausgleich", "keine", "alle"]] = None
+    # Diese Auswertung zaehlt nicht als Note (Rueckmeldung ohne Note, auch fuer
+    # die Kinder). Gilt zusaetzlich zum Schalter am Quiz (`question_sets.unbenotet`).
+    unbenotet: Optional[bool] = None
     model_config = {"extra": "allow"}
 
     @field_validator("grade_scale")

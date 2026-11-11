@@ -85,8 +85,9 @@ async def quiz(db: AsyncSession, session: Session, nur_card_id: Optional[int] = 
     qs = await db.get(QuestionSet, session.question_set_id)
     niveau_aktiv = bool(qs and qs.niveau_aktiv)
     minuspunkte = bool(qs and qs.minuspunkte)
-    unbenotet = bool(qs and qs.unbenotet)
     config = session.eval_config or {}
+    # Am Quiz ODER an dieser einen Auswertung als „nicht benotet“ markiert.
+    unbenotet = bool(qs and qs.unbenotet) or bool(config.get("unbenotet"))
     qmap = session.question_map or {}
 
     items = (await db.execute(
