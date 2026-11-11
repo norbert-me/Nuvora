@@ -277,7 +277,9 @@ function Ergebnisse({ results, noten = [], t }) {
           <div key={idx} style={{ ...cardStyle, padding: "12px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+                {/* Der Testname beginnt mit der Klasse („7.5 — …"): die kennen die Kinder selbst. Und er
+                    wird umgebrochen statt abgeschnitten — der Rest ist oft das Wichtigste. */}
+                <div style={{ fontWeight: 600, overflowWrap: "anywhere", lineHeight: 1.3 }}>{ohneKlasse(r.name)}</div>
                 <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.date ? new Date(r.date).toLocaleDateString() : ""}</div>
               </div>
               <div style={{ fontSize: 16, fontWeight: 800, color: r.pct >= 50 ? C.success : C.danger }}>{r.note ? r.note.replace("-", "−") : `${r.pct}%`}</div>
@@ -458,4 +460,11 @@ function Lernstand({ results, t }) {
       </div>
     </div>
   );
+}
+
+// „7.5 — 1 Rationale Zahlen" -> „1 Rationale Zahlen": der Name einer Sitzung beginnt mit der Klasse.
+export function ohneKlasse(name) {
+  const n = String(name || "");
+  const i = n.indexOf(" — ");
+  return i > 0 && i < 20 ? n.slice(i + 3).trim() || n : n;
 }
