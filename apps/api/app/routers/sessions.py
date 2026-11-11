@@ -57,7 +57,8 @@ async def get_active_sessions(user: User = Depends(get_current_user), db: AsyncS
     sessions = result.scalars().all()
     out = []
     for s in sessions:
-        item = {"id": s.id, "code": s.code, "name": s.name, "class_id": s.class_id, "question_set_id": s.question_set_id, "current_question_id": s.current_question_id, "mode": s.mode}
+        item = {"id": s.id, "code": s.code, "name": s.name, "class_id": s.class_id, "question_set_id": s.question_set_id, "current_question_id": s.current_question_id, "mode": s.mode,
+                "question_layout": s.question_layout}
         if s.class_id:
             cls = await db.get(SchoolClass, s.class_id)
             item["class_name"] = cls.name if cls else None
@@ -166,6 +167,40 @@ class QuestionMapIn(RootModel[Dict[str, Optional[str]]]):
         return v
 
 
+class QuestionLayoutIn(RootModel[List[dict]]):
+    """Gezeigte Reihenfolge: je Frage {id, choices, choice_images, correct_answer}
+    in der Reihenfolge der Sitzung. Nur Form und Groesse werden geprueft."""
+
+    @field_validator("root")
+    @classmethod
+    def form_ok(cls, v):
+        if len(v) > 1000:
+            raise ValueError("zu viele Fragen (max. 1000)")
+        sauber = []
+        for e in v:
+            if not isinstance(e.get("id"), int):
+                raise ValueError("Jede Frage braucht eine id")
+            ch = e.get("choices")
+            if ch is not None and (not isinstance(ch, dict) or len(ch) > 6
+                                   or any(not isinstance(k, str) or len(k) > 2 for k in ch)):
+                raise ValueError("Antworten ungültig")
+            sauber.append({"id": e["id"],
+                           "choices": {k: (str(w)[:1000] if w is not None else None) for k, w in (ch or {}).items()},
+                           "choice_images": ({k: str(w)[:500] for k, w in e["choice_images"].items()}
+                                             if isinstance(e.get("choice_images"), dict) else None),
+                           "correct_answer": (str(e["correct_answer"])[:20] if e.get("correct_answer") is not None else None)})
+        return sauber
+
+
+@router.put("/{session_id}/question-layout")
+async def save_question_layout(session_id: int, body: list, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Merkt die gezeigte Reihenfolge, damit „Fortsetzen“ dieselbe zeigt."""
+    s = await nur_eigenes(db, Session, session_id, user)
+    s.question_layout = geprueft(QuestionLayoutIn, body, "Reihenfolge").model_dump()
+    await db.commit()
+    return {"ok": True}
+
+
 @router.put("/{session_id}/question-map")
 async def save_question_map(session_id: int, body: dict, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """`body: dict` in der Signatur ist Absicht — siehe app/importe.py."""
@@ -178,7 +213,7 @@ async def save_question_map(session_id: int, body: dict, user: User = Depends(ge
 @router.get("/{session_id}")
 async def get_session(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     s = await oder_403(db, Session, session_id, user)
-    out = {"id": s.id, "code": s.code, "name": s.name, "class_id": s.class_id, "question_set_id": s.question_set_id, "current_question_id": s.current_question_id, "status": s.status, "archived": s.archived}
+    out = {"id": s.id, "code": s.code, "name": s.name, "class_id": s.class_id, "question_set_id": s.question_set_id, "current_question_id": s.current_question_id, "status": s.status, "archived": s.archived, "question_layout": s.question_layout}
     if s.class_id:
         cls = await db.get(SchoolClass, s.class_id)
         out["class_name"] = cls.name if cls else None

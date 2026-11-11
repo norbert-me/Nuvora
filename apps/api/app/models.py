@@ -281,6 +281,11 @@ class Session(Base):
     mode: Mapped[str] = mapped_column(String(20), default="test", server_default="test")
     archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     question_map: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Die Reihenfolge und die gemischten Antworten, WIE SIE GEZEIGT WURDEN. Das
+    # Mischen passiert beim Start im Browser; wer die Seite neu laedt (Netzausfall,
+    # Absturz) und die Sitzung fortsetzt, bekam sonst die Fragen in der Reihenfolge
+    # des Sets zurueck — eine andere als die, nach der gerade abgestimmt wurde.
+    question_layout: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     eval_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     scans: Mapped[list["Scan"]] = relationship(back_populates="session", cascade="all, delete-orphan")

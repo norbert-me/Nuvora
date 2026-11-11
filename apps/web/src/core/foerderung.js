@@ -43,4 +43,4 @@ export const MASSNAHMEN = [
  * Gesamtnote, und es wird aus den Klassenwerten (Schnitt, Verteilung,
  * Notenuebernahme) herausgerechnet.
  */
-export const leIst = (kind) => Array.isArray(kind && kind.foerder) && kind.foerder.includes("Lernen");
+export const leIst = (kind) => !!kind && (kind.le === true || (Array.isArray(kind.foerder) && kind.foerder.includes("Lernen")));

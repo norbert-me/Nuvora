@@ -161,6 +161,9 @@ async def quiz(db: AsyncSession, session: Session, nur_card_id: Optional[int] = 
             "note": None if unbenotet else note_aus_pct(w["pct"], config.get("grade_scale")),
             "note_tendenz": None if unbenotet else note_mit_tendenz(w["pct"], config.get("grade_scale")),
             "unbenotet": unbenotet,
+            # ALLE Themen mit Prozent (auch die dazwischen): daraus bildet die Schuelerseite
+            # den Lernstand ueber mehrere Tests.
+            "themen": themen,
             "sass": [x for x in themen if x["pct"] >= SASS],
             "offen": [x for x in themen if x["pct"] < OFFEN],
         })

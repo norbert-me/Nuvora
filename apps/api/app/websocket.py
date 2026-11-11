@@ -19,6 +19,12 @@ connections = defaultdict(list)
 # auf die ausgewiesenen.
 authentifiziert: set = set()
 
+# Der zuletzt gemeldete Zustand des Hosts je Sitzung (aufgedeckt? letzte Frage?).
+# Ein Scanner, dessen Leitung kurz weg war, hat die Meldung verpasst — er bekommt sie
+# beim Wiederverbinden sofort nachgereicht, statt bis zum naechsten Klick zu raten.
+letzter_zustand: dict = {}
+_ZUSTAND_MAX = 200
+
 # Obergrenze je Sitzung — gezaehlt werden nur AUSGEWIESENE Verbindungen.
 # Realistisch sind 1 Host + wenige Scanner. Vorher zaehlte jede angenommene
 # Leitung mit: wer 50 unangemeldete Sockets auf eine fremde (durchzaehlbare)

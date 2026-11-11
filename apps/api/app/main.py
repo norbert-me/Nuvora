@@ -432,6 +432,7 @@ def _ensure_columns(sync_conn):
         # Wahrheit.
         ("attendance", "kurs_id", "INTEGER"),
         ("sessions", "kurs_id", "INTEGER"),
+        ("sessions", "question_layout", "JSON"),
         ("zufall_draws", "kurs_id", "INTEGER"),
         ("quartal_dividers", "kurs_id", "INTEGER"),
         ("plan_weeks", "kurs_id", "INTEGER"),
@@ -1364,6 +1365,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
             if not ws.freigeben(websocket, session_id):
                 await _schliessen(1013)  # Obergrenze je Sitzung erreicht
                 return
+            alt = ws.letzter_zustand.get(session_id)
+            if alt:
+                try:
+                    await websocket.send_text(_json.dumps(alt))   # Zustand nachreichen (Wiederverbinden)
+                except Exception:
+                    pass
             break
         while True:
             raw = await websocket.receive_text()
@@ -1375,6 +1382,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                 continue
             # remote: Scanner -> Host (Aufdecken/Weiter/...); host_state/session_finished: Host -> Scanner
             if msg.get("type") in ("remote", "host_state", "session_finished"):
+                if msg["type"] == "host_state":
+                    if len(ws.letzter_zustand) >= ws._ZUSTAND_MAX and session_id not in ws.letzter_zustand:
+                        ws.letzter_zustand.pop(next(iter(ws.letzter_zustand)), None)   # aeltester raus
+                    ws.letzter_zustand[session_id] = msg
+                elif msg["type"] == "session_finished":
+                    ws.letzter_zustand.pop(session_id, None)
                 await ws.broadcast(session_id, msg)
     except WebSocketDisconnect:
         pass    # Gegenstelle weg: kein Fehler, aufgeraeumt wird im finally

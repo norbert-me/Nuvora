@@ -121,7 +121,8 @@ def _keyw(user, class_id, kurs_id):
 async def _le_ids(db, rows) -> set:
     """Zeilen mit Foerderschwerpunkt Lernen (LE): keine Note. Die Angabe steht an
     der Person, aelterer Bestand noch an der Zeile. Nach aussen geht nur dieses
-    eine Ja/Nein, nie die uebrigen Foerderangaben (Art. 9)."""
+    eine Ja/Nein (`le`), nie die Foerderangaben selbst (Art. 9) — das Feld heisst
+    bewusst nicht `foerder`: der Selbsttest sucht Exporte nach genau diesem Namen."""
     pids = {r.person_id for r in rows if r.person_id}
     pers = {}
     if pids:
@@ -137,7 +138,7 @@ async def roster(class_id: int, user: User = Depends(require_module), db: AsyncS
     # dieses Blatt geschrieben haben.
     rows = await _roster(db, class_id)
     le = await _le_ids(db, rows)
-    return [{"id": s.id, "name": s.name, "niveau": s.niveau or "", "foerder": ["Lernen"] if s.id in le else []} for s in rows]
+    return [{"id": s.id, "name": s.name, "niveau": s.niveau or "", "le": s.id in le} for s in rows]
 
 
 @router.get("/kurse/{kurs_id}/students")
@@ -147,7 +148,7 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
     await eigener_kurs(db, user, kurs_id)
     rows = await _kanon_kurs(db, kurs_id)
     le = await _le_ids(db, rows)
-    return [{"id": s.id, "name": s.name, "class_id": s.class_id, "niveau": s.niveau or "", "foerder": ["Lernen"] if s.id in le else []} for s in rows]
+    return [{"id": s.id, "name": s.name, "class_id": s.class_id, "niveau": s.niveau or "", "le": s.id in le} for s in rows]
 
 
 @router.get("/classes/{class_id}/works", response_model=List[WorkOut])

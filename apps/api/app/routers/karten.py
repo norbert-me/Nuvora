@@ -1783,7 +1783,7 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
             "unbenotet": bool(r.get("unbenotet")),
             # Was das Kind aus der Zahl machen soll — ohne das ist eine Prozent-
             # angabe nur eine Zahl. Kein Vergleich mit der Klasse.
-            "sass": r["sass"], "offen": r["offen"],
+            "sass": r["sass"], "offen": r["offen"], "themen": r.get("themen", []),
         })
     return out
 

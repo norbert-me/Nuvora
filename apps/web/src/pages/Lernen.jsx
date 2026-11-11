@@ -271,6 +271,7 @@ function Ergebnisse({ results, noten = [], t }) {
           ))}
         </div>
       )}
+      <Lernstand results={results} t={t} />
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {results.map((r, idx) => (
           <div key={idx} style={{ ...cardStyle, padding: "12px 16px" }}>
@@ -419,6 +420,54 @@ function WaageAufgaben({ token, liste, t }) {
         <button onClick={() => sende(false)} style={btnSecondary}>{t("common.save")}</button>
         <button onClick={() => sende(true)} style={btnPrimary}>{t("pap.abgeben")}</button>
         {meldung && <span style={{ fontSize: 13, color: "var(--text3)" }}>{meldung}</span>}
+      </div>
+    </div>
+  );
+}
+
+// Lernstand ueber ALLE Tests: je Thema die Punkte aller Fragen zusammen — daraus folgt,
+// was sich das Kind als Naechstes ansehen sollte. Nur die eigenen Themen, kein Vergleich.
+// Themen entstehen nur aus Fragen, die einem Thema zugeordnet sind (Quiz-Editor).
+function Lernstand({ results, t }) {
+  const je = new Map();
+  for (const r of results || []) {
+    for (const x of r.themen || []) {
+      const a = je.get(x.label) || { erreicht: 0, max: 0 };
+      a.erreicht += x.erreicht; a.max += x.max;
+      je.set(x.label, a);
+    }
+  }
+  const liste = [...je.entries()].map(([label, a]) => ({ label, pct: a.max ? Math.round((a.erreicht / a.max) * 100) : 0, max: a.max }))
+    .sort((x, y) => x.pct - y.pct);
+  if (!liste.length) return null;
+  const offen = liste.filter((x) => x.pct < 50);
+  const stufe = (pct) => (pct >= 75 ? { farbe: C.success, text: t("lernen.stand.sitzt") } : pct >= 50 ? { farbe: C.warning, text: t("lernen.stand.fast") } : { farbe: C.danger, text: t("lernen.stand.nochmal") });
+  return (
+    <div style={{ ...cardStyle, padding: 16, marginBottom: 12 }}>
+      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{t("lernen.stand.titel")}</div>
+      {offen.length > 0 ? (
+        <p style={{ fontSize: 14, margin: "0 0 12px", color: "var(--text)" }}>
+          <Icon d={ICONS.bulb} size={14} color={C.warning} />{" "}
+          <strong>{t("lernen.stand.zuerst")}</strong> {offen.slice(0, 3).map((x) => x.label).join(", ")}
+        </p>
+      ) : (
+        <p style={{ fontSize: 14, margin: "0 0 12px", color: "var(--text2)" }}>{t("lernen.stand.allesGut")}</p>
+      )}
+      <div style={{ display: "grid", gap: 8 }}>
+        {liste.map((x) => {
+          const st = stufe(x.pct);
+          return (
+            <div key={x.label}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{x.label}</span>
+                <span style={{ color: st.farbe, fontWeight: 700, whiteSpace: "nowrap" }}>{x.pct} % · {st.text}</span>
+              </div>
+              <div style={{ height: 6, borderRadius: "3px", background: "var(--bg2)", marginTop: 3 }}>
+                <div style={{ width: `${x.pct}%`, height: "100%", borderRadius: "3px", background: st.farbe }} />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

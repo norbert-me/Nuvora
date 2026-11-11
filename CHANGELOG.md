@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote bei Netzausfall:** die gezeigte Reihenfolge der Fragen (und die gemischten Antworten) wird gemerkt — wer die Seite neu lädt und die Sitzung fortsetzt, sieht dieselbe Reihenfolge statt der des Sets. Scanner und Host verbinden sich nach einem Ausfall von selbst neu, der Scanner bekommt den Zustand des Hosts nachgereicht, der Host holt die verpassten Scans der aktuellen Frage.
+- **Ergebnisse (Zugang der Kinder):** neuer Block „Dein Lernstand“ — je Thema Prozent über alle Tests, mit „Als Erstes nochmal ansehen“. Themen entstehen nur aus Fragen mit zugeordnetem Thema.
 - **Themenstand je Kurs:** Karteikarten zählen nur noch im Kurs, dem der Stapel zugewiesen ist (7.5 LZ zeigte Karten aus 7.5 Mathe, weil beide dieselbe Klasse teilen).
 - **Karteikarten, QR-Zettel drucken:** feste Seiten mit je 12 Zetteln — kein QR-Code wird mehr in der Mitte durchgeschnitten.
 - **CardVote-Auswertung:** „Nicht benotet“ lässt sich auch an der einzelnen Auswertung setzen; die Kinder sehen an ihrem Zugang „Übung“.

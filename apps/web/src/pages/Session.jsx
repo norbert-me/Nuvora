@@ -32,6 +32,23 @@ const SvgMedal = ({ place, size = 24 }) => {
   );
 };
 
+// Die beim Start gezeigte Reihenfolge samt gemischten Antworten wieder herstellen.
+// Ohne gemerkte Reihenfolge (ältere Sitzung, kein Mischen) bleibt es die des Sets.
+function ordnungAnwenden(fragen, layout) {
+  if (!Array.isArray(layout) || !layout.length) return fragen;
+  const nachId = new Map(fragen.map((q) => [q.id, q]));
+  const aus = [];
+  for (const e of layout) {
+    const q = nachId.get(e.id);
+    if (!q) continue;
+    aus.push({ ...q, ...(e.choices && Object.keys(e.choices).length ? { choices: e.choices } : {}),
+      choice_images: e.choice_images || (e.choices && Object.keys(e.choices).length ? null : q.choice_images),
+      ...(e.correct_answer != null ? { correct_answer: e.correct_answer } : {}) });
+    nachId.delete(e.id);
+  }
+  return [...aus, ...nachId.values()];      // später dazugekommene Fragen hinten anhängen
+}
+
 export default function Session() {
   const { t } = useLanguage();
   const { id } = useParams();
@@ -75,6 +92,19 @@ export default function Session() {
   // siehe unten). Regel 3: ohne Modul Orga bleibt die Menge leer.
   const [abwesend, setAbwesend] = useState(() => new Set());
 
+  // Nach einer Unterbrechung: was an der aktuellen Frage inzwischen eingegangen ist, nachladen.
+  const nachladenRef = useRef(null);
+  nachladenRef.current = async () => {
+    const qid = question?.id;
+    if (!sessionId || !qid) return;
+    try {
+      const r = await fetch(`${API}/sessions/${sessionId}/results?question_id=${qid}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      setScannedStudents((d.scans || []).map((sc) => ({ student_id: sc.student_id, answer: sc.answer, time: Date.now() })));
+      setCounts(d.counts || {});
+    } catch { /* weiter ohne Netz: der naechste Versuch holt es */ }
+  };
   useEffect(() => {
     fetch(`${API}/classes`).then((r) => r.ok ? r.json() : []).then((d) => setClasses(Array.isArray(d) ? d : []));
     fetch(`${API}/kurse`).then((r) => r.ok ? r.json() : []).then((d) => setKurse(Array.isArray(d) ? d : []));
@@ -151,6 +181,10 @@ export default function Session() {
       const qmap = {};
       qs.forEach((q) => { qmap[String(q.id)] = q.correct_answer || ""; });
       fetch(`${API}/sessions/${s.id}/question-map`, alsJson("PUT", qmap));
+      // Die gezeigte Reihenfolge merken: wer die Seite neu laedt (Netzausfall) und die
+      // Sitzung fortsetzt, soll dieselben Fragen in derselben Reihenfolge sehen.
+      fetch(`${API}/sessions/${s.id}/question-layout`, alsJson("PUT",
+        qs.map((q) => ({ id: q.id, choices: q.choices || {}, choice_images: q.choice_images || null, correct_answer: q.correct_answer || null }))));
     }
     if (gameMode && timerSeconds === 0) setTimerSeconds(0);
   };
@@ -167,7 +201,9 @@ export default function Session() {
       if (res.ok) {
         const qs = await res.json();
         setSelectedSet(qs);
-        setQuestions(qs.questions || []);
+        const geordnet = ordnungAnwenden(qs.questions || [], s.question_layout);
+        qs.questions = geordnet;
+        setQuestions(geordnet);
         if (s.current_question_id && qs.questions) {
           const idx = qs.questions.findIndex((q) => q.id === s.current_question_id);
           if (idx >= 0) {
@@ -203,13 +239,28 @@ export default function Session() {
 
   useEffect(() => {
     if (!sessionId) return;
+    // Faellt die Leitung weg (Netzausfall, WLAN), verbindet sich der Host mit wachsendem
+    // Abstand neu — die Sitzung laeuft im Browser weiter, nur die Handys waeren sonst
+    // stumm geblieben. Nach dem Wiederverbinden werden die Scans der aktuellen Frage
+    // nachgeladen, die in der Zwischenzeit eingegangen sind.
+    let ws = null, zu = false, versuch = 0, timer = null;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${proto}//${window.location.host}/ws/session/${sessionId}`);
-    wsRef.current = ws;
-    ws.addEventListener("open", () => {
-      ws.send(JSON.stringify({ type: "auth", token: localStorage.getItem("token") || "" }));
-    });
-    ws.onmessage = (e) => {
+    const verbinden = () => {
+      ws = new WebSocket(`${proto}//${window.location.host}/ws/session/${sessionId}`);
+      wsRef.current = ws;
+      ws.addEventListener("open", () => {
+        const erneut = versuch > 0;
+        versuch = 0;
+        ws.send(JSON.stringify({ type: "auth", token: localStorage.getItem("token") || "" }));
+        if (erneut) nachladenRef.current?.();
+      });
+      ws.addEventListener("close", () => {
+        if (zu) return;
+        timer = setTimeout(verbinden, Math.min(10000, 1000 * 2 ** Math.min(versuch++, 4)));
+      });
+      ws.onmessage = onNachricht;
+    };
+    const onNachricht = (e) => {
       const data = JSON.parse(e.data);
       if (data.type === "scan") {
         setScannedStudents((prev) => {
@@ -225,7 +276,8 @@ export default function Session() {
         else if (data.action === "finish") finishRef.current?.();
       }
     };
-    return () => ws.close();
+    verbinden();
+    return () => { zu = true; clearTimeout(timer); if (ws) ws.close(); };
   }, [sessionId]);
 
   const saveQuestionTime = () => {
