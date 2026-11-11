@@ -14,7 +14,7 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.5.4 — 11.11.2026
 
 - **Zugang der Kinder (Ergebnisse), neu gestaltet:** Handy untereinander, am PC Note und Lernstand nebeneinander und die Tests darunter in voller Breite. Teilnoten als Tabelle (Name, Note, Gewicht in festen Spalten); der Lernstand gruppiert nach Oberthema („Rationale Zahlen“ einmal als Kopf) und nennt den Status nur noch, wo etwas zu tun ist; jeder Test zeigt ein Ergebnis groß und das Übrige klein darunter.
 - **Zugang der Kinder:** die Teilnoten zeigen ihr Gewicht in Prozent („Klassenarbeiten 3 · 40 %“). Eine leere Seite hat keinen Scrollbalken mehr (die volle Fensterhöhe wurde durch den Seitenzoom um 6 % zu groß; gilt auch für die Code-Detektiv-Seiten der Kinder).
