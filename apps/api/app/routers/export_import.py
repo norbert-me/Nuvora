@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 # Unterstrich im Namen) und in noten.py ein drittes Mal mit Text-Schluesseln.
 # Es gibt eine: die in scoring.py, wo auch gerechnet wird.
 from ..uploads import eigene_bilder, eigenes_bild
-from ..scoring import DEFAULT_SCALE, bewerte, bonus_regel_von, e_modus_von, gefehlt_von, status_of
+from ..scoring import DEFAULT_SCALE, bewerte, bonus_regel_von, e_modus_von, gefehlt_von, status_of, konfig_mit_vorgaben
 from ..uploads import anhang_kopf
 from ..schueler import sortiert
 from ..pdfdruck import als_anhang, neue_seite
@@ -867,7 +867,7 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
     for i, q in enumerate(questions):
         ws.cell(row=2, column=i + 2, value=q._shuffled_correct or "–")
 
-    config = session.eval_config or {}
+    config = konfig_mit_vorgaben(session.eval_config, user)
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     qdicts = [{"id": q.id, "correct_answer": q._shuffled_correct, "niveau": getattr(q, "_niveau", ""),
                "topic_id": getattr(q, "topic_id", None)} for q in questions]
@@ -921,7 +921,7 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
     all_scans = result.scalars().all()
     scan_map = {(s.student_id, s.question_id): s.answer for s in all_scans}
 
-    config = session.eval_config or {}
+    config = konfig_mit_vorgaben(session.eval_config, user)
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     weights = config.get("weights", {})
     scale = _skala(config)
@@ -1117,7 +1117,7 @@ async def student_evaluation_pdf(session_id: int, card_id: int, user: User = Dep
     result = await db.execute(select(Scan).where(Scan.session_id == session_id))
     scan_map = {(s.student_id, s.question_id): s.answer for s in result.scalars().all()}
 
-    config = session.eval_config or {}
+    config = konfig_mit_vorgaben(session.eval_config, user)
     questions = [q for q in questions if (student["card_id"], q["id"]) in scan_map]
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     buf = _build_student_pdf_single(student, questions, scan_map, session, config, niveau_aktiv, minuspunkte)
@@ -1145,7 +1145,7 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
     from reportlab.lib.units import mm
     # HexColor faellt hier weg: die Farbwahl steckt jetzt in _antwort_farbe().
 
-    config = session.eval_config or {}
+    config = konfig_mit_vorgaben(session.eval_config, user)
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     weights = config.get("weights", {})
     scale = _skala(config)
@@ -1279,7 +1279,7 @@ async def class_student_pdf(class_id: int, card_id: int, user: User = Depends(ge
         if not scans:
             continue
 
-        config = session.eval_config or {}
+        config = konfig_mit_vorgaben(session.eval_config, user)
         weights = config.get("weights", {})
         scale = _skala(config)
         get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))

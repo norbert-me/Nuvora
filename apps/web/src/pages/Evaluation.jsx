@@ -314,6 +314,8 @@ export default function Evaluation() {
 
   const scores = presentStudents.map((s) => s.weightedScore);
   const pcts = presentStudents.map((s) => s.pct);
+  // LE-Kinder bekommen keine Note: sie zaehlen nicht in Notenverteilung und Notenschnitt.
+  const notenPcts = presentStudents.filter((s) => !s.le).map((s) => s.pct);
   const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
   // Prozentwerte kommen aus der Wertung je Kind (bei E/G hat nicht jedes
   // dieselbe erreichbare Punktzahl) — nicht mehr aus einem gemeinsamen Maximum.
@@ -327,11 +329,11 @@ const gradeDistribution = (() => {
     if (gradeMode === "tendency") {
       const dist = {};
       TENDENCY_GRADES.forEach((g) => { dist[g] = 0; });
-      pcts.forEach((p) => { dist[tendencyGrade(p, gradeScale)]++; });
+      notenPcts.forEach((p) => { dist[tendencyGrade(p, gradeScale)]++; });
       return dist;
     }
     const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-    pcts.forEach((p) => { dist[Math.round(gradeFromPct(p, gradeScale))]++; });
+    notenPcts.forEach((p) => { dist[Math.round(gradeFromPct(p, gradeScale))]++; });
     return dist;
   })();
 
@@ -1032,7 +1034,7 @@ const gradeDistribution = (() => {
                     )}
                   </td>
                   <td style={{ ...td, textAlign: "center", fontWeight: 700, color: GRADE_COLORS[Math.round(grade)] }}>
-                    {student.ownMax > 0 && !unbenotet ? grade.toFixed(1) : "–"}
+                    {student.le ? <span title={t("kurse.leHint")}>LE</span> : student.ownMax > 0 && !unbenotet ? grade.toFixed(1) : "–"}
                   </td>
                 </tr>
               );

@@ -15,7 +15,7 @@ from ..kursmitglieder import class_kurs_ids, sibling_class_ids
 from ..schueler import roster_klasse
 from ..models import Scan, Session, SchoolClass, Student, QuestionSet, QuestionSetItem, Question, User, Topic
 from .auth import get_current_user
-from ..scoring import bewerte, bonus_regel_von, e_modus_von, gefehlt_von, note_aus_pct, status_of
+from ..scoring import bewerte, bonus_regel_von, e_modus_von, gefehlt_von, note_aus_pct, status_of, konfig_mit_vorgaben
 # Punktelogik der Klassenarbeit (Teilaufgaben, Altformat, Abwesende) — die
 # Fruehwarnung rechnet sie NICHT nach, sie ruft sie auf. Kein Importring:
 # klassenarbeit.py holt nur database/models/auth/modules.
@@ -271,8 +271,11 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
                 select(Kurs).where(Kurs.id.in_(ids), Kurs.owner_id == user.id).order_by(Kurs.name))).scalars().all()]
         # Roster kursweit (gleichnamige Fach-Klassen-SuS = eine Person). Die
         # Kartennummern (card_id) sind bei gleicher Lerngruppe deckungsgleich.
-        students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""}
-                    for s in await _kurs_roster(db, session.class_id)]
+        from ..schueler import le_ids
+        roster_zeilen = await _kurs_roster(db, session.class_id)
+        le = await le_ids(db, roster_zeilen)
+        students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or "", "le": s.id in le}
+                    for s in roster_zeilen]
         sc = await db.get(SchoolClass, session.class_id)
         # Der Kurs, dem die Session zugewiesen ist — ohne Zuweisung der der Klasse.
         kurs_id = session.kurs_id or (sc.kurs_id if sc else None)
@@ -315,7 +318,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
     for scan in all_scans:
         scan_map[(scan.student_id, scan.question_id)] = scan.answer
 
-    config = session.eval_config or {}
+    config = konfig_mit_vorgaben(session.eval_config, user)
     rows = []
     for student in students:
         answers = []
@@ -343,6 +346,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
             "card_id": student["card_id"],
             "name": student["name"],
             "niveau": student["niveau"],
+            "le": bool(student.get("le")),     # LE: keine Note (Anzeige „LE“ statt Note)
             "answers": answers,
             "score": wertung["score"],
             "total": wertung["max_score"],
@@ -720,7 +724,7 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
                 niveau_aktiv = bool(qs.niveau_aktiv)
                 minuspunkte = bool(qs.minuspunkte)
 
-        config = session.eval_config or {}
+        config = konfig_mit_vorgaben(session.eval_config, user)
         student_scores = {}
         for student in students:
             has_any = any((student["card_id"], q["id"]) in scan_map for q in questions)
@@ -857,7 +861,7 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
             if max_score == 0:
                 continue
 
-            config = session.eval_config or {}
+            config = konfig_mit_vorgaben(session.eval_config, user)
             for student in cls.students:
                 has_any = any((student.card_id, q["id"]) in scan_map for q in questions)
                 if status_of(student.card_id, has_any, config) == "krank":
@@ -918,7 +922,7 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
             select(Session).where(Session.class_id == cls.id, Session.archived == False)
         )
         for session in sess_result.scalars().all():
-            config = session.eval_config or {}
+            config = konfig_mit_vorgaben(session.eval_config, user)
             scale_raw = config.get("grade_scale", {1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0})
             scale = {int(k): v for k, v in scale_raw.items()}
             weights = config.get("weights", {})
@@ -1060,7 +1064,7 @@ async def _fruehwarn_daten(db, user, class_id: int):
         fragen = {it.question.id: (qmap.get(str(it.question.id), it.question.correct_answer),
                                    it.question.topic_id) for it in items}
         scans = (await db.execute(select(Scan).where(Scan.session_id == sess.id))).scalars().all()
-        config = sess.eval_config or {}
+        config = konfig_mit_vorgaben(sess.eval_config, user)
 
         t = fw.Test(session_id=sess.id, name=sess.name or "", datum=sess.created_at, art="quiz")
         hat_abgegeben = {s.student_id for s in scans}

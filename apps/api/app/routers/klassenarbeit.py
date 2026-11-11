@@ -20,7 +20,7 @@ from ..database import get_db
 from .. import arbeitswertung as aw
 # `roster_kurs` heisst hier unten schon ein Endpunkt — deshalb umbenannt
 # importiert, sonst ueberdeckt der Endpunkt den Helfer.
-from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
+from ..schueler import le_ids, roster_klasse, roster_kurs as _kanon_kurs
 from ..models import ExamDate, Person, SchoolClass, WorkAnalysis, Student, Topic, User
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
@@ -118,17 +118,7 @@ def _keyw(user, class_id, kurs_id):
     return kurs_oder_klasse(WorkAnalysis, user, class_id, kurs_id)
 
 
-async def _le_ids(db, rows) -> set:
-    """Zeilen mit Foerderschwerpunkt Lernen (LE): keine Note. Die Angabe steht an
-    der Person, aelterer Bestand noch an der Zeile. Nach aussen geht nur dieses
-    eine Ja/Nein (`le`), nie die Foerderangaben selbst (Art. 9) — das Feld heisst
-    bewusst nicht `foerder`: der Selbsttest sucht Exporte nach genau diesem Namen."""
-    pids = {r.person_id for r in rows if r.person_id}
-    pers = {}
-    if pids:
-        pers = {p.id: p for p in (await db.execute(select(Person).where(Person.id.in_(pids)))).scalars().all()}
-    return {r.id for r in rows
-            if "Lernen" in (((pers.get(r.person_id).foerder if pers.get(r.person_id) else None) or r.foerder) or [])}
+_le_ids = le_ids   # eine Quelle: app/schueler.py
 
 
 @router.get("/classes/{class_id}/students")

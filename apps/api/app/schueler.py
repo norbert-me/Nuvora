@@ -98,3 +98,16 @@ async def zeilen_der_person(db, name: str, class_ids) -> list[Student]:
         alle |= await sibling_class_ids(db, cid)
     rows = (await db.execute(select(Student).where(Student.class_id.in_(list(alle))))).scalars().all()
     return [s for s in rows if s.name.strip() == name]
+
+
+async def le_ids(db, rows) -> set:
+    """Zeilen mit Foerderschwerpunkt Lernen (LE): keine Note. Die Angabe steht an der
+    Person, aelterer Bestand noch an der Zeile. Nach aussen geht nur das Ja/Nein,
+    nie die Foerderangaben selbst (Art. 9)."""
+    from .models import Person
+    pids = {r.person_id for r in rows if r.person_id}
+    pers = {}
+    if pids:
+        pers = {p.id: p for p in (await db.execute(select(Person).where(Person.id.in_(pids)))).scalars().all()}
+    return {r.id for r in rows
+            if "Lernen" in (((pers.get(r.person_id).foerder if pers.get(r.person_id) else None) or r.foerder) or [])}

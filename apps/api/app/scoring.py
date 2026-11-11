@@ -326,3 +326,22 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
         # Auswertung sagt sonst „E-Bonus", wo gar keine E-Frage im Spiel war.
         "gefehlt_total": sum(1 for q in extra if verpasst(q)),
     }
+
+
+def konfig_mit_vorgaben(config: Optional[dict], user=None) -> dict:
+    """Die Einstellungen einer Auswertung MIT den Vorgaben des Profils.
+
+    Die Auswertungsseite faellt ohne eigene Angabe auf das Profil zurueck (Notenschluessel,
+    Bonusregel). Rechneten die uebrigen Wege (Zugang der Kinder, PDF, Excel, Notenbuch)
+    ohne diesen Rueckgriff, bekam dasselbe Kind dort eine andere Note als in der
+    Auswertung — sobald das Profil von der eingebauten Vorgabe abwich. Eine Quelle:
+    alle Leser holen die Einstellungen hierueber."""
+    out = dict(config or {})
+    skala = getattr(user, "grade_scale", None)
+    if not out.get("grade_scale") and isinstance(skala, dict) and skala:
+        out["grade_scale"] = skala
+    ansichten = getattr(user, "ansichten", None) or {}
+    bonus = ansichten.get("bonus_regel") if isinstance(ansichten, dict) else None
+    if not isinstance(out.get("bonus_regel"), dict) and isinstance(bonus, dict):
+        out["bonus_regel"] = bonus
+    return out

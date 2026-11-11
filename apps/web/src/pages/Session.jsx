@@ -62,6 +62,7 @@ export default function Session() {
   const [selectedSet, setSelectedSet] = useState(null);
   const [showAnswers, setShowAnswers] = useState(false);
   const [gameMode, setGameMode] = useState(false);
+  const [nichtBenotet, setNichtBenotet] = useState(false);   // diese Sitzung zaehlt nicht als Note
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timeLeft, setTimeLeft] = useState(null);
   const timerRef = useRef(null);
@@ -171,6 +172,11 @@ export default function Session() {
         mode: gameMode ? "game" : "test",
       }));
     const s = await res.json();
+    // Nicht benotet: schon beim Start festhalten, damit auch die Kinder an ihrem Zugang
+    // sehen, dass es dafuer keine Note gibt (steht in der Auswertung wieder aenderbar).
+    if (nichtBenotet && !selectedSet.unbenotet) {
+      fetch(`${API}/sessions/${s.id}/eval-config`, alsJson("PUT", { unbenotet: true })).catch(() => {});
+    }
     setSessionId(s.id);
     setSessionCode(s.code || String(s.id).padStart(4, "0"));
     let qs = selectedSet.questions;
@@ -561,6 +567,13 @@ export default function Session() {
               <input type="checkbox" checked={showAnswers} onChange={(e) => setShowAnswers(e.target.checked)}
                 style={{ width: 18, height: 18, accentColor: "var(--accent)" }} />
               <span style={{ fontSize: 14, color: "var(--text)" }}>{t("session.showAnswers")}</span>
+            </label>
+
+            <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: selectedSet.unbenotet ? "default" : "pointer", marginBottom: 16 }}>
+              <input type="checkbox" checked={nichtBenotet || !!selectedSet.unbenotet} disabled={!!selectedSet.unbenotet}
+                onChange={(e) => setNichtBenotet(e.target.checked)}
+                style={{ width: 18, height: 18, accentColor: "var(--accent)" }} />
+              <span style={{ fontSize: 14, color: "var(--text)" }}>{t("session.nichtBenotet")}</span>
             </label>
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>

@@ -1781,6 +1781,7 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
             "score": r["punkte"], "total": r["max"], "pct": r["pct"],
             "note": r["note_tendenz"],
             "unbenotet": bool(r.get("unbenotet")),
+            "le": bool(r.get("le")),
             # Was das Kind aus der Zahl machen soll — ohne das ist eine Prozent-
             # angabe nur eine Zahl. Kein Vergleich mit der Klasse.
             "sass": r["sass"], "offen": r["offen"], "themen": r.get("themen", []),
@@ -1812,6 +1813,8 @@ async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
         for term in termine:
             secs, rows = await _summarize(db, owner, st.class_id, term, agg="mean", kurs_id=kid)
             r = next((x for x in rows if x.student_id == st.id), None)
+            if r is not None and getattr(r, "le", False):
+                continue          # LE: keine Note — das Kind sieht nur den Hinweis
             wert = (r.total_override if r.total_override is not None else r.weighted) if r else None
             if wert is not None:
                 # Verlauf: die Spaltennoten in Zeitreihenfolge (Datum der Leistung, sonst Anlage).
