@@ -92,6 +92,12 @@ export default function Session() {
   // Wer heute fehlt, braucht nicht gescannt zu werden (Namen, nicht ids —
   // siehe unten). Regel 3: ohne Modul Orga bleibt die Menge leer.
   const [abwesend, setAbwesend] = useState(() => new Set());
+  // Kurz aufpoppender Name beim Scannen (auch „nochmal gescannt"): gescannte Kinder
+  // verschwinden aus der Liste, also braucht die Klasse einen anderen Beleg fuer „erfasst".
+  const [popups, setPopups] = useState([]);
+  const scannedRef = useRef(new Set());
+  const namenRef = useRef({});
+  const letzterScanRef = useRef({});
 
   // Nach einer Unterbrechung: was an der aktuellen Frage inzwischen eingegangen ist, nachladen.
   const nachladenRef = useRef(null);
@@ -127,12 +133,16 @@ export default function Session() {
   useEffect(() => {
     if (!selectedClass) { setAbwesend(new Set()); return; }
     let gilt = true;
+    // Wird neu geholt, wenn die Seite wieder in den Vordergrund kommt und alle 45 s:
+    // die Anwesenheit wird oft erst WAEHREND der Stunde eingetragen, und ein einmaliger
+    // Abruf beim Auswaehlen der Klasse sah das nie.
+    const holen = () => {
     const heute = new Date(); heute.setHours(12, 0, 0, 0);   // Tagesmitte: die Zeitzone soll den Tag nicht kippen
     fetch(`${API}/anwesenheit/${selectedClass.id}?date=${encodeURIComponent(heute.toISOString())}`)
-      .then((r) => (r.ok ? r.json() : {}))
-      .catch(() => ({}))
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null)
       .then((d) => {
-        if (!gilt) return;
+        if (!gilt || d === null) return;     // keine Antwort: den letzten Stand behalten statt alle anwesend zu setzen
         const namen = new Map();
         classes.forEach((c) => (c.students || []).forEach((st) => namen.set(String(st.id), (st.name || "").trim())));
         const weg = new Set();
@@ -143,7 +153,12 @@ export default function Session() {
         });
         setAbwesend(weg);
       });
-    return () => { gilt = false; };
+    };
+    holen();
+    const takt = setInterval(holen, 45000);
+    const zurueck = () => { if (document.visibilityState === "visible") holen(); };
+    document.addEventListener("visibilitychange", zurueck);
+    return () => { gilt = false; clearInterval(takt); document.removeEventListener("visibilitychange", zurueck); };
   }, [selectedClass, classes]);
 
   const shuffleArray = (arr) => {
@@ -269,6 +284,21 @@ export default function Session() {
     const onNachricht = (e) => {
       const data = JSON.parse(e.data);
       if (data.type === "scan") {
+        const erneut = scannedRef.current.has(data.student_id);
+        const name = namenRef.current[data.student_id];
+        // Eine Karte, die im Bild bleibt, wird alle paar Bilder erneut gemeldet — das soll
+        // kein Dauerfeuer von Fenstern werden: nach dem ersten Mal poppt sie nur auf, wenn
+        // sich die Antwort geaendert hat oder die Karte mehrere Sekunden weg war.
+        const frueher = letzterScanRef.current[data.student_id];
+        const jetzt = Date.now();
+        const zeigen = !erneut || !frueher || frueher.answer !== data.answer || jetzt - frueher.zeit > 6000;
+        const geaendert = !!(erneut && frueher && frueher.answer !== data.answer);
+        letzterScanRef.current[data.student_id] = { answer: data.answer, zeit: jetzt };
+        if (name && zeigen) {
+          const key = `${data.student_id}-${Date.now()}`;
+          setPopups((p) => [...p.slice(-4), { key, name, erneut, geaendert }]);
+          setTimeout(() => setPopups((p) => p.filter((x) => x.key !== key)), 2600);
+        }
         setScannedStudents((prev) => {
           const filtered = prev.filter((s) => s.student_id !== data.student_id);
           return [...filtered, { student_id: data.student_id, answer: data.answer, time: Date.now() }];
@@ -325,7 +355,7 @@ export default function Session() {
     setQuestion(q);
     setQuestionIndex(idx);
     setCounts({ A: 0, B: 0, C: 0, D: 0 });
-    setScannedStudents([]);
+    setScannedStudents([]); letzterScanRef.current = {};
     setRevealed(false);
     setShowLeaderboard(false);
     broadcastState(false, idx + 1 >= questions.length);
@@ -466,6 +496,8 @@ export default function Session() {
   const fehltHeute = (st) => abwesend.has((st.name || "").trim());
   const erwartet = studentList.filter((st) => !fehltHeute(st));
   const studentMap = Object.fromEntries(studentList.map((s) => [s.card_id, s.name]));
+  scannedRef.current = scannedIds;
+  namenRef.current = studentMap;
 
   const niveauMap = Object.fromEntries(studentList.map((s) => [s.card_id, s.niveau || ""]));
   const leaderboard = Object.entries(scores)
@@ -919,6 +951,18 @@ export default function Session() {
         </div>
       )}
 
+      {popups.length > 0 && (
+        <div style={{ position: "fixed", top: 70, right: 16, zIndex: 80, display: "grid", gap: 8, pointerEvents: "none" }}>
+          {popups.map((p) => (
+            <div key={p.key} style={{ animation: "slideUp 0.25s ease", background: "var(--text)", color: "var(--bg)",
+              padding: "10px 18px", borderRadius: CONTROL_R, fontSize: "clamp(16px, 2.4vh, 24px)", fontWeight: 700,
+              boxShadow: "0 6px 24px rgba(0,0,0,0.25)" }}>
+              {p.name}{p.erneut && <span style={{ marginLeft: 10, fontSize: "0.7em", fontWeight: 600, opacity: 0.85 }}>↻ {t(p.geaendert ? "cv.geaendert" : "cv.nochmal")}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
       {question && (
         <>
           {/* Namen UEBER der Frage (Wunsch 02.10.2026): beim Scannen schaut die
@@ -937,7 +981,17 @@ export default function Session() {
                 )}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {[...studentList].sort((a, b) => {
+                {/* Die Liste beantwortet „auf wen warte ich noch?": wer gescannt hat oder
+                    fehlt, steht NICHT mehr darin (statt nur die Farbe zu wechseln). Nach dem
+                    Aufdecken mit „Antworten zeigen" stehen alle gescannten Kinder in der
+                    Farbe ihrer Antwort da. */}
+                {studentList.length > 0 && erwartet.every((st) => scannedIds.has(st.card_id)) && !(revealed && showAnswers) && (
+                  <span style={{ fontSize: "clamp(14px, 2vh, 19px)", color: "var(--text3)" }}>{t("cv.alleErfasst")}</span>
+                )}
+                {[...studentList].filter((st) => {
+                  if (revealed && showAnswers) return scannedIds.has(st.card_id);
+                  return !scannedIds.has(st.card_id) && !fehltHeute(st);
+                }).sort((a, b) => {
                   // Wer fehlt, steht ganz hinten: die Liste beantwortet „auf
                   // wen warte ich noch?", und dort gehoert niemand hin, der
                   // gar nicht im Raum ist.

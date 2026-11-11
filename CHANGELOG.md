@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote-Sitzung am Beamer:** die Liste zeigt nur noch, auf wen noch gewartet wird — gescannte und abwesende Kinder verschwinden daraus (statt die Farbe zu wechseln). Beim Scannen poppt kurz der Name auf, bei einer Karte, die nochmal gescannt wurde, mit „nochmal gescannt“ bzw. „Antwort geändert“. Die Anwesenheit wird alle 45 Sekunden und beim Zurückkehren auf die Seite neu geholt.
 - **CardVote-Note stimmt überall überein:** Auswertung, Zugang der Kinder, PDF und Excel rechnen jetzt mit demselben Notenschlüssel und derselben Bonusregel — ohne eigene Angabe an der Auswertung gilt das Profil (der Zugang der Kinder nahm bisher die eingebaute Vorgabe).
 - **LE-Kinder:** am Zugang steht keine Note, sondern „Keine Note“; in der CardVote-Auswertung „LE“ statt Note, ohne Einfluss auf Notenverteilung.
 - **CardVote starten:** „Nicht benotet“ lässt sich schon beim Start der Sitzung anhaken.
