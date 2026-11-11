@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Zugang der Kinder (Ergebnisse), neu gestaltet:** Handy untereinander, am PC Note und Lernstand nebeneinander und die Tests darunter in voller Breite. Teilnoten als Tabelle (Name, Note, Gewicht in festen Spalten); der Lernstand gruppiert nach Oberthema („Rationale Zahlen“ einmal als Kopf) und nennt den Status nur noch, wo etwas zu tun ist; jeder Test zeigt ein Ergebnis groß und das Übrige klein darunter.
 - **Zugang der Kinder:** die Teilnoten zeigen ihr Gewicht in Prozent („Klassenarbeiten 3 · 40 %“). Eine leere Seite hat keinen Scrollbalken mehr (die volle Fensterhöhe wurde durch den Seitenzoom um 6 % zu groß; gilt auch für die Code-Detektiv-Seiten der Kinder).
 - **Zugang der Kinder:** unter der aktuellen Note stehen die Teilnoten als Bereiche („Mündlich 2−  Klassenarbeiten 3+“); der Pfeil erscheint erst ab einer halben Note Unterschied (vorher schon bei 0,3) und gar nicht bei „gleich“; die Aussage im Lernstand passt zu den Balken („Alle Themen sitzen“ nur, wenn es stimmt; die Zeile „Hier fehlt noch etwas Sicherheit“ ist weg); das Fach steht ohne Klasse („Mathematik“ statt „7.5 Mathematik“).
 - **Notenbuch:** „UB“ in eine Zelle tippen setzt dieses Kind in dieser Spalte auf „nicht benotet“ (zählt nicht, gilt nicht als fehlend); LE-Kinder mit UB in der Klassenarbeit werden nicht mehr als „Note fehlt“ markiert; Tab/Enter überspringt Kinder, die an dem Tag gefehlt haben (und LE-Kinder in Klassenarbeits-Spalten).

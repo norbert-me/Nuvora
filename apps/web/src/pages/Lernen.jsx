@@ -5,7 +5,7 @@
 // ALLE Routen, also auch um die öffentlichen. Harte deutsche Zeichenketten
 // standen hier nur, weil die Seite kein Konto braucht — die lernende Person
 // liest sie trotzdem.
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import CardFace from "../components/CardFace.jsx";
 import { COLORS as C, REIFE_COLORS, Icon, ICONS, Tabs, btnPrimary, btnSecondary, cardStyle } from "../components/Icons.jsx";
 import { useParams } from "react-router-dom";
@@ -130,7 +130,7 @@ export default function Lernen() {
   }
 
   if (aktiverTab === "ergebnisse") {
-    return <Center hinweis={t("lernen.footerHint")}><div style={{ width: "100%", maxWidth: 460 }}>{tabBar}<Ergebnisse t={t} results={results} noten={noten} /></div></Center>;
+    return <Center hinweis={t("lernen.footerHint")}><div style={{ width: "100%", maxWidth: 780 }}>{tabBar}<Ergebnisse t={t} results={results} noten={noten} /></div></Center>;
   }
 
   if (done) {
@@ -257,8 +257,11 @@ function Ergebnisse({ results, noten = [], t }) {
       <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 12, textAlign: "center" }}>{t("lernen.resultsTitle")}</h2>
       {/* Übersicht: die aktuelle Note aus dem Notenbuch (je Kurs), mit Tendenz.
           Quizze vor der letzten Klassenarbeit liefert der Server gar nicht mehr aus. */}
+      {/* Handy: alles untereinander. PC: Noten und Lernstand nebeneinander, die Tests darunter
+          in voller Breite (reines CSS-Raster, kein eigener Umbruchpunkt im Code). */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: 12, alignItems: "start", marginBottom: 12 }}>
       {noten.length > 0 && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        <div style={{ display: "grid", gap: 12 }}>
           {noten.map((n, i) => (
             <div key={i} style={{ ...cardStyle, padding: "16px", textAlign: "center", flex: "1 1 120px" }}>
               <div style={{ fontSize: 12, color: "var(--text3)" }}>{t("lernen.aktuelleNote")}{n.kurs ? ` · ${n.kurs}` : ""}</div>
@@ -267,12 +270,17 @@ function Ergebnisse({ results, noten = [], t }) {
                   <span title={t(n.trend > 0 ? "noten.trendBesser" : n.trend < 0 ? "noten.trendSchlechter" : "noten.trendGleich")}
                     style={{ marginLeft: 6, color: n.trend > 0 ? C.success : n.trend < 0 ? C.danger : "var(--text3)" }}>{n.trend > 0 ? "↗" : n.trend < 0 ? "↘" : "→"}</span>
                 )}</div>
-              {/* Teilnoten = die Bereiche (Muendlich, Klassenarbeiten …), klein und in einer Zeile. */}
+              {/* Teilnoten = die Bereiche (Muendlich, Klassenarbeiten …): eine ruhige Tabelle —
+                  Name links, Note und Gewicht in festen Spalten rechts. */}
               {(n.teilnoten || []).length > 0 && (
-                <div style={{ marginTop: 8, display: "flex", gap: "4px 14px", flexWrap: "wrap", justifyContent: "center", fontSize: 13, color: "var(--text2)" }}>
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)", display: "grid",
+                  gridTemplateColumns: "1fr auto 3.2em", gap: "6px 12px", alignItems: "baseline", textAlign: "left", fontSize: 14 }}>
                   {n.teilnoten.map((x, k) => (
-                    <span key={k}>{x.name} <strong style={{ color: "var(--text)" }}>{String(x.note).replace("-", "−")}</strong>
-                      {x.gewicht > 0 && <span style={{ color: "var(--text3)", fontSize: 12 }}> · {x.gewicht} %</span>}</span>
+                    <React.Fragment key={k}>
+                      <span style={{ color: "var(--text2)", overflowWrap: "anywhere" }}>{x.name}</span>
+                      <strong style={{ textAlign: "right" }}>{String(x.note).replace("-", "−")}</strong>
+                      <span style={{ textAlign: "right", fontSize: 12, color: "var(--text3)" }}>{x.gewicht > 0 ? `${x.gewicht} %` : ""}</span>
+                    </React.Fragment>
                   ))}
                 </div>
               )}
@@ -281,6 +289,7 @@ function Ergebnisse({ results, noten = [], t }) {
         </div>
       )}
       <Lernstand results={results} t={t} />
+      </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {results.map((r, idx) => (
           <div key={idx} style={{ ...cardStyle, padding: "12px 16px" }}>
@@ -291,11 +300,13 @@ function Ergebnisse({ results, noten = [], t }) {
                 <div style={{ fontWeight: 600, overflowWrap: "anywhere", lineHeight: 1.3 }}>{ohneKlasse(r.name)}</div>
                 <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.date ? new Date(r.date).toLocaleDateString() : ""}</div>
               </div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: r.pct >= 50 ? C.success : C.danger }}>{r.note ? r.note.replace("-", "−") : `${r.pct}%`}</div>
-              {r.le ? <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)" }}>{t("lernen.leHinweis")}</div>
-                : r.unbenotet ? <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)" }}>{t("lernen.unbenotet")}</div>
-                : <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.pct}%</div>}
-              <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.score}/{r.total}</div>
+              {/* Rechts EIN Ergebnis gross (Note, sonst Prozent) und darunter klein, was dazugehoert. */}
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2, color: r.pct >= 50 ? C.success : C.danger }}>{r.note ? r.note.replace("-", "−") : `${r.pct} %`}</div>
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>
+                  {r.le ? `${t("lernen.leHinweis")} · ` : r.unbenotet ? `${t("lernen.unbenotet")} · ` : r.note ? `${r.pct} % · ` : ""}{r.score}/{r.total}
+                </div>
+              </div>
             </div>
             {/* Was aus den Themen folgt, steht NUR oben im Lernstand (ueber alle Tests) — je Test
                 dieselbe Aussage noch einmal war doppelt. */}
@@ -435,39 +446,48 @@ function Lernstand({ results, t }) {
       je.set(x.label, a);
     }
   }
-  const liste = [...je.entries()].map(([label, a]) => ({ label, pct: a.max ? Math.round((a.erreicht / a.max) * 100) : 0, max: a.max }))
-    .sort((x, y) => x.pct - y.pct);
+  const liste = [...je.entries()].map(([label, a]) => {
+    // „Rationale Zahlen / Addieren": der Oberbegriff steht einmal als Kopf, nicht in jeder Zeile.
+    const i = label.indexOf(" / ");
+    return { label, ober: i > 0 ? label.slice(0, i) : "", unter: i > 0 ? label.slice(i + 3) : label, pct: a.max ? Math.round((a.erreicht / a.max) * 100) : 0, max: a.max };
+  }).sort((x, y) => x.pct - y.pct);
+  const gruppen = [...liste.reduce((m, x) => m.set(x.ober, [...(m.get(x.ober) || []), x]), new Map())];
   if (!liste.length) return null;
   const offen = liste.filter((x) => x.pct < 50);
   const stufe = (pct) => (pct >= 75 ? { farbe: C.success, text: t("lernen.stand.sitzt") } : pct >= 50 ? { farbe: C.warning, text: t("lernen.stand.fast") } : { farbe: C.danger, text: t("lernen.stand.nochmal") });
   return (
-    <div style={{ ...cardStyle, padding: 16, marginBottom: 12 }}>
+    <div style={{ ...cardStyle, padding: 16 }}>
       <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{t("lernen.stand.titel")}</div>
       {/* Die Aussage oben muss zu den Balken darunter passen: „alles sitzt" nur, wenn wirklich jedes Thema sitzt. */}
       {offen.length > 0 ? (
         <p style={{ fontSize: 14, margin: "0 0 12px", color: "var(--text)" }}>
           <Icon d={ICONS.bulb} size={14} color={C.warning} />{" "}
-          <strong>{t("lernen.stand.zuerst")}</strong> {offen.slice(0, 3).map((x) => x.label).join(", ")}
+          <strong>{t("lernen.stand.zuerst")}</strong> {offen.slice(0, 3).map((x) => x.unter).join(", ")}
         </p>
       ) : liste.every((x) => x.pct >= 75) ? (
         <p style={{ fontSize: 14, margin: "0 0 12px", color: "var(--text2)" }}>{t("lernen.stand.allesGut")}</p>
       ) : null}
-      <div style={{ display: "grid", gap: 8 }}>
-        {liste.map((x) => {
-          const st = stufe(x.pct);
-          return (
-            <div key={x.label}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
-                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{x.label}</span>
-                <span style={{ color: st.farbe, fontWeight: 700, whiteSpace: "nowrap" }}>{x.pct} % · {st.text}</span>
-              </div>
-              <div style={{ height: 6, borderRadius: "3px", background: "var(--bg2)", marginTop: 3 }}>
-                <div style={{ width: `${x.pct}%`, height: "100%", borderRadius: "3px", background: st.farbe }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {gruppen.map(([ober, zeilen]) => (
+        <div key={ober} style={{ marginTop: 10 }}>
+          {ober && <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", marginBottom: 4 }}>{ober}</div>}
+          <div style={{ display: "grid", gap: 8 }}>
+            {zeilen.map((x) => {
+              const st = stufe(x.pct);
+              return (
+                <div key={x.label}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 14 }}>
+                    <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{x.unter}</span>
+                    <span style={{ color: st.farbe, fontWeight: 700, whiteSpace: "nowrap" }}>{x.pct} %{x.pct < 75 ? ` · ${st.text}` : ""}</span>
+                  </div>
+                  <div style={{ height: 5, borderRadius: "3px", background: "var(--bg2)", marginTop: 3 }}>
+                    <div style={{ width: `${x.pct}%`, height: "100%", borderRadius: "3px", background: st.farbe }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
