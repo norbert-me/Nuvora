@@ -34,4 +34,10 @@ describe("spaltenNachZeit", () => {
     const r = spaltenNachZeit([{ id: 1 }, { id: 2 }]);
     expect(r.map((c) => c.id)).toEqual([1, 2]);
   });
+  it("Schwelle ist eine halbe Note: Tendenzschwankungen zeigen keinen Pfeil", () => {
+    expect(notenTrend([2, 2.4])).toBe(0);
+    expect(notenTrend([2.3, 2.0])).toBe(0);
+    expect(notenTrend([2, 2.5])).toBe(-1);
+    expect(notenTrend([3, 2.5])).toBe(1);
+  });
 });

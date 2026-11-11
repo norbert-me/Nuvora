@@ -372,18 +372,35 @@ export default function Noten() {
     const { cats, kinder } = zellFolge();
     const sp = cats.indexOf(catId), ze = kinder.indexOf(studentId);
     if (sp < 0 || ze < 0) return null;
-    const nze = ze + (hoch ? -1 : 1);
+    // Wer an dem Tag der Spalte gefehlt hat (oder als LE in einer Klassenarbeit nicht benotet
+    // wird), wird uebersprungen: dort gibt es nichts einzutragen, und man tippt sonst ins Leere.
+    let nze = ze + (hoch ? -1 : 1);
+    while (nze >= 0 && nze < kinder.length && zelleUeberspringen(kinder[nze], cats[sp])) nze += hoch ? -1 : 1;
     if (nze < 0 || nze >= kinder.length) return null;
     return `${kinder[nze]}:${cats[sp]}`;
+  };
+  const zelleUeberspringen = (sid, cid) => {
+    const cat = (sections || []).flatMap((x) => x.categories || []).find((c) => c.id === cid);
+    if (!cat) return false;
+    const st = statusVon(sid, cat);
+    if (st === "fehlt" || st === "entsch") return true;
+    return !!(summary || []).find((r) => r.student_id === sid)?.le && !!cat.source_work_id;
   };
 
   // Note in den Entwurf legen. Leeres Feld = Note löschen (beim Speichern);
   // eine unlesbare Eingabe fasst nichts an.
   const noteSetzen = (studentId, catId, text) => {
     setZelle(null);
+    // „UB" in die Zelle: dieses Kind wird in dieser Spalte nicht benotet. Gespeichert wird
+    // es als Kommentar „UB" ohne Note — es zaehlt in keinen Schnitt und gilt nicht als fehlend.
+    if (String(text).trim().toUpperCase() === "UB") {
+      entwurf.setz({ [`n:${studentId}:${catId}`]: null, [`k:${studentId}:${catId}`]: "UB" });
+      return;
+    }
     const wert = parseNote(text);
     if (wert === null && String(text).trim() !== "") return;
-    entwurf.setz({ [`n:${studentId}:${catId}`]: wert });
+    // Eine Note ersetzt ein „UB" an derselben Zelle.
+    entwurf.setz({ [`n:${studentId}:${catId}`]: wert, ...(wert != null && kommentarVon(studentId, catId) === "UB" ? { [`k:${studentId}:${catId}`]: "" } : {}) });
   };
 
   // Kommentar an einer Zelle: „Formel vergessen", „krank, nachgeschrieben".
@@ -508,6 +525,8 @@ export default function Noten() {
   const spaltenMitNoten = new Set(summary ? summary.flatMap((r) => Object.keys(r.per_category || {})).map(Number) : []);
   // Freiwillige Spalten (Raketenaufgaben, c.optional) zaehlen nie als fehlend.
   const noteFehltIn = (sid, c) => {
+    // LE-Kinder werden in Klassenarbeiten nicht benotet („UB") — das ist keine Luecke.
+    if (c.source_work_id && (summary || []).find((r) => r.student_id === sid)?.le) return false;
     if (c.optional || !spaltenMitNoten.has(c.id) || noteVon(sid, c.id) != null || kommentarVon(sid, c.id)) return false;
     const stat = statusVon(sid, c);
     return stat !== "fehlt" && stat !== "entsch";
@@ -947,7 +966,7 @@ export default function Noten() {
                                       window.addEventListener("pointermove", aus);
                                     }}
                                     style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 14, fontWeight: wert != null ? 600 : 400 }}>
-                                    {wert != null ? de(wert) : (s.le && c.source_work_id
+                                    {wert != null ? de(wert) : (kommentarVon(s.student_id, c.id) === "UB" || (s.le && c.source_work_id)
                                       // LE-Kind in einer Klassenarbeits-Spalte: nicht benotet, nicht „leer".
                                       ? <span title={t("kurse.leHint")} style={{ color: "var(--text3)", fontSize: 12, fontWeight: 700 }}>UB</span>
                                       : <span style={{ color: "var(--border2)" }}>·</span>)}

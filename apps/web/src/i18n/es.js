@@ -2727,6 +2727,8 @@ export default {
   "lernen.sass": "Esto salió bien",
   "lernen.stand.titel": "Tu nivel",
   "lernen.stand.zuerst": "Mira esto primero:",
+  "lernen.stand.ueben": "Aquí falta algo de seguridad:",
+  "lernen.teilnoten": "Notas parciales",
   "lernen.stand.allesGut": "Todos los temas están bien — ¡sigue así!",
   "lernen.stand.sitzt": "seguro",
   "lernen.stand.fast": "casi",

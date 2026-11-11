@@ -2726,6 +2726,8 @@ export default {
   "lernen.sass": "This worked",
   "lernen.stand.titel": "Where you stand",
   "lernen.stand.zuerst": "Look at these first:",
+  "lernen.stand.ueben": "A bit more practice here:",
+  "lernen.teilnoten": "Partial grades",
   "lernen.stand.allesGut": "All topics are solid — keep going!",
   "lernen.stand.sitzt": "solid",
   "lernen.stand.fast": "almost there",

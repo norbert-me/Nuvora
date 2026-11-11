@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Zugang der Kinder:** unter der aktuellen Note stehen die Teilnoten; der Pfeil erscheint erst ab einer halben Note Unterschied (vorher schon bei 0,3) und gar nicht bei „gleich“; die Aussage im Lernstand passt zu den Balken („Alle Themen sitzen“ nur, wenn es stimmt); das Fach steht ohne Klasse („Mathematik“ statt „7.5 Mathematik“).
+- **Notenbuch:** „UB“ in eine Zelle tippen setzt dieses Kind in dieser Spalte auf „nicht benotet“ (zählt nicht, gilt nicht als fehlend); LE-Kinder mit UB in der Klassenarbeit werden nicht mehr als „Note fehlt“ markiert; Tab/Enter überspringt Kinder, die an dem Tag gefehlt haben (und LE-Kinder in Klassenarbeits-Spalten).
 - **Zugang der Kinder:** die aktuelle Note nennt nur das Fach („Mathematik“), nicht „7.5 Mathematik“.
 - **Zugang der Kinder:** „Impressum & Datenschutz“ klebt am unteren Rand und ist ohne Scrollen sichtbar (auch bei Code-Detektiv); der Testname wird umgebrochen statt abgeschnitten und beginnt nicht mehr mit der Klasse.
 - **Ergebnisse (Zugang der Kinder):** der Lernstand steht nur noch oben, nicht mehr zusätzlich unter jedem einzelnen Test.

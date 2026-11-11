@@ -2716,6 +2716,8 @@ export default {
   "lernen.sass": "Das saß",
   "lernen.stand.titel": "Dein Lernstand",
   "lernen.stand.zuerst": "Als Erstes nochmal ansehen:",
+  "lernen.stand.ueben": "Hier fehlt noch etwas Sicherheit:",
+  "lernen.teilnoten": "Teilnoten",
   "lernen.stand.allesGut": "Alle Themen sitzen — weiter so!",
   "lernen.stand.sitzt": "sitzt",
   "lernen.stand.fast": "fast sicher",

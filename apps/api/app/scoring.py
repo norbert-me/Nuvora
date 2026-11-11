@@ -108,13 +108,13 @@ def note_label(wert: float) -> str:
 
 def noten_trend(werte) -> Optional[int]:
     """Besser (1), schlechter (-1), gleich (0) oder None (unter zwei Noten).
-    Spiegel von core/notentrend.js: erste gegen zweite Haelfte, ab 0,3."""
+    Spiegel von core/notentrend.js: erste gegen zweite Haelfte, ab 0,5 (eine halbe Note)."""
     w = [float(v) for v in (werte or []) if v is not None]
     if len(w) < 2:
         return None
     h = len(w) // 2
     diff = sum(w[-h:]) / h - sum(w[:h]) / h
-    return 1 if diff <= -0.3 else -1 if diff >= 0.3 else 0
+    return 1 if diff <= -0.5 else -1 if diff >= 0.5 else 0
 
 
 def status_of(card_id: int, has_any_scan: bool, config: Optional[dict]) -> str:

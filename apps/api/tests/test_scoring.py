@@ -214,6 +214,8 @@ def test_noten_trend_spiegelt_das_frontend():
     from app.scoring import noten_trend as n
     assert n([3]) is None and n([3, 2]) == 1 and n([2, 3]) == -1 and n([2, 2.1, 2]) == 0
     assert n([4, 3, 2]) == 1 and n([None, 3, 2]) == 1
+    # Schwelle: eine halbe Note — eine Tendenzstufe (0,3) ist noch kein Auf- oder Abstieg.
+    assert n([2, 2.4]) == 0 and n([2.3, 2.0]) == 0 and n([2, 2.5]) == -1 and n([3, 2.5]) == 1
 
 
 def _qs():

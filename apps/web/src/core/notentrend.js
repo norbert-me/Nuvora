@@ -7,8 +7,9 @@
 // (bei zweien: erste gegen zweite); unter zwei keine Aussage. Kleiner Wert = bessere Note.
 
 export const MINDEST_NOTEN = 2;
-/** Unterschied der Hälftenmittel, ab dem eine Richtung gemeldet wird (eine Tendenzstufe). */
-export const SCHWELLE = 0.3;
+/** Unterschied der Hälftenmittel, ab dem eine Richtung gemeldet wird: eine halbe Note. Kleinere Schwankungen
+ *  (eine Tendenzstufe = 0,3) sind Rauschen, kein Auf- oder Abstieg — der Pfeil soll nur bei deutlichen Änderungen stehen. */
+export const SCHWELLE = 0.5;
 
 /**
  * @param {number[]} werte Noten in Zeitreihenfolge (älteste zuerst)
