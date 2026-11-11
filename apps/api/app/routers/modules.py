@@ -397,7 +397,10 @@ REGISTRY: List[ModuleDef] = [
             "die Pfeile fest und erscheinen Schritt für Schritt; im freien "
             "Modus ohne Aufgabe lassen sich Start und Pfeile ziehen, und der "
             "Term entsteht daraus. Zeigt, warum „minus eine negative Zahl“ plus "
-            "ist: der Pfeil der Zahl wird umgedreht. Reines Werkzeug, ohne Daten."
+            "ist: der Pfeil der Zahl wird umgedreht. Dazu die Plättchenmethode "
+            "(Guthaben und Schulden): 5 − 3 heißt fünf Guthaben, drei abziehen; "
+            "minus eine Schuld heißt Schulden wegnehmen, wo keine liegen, über "
+            "Nullpaare. Reines Werkzeug, ohne Daten."
         ),
         path="/zahlenstrahl",
         stage="beta",

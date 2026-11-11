@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { COLORS as C, ICONS, Icon, Segment, btnPrimary, btnSecondary, cardStyle, pageApp, segmentBtn, toolbarBtn, toolbarInput } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import Plaettchen from "./Plaettchen.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { RASTER, achsenRadius, aufgabe, begrenze, berechne, leseZahl, phasen, rastern, regel, schreibe, termText } from "../core/zahlenstrahl.js";
 
@@ -24,7 +25,7 @@ const freiVorgabe = (raster) => (raster <= 0.1
   ? { start: 0.2, schritte: [{ op: "-", zahl: -0.3 }] }
   : { start: 2, schritte: [{ op: "-", zahl: -3 }] });
 
-export default function Zahlenstrahl() {
+function Strahl() {
   const { t } = useLanguage();
   const [modus, setModus] = useState("aufgabe");          // "aufgabe" | "frei"
   const [raster, setRaster] = useState(1);                // 1 | 0.5 | 0.1
@@ -284,5 +285,25 @@ function ZahlFeld({ wert, onChange, grenze }) {
       onFocus={() => setFokus(true)} onBlur={() => { setFokus(false); setText(schreibe(wert)); }}
       onChange={(e) => { setText(e.target.value); const v = leseZahl(e.target.value, grenze); if (v !== null) onChange(v); }}
       style={{ ...toolbarInput, width: 70, textAlign: "center", ...(ok ? null : { borderColor: C.danger }) }} />
+  );
+}
+
+// Zwei Wege zu denselben ganzen Zahlen: der Zahlenstrahl (Pfeile) und die Plaettchen
+// (Guthaben/Schulden). Ein Modul, weil es dieselbe Frage ist — „was ist 5 − (−3)?".
+export default function Zahlenstrahl() {
+  const { t } = useLanguage();
+  const [ansicht, setAnsicht] = useState("strahl");
+  return (
+    <div style={{ ...pageApp }}>
+      <div style={{ marginBottom: 12 }}>
+        <Segment>
+          {[["strahl", t("zahlenstrahl.ansichtStrahl")], ["plaettchen", t("zahlenstrahl.ansichtPlaettchen")]].map(([k, l]) => (
+            <button key={k} onClick={() => setAnsicht(k)} aria-pressed={ansicht === k}
+              style={{ ...segmentBtn, fontWeight: ansicht === k ? 700 : 500, color: ansicht === k ? "var(--accent)" : "var(--text2)" }}>{l}</button>
+          ))}
+        </Segment>
+      </div>
+      {ansicht === "strahl" ? <Strahl /> : <Plaettchen />}
+    </div>
   );
 }

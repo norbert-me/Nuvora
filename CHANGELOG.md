@@ -14,6 +14,10 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- **Zahlenstrahl: Plättchenmethode (Guthaben und Schulden).** Eine zweite Ansicht im Modul: 5 − 3 heißt fünf Guthaben, drei abziehen; „minus eine Schuld“ heißt Schulden wegnehmen — wo keine liegen, erst Nullpaare dazulegen. Als Aufgabe Schritt für Schritt oder frei zum Selberlegen.
+
 ## 4.5.4 — 11.11.2026
 
 - **Zugang der Kinder (Ergebnisse), neu gestaltet:** Handy untereinander, am PC Note und Lernstand nebeneinander und die Tests darunter in voller Breite. Teilnoten als Tabelle (Name, Note, Gewicht in festen Spalten); der Lernstand gruppiert nach Oberthema („Rationale Zahlen“ einmal als Kopf) und nennt den Status nur noch, wo etwas zu tun ist; jeder Test zeigt ein Ergebnis groß und das Übrige klein darunter.
