@@ -819,7 +819,9 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
 
     def _ist_le(x):
         p = personen.get(getattr(x, "person_id", None))
-        return "Lernen" in ((p.foerder if p and p.foerder else None) or x.foerder or [])
+        # Person ODER Zeile: eine nichtleere Angabe an der Person (z. B. nur „LRS") darf ein „Lernen"
+        # an der Zeile nicht verdecken — das Kind bekam dann trotzdem eine Note angezeigt.
+        return "Lernen" in set((p.foerder or []) if p else []) | set(x.foerder or [])
 
     out = []
     for st in students:

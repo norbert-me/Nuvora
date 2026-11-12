@@ -110,4 +110,5 @@ async def le_ids(db, rows) -> set:
     if pids:
         pers = {p.id: p for p in (await db.execute(select(Person).where(Person.id.in_(pids)))).scalars().all()}
     return {r.id for r in rows
-            if "Lernen" in (((pers.get(r.person_id).foerder if pers.get(r.person_id) else None) or r.foerder) or [])}
+            # Person ODER Zeile (siehe noten._ist_le): die eine verdeckt die andere nicht.
+            if "Lernen" in (set((pers.get(r.person_id).foerder or []) if pers.get(r.person_id) else []) | set(r.foerder or []))}

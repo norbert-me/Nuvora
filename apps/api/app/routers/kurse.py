@@ -400,7 +400,7 @@ async def list_kinder(kurs_id: int, user: User = Depends(get_current_user), db: 
         # Gilt fuer DIESEN Kurs: fachbezogene Massnahmen tragen ihre kurs_id,
         # aeltere ohne gelten ueberall.
         nta = any(m.get("kurs_id") in (None, kurs_id) for m in (z.massnahmen or []))
-        foerder = set((p.foerder if p and p.foerder else None) or z.foerder or [])
+        foerder = set((p.foerder or []) if p else []) | set(z.foerder or [])
         sonder = [k for w, k in (("LRS", "LRS"), ("Lernen", "LE")) if w in foerder]
         out.append(KindOut(student_id=z.id, person_id=z.person_id, name=z.name,
                            card_id=z.card_id, position=z.position or 0, sonder=sonder,

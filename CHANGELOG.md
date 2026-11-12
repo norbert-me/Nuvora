@@ -16,6 +16,9 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Rückmeldebogen:** der Dateiname beim „Als PDF sichern“ ist „Rückmeldebogen_<Name der Arbeit>“ (Klassenarbeit und CardVote-Test).
+- **LE:** ein Kind mit „Lernen“ an der Zeile, aber nur „LRS“ an der Person, bekam am Zugang trotzdem eine Note — jetzt gilt LE, sobald Person oder Zeile es sagt.
+- **Zugang der Kinder:** der Hinweis „Dein Übungsstand wird unter deinem Namen gespeichert …“ steht nicht mehr da.
 - **Seiten öffnen sich auch bei kurzer Unterbrechung des Internets:** der Service-Worker antwortet nach 3 Sekunden aus dem Zwischenspeicher (die genaue Seite, sonst die Hülle), statt zu warten, bis der Abruf scheitert; ohne Verbindung sofort. Gilt auch für die Lernpfad-Seite.
 - **CardVote-Auswertung:** nur noch Prozent — Kacheln, Boxplot und die Ansicht je Kind ohne erreichte Punkte; auch am Zugang der Kinder steht nur Prozent. Im Rückmeldebogen entfällt „1 / 3“ unter „Daran müssen wir arbeiten“.
 - **QR-Zettel drucken (Karteikarten):** keine leeren Blätter mehr — 12 Zettel je Seite mit festem Seitenrand (10 mm), die Seite passt auf jedem Gerät.

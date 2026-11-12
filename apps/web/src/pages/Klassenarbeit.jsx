@@ -24,6 +24,7 @@ import { gradeFromPct, gradeDetailed, quantile, stdev, DEFAULT_SCALE, datumKurz 
 import { useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import { alsJson, hol } from "../core/melden.js";
 import { ymd } from "../core/datum.js";
+import { bogenName, druckenMitTitel } from "../core/drucken.js";
 import NotenUebernahme from "../components/NotenUebernahme.jsx";
 import { konfidenzProzent, mittel, streuung, trennschaerfe } from "../core/aufgabenstatistik.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
@@ -1205,7 +1206,7 @@ export default function Klassenarbeit() {
     setStandDaten(teile.includes("stand") ? await standHolen() : null);
     // KaTeX zeichnet die Aufgabentexte nachgeladen — kurz warten, sonst steht
     // im Ausdruck der Quelltext.
-    setTimeout(() => window.print(), pool ? 900 : 100);
+    setTimeout(() => druckenMitTitel(bogenName(work && work.name)), pool ? 900 : 100);
   };
   const druckBogen = useMemo(() => {
     const basisListe = wdhPool ? wdhZuteilen(druckBogenRoh, wdhPool, themen.byId, wdhMax) : druckBogenRoh;

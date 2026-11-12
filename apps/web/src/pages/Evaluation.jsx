@@ -7,6 +7,7 @@ import Latex from "../components/Latex.jsx";
 import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, linkBtn, pageApp, panelStyle, quoteFarbe, quoteFlaeche, selectStyle, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
+import { bogenName, druckenMitTitel } from "../core/drucken.js";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 import { bewerte, bonusRegelVon, statusOf } from "../core/scoring.js";
@@ -637,7 +638,7 @@ const gradeDistribution = (() => {
           <Icon d={ICONS.eye} size={15} color={susAnsicht ? C.aufAkzent : "var(--text2)"} /> {t("klassenarbeit.presentMode")}
         </button>
         {bogen.length > 0 && (
-          <button onClick={() => window.print()} style={toolbarBtn} title={t("bogen.printHint")}>
+          <button onClick={() => druckenMitTitel(bogenName(session_name))} style={toolbarBtn} title={t("bogen.printHint")}>
             <Icon d={ICONS.print} size={15} /> {t("bogen.print")}
           </button>
         )}

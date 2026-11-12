@@ -328,7 +328,7 @@ const Center = ({ children, hinweis }) => (
       {children}
     </div>
     {/* Pflichtangaben auch hier: diese Seite sehen Lernende ohne Konto. */}
-    <RechtsFuss hinweis={hinweis} />
+    <RechtsFuss />
   </div>
 );
 
