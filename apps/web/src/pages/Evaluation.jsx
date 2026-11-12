@@ -407,19 +407,26 @@ const gradeDistribution = (() => {
 
   const suggestions = (() => {
     const tips = [];
-    const tooEasy = questionStats.filter((s, i) => s.pct >= 90 && questions[i].correct_answer);
-    const tooHard = questionStats.filter((s, i) => s.pct <= 20 && s.answered > 0 && questions[i].correct_answer);
-    const lowDisc = questionStats.filter((s) => s.discrimination !== null && s.discrimination < 0.1 && s.answered > 0);
-    const negDisc = questionStats.filter((s) => s.discrimination !== null && s.discrimination < 0);
+    // Je Vorschlag die betroffenen Fragen (Index): sie werden verlinkt und oeffnen die Frage.
+    const idx = (f) => questionStats.map((s, i) => (f(s, i) ? i : -1)).filter((i) => i >= 0);
+    const tooEasy = idx((s, i) => s.pct >= 90 && questions[i].correct_answer);
+    const tooHard = idx((s, i) => s.pct <= 20 && s.answered > 0 && questions[i].correct_answer);
+    const lowDisc = idx((s) => s.discrimination !== null && s.discrimination < 0.1 && s.answered > 0);
+    const negDisc = idx((s) => s.discrimination !== null && s.discrimination < 0);
 
     if (tooEasy.length > 0)
-      tips.push(t("cv.tipTooEasy", { n: tooEasy.length }));
+      tips.push({ text: t("cv.tipTooEasy", { n: tooEasy.length }), fragen: tooEasy });
     if (tooHard.length > 0)
-      tips.push(t("cv.tipTooHard", { n: tooHard.length }));
+      tips.push({ text: t("cv.tipTooHard", { n: tooHard.length }), fragen: tooHard });
     if (negDisc.length > 0)
-      tips.push(t("cv.tipNegDisc", { n: negDisc.length }));
+      tips.push({ text: t("cv.tipNegDisc", { n: negDisc.length }), fragen: negDisc });
     if (lowDisc.length > 1)
-      tips.push(t("cv.tipLowDisc", { n: lowDisc.length }));
+      tips.push({ text: t("cv.tipLowDisc", { n: lowDisc.length }), fragen: lowDisc });
+    // Gewichtung: wer etwas aendern kann, soll es hier erfahren — und mit einem Klick dort sein.
+    if (tooEasy.length > 0)
+      tips.push({ text: t("cv.tipWeightEasy"), fragen: tooEasy, gewicht: true });
+    if (negDisc.length > 0 || tooHard.length > 0)
+      tips.push({ text: t("cv.tipWeightOut"), fragen: [...new Set([...negDisc, ...tooHard])], gewicht: true });
 
     if (avgPct > 85) tips.push(t("cv.tipEasyOverall"));
     if (avgPct < 40) tips.push(t("cv.tipHardOverall"));
@@ -553,16 +560,23 @@ const gradeDistribution = (() => {
               <span style={{ width: 28, fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{k}</span>
               {/* Balken: der Radius rundet die Kappe der Grafik, kein
                   Bedienelement — deshalb Zahl statt Token. */}
-              <div style={{ flex: 1, height: 28, background: "var(--bg2)", borderRadius: 6, overflow: "hidden" }}>
+              <div style={{ flex: 1, height: 28, background: "var(--bg2)", borderRadius: 6, overflow: "hidden", position: "relative" }}>
+                {/* Ein schmaler Balken (1 von 23) hat keinen Platz fuer seine Beschriftung: sie stand halb
+                    darin und sah kaputt aus. Unter 18 % steht sie NEBEN dem Balken, in Textfarbe. */}
                 <div style={{
                   height: "100%", width: `${pct}%`,
                   background: isCorrect ? C.success : ANTWORT_COLORS[k],
                   borderRadius: 6, display: "flex", alignItems: "center", paddingLeft: 8,
                   color: C.aufAkzent, fontSize: 13, fontWeight: 600, transition: "width 0.3s",
-                  minWidth: count > 0 ? 28 : 0, opacity: isCorrect ? 1 : 0.6,
+                  minWidth: count > 0 ? 6 : 0, opacity: isCorrect ? 1 : 0.6,
                 }}>
-                  {count > 0 && `${count} (${Math.round(pct)}%)`}
+                  {count > 0 && pct >= 18 && `${count} (${Math.round(pct)}%)`}
                 </div>
+                {count > 0 && pct < 18 && (
+                  <span style={{ position: "absolute", top: 0, bottom: 0, left: `calc(${pct}% + 8px)`, display: "flex", alignItems: "center", fontSize: 13, fontWeight: 600, color: "var(--text2)" }}>
+                    {count} ({Math.round(pct)}%)
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -827,7 +841,7 @@ const gradeDistribution = (() => {
       )}
 
       {showWeights && (
-        <div style={{ ...cardStyle, marginBottom: 12 }}>
+        <div id="gewichte" style={{ ...cardStyle, marginBottom: 12 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>{t("cv.weights")}</h3>
           <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>{t("cv.weightsHint")}</p>
           <style>{NUM_CSS}</style>
@@ -892,11 +906,27 @@ const gradeDistribution = (() => {
             <Icon d={ICONS.bulb} size={18} color="var(--text2)" />
             <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{t("cv.suggestions")}</h3>
           </div>
-          {suggestions.map((tip, i) => (
-            <div key={i} style={{ fontSize: 13, color: "var(--text)", marginBottom: 8, lineHeight: 1.5, paddingLeft: 12, borderLeft: `2px solid ${C.warning}` }}>
-              {tip}
-            </div>
-          ))}
+          {suggestions.map((tip, i) => {
+            const text = typeof tip === "string" ? tip : tip.text;
+            const fragen = typeof tip === "string" ? [] : (tip.fragen || []);
+            return (
+              <div key={i} style={{ fontSize: 13, color: "var(--text)", marginBottom: 8, lineHeight: 1.5, paddingLeft: 12, borderLeft: `2px solid ${C.warning}` }}>
+                {text}
+                {(fragen.length > 0 || (typeof tip !== "string" && tip.gewicht)) && (
+                  <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", marginLeft: 8, verticalAlign: "middle" }}>
+                    {fragen.map((qi) => (
+                      <button key={qi} onClick={() => setSelectedQ(qi)} title={t("cv.tipOeffnen", { n: qi + 1 })}
+                        style={{ ...chipStyle, cursor: "pointer", border: "1px solid var(--border2)", background: "var(--card)", fontSize: 12, fontWeight: 700, padding: "1px 8px" }}>F{qi + 1}</button>
+                    ))}
+                    {typeof tip !== "string" && tip.gewicht && (
+                      <button onClick={() => { setShowScale(false); setShowFragen(false); setShowWeights(true); setTimeout(() => document.getElementById("gewichte")?.scrollIntoView({ block: "center", behavior: "smooth" }), 50); }}
+                        style={{ ...chipStyle, cursor: "pointer", border: "1px solid var(--accent)", color: "var(--accent)", background: "var(--card)", fontSize: 12, fontWeight: 700, padding: "1px 8px" }}>{t("cv.tipGewichtOeffnen")}</button>
+                    )}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
