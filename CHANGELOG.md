@@ -14,7 +14,7 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.5.5 — 12.11.2026
 
 - **Kurs:** unter „Im Kurs öffnen“ gibt es „Lernstand“ — die Frühwarn-Darstellung über Quizze **und** Klassenarbeiten. In der CardVote-Auswertung zählen wieder nur die Tests.
 - **CardVote-Auswertung:** eine Frage lässt sich nachträglich „nicht werten“ (Ansicht „Alle Fragen“) — sie zählt dann in Note, Themen, Rückmeldung und Zugang der Kinder nicht mehr, z. B. wenn der Versuch abbrach und sie nie gestellt wurde. Zurücknehmen mit „Wieder werten“.
