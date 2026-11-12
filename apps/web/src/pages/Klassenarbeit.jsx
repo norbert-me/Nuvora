@@ -1645,7 +1645,17 @@ export default function Klassenarbeit() {
           {/* Gewichtung der Themen: wie viele Punkte entfallen auf jedes Thema?
               Beim Erstellen der Arbeit die Frage, ob ein Unterthema mit zwei
               Punkten ueberhaupt etwas aussagen kann. */}
-          <ThemenGewichte gw={themenGewichte(work.tasks)} titel={t("klassenarbeit.gewichtTitel")} hint={t("klassenarbeit.gewichtHint")} themen={themen} t={t} />
+          {/* Die Gewichtung je Aufgabe steht jetzt in der Zeile „Gewicht" unter dem Punkte-Raster; die
+              Aufschluesselung nach THEMEN bleibt, aber eingeklappt — sie war ein weiterer Kasten, der die
+              Seite fuellte, bevor man ueberhaupt Punkte eingetragen hatte. */}
+          {themenGewichte(work.tasks).some((x) => x.topic != null && x.topic !== "form") && (
+            <details style={{ marginBottom: 12 }}>
+              <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text2)" }}>{t("klassenarbeit.gewichtTitel")}</summary>
+              <div style={{ marginTop: 8 }}>
+                <ThemenGewichte gw={themenGewichte(work.tasks)} titel={t("klassenarbeit.gewichtTitel")} hint={t("klassenarbeit.gewichtHint")} themen={themen} t={t} />
+              </div>
+            </details>
+          )}
           </>)}
 
           {/* 2) Punkte-Raster: Zeilen = Schüler, Spalten = Aufgaben (0..max). */}
@@ -1793,6 +1803,44 @@ export default function Klassenarbeit() {
                     );
                   })}
                 </tbody>
+                {/* Zwei Zeilen unter dem Raster, beide in PROZENT: wie viel jede Aufgabe an der Arbeit wiegt
+                    (Gewicht) und wie viel der Klasse sie im Schnitt gelungen ist (Ø). Beides stand vorher in
+                    eigenen Kaesten ueber und unter der Tabelle. */}
+                {(() => {
+                  const gesamt = totalMax();
+                  const anteil = (m) => (gesamt > 0 ? Math.round((m / gesamt) * 100) : 0);
+                  const einheitPct = (id) => { const x = analyse && analyse.perUnit.find((y) => y.id === id); return x && x.n > 0 ? x.pct : null; };
+                  const aufgabePct = (id) => { const x = analyse && analyse.perTask.find((y) => y.id === id); return x && x.n > 0 ? x.pct : null; };
+                  const kopf = { ...td, ...klebtLinks, textAlign: "left", fontSize: 12, fontWeight: 700, color: "var(--text2)", background: "var(--bg2)" };
+                  const zelleF = { ...td, fontSize: 12, color: "var(--text2)", background: "var(--bg2)" };
+                  const pctText = (v) => (v == null ? "" : `${v} %`);
+                  return (
+                    <tfoot>
+                      <tr>
+                        <td style={kopf} title={t("klassenarbeit.gewichtZeileHint")}>{t("klassenarbeit.gewichtZeile")}</td>
+                        {(work.tasks || []).flatMap((tk) => spalten(tk).map((sp, j) => {
+                          const rand = j === 0 ? "1px solid var(--border)" : undefined;
+                          if (sp.art === "wahl") return <td key={tk.id + "-wahl"} style={{ ...zelleF, borderLeft: rand }} />;
+                          if (sp.art === "summe") return <td key={tk.id + "-sum"} style={{ ...zelleF, fontWeight: 700 }}>{anteil(basis([tk]))} %</td>;
+                          return <td key={sp.u.id} style={{ ...zelleF, borderLeft: rand }}>{anteil(sp.u.max)} %</td>;
+                        }))}
+                        <td style={{ ...zelleF, fontWeight: 700, borderLeft: "1px solid var(--border)" }}>100 %</td>
+                        <td style={zelleF} />
+                      </tr>
+                      <tr>
+                        <td style={kopf} title={t("klassenarbeit.schnittZeileHint")}>{t("klassenarbeit.schnittZeile")}</td>
+                        {(work.tasks || []).flatMap((tk) => spalten(tk).map((sp, j) => {
+                          const rand = j === 0 ? "1px solid var(--border)" : undefined;
+                          if (sp.art === "wahl") return <td key={tk.id + "-wahl"} style={{ ...zelleF, borderLeft: rand }} />;
+                          if (sp.art === "summe") return <td key={tk.id + "-sum"} style={{ ...zelleF, fontWeight: 700 }}>{pctText(aufgabePct(tk.id))}</td>;
+                          return <td key={sp.u.id} style={{ ...zelleF, borderLeft: rand }}>{pctText(einheitPct(sp.u.id))}</td>;
+                        }))}
+                        <td style={{ ...zelleF, fontWeight: 700, borderLeft: "1px solid var(--border)" }}>{pctText(analyse && analyse.noten && analyse.noten.avgPct)}</td>
+                        <td style={zelleF} />
+                      </tr>
+                    </tfoot>
+                  );
+                })()}
               </table>
             </div>
           )}

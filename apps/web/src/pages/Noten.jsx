@@ -141,11 +141,13 @@ export default function Noten() {
   const [agg, setAgg] = useState(() => { try { return localStorage.getItem("noten_agg") === "median" ? "median" : "mean"; } catch { return "mean"; } });
   const [yearData, setYearData] = useState({ sections: [], rows: [] });
   const [dividers, setDividers] = useState([]); // Quartalsstriche: after_category_id[]
-  const [collapsed, setCollapsed] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem("noten_collapsed") || "[]")); } catch { return new Set(); } });
+  // Beim Oeffnen sind IMMER alle Spalten ausgeklappt (Wunsch des Nutzers): zugeklappt gilt nur
+  // fuer diese Sitzung und wird nicht gemerkt — sonst fehlen beim naechsten Mal Noten, ohne dass
+  // man sich erinnert, sie eingeklappt zu haben.
+  const [collapsed, setCollapsed] = useState(() => new Set());
   const toggleCollapse = (secId) => setCollapsed((prev) => {
     const n = new Set(prev);
     n.has(secId) ? n.delete(secId) : n.add(secId);
-    localStorage.setItem("noten_collapsed", JSON.stringify([...n]));
     return n;
   });
   const [menuSec, setMenuSec] = useState(null);   // Abschnitt mit offenem Menue
@@ -1196,14 +1198,21 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
 // man beim Lesen wechselt, nicht beim Einrichten.
 function NotenVerteilung({ werte, stufung, hoehe = 90, t }) {
   const [box, setBox] = useState(false);
+  // Teilnoten direkt am Diagramm umschaltbar (wie in der Klassenarbeit); Startwert ist die Wahl aus dem Zahnrad.
+  const [fein, setFein] = useState(stufung === "teil");
+  stufung = fein ? "teil" : (stufung === "teil" ? "ganz" : stufung);
   const dist = verteilung(werte, stufung);
   const maxD = Math.max(...dist.map((d) => d.n), 1);
   const zahlen = (werte || []).filter((v) => v != null && Number.isFinite(Number(v))).map(Number);
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
         <Tabs value={box ? "box" : "balken"} onChange={(v) => setBox(v === "box")}
           options={[["balken", t("noten.distBalken")], ["box", t("noten.distBox")]]} />
+        {!box && (
+          <Tabs value={fein ? "fein" : "ganz"} onChange={(v) => setFein(v === "fein")}
+            options={[["ganz", t("klassenarbeit.distWhole")], ["fein", t("klassenarbeit.distFine")]]} />
+        )}
       </div>
       {box ? (
         zahlen.length >= 3 ? <Boxplot values={zahlen} max={6} />
