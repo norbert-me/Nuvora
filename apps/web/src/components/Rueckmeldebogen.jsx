@@ -234,7 +234,7 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
           {b.offen.length > 0 ? (
             <Abschnitt titel={t("bogen.offen")} farbe={C.danger} icon={ICONS.bulb}>
               {b.offen.map((x) => (
-                <li key={x.label} style={zeile}>{x.label} <span style={klein}>({x.erreicht} / {x.max})</span></li>
+                <li key={x.label} style={zeile}>{x.label}</li>
               ))}
             </Abschnitt>
           ) : (

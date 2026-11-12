@@ -16,6 +16,8 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Seiten öffnen sich auch bei kurzer Unterbrechung des Internets:** der Service-Worker antwortet nach 3 Sekunden aus dem Zwischenspeicher (die genaue Seite, sonst die Hülle), statt zu warten, bis der Abruf scheitert; ohne Verbindung sofort. Gilt auch für die Lernpfad-Seite.
+- **CardVote-Auswertung:** nur noch Prozent — Kacheln, Boxplot und die Ansicht je Kind ohne erreichte Punkte; auch am Zugang der Kinder steht nur Prozent. Im Rückmeldebogen entfällt „1 / 3“ unter „Daran müssen wir arbeiten“.
 - **QR-Zettel drucken (Karteikarten):** keine leeren Blätter mehr — 12 Zettel je Seite mit festem Seitenrand (10 mm), die Seite passt auf jedem Gerät.
 - **Handy:** Zahlenstrahl und KI-Rennen ragen nicht mehr aus dem Bild (Aufgabenart bzw. Betriebsart als Auswahl).
 - **Zahlenstrahl: Plättchenmethode (Guthaben und Schulden).** Eine zweite Ansicht im Modul: 5 − 3 heißt fünf Guthaben, drei abziehen; „minus eine Schuld“ heißt Schulden wegnehmen — wo keine liegen, erst Nullpaare dazulegen. Als Aufgabe Schritt für Schritt oder frei zum Selberlegen.

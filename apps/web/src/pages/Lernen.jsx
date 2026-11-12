@@ -304,7 +304,7 @@ function Ergebnisse({ results, noten = [], t }) {
               <div style={{ textAlign: "right", flexShrink: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2, color: r.pct >= 50 ? C.success : C.danger }}>{r.note ? r.note.replace("-", "−") : `${r.pct} %`}</div>
                 <div style={{ fontSize: 12, color: "var(--text3)" }}>
-                  {r.le ? `${t("lernen.leHinweis")} · ` : r.unbenotet ? `${t("lernen.unbenotet")} · ` : r.note ? `${r.pct} % · ` : ""}{r.score}/{r.total}
+                  {r.le ? t("lernen.leHinweis") : r.unbenotet ? t("lernen.unbenotet") : r.note ? `${r.pct} %` : ""}
                 </div>
               </div>
             </div>

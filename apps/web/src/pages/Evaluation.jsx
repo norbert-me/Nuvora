@@ -86,9 +86,9 @@ export default function Evaluation() {
   useEffect(() => {
     if (sp.get("import") === "1" && notenAktiv && data?.class_id) setNotenDialog(true);
   }, [sp, notenAktiv, data]);
-  const [avgMode, setAvgMode] = useState("pts");
-  const [medMode, setMedMode] = useState("pts");
-  const [sdMode, setSdMode] = useState("pts");
+  // Nur Prozent: erreichte Punkte sind nicht vergleichbar (E/G, Gewichte, Bonus, Minuspunkte —
+  // jedes Kind hat eine andere erreichbare Punktzahl). Es gibt deshalb keinen Umschalter auf Punkte.
+  const avgMode = "pct", medMode = "pct", sdMode = "pct";
   // Lehrer-Übersicht nach Kursniveau filtern ("" = alle).
   const [niveauFilter, setNiveauFilter] = useState("");
   const [loadError, setLoadError] = useState(false);
@@ -697,20 +697,14 @@ const gradeDistribution = (() => {
         <Stat
           label={avgMode === "pts" ? t("cv.statAvgPoints") : t("cv.statAvgPct")}
           value={avgMode === "pts" ? fmt(avgScore) : `${avgPct}%`}
-          onClick={() => setAvgMode(avgMode === "pts" ? "pct" : "pts")}
-          clickable
         />
         <Stat
           label={medMode === "pts" ? t("cv.statMedian") : t("cv.statMedianPct")}
           value={medMode === "pts" ? fmt(medianScore) : `${medianPct}%`}
-          onClick={() => setMedMode(medMode === "pts" ? "pct" : "pts")}
-          clickable
         />
         <Stat
           label={sdMode === "pts" ? t("cv.statSd") : t("cv.statSdPct")}
           value={sdMode === "pts" ? fmt(sd) : `${sdPct.toFixed(1)}%`}
-          onClick={() => setSdMode(sdMode === "pts" ? "pct" : "pts")}
-          clickable
           info={() => setShowSdInfo(!showSdInfo)}
         />
         {quizCi && (
@@ -782,9 +776,9 @@ const gradeDistribution = (() => {
                     Notenverteilung im Reiter daneben liest man die Zahlen
                     sonst als Noten — und 85 waere dort eine sehr schlechte. */}
                 <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}>
-                  {niveauAktiv ? t("cv.boxplotAxisPct") : t("cv.boxplotAxisPts", { max: fmt(maxScore) })}
+                  {t("cv.boxplotAxisPct")}
                 </div>
-                {niveauAktiv ? <Boxplot values={pcts} max={100} /> : <Boxplot values={scores} max={maxScore} />}
+                <Boxplot values={pcts} max={100} unit="%" />
               </>)
             : <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("cv.needThree")}</p>
         )}
