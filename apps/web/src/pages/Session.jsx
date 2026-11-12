@@ -138,19 +138,25 @@ export default function Session() {
     // Abruf beim Auswaehlen der Klasse sah das nie.
     const holen = () => {
     const heute = new Date(); heute.setHours(12, 0, 0, 0);   // Tagesmitte: die Zeitzone soll den Tag nicht kippen
-    fetch(`${API}/anwesenheit/${selectedClass.id}?date=${encodeURIComponent(heute.toISOString())}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null)
-      .then((d) => {
-        if (!gilt || d === null) return;     // keine Antwort: den letzten Stand behalten statt alle anwesend zu setzen
+    // ALLE Klassen des Kurses fragen, nicht nur die gewaehlte: die Liste der Karten ist kursweit
+    // (Kinder aus mehreren Klassen oder einzeln hinzugefuegt), die Anwesenheit antwortet aber nur
+    // mit den Zeilen der angefragten Klasse — wer in einer anderen Klasse des Kurses steht, fehlte
+    // sonst in der Liste, obwohl er als abwesend eingetragen war.
+    const kurs = kurse.find((k) => (k.classes || []).some((c) => c.id === selectedClass.id));
+    const ids = kurs ? kurs.classes.map((c) => c.id) : [selectedClass.id];
+    Promise.all(ids.map((cid) =>
+      fetch(`${API}/anwesenheit/${cid}?date=${encodeURIComponent(heute.toISOString())}`)
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null)))
+      .then((antworten) => {
+        if (!gilt || antworten.every((d) => d === null)) return;   // keine Antwort: den letzten Stand behalten statt alle anwesend zu setzen
         const namen = new Map();
         classes.forEach((c) => (c.students || []).forEach((st) => namen.set(String(st.id), (st.name || "").trim())));
         const weg = new Set();
-        Object.entries(d || {}).forEach(([sid, eintrag]) => {
+        antworten.forEach((d) => Object.entries(d || {}).forEach(([sid, eintrag]) => {
           if (!eintrag || !["fehlt", "entsch"].includes(eintrag.status)) return;
           const name = namen.get(String(sid));
           if (name) weg.add(name);
-        });
+        }));
         setAbwesend(weg);
       });
     };
@@ -159,7 +165,7 @@ export default function Session() {
     const zurueck = () => { if (document.visibilityState === "visible") holen(); };
     document.addEventListener("visibilitychange", zurueck);
     return () => { gilt = false; clearInterval(takt); document.removeEventListener("visibilitychange", zurueck); };
-  }, [selectedClass, classes]);
+  }, [selectedClass, classes, kurse]);
 
   const shuffleArray = (arr) => {
     const a = [...arr];

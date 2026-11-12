@@ -14,6 +14,10 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## Unveröffentlicht
+
+- **CardVote-Sitzung:** abwesende Kinder verschwinden auch dann aus der Liste der noch zu scannenden, wenn sie in einer anderen Klasse des Kurses stehen (die Anwesenheit wird für alle Klassen des Kurses geholt).
+
 ## 4.5.5 — 12.11.2026
 
 - **Kurs:** unter „Im Kurs öffnen“ gibt es „Lernstand“ — die Frühwarn-Darstellung über Quizze **und** Klassenarbeiten. In der CardVote-Auswertung zählen wieder nur die Tests.
