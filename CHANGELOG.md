@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote-Auswertung:** eine Frage lässt sich nachträglich „nicht werten“ (Ansicht „Alle Fragen“) — sie zählt dann in Note, Themen, Rückmeldung und Zugang der Kinder nicht mehr, z. B. wenn der Versuch abbrach und sie nie gestellt wurde. Zurücknehmen mit „Wieder werten“.
 - **Klassenarbeit:** unter dem Punkte-Raster stehen die Zeilen „Gewicht“ (Anteil jeder Aufgabe an der Arbeit) und „Ø Klasse“ (Schnitt in Prozent je Aufgabe und Teilaufgabe); die Gewichtung nach Themen ist eingeklappt.
 - **Notenbuch:** beim Öffnen sind immer alle Spalten ausgeklappt; die Notenverteilung lässt sich direkt am Diagramm auf Teilnoten umschalten (wie in der Klassenarbeit).
 - **Startseite:** neues Widget „Schwache Lernende“ (aus; im Bearbeiten-Bereich einzuschalten) — die Kinder, die die Frühwarnung über mehrere Tests und Arbeiten hinweg meldet, mit Abstand zur Klasse und Sprung in die Ansicht des Kindes. Am Beamer bleibt es verborgen.

@@ -318,6 +318,9 @@ class EvalConfigIn(BaseModel):
     wie "eins" ergab dort einen HTTP 500, und zwar erst beim Export, nicht beim
     Speichern."""
     weights: Optional[Dict[str, float]] = None
+    # Fragen, die in DIESER Auswertung nicht zaehlen (z. B. nie gestellt, weil der
+    # Versuch abbrach): fehlende Antworten waeren sonst fuer alle „falsch".
+    ausgeschlossen: Optional[List[int]] = None
     grade_scale: Optional[Dict[str, float]] = None
     krank: Optional[List[Union[int, str]]] = None
     anwesend: Optional[List[Union[int, str]]] = None

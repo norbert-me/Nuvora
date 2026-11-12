@@ -95,6 +95,9 @@ async def quiz(db: AsyncSession, session: Session, nur_card_id: Optional[int] = 
     items = (await db.execute(
         select(QuestionSetItem).where(QuestionSetItem.question_set_id == session.question_set_id)
     )).scalars().all()
+    # Nachtraeglich ausgenommene Fragen (eval_config.ausgeschlossen) zaehlen nicht.
+    _ohne = {int(x) for x in ((session.eval_config or {}).get("ausgeschlossen") or []) if str(x).lstrip("-").isdigit()}
+    items = [it for it in items if it.question_id not in _ohne]
     # Fragen laden (die Beziehung ist hier nicht vorgeladen — eine Abfrage).
     from .models import Question
     q_ids = [it.question_id for it in items]

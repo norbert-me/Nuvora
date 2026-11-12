@@ -76,7 +76,13 @@ async def _mit_wiederholung(db: AsyncSession, arbeit, versuche: int = 6):
                                   "Gerade zu viel los. Bitte gleich noch einmal scannen.")
 
 
-async def _set_items(db: AsyncSession, question_set_id: int, sortiert: bool = False):
+def ausgeschlossene(session) -> set:
+    """Fragen, die diese Auswertung nachtraeglich ausgenommen hat (`eval_config.ausgeschlossen`)."""
+    roh = (getattr(session, "eval_config", None) or {}).get("ausgeschlossen") or []
+    return {int(x) for x in roh if isinstance(x, (int, str)) and str(x).lstrip("-").isdigit()}
+
+
+async def _set_items(db: AsyncSession, question_set_id: int, sortiert: bool = False, ohne=None):
     """Die Fragen eines Quiz-Sets laden (Frage gleich mitgeladen).
 
     Vorher stand dieselbe Abfrage wortgleich an fuenf Stellen. `sortiert` bleibt
@@ -86,6 +92,8 @@ async def _set_items(db: AsyncSession, question_set_id: int, sortiert: bool = Fa
     """
     q = (select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
          .where(QuestionSetItem.question_set_id == question_set_id))
+    if ohne:
+        q = q.where(QuestionSetItem.question_id.notin_(list(ohne)))
     if sortiert:
         q = q.order_by(QuestionSetItem.position)
     return (await db.execute(q)).scalars().all()
@@ -101,7 +109,7 @@ async def _fragen_und_flags(db: AsyncSession, session):
     questions = []
     if session.question_set_id:
         qmap = session.question_map or {}
-        for item in await _set_items(db, session.question_set_id):
+        for item in await _set_items(db, session.question_set_id, ohne=ausgeschlossene(session)):
             q = item.question
             questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer),
                               "niveau": item.niveau or "",
@@ -295,11 +303,17 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
     unbenotet = unbenotet or bool((session.eval_config or {}).get("unbenotet"))
 
     questions = []
+    ausgenommen = []
+    ohne = ausgeschlossene(session)
     if session.question_set_id:
         # Sortiert: die Auswertung zeigt die Fragen in der Reihenfolge des Sets.
         qmap = session.question_map or {}
         for item in await _set_items(db, session.question_set_id, sortiert=True):
             q = item.question
+            if q.id in ohne:
+                # Nicht gewertet, aber sichtbar — sonst liesse sich die Entscheidung nicht zuruecknehmen.
+                ausgenommen.append({"id": q.id, "text": q.text})
+                continue
             correct = qmap.get(str(q.id), q.correct_answer)
             questions.append({
                 "id": q.id,
@@ -375,6 +389,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
         "unbenotet": unbenotet,
         "unbenotet_quiz": quiz_unbenotet,
         "questions": questions,
+        "ausgeschlossen": ausgenommen,
         "students": rows,
     }
 
@@ -388,7 +403,7 @@ async def get_topic_stats(session_id: int, user: User = Depends(get_current_user
     if not session.question_set_id:
         return {"class_id": session.class_id, "topics": []}
 
-    items = await _set_items(db, session.question_set_id)   # ungeordnet: hier wird nur gezaehlt
+    items = await _set_items(db, session.question_set_id, ohne=ausgeschlossene(session))   # ungeordnet: hier wird nur gezaehlt
     qmap = session.question_map or {}
     q_topic = {}   # question_id -> topic_id
     q_correct = {}  # question_id -> correct_answer
@@ -486,7 +501,7 @@ async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int]
     for sess in sessions:
         if not sess.question_set_id:
             continue
-        items = await _set_items(db, sess.question_set_id)   # ungeordnet: hier wird nur gezaehlt
+        items = await _set_items(db, sess.question_set_id, ohne=ausgeschlossene(sess))   # ungeordnet: hier wird nur gezaehlt
         qmap = sess.question_map or {}
         q_topic = {it.question.id: it.question.topic_id for it in items if it.question.topic_id}
         q_correct = {it.question.id: qmap.get(str(it.question.id), it.question.correct_answer) for it in items}
@@ -698,7 +713,7 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
         if session.question_set_id:
             # Sortiert wie in der Einzelauswertung — dieselbe Reihenfolge.
             qmap = session.question_map or {}
-            for item in await _set_items(db, session.question_set_id, sortiert=True):
+            for item in await _set_items(db, session.question_set_id, sortiert=True, ohne=ausgeschlossene(session)):
                 q = item.question
                 questions.append({
                     "id": q.id,
@@ -1057,7 +1072,7 @@ async def _fruehwarn_daten(db, user, class_id: int):
     for sess in sessions:
         if not sess.question_set_id or not sess.created_at:
             continue
-        items = await _set_items(db, sess.question_set_id)   # ungeordnet: hier wird nur gezaehlt
+        items = await _set_items(db, sess.question_set_id, ohne=ausgeschlossene(sess))   # ungeordnet: hier wird nur gezaehlt
         qmap = sess.question_map or {}
         # Die richtige Antwort kann je Sitzung abweichen (question_map) — dieselbe
         # Quelle wie in der Auswertung, sonst rechnen zwei Ansichten verschieden.

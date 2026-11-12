@@ -103,7 +103,7 @@ export default function Evaluation() {
   // Vorher lief jede dieser Aenderungen nach 800 ms von selbst zum Server —
   // man sah nur ein kurzes „gespeichert" und hatte nichts in der Hand.
   const [gespeicherteConfig, setGespeicherteConfig] = useState({
-    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [], gefehlt: {}, eModus: "bonus", unbenotet: false, bonus: profilBonus(),
+    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [], gefehlt: {}, eModus: "bonus", unbenotet: false, ausgeschlossen: [], bonus: profilBonus(),
   });
   // Was sonst noch in der Konfiguration steht (Zeiten aus der Live-Sitzung).
   // Die PUT ersetzt sie als Ganzes — ohne diese Kopie waeren sie nach dem
@@ -114,11 +114,14 @@ export default function Evaluation() {
         ...restConfig.current,
         weights: wert.weights, grade_scale: wert.gradeScale,
         krank: wert.krank, anwesend: wert.anwesend, gefehlt: wert.gefehlt,
-        e_modus: wert.eModus, unbenotet: !!wert.unbenotet,
+        e_modus: wert.eModus, unbenotet: !!wert.unbenotet, ausgeschlossen: wert.ausgeschlossen || [],
         bonus_regel: { max_stufen: wert.bonus.maxStufen, mindest_nenner: wert.bonus.mindestNenner, falsch_zehrt: wert.bonus.falschZehrt },
       })).catch(() => null);
     if (!r || !r.ok) return false;
+    // Welche Fragen zaehlen, rechnet der Server — danach also neu laden.
+    const vorher = (gespeicherteConfig.ausgeschlossen || []).join(",");
     setGespeicherteConfig(wert);
+    if ((wert.ausgeschlossen || []).join(",") !== vorher) setNeuLaden((n) => n + 1);
   });
   const { weights, gradeScale, krank: krankListe, anwesend: anwesendListe, gefehlt: gefehltMap, eModus, bonus } = eConf.wert;
   // Nicht benotet: am Quiz (vom Server) ODER an dieser Auswertung (live aus dem Entwurf).
@@ -130,6 +133,7 @@ export default function Evaluation() {
   // offene Aenderung aus. Ohne diese Zeile stuende die Seite direkt nach dem
   // Aufruf auf „nicht gespeichert" und zeigte den Notenschluessel von vorher.
   const [ladeStand, setLadeStand] = useState(0);
+  const [neuLaden, setNeuLaden] = useState(0);
   // Rueckmeldung je Kind (was sass, was fehlt). Eigener Aufruf statt aus der
   // Auswertung gerechnet: die Regeln (Schwellen, Mindestzahl an Fragen, wer als
   // krank gilt) stehen im Server (app/rueckmeldung.py) und werden vom Kind auf
@@ -155,7 +159,7 @@ export default function Evaluation() {
       clearTimeout(timer);
       if (weg.current) { navigate("/", { replace: true }); return; }
       if (evalData && evalData.questions && evalData.students) setData({ ...evalData, _evalConfig: config || {} });
-      const { weights: _w, grade_scale: _g, krank: _k, anwesend: _a, gefehlt: _f, unbenotet: _u, ...rest } = config || {};
+      const { weights: _w, grade_scale: _g, krank: _k, anwesend: _a, gefehlt: _f, unbenotet: _u, ausgeschlossen: _x, ...rest } = config || {};
       restConfig.current = rest;
       let skala = (config && config.grade_scale) || null;
       if (!skala) {
@@ -175,6 +179,7 @@ export default function Evaluation() {
         // „bonus" — sonst aenderte sich ueber Nacht jede alte Note.
         eModus: ["bonus", "ausgleich", "keine", "alle"].includes(config && config.e_modus) ? config.e_modus : "bonus",
         unbenotet: !!(config && config.unbenotet),
+        ausgeschlossen: (config && Array.isArray(config.ausgeschlossen)) ? config.ausgeschlossen.map(Number) : [],
         // Ohne eigene Regel an dieser Auswertung gilt die Vorgabe aus dem Profil,
         // sonst die eingebaute. Bestandsauswertungen behalten damit ihre Zahlen,
         // solange im Profil nichts steht.
@@ -182,7 +187,7 @@ export default function Evaluation() {
       });
       setLadeStand((n) => n + 1);
     });
-  }, [id]);
+  }, [id, neuLaden]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Datei holen und speichern — dreimal dieselbe Zeile inline war einmal zu oft.
   const holen = async (url, dateiname) => {
@@ -870,7 +875,8 @@ const gradeDistribution = (() => {
             const stat = questionStats[i];
             const loesung = (q.correct_answer || "").split("").filter(Boolean);
             return (
-              <button key={q.id} onClick={() => setSelectedQ(i)}
+              <div key={q.id}>
+              <button onClick={() => setSelectedQ(i)}
                 style={{
                   display: "flex", alignItems: "flex-start", gap: 12, textAlign: "left", width: "100%",
                   padding: "10px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border3)",
@@ -894,6 +900,25 @@ const gradeDistribution = (() => {
                   {stat ? `${stat.correct}/${stat.answered}` : ""}
                 </span>
               </button>
+              <button type="button" className="link-btn" style={linkBtn} title={t("cv.nichtWertenHint")}
+                onClick={() => eConf.setz({ ausgeschlossen: [...new Set([...(eConf.wert.ausgeschlossen || []), q.id])] })}>
+                {t("cv.nichtWerten")}
+              </button>
+              </div>
+            );
+          })}
+          {/* Aus der Wertung genommen: nicht gestellt oder abgebrochen. Bleibt sichtbar, damit es sich zurücknehmen lässt. */}
+          {(data.ausgeschlossen || []).map((q) => {
+            const aus = (eConf.wert.ausgeschlossen || []).includes(q.id);
+            return (
+              <div key={`aus-${q.id}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px dashed var(--border3)", opacity: aus ? 0.6 : 1 }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, textDecoration: aus ? "line-through" : "none" }}><Latex>{q.text}</Latex></span>
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("cv.nichtGewertet")}</span>
+                <button type="button" className="link-btn" style={linkBtn}
+                  onClick={() => eConf.setz({ ausgeschlossen: aus ? (eConf.wert.ausgeschlossen || []).filter((x) => x !== q.id) : [...(eConf.wert.ausgeschlossen || []), q.id] })}>
+                  {aus ? t("cv.wiederWerten") : t("cv.nichtWerten")}
+                </button>
+              </div>
             );
           })}
         </div>
