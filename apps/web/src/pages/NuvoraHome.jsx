@@ -557,7 +557,7 @@ export default function NuvoraHome({ user }) {
           {/* Nicht nur „laeuft das Modul?", sondern auch „ist dieser TEIL an?"
               — dieselbe Frage wie in Navigation, Suche und Modul-Kachel, und
               deshalb dieselbe Funktion (useZielFilter). */}
-          {!edit && WIDGETS.filter((w) => kacheln.wert.widgets.includes(w.key) && zielDa({ modul: w.modul, option: w.option }) && !(beamer.aktiv && BEAMER_MODULE.includes(w.modul))).map((w) => {
+          {!edit && WIDGETS.filter((w) => kacheln.wert.widgets.includes(w.key) && zielDa({ modul: w.modul, option: w.option }) && !(beamer.aktiv && (BEAMER_MODULE.includes(w.modul) || w.sensibel))).map((w) => {
             if (w.key === "heute") return <HeutePanel key={w.key} t={t} />;
             if (w.key === "schwach") {
               return <SchwacheWoche key={w.key} t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} />;

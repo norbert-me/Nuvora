@@ -198,6 +198,45 @@ function Ausleihe() {
 // weiter auf der Startseite, obwohl der Teil, aus dem es seine Zahlen holt, im
 // Zahnrad abgeschaltet war — eine Kachel, die auf etwas zeigt, das es fuer
 // dieses Konto nicht gibt.
+// ── Schwache Lernende (Fruehwarnung) ──
+// Auf Wunsch (Voreinstellung: AUS): die Kinder, die ueber mehrere Tests und Arbeiten hinweg hinter der
+// Klasse zurueckliegen. Die Rechnung steht in app/fruehwarnung.py; hier wird nur gezeigt, was sie meldet.
+// Sie laeuft je Klasse und ist nicht billig — deshalb ist das Widget ausgeschaltet, bis jemand es will,
+// und fragt die Klassen nacheinander statt alle auf einmal. Es ist eine Beobachtung, nie eine Diagnose.
+function SchwacheSuS() {
+  const { t } = useLanguage();
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    let weg = false;
+    (async () => {
+      const klassen = await hol("/api/classes", []);
+      const liste = (Array.isArray(klassen) ? klassen : []).filter((k) => !k.archived && !k.archived_at).slice(0, 8);
+      const aus = [];
+      for (const k of liste) {
+        const d = await hol(`/api/classes/${k.id}/fruehwarnung`, null);
+        (d?.schueler || []).filter((s) => s.status === "melden").forEach((s) => aus.push({ klasse: k, kind: s }));
+      }
+      aus.sort((a, b) => (a.kind.abstand_median ?? 0) - (b.kind.abstand_median ?? 0));
+      if (!weg) setRows(aus);
+    })();
+    return () => { weg = true; };
+  }, []);
+  if (rows === null) return null;
+  return (
+    <WidgetKarte titel={t("widget.schwacheSus")} leer={t("widget.schwacheSusLeer")}>
+      {rows.length > 0 && rows.slice(0, 8).map(({ klasse, kind }) => (
+        <Link key={`${klasse.id}-${kind.card_id}`} to={`/cardvote/student-evaluation/${klasse.id}/${kind.card_id}`} style={zeile} title={kind.begruendung || ""}>
+          <span style={{ flex: 1, minWidth: 0, fontWeight: 600 }}>{kind.name}</span>
+          {kind.abstand_median != null && (
+            <span style={{ color: C.danger, fontWeight: 700, fontSize: 13 }}>{kind.abstand_median > 0 ? "+" : "\u2212"}{Math.abs(Math.round(kind.abstand_median))} Pp</span>
+          )}
+          <span style={{ ...chipStyle, fontSize: 12 }}>{klasse.name}</span>
+        </Link>
+      ))}
+    </WidgetKarte>
+  );
+}
+
 export const WIDGETS = [
   { key: "heute", modul: "kalender", labelKey: "widget.heute", an: true },
   { key: "schwach", modul: "cardvote", labelKey: "widget.schwach", an: true },
@@ -205,4 +244,5 @@ export const WIDGETS = [
   { key: "todo", modul: "notizbrett", option: "aufgaben", labelKey: "widget.todo", an: false, komponente: OffeneTodos },
   { key: "notiz", modul: "notizbrett", option: "notizen", labelKey: "widget.notiz", an: false, komponente: Notizen },
   { key: "ausleihe", modul: "orga", option: "ausleihe", labelKey: "widget.ausleihe", an: false, komponente: Ausleihe },
+  { key: "schwacheSus", modul: "cardvote", labelKey: "widget.schwacheSus", an: false, sensibel: true, komponente: SchwacheSuS },
 ];
