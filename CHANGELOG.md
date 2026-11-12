@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote-Auswertung:** die Vorschläge verlinken auf die betroffenen Fragen (F3 öffnet Frage 3) und nennen Gewichtungsempfehlungen mit Sprung zur Gewichtung; kleine Balken in der Antwortverteilung (z. B. 1 von 23) tragen ihre Beschriftung daneben statt halb darin.
 - **Klassenarbeit:** einzelne Kinder lassen sich als „UB“ (unbewertet) markieren — Punkte und Rückmeldung bleiben, das Kind zählt aber nicht in Notenverteilung und Schnitt und geht nicht ins Notenbuch.
 - **Rückmeldebogen:** der Dateiname beim „Als PDF sichern“ ist „Rückmeldebogen_<Name der Arbeit>“ (Klassenarbeit und CardVote-Test).
 - **LE:** ein Kind mit „Lernen“ an der Zeile, aber nur „LRS“ an der Person, bekam am Zugang trotzdem eine Note — jetzt gilt LE, sobald Person oder Zeile es sagt.
