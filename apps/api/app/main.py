@@ -433,6 +433,7 @@ def _ensure_columns(sync_conn):
         ("attendance", "kurs_id", "INTEGER"),
         ("sessions", "kurs_id", "INTEGER"),
         ("sessions", "question_layout", "JSON"),
+        ("work_analyses", "unbewertet", "JSON"),
         ("zufall_draws", "kurs_id", "INTEGER"),
         ("quartal_dividers", "kurs_id", "INTEGER"),
         ("plan_weeks", "kurs_id", "INTEGER"),

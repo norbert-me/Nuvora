@@ -282,7 +282,8 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
   };
   // LE-Kinder (Foerderschwerpunkt Lernen) haben keine Note: sie zaehlen nicht in
   // Schnitt, Verteilung und Aufgabenstatistik der Klasse.
-  const graded = students.filter(erfasstIst).filter((s) => !leIst(s));
+  const ubKinder = new Set((work.unbewertet || []).map(String));
+  const graded = students.filter(erfasstIst).filter((s) => !leIst(s) && !ubKinder.has(String(s.id)));
   // Je Kind seine Wertung und sein Themenprofil — beides in der Fassung,
   // die es je Aufgabe geschrieben hat.
   const wert = new Map(graded.map((s) => [s.id, wertung(wk, s.id, effScale)]));
@@ -785,7 +786,7 @@ export default function Klassenarbeit() {
     if (!next || !next.id) return false;
     // scale: echtes dict = Override, sonst {} (Server setzt zurueck auf Profil).
     const scaleOut = (next.scale && Object.keys(next.scale).length) ? next.scale : {};
-    const r = await fetch(`${API}/works/${next.id}`, alsJson("PUT", { name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [], fehler: next.fehler || {}, wechsel: next.wechsel || {} })).catch(() => null);
+    const r = await fetch(`${API}/works/${next.id}`, alsJson("PUT", { name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [], unbewertet: next.unbewertet || [], fehler: next.fehler || {}, wechsel: next.wechsel || {} })).catch(() => null);
     if (!r || !r.ok) { showAlert(t("common.notWork")); return false; }
     setSavedWork(next);
     if (verknuepft.length) {
@@ -1114,6 +1115,15 @@ export default function Klassenarbeit() {
     if (wasLegacy) delete results[key];                 // alten Marker aufloesen
     if (cur.has(key) || wasLegacy) cur.delete(key); else cur.add(key);
     persist({ ...work, results, absent: [...cur] });
+  };
+
+  // UB: dieses Kind bekommt in DIESER Arbeit keine Note — Punkte und Rueckmeldung bleiben, es zaehlt aber
+  // nicht in Verteilung und Schnitt und nicht ins Notenbuch. (LE gilt ohnehin immer.)
+  const istUb = (sid) => (work.unbewertet || []).map(String).includes(String(sid));
+  const toggleUb = (sid) => {
+    const cur = new Set((work.unbewertet || []).map(String));
+    if (cur.has(String(sid))) cur.delete(String(sid)); else cur.add(String(sid));
+    persist({ ...work, unbewertet: [...cur] });
   };
 
   // Gültiger Notenschlüssel: Override der Arbeit, sonst Profil-Voreinstellung.
@@ -1700,7 +1710,7 @@ export default function Klassenarbeit() {
                     // Tendenznote (2+) oder Notenwert in 0,3-Schritten (2,3).
                     const gd = (erfasst && tm) ? gradeDetailed(wt.pct, effScale) : null;
                     // LE (Foerderschwerpunkt Lernen): nicht bewertet — „UB“ statt Note.
-                    const note = leIst(s) ? "UB" : gd ? (gradeMode === "wert" ? komma(gd.wert) : gd.note) : "";
+                    const note = (leIst(s) || istUb(s.id)) ? "UB" : gd ? (gradeMode === "wert" ? komma(gd.wert) : gd.note) : "";
                     return (
                       <tr key={s.id} style={{ ...(abw ? { opacity: 0.5 } : {}), ...(fokus && fokus.sid === s.id ? { background: FOKUS_TON } : {}) }}>
                         <td style={{ ...td, ...klebtLinks, textAlign: "left", padding: "4px 8px", fontWeight: 500, whiteSpace: "nowrap",
@@ -1714,6 +1724,11 @@ export default function Klassenarbeit() {
                               aria-label={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")} aria-pressed={abw}
                               style={{ border: "none", background: "none", cursor: "pointer", color: abw ? C.warning : "var(--text3)", padding: 0, display: "inline-flex",
                                 alignItems: "center", justifyContent: "center", minWidth: 32, minHeight: 32, margin: "-4px 0 -4px -8px" }}><Icon d={abw ? ICONS.eyeOff : ICONS.eye} size={15} /></button>
+                            {/* UB: in dieser Arbeit keine Note fuer dieses Kind (LE gilt immer). */}
+                            <button onClick={() => toggleUb(s.id)} title={t("klassenarbeit.ubHint")} aria-label={t("klassenarbeit.ubHint")} aria-pressed={istUb(s.id)}
+                              disabled={leIst(s)}
+                              style={{ border: "1px solid var(--border2)", borderRadius: "6px", cursor: leIst(s) ? "default" : "pointer", fontSize: 11, fontWeight: 700, padding: "1px 5px",
+                                background: istUb(s.id) || leIst(s) ? "var(--bg3)" : "none", color: istUb(s.id) || leIst(s) ? "var(--text)" : "var(--text3)" }}>UB</button>
                             {s.name}
                           </span>
                         </td>
@@ -1928,10 +1943,11 @@ export default function Klassenarbeit() {
 // Krank/abwesend bekommt ohnehin keine Note.
 function notenAusArbeit(students, work, scale) {
   const absentU = new Set((work.absent || []).map(String));
+  const ubU = new Set((work.unbewertet || []).map(String));      // einzelne Kinder ohne Note (UB)
   if (!basis(work.tasks)) return [];
   return students
     .filter((s) => {
-      if (leIst(s)) return false;                          // LE: keine Note
+      if (leIst(s) || ubU.has(String(s.id))) return false;   // LE oder UB: keine Note
       if (absentU.has(String(s.id))) return false;
       const r = (work.results || {})[String(s.id)];
       if (!r || r === "abwesend") return false;

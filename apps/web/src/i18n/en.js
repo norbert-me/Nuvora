@@ -2029,6 +2029,7 @@ export default {
   "klassenarbeit.ci": "95% CI",
   "klassenarbeit.ciHint": "95% confidence interval of this task's mean success rate.",
   "klassenarbeit.attendance": "Present",
+  "klassenarbeit.ubHint": "No grade for this pupil in this test (ungraded)",
   "klassenarbeit.egAnzahl": "Pupils E / G",
   "klassenarbeit.egAnzahlE": "Pupils E",
   "klassenarbeit.egAnzahlG": "Pupils G",

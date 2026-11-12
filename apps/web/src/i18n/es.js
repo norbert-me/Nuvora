@@ -2030,6 +2030,7 @@ export default {
   "klassenarbeit.ci": "IC 95%",
   "klassenarbeit.ciHint": "Intervalo de confianza del 95% de la tasa media de acierto de esta tarea.",
   "klassenarbeit.attendance": "Presentes",
+  "klassenarbeit.ubHint": "Sin nota para este alumno en este examen (sin calificar)",
   "klassenarbeit.egAnzahl": "Alumnado E / G",
   "klassenarbeit.egAnzahlE": "Alumnado E",
   "klassenarbeit.egAnzahlG": "Alumnado G",

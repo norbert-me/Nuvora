@@ -1591,6 +1591,11 @@ class WorkAnalysis(Base):
     # abwesend heisst „aus der Klassenstatistik rausrechnen", loescht aber die
     # erreichten Punkte NICHT — kommt der SuS zurueck, sind sie noch da.
     absent: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Einzelne Kinder, die in DIESER Arbeit keine Note bekommen („UB", unbewertet): Punkte,
+    # Themenstand und Rueckmeldebogen bleiben, nur die Note faellt weg — nicht in Verteilung und
+    # Schnitt, nicht ins Notenbuch. (Foerderschwerpunkt Lernen gilt ohnehin ueberall; das hier ist
+    # die Ausnahme fuer ein einzelnes Kind und eine einzelne Arbeit.)
+    unbewertet: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Niveau dieser Arbeit: "" (alle), "E" oder "G". Kurse mit E/G schreiben
     # ZWEI Arbeiten — verschiedene Blaetter, verschiedene Punkte. Mit dem Niveau
     # zeigt die Auswertung nur die Kinder, die dieses Blatt geschrieben haben;

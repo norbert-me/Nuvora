@@ -2012,6 +2012,7 @@ export default {
   "klassenarbeit.ci": "95%-KI",
   "klassenarbeit.ciHint": "95%-Konfidenzintervall der mittleren Trefferquote dieser Aufgabe.",
   "klassenarbeit.attendance": "Anwesend",
+  "klassenarbeit.ubHint": "Keine Note für dieses Kind in dieser Arbeit (unbewertet)",
   "klassenarbeit.egAnzahl": "SuS E / G",
   "klassenarbeit.egAnzahlE": "SuS E",
   "klassenarbeit.egAnzahlG": "SuS G",

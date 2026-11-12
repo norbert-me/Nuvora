@@ -84,6 +84,7 @@ class WorkPut(BaseModel):
     results: Optional[dict] = None      # {student_id: [wrong_task_id]}
     scale: Optional[dict] = None        # Notenschlüssel {"1":87,…} oder null = Profil
     absent: Optional[list] = None       # abwesende student_ids (Punkte bleiben)
+    unbewertet: Optional[list] = None   # Kinder ohne Note in dieser Arbeit (UB)
     fehler: Optional[dict] = None       # {student_id: {unit_id: Fehlerart}}
     wechsel: Optional[dict] = None      # {student_id: [task_id]} — Fassung des anderen Blatts geschrieben
 
@@ -98,6 +99,7 @@ class WorkOut(BaseModel):
     results: dict = {}
     scale: Optional[dict] = None
     absent: list = []
+    unbewertet: list = []
     fehler: dict = {}
     wechsel: dict = {}
     niveau: str = ""
@@ -155,7 +157,7 @@ async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = 
         return d.date().isoformat() if d else None
     # Nach Datum der Arbeit, neueste zuerst; gleicher Tag nach Anlage (E/G-Paare bleiben beieinander).
     rows = sorted(rows, key=lambda w: (_tag(w) or "", w.id), reverse=True)
-    return [WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "", datum=_tag(w)) for w in rows]
+    return [WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], unbewertet=w.unbewertet or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "", datum=_tag(w)) for w in rows]
 
 
 @router.post("/works", response_model=WorkOut, status_code=201)
@@ -404,9 +406,11 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
     if body.absent is not None:
         # Abwesende als eindeutige String-IDs; Punkte in results bleiben unberuehrt.
         w.absent = list({str(x)[:40] for x in body.absent[:400]}) or None
+    if body.unbewertet is not None:
+        w.unbewertet = list({str(x)[:40] for x in body.unbewertet[:400]}) or None
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "")
+    return WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], unbewertet=w.unbewertet or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "")
 
 
 @router.post("/works/{work_id}/teilen", response_model=List[WorkOut])

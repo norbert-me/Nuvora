@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **Klassenarbeit:** einzelne Kinder lassen sich als „UB“ (unbewertet) markieren — Punkte und Rückmeldung bleiben, das Kind zählt aber nicht in Notenverteilung und Schnitt und geht nicht ins Notenbuch.
 - **Rückmeldebogen:** der Dateiname beim „Als PDF sichern“ ist „Rückmeldebogen_<Name der Arbeit>“ (Klassenarbeit und CardVote-Test).
 - **LE:** ein Kind mit „Lernen“ an der Zeile, aber nur „LRS“ an der Person, bekam am Zugang trotzdem eine Note — jetzt gilt LE, sobald Person oder Zeile es sagt.
 - **Zugang der Kinder:** der Hinweis „Dein Übungsstand wird unter deinem Namen gespeichert …“ steht nicht mehr da.
