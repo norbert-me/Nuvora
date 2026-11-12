@@ -68,7 +68,7 @@ export default function StudentEvaluation() {
 
       {/* Verlauf gegen die Klasse: dieselbe Auswertung wie auf der Startseite,
           hier nur fuer dieses Kind. Zeigt sich nichts, steht hier auch nichts. */}
-      <FruehwarnPanel classId={classId} nurKind={cardId} />
+      <FruehwarnPanel classId={classId} nurKind={cardId} nur="quiz" />
       {/* Themenstand dieses Kindes: was sitzt, was nicht, und wird es besser? */}
       <Themenstand classId={classId} cardId={cardId} />
       {/* Der Verlauf beider Quellen auf einer Achse — die Frage „wird es

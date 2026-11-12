@@ -158,7 +158,7 @@ export function FruehwarnKarte({ schueler, t, offen = false }) {
  * Panel für eine Klasse. `nurKind` (card_id) zeigt nur dieses Kind — so nutzt
  * die Schüleransicht dieselbe Auswertung, ohne sie ein zweites Mal zu bauen.
  */
-export default function FruehwarnPanel({ classId, nurKind = null, titel = true }) {
+export default function FruehwarnPanel({ classId, nurKind = null, titel = true, nur = "" }) {
   const { t } = useLanguage();
   const [empfindlich, setEmpfindlich] = useEmpfindlich();
   const [daten, setDaten] = useState(null);
@@ -166,10 +166,10 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true }
   useEffect(() => {
     if (!classId) return;
     let ab = false;
-    hol(`/api/classes/${classId}/fruehwarnung?empfindlich=${empfindlich ? "true" : "false"}`, null)
+    hol(`/api/classes/${classId}/fruehwarnung?empfindlich=${empfindlich ? "true" : "false"}${nur ? `&nur=${nur}` : ""}`, null)
       .then((d) => { if (!ab) setDaten(d); });
     return () => { ab = true; };
-  }, [classId, empfindlich]);
+  }, [classId, empfindlich, nur]);
 
   if (!daten) return null;
 

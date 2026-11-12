@@ -168,6 +168,7 @@ export default {
   "kursLinks.klassenleitung": "Klassenleitung",
   "kursLinks.lernpfad": "Lernpfad",
   "kursLinks.zufall": "Zufall",
+  "kursLinks.lernstand": "Lernstand",
   "classes.trash": "Papierkorb",
   "kurse.emptyTitle": "Noch kein Kurs",
   "kurse.emptyHint": "Ein Kurs ist ein Fach einer Klasse (z.B. Mathe 7.5). Oben Namen eingeben und anlegen.",

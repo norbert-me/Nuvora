@@ -1046,7 +1046,7 @@ async def _arbeiten_als_tests(db, user, class_id: int, id_zu_karte: dict):
     return tests
 
 
-async def _fruehwarn_daten(db, user, class_id: int):
+async def _fruehwarn_daten(db, user, class_id: int, nur_quiz: bool = False):
     """Erhebungen einer Klasse in der Form, die app/fruehwarnung.py erwartet."""
 
     roster = await _kurs_roster(db, class_id)
@@ -1059,7 +1059,9 @@ async def _fruehwarn_daten(db, user, class_id: int):
     id_zu_karte = {s.id: s.card_id for s in roster}
 
     tests = []
-    if await is_active(db, user.id, "auswertung"):
+    # `nur_quiz`: die CardVote-Auswertung zeigt nur ihre eigenen Tests; die Klassenarbeiten
+    # kommen in der Kursansicht („Lernstand") dazu.
+    if not nur_quiz and await is_active(db, user.id, "auswertung"):
         tests += await _arbeiten_als_tests(db, user, class_id, id_zu_karte)
     if not await is_active(db, user.id, "cardvote"):
         return tests, kinder
@@ -1164,7 +1166,7 @@ async def _fehlzeiten(db, user, class_id: int) -> dict:
 
 
 @kern_router.get("/classes/{class_id}/fruehwarnung")
-async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
+async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False, nur: str = "",
                               user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Vollbild für eine Klasse: je Kind Kurve, Etiketten, Themen, Begründung."""
 
@@ -1174,7 +1176,7 @@ async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
     if school_class.owner_id and school_class.owner_id != user.id:
         raise HTTPException(403, "Kein Zugriff auf diese Klasse")
 
-    tests, kinder = await _fruehwarn_daten(db, user, class_id)
+    tests, kinder = await _fruehwarn_daten(db, user, class_id, nur_quiz=(nur == "quiz"))
     quellen = await _fruehwarn_quellen(db, user, class_id)
     if not tests:
         # Kein blosses "nichts da": WARUM nichts da ist, ist der eigentliche

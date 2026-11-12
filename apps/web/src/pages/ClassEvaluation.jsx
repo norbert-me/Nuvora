@@ -132,7 +132,7 @@ export default function ClassEvaluation() {
       {/* Frühwarnung: wer hängt über mehrere Tests hinweg hinterher? Steht VOR
           den Kennzahlen — eine Durchschnittsquote sagt nichts über einzelne
           Kinder, und genau danach wird hier gesucht. */}
-      <FruehwarnPanel classId={id} nurKind={suche.get("fw")} />
+      <FruehwarnPanel classId={id} nurKind={suche.get("fw")} nur="quiz" />
 
       {/* Stat tiles */}
       <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>

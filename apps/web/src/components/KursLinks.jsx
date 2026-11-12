@@ -15,7 +15,8 @@
 // mehrere Fach-Klassen, wählt man oben, für welche der Sprung gilt.
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, COLORS as C, chipStyle, sectionLabel } from "./Icons.jsx";
+import FruehwarnPanel from "./Fruehwarnung.jsx";
+import { Icon, ICONS, COLORS as C, Modal, chipStyle, sectionLabel } from "./Icons.jsx";
 import { rememberClass } from "../core/cache.js";
 import { useModules, useZielFilter } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -25,6 +26,7 @@ export default function KursLinks({ kurs }) {
   const { modules } = useModules();
   const klassen = kurs?.classes || [];
   const [classId, setClassId] = useState(klassen[0]?.id ?? null);
+  const [lernstand, setLernstand] = useState(false);
   // Der Startwert gilt nur beim ersten Rendern. Ein frisch angelegter Kurs hat
   // aber noch KEINE Klasse — classId blieb dann null, und weil die Leiste ohne
   // Klasse nichts anzeigen kann, blieb sie auch nach dem Hinzufuegen der Klasse
@@ -58,7 +60,11 @@ export default function KursLinks({ kurs }) {
     an("zufall") && { to: `/zufall?${q}`, icon: ICONS.shuffle, label: t("kursLinks.zufall") },
   ].filter(Boolean);
 
-  if (ziele.length === 0) return null;
+  // Lernstand des Kurses: dieselbe Darstellung wie in der CardVote-Auswertung, aber ueber ALLE
+  // Erhebungen (Quizze und Klassenarbeiten). Die Quellen prueft der Server je Modul.
+  const lernstandDa = an("cardvote") || an("auswertung");
+
+  if (ziele.length === 0 && !lernstandDa) return null;
 
   return (
     <div style={{ marginBottom: 12 }}>
@@ -95,7 +101,22 @@ export default function KursLinks({ kurs }) {
             {z.label}
           </Link>
         ))}
+        {lernstandDa && (
+          <button type="button" onClick={() => setLernstand(true)}
+            style={{
+              ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px", cursor: "pointer",
+              border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text2)", fontSize: 13, fontWeight: 500,
+            }}>
+            <Icon d={ICONS.chart} size={14} color={C.info} />
+            {t("kursLinks.lernstand")}
+          </button>
+        )}
       </div>
+      {lernstand && (
+        <Modal title={t("kursLinks.lernstand")} onClose={() => setLernstand(false)}>
+          <FruehwarnPanel classId={classId} titel={false} />
+        </Modal>
+      )}
     </div>
   );
 }
