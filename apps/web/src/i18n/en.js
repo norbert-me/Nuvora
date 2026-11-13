@@ -1562,7 +1562,7 @@ export default {
   "reihen.neuName": "New unit",
   "reihen.stundenAnhaengen": "Add lessons from calendar",
   "reihen.anhaengen": "Add",
-  "reihen.keineStunden": "No planned lessons with content in this period.",
+  "reihen.keineStunden": "No lessons of this course in this period.",
   "reihen.reiheWaehlen": "Choose series …",
   "reihen.ohneFach": "No subject",
   "reihen.ohneStufe": "No grade level",

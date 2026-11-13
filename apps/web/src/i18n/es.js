@@ -1563,7 +1563,7 @@ export default {
   "reihen.neuName": "Nueva unidad",
   "reihen.stundenAnhaengen": "Añadir clases del calendario",
   "reihen.anhaengen": "Añadir",
-  "reihen.keineStunden": "No hay clases planificadas con contenido en este periodo.",
+  "reihen.keineStunden": "No hay clases de este curso en este periodo.",
   "reihen.reiheWaehlen": "Elegir serie …",
   "reihen.ohneFach": "Sin asignatura",
   "reihen.ohneStufe": "Sin nivel",

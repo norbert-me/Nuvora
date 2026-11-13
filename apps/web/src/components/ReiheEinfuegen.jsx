@@ -20,6 +20,16 @@ export default function InKurs({ reihe: reiheFix = null, kursId: kursVor = "", o
   const [reihen, setReihen] = useState([]);
   const [reiheId, setReiheId] = useState(reiheFix ? reiheFix.id : "");
   const reihe = reiheFix || { id: reiheId };
+  // Welche Stunden der Reihe? Alle angehakt; abwaehlen, was nicht in den Kalender soll.
+  const [alleStunden, setAlleStunden] = useState([]);
+  const [wahl, setWahl] = useState([]);
+  useEffect(() => {
+    if (!reihe.id) { setAlleStunden([]); setWahl([]); return; }
+    let weg = false;
+    hol(`${API}/${reihe.id}`, null).then((d) => { if (weg || !d) return; const l = d.stunden || []; setAlleStunden(l); setWahl(l.map((x) => x.id)); });
+    return () => { weg = true; };
+  }, [reihe.id]);
+  const umschalten = (id) => setWahl((w) => (w.includes(id) ? w.filter((x) => x !== id) : [...w, id]));
   useEffect(() => { if (!reiheFix) hol(API).then((d) => setReihen(Array.isArray(d) ? d : [])); }, [reiheFix]);
   const [ab, setAb] = useState(ymd(new Date()));
   const [vor, setVor] = useState(null);
@@ -28,15 +38,15 @@ export default function InKurs({ reihe: reiheFix = null, kursId: kursVor = "", o
   useEffect(() => { hol("/api/kurse").then((d) => setKurse(Array.isArray(d) ? d : [])); }, []);
   useEffect(() => {
     setVor(null);
-    if (!kursId || !ab || !reihe.id) return;
+    if (!kursId || !ab || !reihe.id || wahl.length === 0) return;
     let abbruch = false;
-    hol(`${API}/${reihe.id}/vorschau?kurs_id=${kursId}&ab=${ab}`, null).then((d) => { if (!abbruch) setVor(Array.isArray(d) ? d : null); });
+    hol(`${API}/${reihe.id}/vorschau?kurs_id=${kursId}&ab=${ab}&stunden=${wahl.join(",")}`, null).then((d) => { if (!abbruch) setVor(Array.isArray(d) ? d : null); });
     return () => { abbruch = true; };
-  }, [kursId, ab, reihe.id]);
+  }, [kursId, ab, reihe.id, wahl]);
   const tag = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "2-digit" });
   const anlegen = async () => {
     setFehler("");
-    const res = await fetch(`${API}/${reihe.id}/ausspielen`, alsJson("POST", { kurs_id: Number(kursId), ab })).catch(() => null);
+    const res = await fetch(`${API}/${reihe.id}/ausspielen`, alsJson("POST", { kurs_id: Number(kursId), ab, stunden: wahl })).catch(() => null);
     if (res && res.ok) { setFertig(await res.json()); return; }
     const b = res ? await res.json().catch(() => ({})) : {};
     setFehler(typeof b.detail === "string" ? b.detail : t("common.notWork"));
@@ -69,6 +79,16 @@ export default function InKurs({ reihe: reiheFix = null, kursId: kursVor = "", o
         <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--text2)" }}>
           {t("reihen.ab")} <input type="date" value={ab} onChange={(e) => setAb(e.target.value)} style={inputStyle} />
         </label>
+        {alleStunden.length > 1 && (
+          <div style={{ maxHeight: 140, overflowY: "auto", border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: 8, fontSize: 13 }}>
+            {alleStunden.map((x) => (
+              <label key={x.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "3px 0", cursor: "pointer" }}>
+                <input type="checkbox" checked={wahl.includes(x.id)} onChange={() => umschalten(x.id)} />
+                <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.titel || t("reihen.stundeOhneTitel")}</span>
+              </label>
+            ))}
+          </div>
+        )}
         {vor && (
           <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: 8, fontSize: 13 }}>
             {vor.map((v) => (

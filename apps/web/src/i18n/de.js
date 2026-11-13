@@ -1545,7 +1545,7 @@ export default {
   "reihen.neuName": "Neue Reihe",
   "reihen.stundenAnhaengen": "Stunden aus Kalender anhängen",
   "reihen.anhaengen": "Anhängen",
-  "reihen.keineStunden": "Keine geplanten Stunden mit Inhalt in diesem Zeitraum.",
+  "reihen.keineStunden": "Keine Stunden dieses Kurses in diesem Zeitraum.",
   "reihen.reiheWaehlen": "Reihe wählen …",
   "reihen.ohneFach": "Ohne Fach",
   "reihen.ohneStufe": "Ohne Stufe",

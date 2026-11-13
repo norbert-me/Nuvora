@@ -395,11 +395,13 @@ async def _klasse_des_kurses(db: AsyncSession, kurs_id: int) -> Optional[int]:
     return klassen[0] if len(klassen) == 1 else None
 
 
-async def _kandidaten(db: AsyncSession, user: User, kurs: Kurs, von=None, bis=None, ids=None) -> list:
-    """Die Kalender-Eintraege eines Kurses, die als Stunde einer Reihe taugen:
-    mit Stunde und mit Inhalt (ohne Inhalt ist ein Eintrag nur ein Platz im Plan)."""
-    q = select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.kurs_id == kurs.id,
-                                    CalendarEntry.period.is_not(None))
+async def _kandidaten(db: AsyncSession, user: User, kurs: Kurs, von=None, bis=None, ids=None, alle=False) -> list:
+    """Die Kalender-Eintraege eines Kurses, die als Stunde einer Reihe taugen. Ohne Auswahl nur die
+    mit Inhalt (ohne Inhalt ist ein Eintrag nur ein Platz im Plan); in der AUSWAHL stehen alle
+    Eintraege des Kurses — was dazugehoert, entscheidet die Lehrkraft mit dem Haken."""
+    q = select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.kurs_id == kurs.id)
+    if ids is None:
+        q = q.where(CalendarEntry.period.is_not(None))
     if von:
         q = q.where(CalendarEntry.date >= datetime.combine(von, datetime.min.time()))
     if bis:
@@ -407,6 +409,8 @@ async def _kandidaten(db: AsyncSession, user: User, kurs: Kurs, von=None, bis=No
     if ids is not None:
         q = q.where(CalendarEntry.id.in_(ids))
     eintraege = (await db.execute(q.order_by(CalendarEntry.date, CalendarEntry.period))).scalars().all()
+    if ids is not None or alle:
+        return list(eintraege)
     return [e for e in eintraege if (e.title or e.topic_id or e.notes or e.verlaufsplan)]
 
 
@@ -418,7 +422,7 @@ async def kalender_stunden(kurs_id: int, von: Optional[date] = None, bis: Option
     kurs = await _eigener_kurs(db, user, kurs_id)
     return [{"id": e.id, "date": _tag(e.date).isoformat(),
              "period": e.period, "title": e.title or ""}
-            for e in (await _kandidaten(db, user, kurs, von, bis))[:MAX_STUNDEN * 2]]
+            for e in (await _kandidaten(db, user, kurs, von, bis, alle=True))[:MAX_STUNDEN * 2]]
 
 
 async def _stunden_anhaengen(db: AsyncSession, user: User, r: Reihe, eintraege: list, start: int) -> int:
@@ -555,18 +559,19 @@ async def _auswahl(db: AsyncSession, user: User, reihe: Reihe, ids: Optional[Lis
 
 
 @router.get("/{reihe_id}/vorschau")
-async def vorschau(reihe_id: int, kurs_id: int, ab: date, user: User = Depends(require_module),
+async def vorschau(reihe_id: int, kurs_id: int, ab: date, stunden: Optional[str] = None, user: User = Depends(require_module),
                    db: AsyncSession = Depends(get_db)):
     """Auf welche Termine fielen die Stunden, wenn die Reihe ab `ab` in den Kurs
     gespielt würde? Schreibt nichts."""
     await _kalender_pflicht(db, user)
     reihe = await _eigene_reihe(db, user, reihe_id)
     kurs = await _eigener_kurs(db, user, kurs_id)
-    stunden = await _auswahl(db, user, reihe, None)
-    plaetze, _ = await _plaetze(db, user, kurs, ab, sum(s.dauer or 1 for s in stunden))
+    ids = [int(x) for x in (stunden or "").split(",") if x.strip().isdigit()] or None
+    wahl = await _auswahl(db, user, reihe, ids)
+    plaetze, _ = await _plaetze(db, user, kurs, ab, sum(s.dauer or 1 for s in wahl))
     return [{"stunde_id": st.id, "titel": st.titel, "dauer": st.dauer or 1,
              "termine": [{"date": t.isoformat(), "period": p} for t, p in (slots or [])],
-             "platziert": slots is not None} for st, slots in _verteilen(stunden, plaetze)]
+             "platziert": slots is not None} for st, slots in _verteilen(wahl, plaetze)]
 
 
 @router.post("/{reihe_id}/ausspielen")
