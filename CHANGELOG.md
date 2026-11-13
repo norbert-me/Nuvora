@@ -14,6 +14,15 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## 4.5.7 — 13.11.2026
+
+- **Klassenarbeit:** ein Klick auf die Note wechselt zwischen NB (nicht bewertet) und der Note; der UB-Knopf am Namen entfällt, überall heißt es jetzt NB. Die Auswahl der Arbeiten ist nach Datum sortiert, die älteste oben.
+- **Notenbuch:** ein Kind, das in der Arbeit auf NB steht, zeigt dort NB statt einer fehlenden Note; Klassenarbeits-Noten tragen keinen Kommentar „Klassenarbeit“ mehr.
+- **Verteilung:** Notenbuch, Klassenarbeit und CardVote zeigen dasselbe Feld — Balken oder Boxplot, Noten oder Teilnoten, % oder Note, immer gleich hoch; beim Boxplot steht die gute Seite links.
+- **Reihen:** vorhandene Stunden eines Kurses lassen sich mit Häkchen auswählen und als neue Reihe speichern oder an eine bestehende Reihe anhängen; im Kalender steht „In einen Kurs spielen“ im ⋯-Menü. Die Liste ist nach Fach, Stufe und Reihe gegliedert.
+- **Startseite:** „Schwache Lernende“ erscheint nur, wenn die Frühwarnung jemanden meldet.
+- **Kurs:** der Knopf „Lernstand“ ist wieder entfernt.
+
 ## 4.5.6 — 13.11.2026
 
 - **Notenbuch:** die Kommentar-Ecke oben rechts ist dunkel und auch auf gelb oder rot markierten Zellen zu sehen; die Zellen von LE-Kindern in Klassenarbeits-Spalten sind schraffiert markiert.
