@@ -216,3 +216,17 @@ async def test_qr_nur_fuer_links():
         with pytest.raises(H) as f:
             await Q.qr_bild(schlecht, user=u)
         assert f.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_einzelner_eintrag_ohne_kurs_in_reihe(s):
+    u = await _konto(s)
+    k, c = await _kurs_mit_plan(s, u)
+    from app.zeit import tagesbeginn
+    e = CalendarEntry(owner_id=u.id, date=tagesbeginn(_naechster_montag()), title="Einzeln", class_id=c.id, kurs_id=k.id, period=1)
+    s.add(e)
+    await s.commit()
+    neu = await R.aus_kalender(R.AusKalenderIn(eintrag_ids=[e.id]), user=u, db=s)
+    assert [x.titel for x in neu.stunden] == ["Einzeln"] and neu.fach == "Mathematik"
+    mehr = await R.aus_kalender_anhaengen(neu.id, R.AusKalenderIn(eintrag_ids=[e.id]), user=u, db=s)
+    assert len(mehr.stunden) == 2

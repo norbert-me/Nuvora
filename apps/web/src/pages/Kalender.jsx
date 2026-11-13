@@ -31,6 +31,7 @@ import { addDays, hmToMin, minToHm, isoDay, isoWeek, mondayOf, parseYmd, startOf
 import { stundenZeit, stundenListe, slotGiltAm, PAUSE_BASIS, stundenRang, stundeLabel } from "../core/stunden";
 import { useAktiv, useZielFilter } from "../core/modules.js";
 import ReiheEinfuegen from "../components/ReiheEinfuegen.jsx";
+import ZuReihe from "../components/ZuReihe.jsx";
 import { TextMitTabellen, TextMitTabellenFeld } from "../components/TextMitTabellen.jsx";
 import AutoTextarea from "../components/AutoTextarea.jsx";
 
@@ -2458,6 +2459,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onRau
 }
 
 function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, topicName = () => "", kursName = () => "", onSave, onDelete, onClose, t }) {
+  const [zuReihe, setZuReihe] = useState(false);
   const [title, setTitle] = useState(entry.title || "");
   const [notes, setNotes] = useState(entry.notes || "");
   const [verlauf, setVerlauf] = useState(Array.isArray(entry.verlaufsplan) ? entry.verlaufsplan : []);
@@ -2846,8 +2848,10 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], 
             <div style={{ display: "flex", gap: 8, marginTop: 24, alignItems: "center" }}>
               <button onClick={() => setEdit(true)} style={btnPrimary}>{t("common.edit")}</button>
               <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
-              {entry.id && <button onClick={() => onDelete(entry.id, entry)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
+              {entry.id && aktiv.reihen && <button onClick={() => setZuReihe(true)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("reihen.inReihe")} aria-label={t("reihen.inReihe")}><Icon d={ICONS.plus} size={18} /></button>}
+              {entry.id && <button onClick={() => onDelete(entry.id, entry)} className="icon-btn" style={{ ...iconBtn, marginLeft: entry.id && aktiv.reihen ? 0 : "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
             </div>
+            {zuReihe && <ZuReihe eintragId={entry.id} onClose={() => setZuReihe(false)} />}
           </div>
         )}
         {edit && (<>
@@ -3080,8 +3084,10 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], 
 
         </>)}
         <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, end_date: mehrtaegig ? (() => { const [y, m, d] = endVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : null, title, notes, start_time: mehrtaegig ? "" : (startTime || ""), end_time: mehrtaegig ? "" : (endTime || ""), location: ort, rrule: rruleBauen(), exdate: Array.isArray(entry.exdate) ? entry.exdate : [], verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, topic_ids: topicId ? weitereThemen.filter((x) => x !== Number(topicId)) : [], method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, karten_deck_ids: deckId ? weitereDecks.filter((x) => x !== Number(deckId)) : [], lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>
-          {entry.id && <button onClick={() => onDelete(entry.id, entry)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
+          {entry.id && aktiv.reihen && <button onClick={() => setZuReihe(true)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("reihen.inReihe")} aria-label={t("reihen.inReihe")}><Icon d={ICONS.plus} size={18} /></button>}
+          {entry.id && <button onClick={() => onDelete(entry.id, entry)} className="icon-btn" style={{ ...iconBtn, marginLeft: entry.id && aktiv.reihen ? 0 : "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         </DialogFuss>
+        {zuReihe && <ZuReihe eintragId={entry.id} onClose={() => setZuReihe(false)} />}
         </>)}
         </div>
     </Modal>

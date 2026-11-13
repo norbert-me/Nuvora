@@ -375,7 +375,7 @@ async def reihenfolge(reihe_id: int, body: ReihenfolgeIn, user: User = Depends(r
 
 class AusKalenderIn(BaseModel):
     name: str = Field("", max_length=200)
-    kurs_id: int
+    kurs_id: Optional[int] = None
     von: Optional[date] = None
     bis: Optional[date] = None
     eintrag_ids: Optional[List[int]] = None   # Auswahl; leer = alle im Zeitraum
@@ -399,9 +399,16 @@ async def _kandidaten(db: AsyncSession, user: User, kurs: Kurs, von=None, bis=No
     """Die Kalender-Eintraege eines Kurses, die als Stunde einer Reihe taugen. Ohne Auswahl nur die
     mit Inhalt (ohne Inhalt ist ein Eintrag nur ein Platz im Plan); in der AUSWAHL stehen alle
     Eintraege des Kurses — was dazugehoert, entscheidet die Lehrkraft mit dem Haken."""
-    q = select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.kurs_id == kurs.id)
-    if ids is None:
-        q = q.where(CalendarEntry.period.is_not(None))
+    if ids is not None:
+        # Ausdruecklich gewaehlte Eintraege: der Besitz genuegt, der Kurs muss nicht passen.
+        q = select(CalendarEntry).where(CalendarEntry.owner_id == user.id)
+    else:
+        # Eintraege des Kurses — auch solche, die nur an der Klasse des Kurses haengen.
+        klassen = (await db.execute(select(KursTag.class_id).where(KursTag.kurs_id == kurs.id))).scalars().all()
+        passt = CalendarEntry.kurs_id == kurs.id
+        if klassen:
+            passt = passt | ((CalendarEntry.kurs_id.is_(None)) & CalendarEntry.class_id.in_(klassen))
+        q = select(CalendarEntry).where(CalendarEntry.owner_id == user.id, passt, CalendarEntry.period.is_not(None))
     if von:
         q = q.where(CalendarEntry.date >= datetime.combine(von, datetime.min.time()))
     if bis:
@@ -461,13 +468,20 @@ async def aus_kalender(body: AusKalenderIn, user: User = Depends(require_module)
     ausgewaehlten `eintrag_ids`)."""
     await _kalender_pflicht(db, user)
     rate_limit("reihen_neu", f"u{user.id}", 60, 3600, "Zu viele neue Reihen.")
-    kurs = await _eigener_kurs(db, user, body.kurs_id)
+    kurs = await _eigener_kurs(db, user, body.kurs_id) if body.kurs_id else None
+    if kurs is None and not body.eintrag_ids:
+        raise HTTPException(400, "Kurs oder Auswahl fehlt")
     eintraege = await _kandidaten(db, user, kurs, body.von, body.bis, body.eintrag_ids)
     if not eintraege:
         raise HTTPException(404, "In diesem Zeitraum gibt es keine geplanten Stunden mit Inhalt")
     eintraege = eintraege[:MAX_STUNDEN * 2]
-    r = Reihe(owner_id=user.id, name=(body.name or "").strip() or f"Reihe aus {kurs.name}"[:200], fach=kurs.fach or "",
-              jahrgang=kurs.jahrgang or "", quelle=f"{kurs.name}"[:200])
+    if kurs is None and eintraege[0].kurs_id:
+        kurs = await db.get(Kurs, eintraege[0].kurs_id)
+        if kurs is not None and kurs.owner_id != user.id:
+            kurs = None
+    r = Reihe(owner_id=user.id, name=(body.name or "").strip() or (f"Reihe aus {kurs.name}"[:200] if kurs else "Neue Reihe"),
+              fach=(kurs.fach if kurs else "") or "", jahrgang=(kurs.jahrgang if kurs else "") or "",
+              quelle=(kurs.name if kurs else "")[:200])
     db.add(r)
     await db.flush()
     await _stunden_anhaengen(db, user, r, eintraege, 0)
@@ -483,7 +497,9 @@ async def aus_kalender_anhaengen(reihe_id: int, body: AusKalenderIn, user: User 
     await _kalender_pflicht(db, user)
     rate_limit("reihen_neu", f"u{user.id}", 120, 3600, "Zu viele Änderungen an Reihen.")
     r = await _eigene_reihe(db, user, reihe_id)
-    kurs = await _eigener_kurs(db, user, body.kurs_id)
+    kurs = await _eigener_kurs(db, user, body.kurs_id) if body.kurs_id else None
+    if kurs is None and not body.eintrag_ids:
+        raise HTTPException(400, "Kurs oder Auswahl fehlt")
     eintraege = await _kandidaten(db, user, kurs, body.von, body.bis, body.eintrag_ids)
     if not eintraege:
         raise HTTPException(404, "In diesem Zeitraum gibt es keine geplanten Stunden mit Inhalt")
