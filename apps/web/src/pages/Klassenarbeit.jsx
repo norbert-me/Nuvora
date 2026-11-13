@@ -1719,8 +1719,8 @@ export default function Klassenarbeit() {
                     // die Klassenstatistik unten rechnet sie raus. Anzeige umschaltbar:
                     // Tendenznote (2+) oder Notenwert in 0,3-Schritten (2,3).
                     const gd = (erfasst && tm) ? gradeDetailed(wt.pct, effScale) : null;
-                    // LE (Foerderschwerpunkt Lernen): nicht bewertet — „UB“ statt Note.
-                    const note = (leIst(s) || istUb(s.id)) ? "UB" : gd ? (gradeMode === "wert" ? komma(gd.wert) : gd.note) : "";
+                    // LE (Foerderschwerpunkt Lernen): nicht bewertet — „NB“ statt Note.
+                    const note = (leIst(s) || istUb(s.id)) ? "NB" : gd ? (gradeMode === "wert" ? komma(gd.wert) : gd.note) : "";
                     return (
                       <tr key={s.id} style={{ ...(abw ? { opacity: 0.5 } : {}), ...(fokus && fokus.sid === s.id ? { background: FOKUS_TON } : {}) }}>
                         <td style={{ ...td, ...klebtLinks, textAlign: "left", padding: "4px 8px", fontWeight: 500, whiteSpace: "nowrap",
@@ -1734,11 +1734,6 @@ export default function Klassenarbeit() {
                               aria-label={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")} aria-pressed={abw}
                               style={{ border: "none", background: "none", cursor: "pointer", color: abw ? C.warning : "var(--text3)", padding: 0, display: "inline-flex",
                                 alignItems: "center", justifyContent: "center", minWidth: 32, minHeight: 32, margin: "-4px 0 -4px -8px" }}><Icon d={abw ? ICONS.eyeOff : ICONS.eye} size={15} /></button>
-                            {/* UB: in dieser Arbeit keine Note fuer dieses Kind (LE gilt immer). */}
-                            <button onClick={() => toggleUb(s.id)} title={t("klassenarbeit.ubHint")} aria-label={t("klassenarbeit.ubHint")} aria-pressed={istUb(s.id)}
-                              disabled={leIst(s)}
-                              style={{ border: "1px solid var(--border2)", borderRadius: "6px", cursor: leIst(s) ? "default" : "pointer", fontSize: 11, fontWeight: 700, padding: "1px 5px",
-                                background: istUb(s.id) || leIst(s) ? "var(--bg3)" : "none", color: istUb(s.id) || leIst(s) ? "var(--text)" : "var(--text3)" }}>UB</button>
                             {s.name}
                           </span>
                         </td>
@@ -1798,7 +1793,12 @@ export default function Klassenarbeit() {
                         })}
                         <td title={erfasst && wt.bonusPct > 0 ? t("klassenarbeit.eBonus", { p: kommaRund(wt.bonusPct, 1) }) : undefined}
                           style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: !erfasst ? "var(--text3)" : abw ? "var(--text3)" : (tm && wt.pct < 50 ? C.danger : "var(--text)") }}>{erfasst ? `${kommaRund(sum, 2)}/${komma(tm)}` : `–/${komma(tm)}`}</td>
-                        <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{note}</td>
+                        <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>
+                          {/* Klick auf die Note: zwischen NB (nicht bewertet) und der Note wechseln. LE ist immer NB. */}
+                          <button onClick={() => toggleUb(s.id)} disabled={leIst(s)} aria-pressed={istUb(s.id)}
+                            title={t("klassenarbeit.ubHint")} aria-label={t("klassenarbeit.ubHint")}
+                            style={{ border: "none", background: "none", font: "inherit", color: "inherit", cursor: leIst(s) ? "default" : "pointer", minWidth: 32, minHeight: 32, padding: 0 }}>{note || "·"}</button>
+                        </td>
                       </tr>
                     );
                   })}

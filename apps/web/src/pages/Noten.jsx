@@ -393,16 +393,16 @@ export default function Noten() {
   // eine unlesbare Eingabe fasst nichts an.
   const noteSetzen = (studentId, catId, text) => {
     setZelle(null);
-    // „UB" in die Zelle: dieses Kind wird in dieser Spalte nicht benotet. Gespeichert wird
+    // „NB" in die Zelle: dieses Kind wird in dieser Spalte nicht benotet. Gespeichert wird
     // es als Kommentar „UB" ohne Note — es zaehlt in keinen Schnitt und gilt nicht als fehlend.
-    if (String(text).trim().toUpperCase() === "UB") {
-      entwurf.setz({ [`n:${studentId}:${catId}`]: null, [`k:${studentId}:${catId}`]: "UB" });
+    if (["UB", "NB"].includes(String(text).trim().toUpperCase())) {
+      entwurf.setz({ [`n:${studentId}:${catId}`]: null, [`k:${studentId}:${catId}`]: "NB" });
       return;
     }
     const wert = parseNote(text);
     if (wert === null && String(text).trim() !== "") return;
     // Eine Note ersetzt ein „UB" an derselben Zelle.
-    entwurf.setz({ [`n:${studentId}:${catId}`]: wert, ...(wert != null && kommentarVon(studentId, catId) === "UB" ? { [`k:${studentId}:${catId}`]: "" } : {}) });
+    entwurf.setz({ [`n:${studentId}:${catId}`]: wert, ...(wert != null && ["UB", "NB"].includes(kommentarVon(studentId, catId)) ? { [`k:${studentId}:${catId}`]: "" } : {}) });
   };
 
   // Kommentar an einer Zelle: „Formel vergessen", „krank, nachgeschrieben".
@@ -527,7 +527,7 @@ export default function Noten() {
   const spaltenMitNoten = new Set(summary ? summary.flatMap((r) => Object.keys(r.per_category || {})).map(Number) : []);
   // Freiwillige Spalten (Raketenaufgaben, c.optional) zaehlen nie als fehlend.
   const noteFehltIn = (sid, c) => {
-    // LE-Kinder werden in Klassenarbeiten nicht benotet („UB") — das ist keine Luecke.
+    // LE-Kinder werden in Klassenarbeiten nicht benotet („NB") — das ist keine Luecke.
     if (c.source_work_id && (summary || []).find((r) => r.student_id === sid)?.le) return false;
     if (c.optional || !spaltenMitNoten.has(c.id) || noteVon(sid, c.id) != null || kommentarVon(sid, c.id)) return false;
     const stat = statusVon(sid, c);
@@ -970,9 +970,9 @@ export default function Noten() {
                                       window.addEventListener("pointermove", aus);
                                     }}
                                     style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 14, fontWeight: wert != null ? 600 : 400 }}>
-                                    {wert != null ? de(wert) : (kommentarVon(s.student_id, c.id) === "UB" || (s.le && c.source_work_id)
+                                    {wert != null ? de(wert) : (["UB", "NB"].includes(kommentarVon(s.student_id, c.id)) || (s.le && c.source_work_id)
                                       // LE-Kind in einer Klassenarbeits-Spalte: nicht benotet, nicht „leer".
-                                      ? <span title={t("kurse.leHint")} style={{ color: "var(--text3)", fontSize: 12, fontWeight: 700 }}>UB</span>
+                                      ? <span title={t("kurse.leHint")} style={{ color: "var(--text3)", fontSize: 12, fontWeight: 700 }}>NB</span>
                                       : <span style={{ color: "var(--border2)" }}>·</span>)}
                                   </button>
                                   {/* Ecke oben rechts. Die Trefferflaeche ist 20 px
