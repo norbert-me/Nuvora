@@ -63,6 +63,25 @@ function Liste() {
     laden();
   };
 
+  // Einordnen: erst nach Fach, darin nach Stufe, darin nach Name der Reihe. Ohne Fach/Stufe ans Ende.
+  const gruppen = useMemo(() => {
+    const vgl = (a, b) => (a && !b ? -1 : !a && b ? 1 : String(a).localeCompare(String(b), undefined, { numeric: true }));
+    const nachFach = new Map();
+    for (const r of liste || []) {
+      const f = (r.fach || "").trim(), j = (r.jahrgang || "").trim();
+      if (!nachFach.has(f)) nachFach.set(f, new Map());
+      const m = nachFach.get(f);
+      if (!m.has(j)) m.set(j, []);
+      m.get(j).push(r);
+    }
+    return [...nachFach.keys()].sort(vgl).map((f) => ({
+      fach: f,
+      stufen: [...nachFach.get(f).keys()].sort(vgl).map((j) => ({
+        stufe: j, reihen: nachFach.get(f).get(j).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+      })),
+    }));
+  }, [liste]);
+
   return (
     <div>
       <Werkzeugleiste
@@ -77,12 +96,17 @@ function Liste() {
           <button onClick={neu} style={btnPrimary}>{t("reihen.neu")}</button>
         </div>
       )}
-      {(liste || []).map((r) => (
+      {gruppen.map((fg) => (
+        <div key={fg.fach} style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, margin: "8px 0" }}>{fg.fach || t("reihen.ohneFach")}</div>
+          {fg.stufen.map((sg) => (
+            <div key={sg.stufe} style={{ marginBottom: 8 }}>
+              <div style={{ ...sectionLabel, margin: "4px 0 6px" }}>{sg.stufe ? t("reihen.stufeN", { n: sg.stufe }) : t("reihen.ohneStufe")}</div>
+              {sg.reihen.map((r) => (
         <div key={r.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
           <Link to={`/reihen?reihe=${r.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "var(--text)" }}>
             <div style={{ fontWeight: 700, fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4, alignItems: "center" }}>
-              {r.fach && <span style={badge(C.info)}>{r.fach}{r.jahrgang ? ` ${r.jahrgang}` : ""}</span>}
               <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("reihen.zahlen", { n: r.stunden_anzahl, m: r.unterrichtsstunden })}</span>
               {r.quelle && <span style={{ fontSize: 12, color: "var(--text3)" }}>· {t("reihen.ausKurs", { name: r.quelle })}</span>}
               {r.naechstes_mal && <span style={badge(C.warning)} title={r.naechstes_mal}>{t("reihen.notizDa")}</span>}
@@ -90,6 +114,10 @@ function Liste() {
           </Link>
           <button onClick={() => kopieren(r)} className="icon-btn" style={iconBtn} title={t("reihen.kopie")} aria-label={t("reihen.kopie")}><Icon d={ICONS.duplicate} size={18} /></button>
           <button onClick={() => loeschen(r)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
+        </div>
+              ))}
+            </div>
+          ))}
         </div>
       ))}
       {aus && <AusKalender onClose={() => setAus(false)} onFertig={(id) => navigate(`/reihen?reihe=${id}`)} />}
