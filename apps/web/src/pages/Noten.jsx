@@ -403,7 +403,7 @@ export default function Noten() {
     const wert = parseNote(text);
     if (wert === null && String(text).trim() !== "") return;
     // Eine Note ersetzt ein „UB" an derselben Zelle.
-    entwurf.setz({ [`n:${studentId}:${catId}`]: wert, ...(wert != null && ["UB", "NB"].includes(kommentarVon(studentId, catId)) ? { [`k:${studentId}:${catId}`]: "" } : {}) });
+    entwurf.setz({ [`n:${studentId}:${catId}`]: wert, ...(wert != null && istNb(studentId, catId) ? { [`k:${studentId}:${catId}`]: "" } : {}) });
   };
 
   // Kommentar an einer Zelle: „Formel vergessen", „krank, nachgeschrieben".
@@ -411,7 +411,11 @@ export default function Noten() {
   // daneben. (Das frühere Modul „Beobachtungen" lag neben dem Notenbuch; jetzt
   // haengt die Bemerkung an der Zelle, zu der sie gehoert.)
   const [kommentarFuer, setKommentarFuer] = useState(null);   // {sid, cid, text}
-  const kommentarSetzen = (sid, cid, text) => { setKommentarFuer(null); entwurf.setz({ [`k:${sid}:${cid}`]: text.trim() }); };
+  const kommentarSetzen = (sid, cid, text) => {
+    setKommentarFuer(null);
+    if (istNb(sid, cid) && !text.trim()) return;   // leerer Kommentar laesst den NB-Vermerk stehen
+    entwurf.setz({ [`k:${sid}:${cid}`]: text.trim() });
+  };
 
   // ── EIN Entwurf für die ganze Tabelle ──
   //
@@ -515,7 +519,11 @@ export default function Noten() {
   const catsVon = (sec) => mitNeuen(entwurf.wert[`oc:${sec.id}`], (sec.categories || []).map((c) => c.id))
     .map((id) => (sec.categories || []).find((c) => c.id === id)).filter(Boolean);
   const noteVon = (sid, cid) => entwurf.wert[`n:${sid}:${cid}`] ?? null;
-  const kommentarVon = (sid, cid) => entwurf.wert[`k:${sid}:${cid}`] || "";
+  // „NB" (nicht bewertet) liegt als Vermerk an der Zelle, ist aber KEIN Kommentar: der Dialog zeigt
+  // ihn nicht, die Ecke sieht ihn nicht, und er zaehlt nicht als „Kommentar da".
+  const rohKommentar = (sid, cid) => entwurf.wert[`k:${sid}:${cid}`] || "";
+  const istNb = (sid, cid) => ["UB", "NB"].includes(rohKommentar(sid, cid));
+  const kommentarVon = (sid, cid) => (istNb(sid, cid) ? "" : rohKommentar(sid, cid));
   const secNoteVon = (s, secId) => (entwurf.wert[`so:${s.student_id}:${secId}`] ?? (s.section_effective?.[String(secId)] ?? null));
   const istSecOverride = (s, secId) => entwurf.wert[`so:${s.student_id}:${secId}`] != null;
   const endNoteVon = (s) => (s.le ? null : (entwurf.wert[`to:${s.student_id}`] ?? s.weighted));
@@ -530,7 +538,7 @@ export default function Noten() {
   const noteFehltIn = (sid, c) => {
     // LE-Kinder werden in Klassenarbeiten nicht benotet („NB") — das ist keine Luecke.
     if (c.source_work_id && (summary || []).find((r) => r.student_id === sid)?.le) return false;
-    if (c.optional || !spaltenMitNoten.has(c.id) || noteVon(sid, c.id) != null || kommentarVon(sid, c.id)) return false;
+    if (c.optional || !spaltenMitNoten.has(c.id) || noteVon(sid, c.id) != null || rohKommentar(sid, c.id)) return false;
     const stat = statusVon(sid, c);
     return stat !== "fehlt" && stat !== "entsch";
   };
@@ -971,7 +979,7 @@ export default function Noten() {
                                       window.addEventListener("pointermove", aus);
                                     }}
                                     style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 14, fontWeight: wert != null ? 600 : 400 }}>
-                                    {wert != null ? de(wert) : (["UB", "NB"].includes(kommentarVon(s.student_id, c.id)) || (s.le && c.source_work_id)
+                                    {wert != null ? de(wert) : (istNb(s.student_id, c.id) || (s.le && c.source_work_id)
                                       // LE-Kind in einer Klassenarbeits-Spalte: nicht benotet, nicht „leer".
                                       ? <span title={t("kurse.leHint")} style={{ color: "var(--text3)", fontSize: 12, fontWeight: 700 }}>NB</span>
                                       : <span style={{ color: "var(--border2)" }}>·</span>)}
