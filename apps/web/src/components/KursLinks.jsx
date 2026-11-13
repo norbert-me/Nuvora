@@ -114,7 +114,7 @@ export default function KursLinks({ kurs }) {
       </div>
       {lernstand && (
         <Modal title={t("kursLinks.lernstand")} onClose={() => setLernstand(false)}>
-          <FruehwarnPanel classId={classId} titel={false} />
+          <FruehwarnPanel classId={classId} titel={false} alleKinder />
         </Modal>
       )}
     </div>
