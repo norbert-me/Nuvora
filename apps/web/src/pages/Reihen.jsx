@@ -24,6 +24,7 @@ import { alsJson, hol } from "../core/melden.js";
 import { askConfirm } from "../core/dialog.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import { useAktiv } from "../core/modules.js";
+import InKurs from "../components/ReiheEinfuegen.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api/reihen";
@@ -96,39 +97,68 @@ function Liste() {
   );
 }
 
-function AusKalender({ onClose, onFertig }) {
+// Vorhandene Stunden eines Kurses als Reihe uebernehmen: Kurs waehlen, die Stunden stehen mit
+// Haken da (alle angehakt), abwaehlen was nicht dazugehoert, uebernehmen. Mit `reiheId` werden
+// sie an diese Reihe gehaengt, sonst entsteht eine neue.
+function AusKalender({ onClose, onFertig, reiheId = null }) {
   const { t } = useLanguage();
   const [kurse, setKurse] = useState([]);
   const [kursId, setKursId] = useState("");
   const [name, setName] = useState("");
   const [von, setVon] = useState("");
   const [bis, setBis] = useState("");
+  const [liste, setListe] = useState(null);
+  const [gewaehlt, setGewaehlt] = useState([]);
   const [fehler, setFehler] = useState("");
   useEffect(() => { hol("/api/kurse").then((d) => setKurse(Array.isArray(d) ? d : [])); }, []);
+  useEffect(() => {
+    setListe(null);
+    if (!kursId) return;
+    let weg = false;
+    hol(`${API}/kalender-stunden?kurs_id=${kursId}${von ? `&von=${von}` : ""}${bis ? `&bis=${bis}` : ""}`, null)
+      .then((d) => { if (weg) return; const l = Array.isArray(d) ? d : []; setListe(l); setGewaehlt(l.map((x) => x.id)); });
+    return () => { weg = true; };
+  }, [kursId, von, bis]);
+  const tag = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "2-digit" });
+  const umschalten = (id) => setGewaehlt((g) => (g.includes(id) ? g.filter((x) => x !== id) : [...g, id]));
   const speichern = async () => {
     setFehler("");
-    const res = await fetch(`${API}/aus-kalender`, alsJson("POST", { kurs_id: Number(kursId), name, von: von || null, bis: bis || null })).catch(() => null);
+    const rumpf = { kurs_id: Number(kursId), name, von: von || null, bis: bis || null, eintrag_ids: gewaehlt };
+    const res = await fetch(reiheId ? `${API}/${reiheId}/aus-kalender` : `${API}/aus-kalender`, alsJson("POST", rumpf)).catch(() => null);
     if (res && res.ok) { const d = await res.json(); onFertig(d.id); return; }
     const b = res ? await res.json().catch(() => ({})) : {};
     setFehler(typeof b.detail === "string" ? b.detail : t("common.notWork"));
   };
   return (
-    <Modal onClose={onClose} width={460} title={t("reihen.ausKalender")}>
+    <Modal onClose={onClose} width={480} title={reiheId ? t("reihen.stundenAnhaengen") : t("reihen.ausKalender")}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <select value={kursId} onChange={(e) => setKursId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
           <option value="">{t("reihen.kursWaehlen")}</option>
           {kurse.map((k) => <option key={k.id} value={k.id}>{k.fach ? `${k.fach} · ` : ""}{k.name}</option>)}
         </select>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("reihen.nameOptional")} style={{ ...inputStyle, width: "100%" }} />
+        {!reiheId && <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("reihen.nameOptional")} style={{ ...inputStyle, width: "100%" }} />}
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <span style={{ fontSize: 13, color: "var(--text2)" }}>{t("reihen.zeitraum")}</span>
           <input type="date" value={von} onChange={(e) => setVon(e.target.value)} style={inputStyle} />
           <span>–</span>
           <input type="date" value={bis} onChange={(e) => setBis(e.target.value)} style={inputStyle} />
         </div>
+        {liste && liste.length > 0 && (
+          <div style={{ maxHeight: 280, overflowY: "auto", border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: 8, fontSize: 13 }}>
+            {liste.map((x) => (
+              <label key={x.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0", cursor: "pointer" }}>
+                <input type="checkbox" checked={gewaehlt.includes(x.id)} onChange={() => umschalten(x.id)} />
+                <span style={{ color: "var(--text3)", whiteSpace: "nowrap" }}>{tag(x.date)} {x.period}.</span>
+                <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.title || t("reihen.stundeOhneTitel")}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        {liste && liste.length === 0 && <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("reihen.keineStunden")}</p>}
         {fehler && <div style={{ color: C.danger, fontSize: 13 }}>{fehler}</div>}
       </div>
-      <DialogFuss onAbbrechen={onClose} onSpeichern={speichern} aus={!kursId} speichern={t("reihen.speichernAls")} />
+      <DialogFuss onAbbrechen={onClose} onSpeichern={speichern} aus={!kursId || gewaehlt.length === 0}
+        speichern={reiheId ? t("reihen.anhaengen") : t("reihen.speichernAls")} />
     </Modal>
   );
 }
@@ -152,6 +182,7 @@ function Editor({ id }) {
   const [detail, setDetail] = useState(null);
   const [fehler, setFehler] = useState("");
   const [spielen, setSpielen] = useState(false);
+  const [anhaengen, setAnhaengen] = useState(false);
   const topics = useThemen();
   const themen = useMemo(() => themenIndex(topics), [topics]);
   const neueId = useRef(-1);
@@ -236,7 +267,10 @@ function Editor({ id }) {
     <div>
       <Werkzeugleiste
         links={<Link to="/reihen" style={{ color: "var(--accent)", textDecoration: "none", fontSize: 14 }}>← {t("reihen.title")}</Link>}
-        mehr={aktiv("kalender") ? [{ key: "spielen", label: t("reihen.inKurs"), icon: ICONS.calendar || ICONS.plus, onClick: () => setSpielen(true), disabled: e.geaendert, title: e.geaendert ? t("reihen.erstSpeichern") : undefined }] : []}>
+        mehr={aktiv("kalender") ? [
+          { key: "spielen", label: t("reihen.inKurs"), icon: ICONS.calendar || ICONS.plus, onClick: () => setSpielen(true), disabled: e.geaendert, title: e.geaendert ? t("reihen.erstSpeichern") : undefined },
+          { key: "anhaengen", label: t("reihen.stundenAnhaengen"), icon: ICONS.import || ICONS.plus, onClick: () => setAnhaengen(true), disabled: e.geaendert, title: e.geaendert ? t("reihen.erstSpeichern") : undefined },
+        ] : []}>
       </Werkzeugleiste>
 
       <div style={{ ...panelStyle, padding: 16, marginBottom: 16 }}>
@@ -263,6 +297,7 @@ function Editor({ id }) {
 
       <SpeicherBalken entwurf={e} />
       {spielen && <InKurs reihe={detail} onClose={() => setSpielen(false)} />}
+      {anhaengen && <AusKalender reiheId={id} onClose={() => setAnhaengen(false)} onFertig={() => { setAnhaengen(false); laden(); }} />}
     </div>
   );
 }
@@ -363,73 +398,5 @@ function StundeKarte({ s, i, n, t, set, weg, schieben, themen, topics, quizze, d
         </div>
       )}
     </div>
-  );
-}
-
-// ─── In einen Kurs spielen ───────────────────────────────────────────────
-
-function InKurs({ reihe, onClose }) {
-  const { t } = useLanguage();
-  const [kurse, setKurse] = useState([]);
-  const [kursId, setKursId] = useState("");
-  const [ab, setAb] = useState(ymd(new Date()));
-  const [vor, setVor] = useState(null);
-  const [fehler, setFehler] = useState("");
-  const [fertig, setFertig] = useState(null);
-  useEffect(() => { hol("/api/kurse").then((d) => setKurse(Array.isArray(d) ? d : [])); }, []);
-  useEffect(() => {
-    setVor(null);
-    if (!kursId || !ab) return;
-    let abbruch = false;
-    hol(`${API}/${reihe.id}/vorschau?kurs_id=${kursId}&ab=${ab}`, null).then((d) => { if (!abbruch) setVor(Array.isArray(d) ? d : null); });
-    return () => { abbruch = true; };
-  }, [kursId, ab, reihe.id]);
-  const tag = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "2-digit" });
-  const anlegen = async () => {
-    setFehler("");
-    const res = await fetch(`${API}/${reihe.id}/ausspielen`, alsJson("POST", { kurs_id: Number(kursId), ab })).catch(() => null);
-    if (res && res.ok) { setFertig(await res.json()); return; }
-    const b = res ? await res.json().catch(() => ({})) : {};
-    setFehler(typeof b.detail === "string" ? b.detail : t("common.notWork"));
-  };
-  if (fertig) {
-    return (
-      <Modal onClose={onClose} width={440} title={t("reihen.inKurs")}>
-        <p style={{ fontSize: 14 }}>{t("reihen.angelegt", { n: fertig.angelegt })}</p>
-        {fertig.nicht_platziert.length > 0 && <p style={{ color: C.warning, fontSize: 13 }}>{t("reihen.nichtPlatziert", { n: fertig.nicht_platziert.length })}</p>}
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <Link to="/kalender" style={{ ...btnPrimary, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>{t("reihen.zumKalender")}</Link>
-          <button onClick={onClose} style={btnSecondary}>{t("noten.close")}</button>
-        </div>
-      </Modal>
-    );
-  }
-  return (
-    <Modal onClose={onClose} width={520} title={t("reihen.inKurs")}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <select value={kursId} onChange={(e) => setKursId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
-          <option value="">{t("reihen.kursWaehlen")}</option>
-          {kurse.map((k) => <option key={k.id} value={k.id}>{k.fach ? `${k.fach} · ` : ""}{k.name}</option>)}
-        </select>
-        <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--text2)" }}>
-          {t("reihen.ab")} <input type="date" value={ab} onChange={(e) => setAb(e.target.value)} style={inputStyle} />
-        </label>
-        {vor && (
-          <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: 8, fontSize: 13 }}>
-            {vor.map((v) => (
-              <div key={v.stunde_id} style={{ display: "flex", gap: 8, padding: "3px 0" }}>
-                <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.titel || t("reihen.stundeOhneTitel")}</span>
-                <span style={{ color: v.platziert ? "var(--text2)" : C.warning, whiteSpace: "nowrap" }}>
-                  {v.platziert ? v.termine.map((x) => `${tag(x.date)} ${x.period}.`).join(", ") : t("reihen.keinPlatz")}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-        {kursId && vor && vor.length === 0 && <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("reihen.keinePlaetze")}</p>}
-        {fehler && <div style={{ color: C.danger, fontSize: 13 }}>{fehler}</div>}
-      </div>
-      <DialogFuss onAbbrechen={onClose} onSpeichern={anlegen} aus={!kursId || !vor || vor.every((v) => !v.platziert)} speichern={t("reihen.anlegen")} />
-    </Modal>
   );
 }

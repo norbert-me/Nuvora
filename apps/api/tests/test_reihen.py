@@ -196,6 +196,14 @@ async def test_aus_kalender_speichert_gehaltene_stunden_als_reihe(s):
     assert d.fach == "Mathematik" and d.quelle == "7.5 Mathe"
     assert d.stunden[0].dateien == 1 and d.stunden[0].notizen == "AB 3"
 
+    # Auswahl: nur die gewaehlten Stunden — und an eine bestehende Reihe anhaengen.
+    liste = await R.kalender_stunden(kurs_id=k.id, user=u, db=s)
+    assert [x["title"] for x in liste] == ["Kuerzen", "Erweitern", "Erweitern"]
+    nur = await R.aus_kalender(R.AusKalenderIn(kurs_id=k.id, eintrag_ids=[e1.id]), user=u, db=s)
+    assert [x.titel for x in nur.stunden] == ["Kuerzen"]
+    mehr = await R.aus_kalender_anhaengen(nur.id, R.AusKalenderIn(kurs_id=k.id, eintrag_ids=[e2.id, e3.id]), user=u, db=s)
+    assert [(x.titel, x.dauer) for x in mehr.stunden] == [("Kuerzen", 1), ("Erweitern", 2)]
+
 
 @pytest.mark.asyncio
 async def test_qr_nur_fuer_links():

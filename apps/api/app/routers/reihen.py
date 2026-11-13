@@ -378,6 +378,7 @@ class AusKalenderIn(BaseModel):
     kurs_id: int
     von: Optional[date] = None
     bis: Optional[date] = None
+    eintrag_ids: Optional[List[int]] = None   # Auswahl; leer = alle im Zeitraum
 
 
 async def _kalender_pflicht(db: AsyncSession, user: User):
@@ -394,33 +395,38 @@ async def _klasse_des_kurses(db: AsyncSession, kurs_id: int) -> Optional[int]:
     return klassen[0] if len(klassen) == 1 else None
 
 
-@router.post("/aus-kalender", response_model=ReiheDetail, status_code=201)
-async def aus_kalender(body: AusKalenderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    """Die gehaltenen Stunden eines Kurses als neue Reihe speichern: in der
-    Reihenfolge des Kalenders, mit Thema, Ablauf, Notizen, Verweisen und den
-    angehängten Dateien. Zwei Einträge desselben Tages mit demselben Titel sind
-    EINE Doppelstunde."""
-    await _kalender_pflicht(db, user)
-    rate_limit("reihen_neu", f"u{user.id}", 60, 3600, "Zu viele neue Reihen.")
-    kurs = await _eigener_kurs(db, user, body.kurs_id)
+async def _kandidaten(db: AsyncSession, user: User, kurs: Kurs, von=None, bis=None, ids=None) -> list:
+    """Die Kalender-Eintraege eines Kurses, die als Stunde einer Reihe taugen:
+    mit Stunde und mit Inhalt (ohne Inhalt ist ein Eintrag nur ein Platz im Plan)."""
     q = select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.kurs_id == kurs.id,
                                     CalendarEntry.period.is_not(None))
-    if body.von:
-        q = q.where(CalendarEntry.date >= datetime.combine(body.von, datetime.min.time()))
-    if body.bis:
-        q = q.where(CalendarEntry.date < datetime.combine(body.bis + timedelta(days=1), datetime.min.time()))
+    if von:
+        q = q.where(CalendarEntry.date >= datetime.combine(von, datetime.min.time()))
+    if bis:
+        q = q.where(CalendarEntry.date < datetime.combine(bis + timedelta(days=1), datetime.min.time()))
+    if ids is not None:
+        q = q.where(CalendarEntry.id.in_(ids))
     eintraege = (await db.execute(q.order_by(CalendarEntry.date, CalendarEntry.period))).scalars().all()
-    # Ohne Inhalt ist ein Eintrag keine Stunde der Reihe, nur ein Platz im Plan.
-    eintraege = [e for e in eintraege if (e.title or e.topic_id or e.notes or e.verlaufsplan)]
-    if not eintraege:
-        raise HTTPException(404, "In diesem Zeitraum gibt es keine geplanten Stunden mit Inhalt")
-    eintraege = eintraege[:MAX_STUNDEN * 2]
-    r = Reihe(owner_id=user.id, name=(body.name or "").strip() or f"Reihe aus {kurs.name}"[:200], fach=kurs.fach or "",
-              jahrgang=kurs.jahrgang or "", quelle=f"{kurs.name}"[:200])
-    db.add(r)
-    await db.flush()
+    return [e for e in eintraege if (e.title or e.topic_id or e.notes or e.verlaufsplan)]
+
+
+@router.get("/kalender-stunden")
+async def kalender_stunden(kurs_id: int, von: Optional[date] = None, bis: Optional[date] = None,
+                           user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Zur Auswahl: welche vorhandenen Stunden eines Kurses lassen sich in eine Reihe uebernehmen?"""
+    await _kalender_pflicht(db, user)
+    kurs = await _eigener_kurs(db, user, kurs_id)
+    return [{"id": e.id, "date": _tag(e.date).isoformat(),
+             "period": e.period, "title": e.title or ""}
+            for e in (await _kandidaten(db, user, kurs, von, bis))[:MAX_STUNDEN * 2]]
+
+
+async def _stunden_anhaengen(db: AsyncSession, user: User, r: Reihe, eintraege: list, start: int) -> int:
+    """Eintraege als Stunden an die Reihe haengen: Reihenfolge des Kalenders, mit Thema, Ablauf,
+    Notizen, Verweisen und den angehaengten Dateien. Zwei Eintraege desselben Tages mit demselben
+    Titel sind EINE Doppelstunde."""
     letzte = None      # (Tag, Titel, ReiheStunde)
-    n = 0
+    n = start
     for e in eintraege:
         tag = _tag(e.date)
         titel = e.title or ""
@@ -442,6 +448,42 @@ async def aus_kalender(body: AusKalenderIn, user: User = Depends(require_module)
             await _datei_verlinken(db, user.id, m, reihe_stunde_id=st.id)
         letzte = (tag, titel, st)
         n += 1
+    return n - start
+
+
+@router.post("/aus-kalender", response_model=ReiheDetail, status_code=201)
+async def aus_kalender(body: AusKalenderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Die gehaltenen Stunden eines Kurses als neue Reihe speichern (alle im Zeitraum oder die
+    ausgewaehlten `eintrag_ids`)."""
+    await _kalender_pflicht(db, user)
+    rate_limit("reihen_neu", f"u{user.id}", 60, 3600, "Zu viele neue Reihen.")
+    kurs = await _eigener_kurs(db, user, body.kurs_id)
+    eintraege = await _kandidaten(db, user, kurs, body.von, body.bis, body.eintrag_ids)
+    if not eintraege:
+        raise HTTPException(404, "In diesem Zeitraum gibt es keine geplanten Stunden mit Inhalt")
+    eintraege = eintraege[:MAX_STUNDEN * 2]
+    r = Reihe(owner_id=user.id, name=(body.name or "").strip() or f"Reihe aus {kurs.name}"[:200], fach=kurs.fach or "",
+              jahrgang=kurs.jahrgang or "", quelle=f"{kurs.name}"[:200])
+    db.add(r)
+    await db.flush()
+    await _stunden_anhaengen(db, user, r, eintraege, 0)
+    await db.commit()
+    await db.refresh(r)
+    return await _detail(db, user, r)
+
+
+@router.post("/{reihe_id}/aus-kalender", response_model=ReiheDetail)
+async def aus_kalender_anhaengen(reihe_id: int, body: AusKalenderIn, user: User = Depends(require_module),
+                                 db: AsyncSession = Depends(get_db)):
+    """Vorhandene Stunden eines Kurses an eine bestehende Reihe haengen."""
+    await _kalender_pflicht(db, user)
+    rate_limit("reihen_neu", f"u{user.id}", 120, 3600, "Zu viele Änderungen an Reihen.")
+    r = await _eigene_reihe(db, user, reihe_id)
+    kurs = await _eigener_kurs(db, user, body.kurs_id)
+    eintraege = await _kandidaten(db, user, kurs, body.von, body.bis, body.eintrag_ids)
+    if not eintraege:
+        raise HTTPException(404, "In diesem Zeitraum gibt es keine geplanten Stunden mit Inhalt")
+    await _stunden_anhaengen(db, user, r, eintraege[:MAX_STUNDEN * 2], await _naechste_position(db, r.id))
     await db.commit()
     await db.refresh(r)
     return await _detail(db, user, r)

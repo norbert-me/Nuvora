@@ -29,7 +29,8 @@ import { feiertage } from "../data/feiertage.js";
 // dieselben Zeilen lagen in Zufall, Sitzplan, Anwesenheit und feiertage.js.
 import { addDays, hmToMin, minToHm, isoDay, isoWeek, mondayOf, parseYmd, startOfDay, wochentagMo0, ymd } from "../core/datum.js";
 import { stundenZeit, stundenListe, slotGiltAm, PAUSE_BASIS, stundenRang, stundeLabel } from "../core/stunden";
-import { useZielFilter } from "../core/modules.js";
+import { useAktiv, useZielFilter } from "../core/modules.js";
+import ReiheEinfuegen from "../components/ReiheEinfuegen.jsx";
 import { TextMitTabellen, TextMitTabellenFeld } from "../components/TextMitTabellen.jsx";
 import AutoTextarea from "../components/AutoTextarea.jsx";
 
@@ -275,6 +276,9 @@ export default function Kalender() {
   // hier ein zweites Mal einzutragen ist die Arbeit, die dieses Modul
   // abnehmen soll. Der Dialog schreibt nichts, bevor jemand bestaetigt.
   const [untisOffen, setUntisOffen] = useState(false);
+  const aktivM = useAktiv();
+  const reihenAn = aktivM("reihen");
+  const [reiheOffen, setReiheOffen] = useState(false);
   const [breaks, setBreaks] = useState([]); // unterrichtsfreie Zeitraeume (Ferien/Feiertage)
   const [examOverview, setExamOverview] = useState([]); // Klassenarbeiten-Übersicht (kommend + Reststunden)
   const loadExams = () => hol(`${API}/klassenarbeiten/uebersicht`).then((d) => setExamOverview(Array.isArray(d) ? d : []));
@@ -882,6 +886,8 @@ export default function Kalender() {
             // und Ferien — und die gehoeren an den Kalender, nicht an die
             // Vorlage. Am Stundenplan sah es aus, als ginge es nur um ihn.
             { key: "untis", label: t("untis.menu"), icon: ICONS.import, onClick: () => setUntisOffen(true) },
+            // Eine Reihe in den Kalender uebernehmen (nur mit dem Modul Reihen, Regel 3).
+            ...(reihenAn ? [{ key: "reihe", label: t("reihen.inKurs"), icon: ICONS.calendar, onClick: () => setReiheOffen(true) }] : []),
           ]}
         >
           <AddButton data-tour="kal-new" onClick={() => setEditing({ date: neuesDatum() })} title={t("kalender.newEntry")} />
@@ -1025,6 +1031,7 @@ export default function Kalender() {
       )}
       {view === "week" && <WeekView beginnMin={beginnMin} extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
       {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} onCancelSlot={cancelSlot} frei={frei} className={className} slotName={slotName} eintragName={eintragName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {reiheOffen && <ReiheEinfuegen onClose={() => { setReiheOffen(false); load(); }} />}
       {untisOffen && (
         <UntisImport onClose={() => setUntisOffen(false)} kurse={kurse} klassen={classes} periods={tt.periods}
           onFertig={() => { loadTt(); loadBreaks(); loadCancels(); loadExt(true); }} />
