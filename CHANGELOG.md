@@ -14,8 +14,9 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.5.6 — 13.11.2026
 
+- **Notenbuch:** die Kommentar-Ecke oben rechts ist dunkel und auch auf gelb oder rot markierten Zellen zu sehen; die Zellen von LE-Kindern in Klassenarbeits-Spalten sind schraffiert markiert.
 - **Boxplot:** klassisch gezeichnet — die Antennen reichen bis zum kleinsten und größten Wert, keine roten Ausreißer-Punkte mehr.
 - **Kurs → Lernstand:** zeigt jedes Kind mit seinem Stand (Auffällige zuerst), nicht nur die gemeldeten.
 - **CardVote-Auswertung:** „Werten“ steht jetzt als Häkchen-Zeile unten in der Ergebnistabelle (statt Knöpfe in „Fragen“); ausgenommene Fragen stehen rechts daneben und lassen sich wieder anhaken.

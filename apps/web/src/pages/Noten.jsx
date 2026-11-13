@@ -920,7 +920,9 @@ export default function Noten() {
                                      ...(statFarbe ? { background: `${statFarbe}1f`, boxShadow: `inset 3px 0 0 ${statFarbe}` } : null),
                                      // Hier fehlt die Note: die Zelle selbst leuchtet, nicht nur der Name —
                                      // sonst sucht man in einer breiten Tabelle die Luecke.
-                                     ...(!s.le && noteFehltIn(s.student_id, c) ? { background: `${C.warning}38`, boxShadow: `inset 0 0 0 2px ${C.warning}` } : null) }}>
+                                     ...(!s.le && noteFehltIn(s.student_id, c) ? { background: `${C.warning}38`, boxShadow: `inset 0 0 0 2px ${C.warning}` } : null),
+                                     // LE-Kind in einer Klassenarbeits-Spalte: die Zelle selbst ist markiert (schraffiert), nicht nur der Name.
+                                     ...(s.le && c.source_work_id ? { background: "repeating-linear-gradient(135deg, var(--bg2) 0 6px, var(--bg3) 6px 12px)" } : null) }}>
                             {zelle === id
                               ? <Zelle initial={wert != null ? de(wert) : ""}
                                   onSave={(txt) => noteSetzen(s.student_id, c.id, txt)}
@@ -990,7 +992,9 @@ export default function Noten() {
                                       // kennt, ist keiner.
                                       opacity: kommentarVon(s.student_id, c.id) ? 1 : 0.35 }}>
                                     <span style={{ display: "block", width: 0, height: 0, pointerEvents: "none",
-                                      borderTop: `9px solid ${kommentarVon(s.student_id, c.id) ? C.warning : "var(--border2)"}`,
+                                      // Dunkel statt Warnfarbe: auf der Markierung (gelb bei fehlender Note, rot bei Abwesenheit)
+                                      // war ein gelbes Dreieck nicht mehr zu sehen.
+                                      borderTop: `9px solid ${kommentarVon(s.student_id, c.id) ? "var(--text)" : "var(--text3)"}`,
                                       borderLeft: "9px solid transparent", marginLeft: 15 }} />
                                   </button>
                                 </div>)}
