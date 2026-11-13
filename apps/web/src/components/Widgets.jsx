@@ -221,10 +221,11 @@ function SchwacheSuS() {
     })();
     return () => { weg = true; };
   }, []);
-  if (rows === null) return null;
+  // Meldet die Fruehwarnung niemanden, steht hier nichts: eine Kachel „zurzeit niemand" ist nur Platz.
+  if (rows === null || rows.length === 0) return null;
   return (
-    <WidgetKarte titel={t("widget.schwacheSus")} leer={t("widget.schwacheSusLeer")}>
-      {rows.length > 0 && rows.slice(0, 8).map(({ klasse, kind }) => (
+    <WidgetKarte titel={t("widget.schwacheSus")}>
+      {rows.slice(0, 8).map(({ klasse, kind }) => (
         <Link key={`${klasse.id}-${kind.card_id}`} to={`/cardvote/student-evaluation/${klasse.id}/${kind.card_id}`} style={zeile} title={kind.begruendung || ""}>
           <span style={{ flex: 1, minWidth: 0, fontWeight: 600 }}>{kind.name}</span>
           {kind.abstand_median != null && (

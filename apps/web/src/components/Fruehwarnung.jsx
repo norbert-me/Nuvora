@@ -158,7 +158,7 @@ export function FruehwarnKarte({ schueler, t, offen = false }) {
  * Panel für eine Klasse. `nurKind` (card_id) zeigt nur dieses Kind — so nutzt
  * die Schüleransicht dieselbe Auswertung, ohne sie ein zweites Mal zu bauen.
  */
-export default function FruehwarnPanel({ classId, nurKind = null, titel = true, nur = "", alleKinder = false }) {
+export default function FruehwarnPanel({ classId, nurKind = null, titel = true, nur = "" }) {
   const { t } = useLanguage();
   const [empfindlich, setEmpfindlich] = useEmpfindlich();
   const [daten, setDaten] = useState(null);
@@ -191,10 +191,7 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true, 
   const liste = nurKind != null ? alle.filter((s) => String(s.card_id) === String(nurKind)) : alle;
   // In der Klassenansicht nur die Auffaelligen zeigen — sonst steht die halbe
   // Klasse in einer Liste, die „genau hinschauen" heisst.
-  // `alleKinder` (Lernstand im Kurs): jedes Kind mit seinem Stand, Auffaellige zuerst.
-  const zeigen = nurKind != null ? liste
-    : alleKinder ? [...liste].sort((a, b) => (b.status === "melden") - (a.status === "melden"))
-    : liste.filter((s) => s.status === "melden");
+  const zeigen = nurKind != null ? liste : liste.filter((s) => s.status === "melden");
 
   if (nurKind != null && zeigen.length === 0) return null;
 
@@ -203,7 +200,7 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true, 
       {titel && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
           <div style={{ fontSize: 16, fontWeight: 700, flex: 1, minWidth: 0 }}>
-            {t("fw.title")}{nurKind == null && !alleKinder && zeigen.length > 0 ? ` (${zeigen.length})` : ""}
+            {t("fw.title")}{nurKind == null && zeigen.length > 0 ? ` (${zeigen.length})` : ""}
           </div>
           <button onClick={() => setEmpfindlich(!empfindlich)}
             style={{ ...chipStyle, cursor: "pointer", background: "var(--card)", minHeight: 32, boxSizing: "border-box",
@@ -216,10 +213,10 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true, 
       )}
       {erhebungen === 0 ? (
         <div style={{ fontSize: 13, color: "var(--text3)" }}>{grund()}</div>
-      ) : !alleKinder && alle.every((s) => s.status === "zu_wenig_daten") ? (
+      ) : alle.every((s) => s.status === "zu_wenig_daten") ? (
         // Nicht „niemand fällt ab": bei einer einzigen Arbeit weiss das niemand.
         <div style={{ fontSize: 13, color: "var(--text3)" }}>{t("fw.tooEarly", { n: erhebungen })}</div>
-      ) : zeigen.length === 0 && !alleKinder ? (
+      ) : zeigen.length === 0 ? (
         <div style={{ fontSize: 14, color: "var(--text2)" }}>
           {t("fw.none")}{" "}
           <span style={{ color: "var(--text3)" }}>{t("fw.basedOn", { n: erhebungen })}</span>

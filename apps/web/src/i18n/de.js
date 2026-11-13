@@ -2436,7 +2436,6 @@ export default {
   "widget.heute": "Heute",
   "widget.schwach": "Schwache Themen",
   "widget.schwacheSus": "Schwache Lernende",
-  "widget.schwacheSusLeer": "Zurzeit meldet die Frühwarnung niemanden.",
   "widget.arbeit": "Nächste Klassenarbeit",
   "widget.arbeitLeer": "Keine Klassenarbeit geplant.",
   "widget.arbeitStunden": "{{n}} Std",

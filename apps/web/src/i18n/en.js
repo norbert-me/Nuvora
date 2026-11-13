@@ -2446,7 +2446,6 @@ export default {
   "widget.heute": "Today",
   "widget.schwach": "Weak topics",
   "widget.schwacheSus": "Pupils falling behind",
-  "widget.schwacheSusLeer": "The early warning is not flagging anyone right now.",
   "widget.arbeit": "Next paper",
   "widget.arbeitLeer": "No paper planned.",
   "widget.arbeitStunden": "{{n}} lessons",

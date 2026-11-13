@@ -2447,7 +2447,6 @@ export default {
   "widget.heute": "Hoy",
   "widget.schwach": "Temas flojos",
   "widget.schwacheSus": "Alumnado rezagado",
-  "widget.schwacheSusLeer": "Ahora mismo la alerta temprana no señala a nadie.",
   "widget.arbeit": "Próximo examen",
   "widget.arbeitLeer": "Ningún examen planificado.",
   "widget.arbeitStunden": "{{n}} horas",
