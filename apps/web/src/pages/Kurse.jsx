@@ -6,6 +6,7 @@ import { liegtDavor, nachJahrAbsteigend } from "../core/schuljahr.js";
 import KursKinder from "../components/KursKinder.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
+import KurseZusammen from "../components/KurseZusammen.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { alsJson, hol, sende } from "../core/melden.js";
@@ -35,6 +36,7 @@ const NEU = "\u0000neu";
 export default function Kurse() {
   const { t } = useLanguage();
   const [kurse, setKurse] = useState([]);
+  const [zusammen, setZusammen] = useState(null);   // Kurs, in den zusammengefuehrt wird
   const [allClasses, setAllClasses] = useState([]);
   // Gelöschte Kurse liegen im gemeinsamen Papierkorb des Kerns (/papierkorb).
   const [neu, setNeu] = useState("");
@@ -213,6 +215,11 @@ export default function Kurse() {
                     title={t("classes.archiveHint")}>
                     {archiv ? t("classes.unarchive") : t("classes.archive")}
                   </button>
+                  {!archiv && kurse.length > 1 && (
+                    <button onClick={() => setZusammen(k)} style={{ ...btnSecondary, ...btnSmall }} title={t("kurse.zusammenHint")}>
+                      {t("kurse.zusammen")}
+                    </button>
+                  )}
                 </div>
 
                 {/* Die Kinder stehen im KURS — dort, wo mit ihnen gearbeitet
@@ -341,6 +348,10 @@ export default function Kurse() {
           </div>
         ))}
       </div>
+      {zusammen && (
+        <KurseZusammen ziel={zusammen} kurse={kurse} onClose={() => setZusammen(null)}
+          onFertig={() => { setZusammen(null); load(); loadClasses(); }} />
+      )}
     </div>
   );
 }

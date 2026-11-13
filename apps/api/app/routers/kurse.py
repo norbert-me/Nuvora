@@ -32,7 +32,7 @@ from ..models import Kurs, KursTag, KursStudent, Person, SchoolClass, Student, U
 from ..personen import sichere_personen
 # Optimistisches Sperren (siehe app/versionierung.py).
 from ..versionierung import VersionOut, pruefe, stand
-from .auth import get_current_user
+from .auth import _verify_pw, get_current_user, rate_limit
 from .classes import MASSNAHMEN_VALUES
 
 # Die Mitgliedschafts-Fragen („welche Klassen, welche SuS, welche Geschwister?")
@@ -741,3 +741,90 @@ async def purge_kurs(kurs_id: int, user: User = Depends(get_current_user), db: A
         raise HTTPException(400, "Kurs ist nicht im Papierkorb")
     await db.delete(k)
     await db.commit()
+
+
+# ─── Kurse zusammenfuehren ───
+# Zwei Kurse sind dieselbe Gruppe (Untis-Import und von Hand angelegt, „M 7.5" und
+# „7.5 Mathematik"): alles, was am Quellkurs haengt, wandert in den Zielkurs; der Quellkurs
+# kommt in den Papierkorb. Verschoben wird jede Tabelle mit `kurs_id` (zur Laufzeit aus den
+# Modellen gezaehlt — ein neues Modul braucht hier keinen Eintrag). NICHTS wird zusammengelegt:
+# zwei Notenbereiche „Muendlich" stehen danach nebeneinander, die Lehrkraft raeumt auf. Nur
+# Zeilen mit Eindeutigkeit (Klasse im Kurs, Kind im Kurs, Stapel im Kurs) werden nicht verdoppelt.
+
+MAX_QUELLEN = 5
+_EINDEUTIG = {"kurs_tags": "class_id", "kurs_students": "student_id", "card_deck_kurse": "deck_id"}
+
+
+def _kurs_tabellen() -> list:
+    from ..models import Base
+    return [t for t in Base.metadata.sorted_tables if t.name != "kurse" and "kurs_id" in t.c]
+
+
+def _passwort_bestaetigt(user, password: str):
+    """Eigenes Passwort — eine Zusammenfuehrung ist nicht mit einem Klick umkehrbar."""
+    if not _verify_pw(password or "", user.password_hash):
+        raise HTTPException(400, "Passwort falsch")
+
+
+async def _zusammen_pruefen(db, user, kurs_id: int, quellen: List[int]):
+    quellen = list(dict.fromkeys(quellen))
+    if not quellen or len(quellen) > MAX_QUELLEN:
+        raise HTTPException(400, f"Zwischen 1 und {MAX_QUELLEN} Kurse auswählen")
+    if kurs_id in quellen:
+        raise HTTPException(400, "Der Zielkurs kann nicht gleichzeitig Quelle sein")
+    ziel = await _owned_kurs(db, user, kurs_id)
+    qs = [await _owned_kurs(db, user, q) for q in quellen]
+    if ziel.deleted_at or any(q.deleted_at for q in qs):
+        raise HTTPException(400, "Kurse im Papierkorb lassen sich nicht zusammenführen")
+    return ziel, qs
+
+
+async def _zusammen_zaehlen(db, quelle_id: int) -> dict:
+    out = {}
+    for t in _kurs_tabellen():
+        n = (await db.execute(select(func.count()).select_from(t).where(t.c.kurs_id == quelle_id))).scalar() or 0
+        if n:
+            out[t.name] = n
+    return out
+
+
+@router.get("/{kurs_id}/zusammenfuehren")
+async def zusammenfuehren_vorschau(kurs_id: int, quellen: str, user: User = Depends(get_current_user),
+                                   db: AsyncSession = Depends(get_db)):
+    """Was wuerde verschoben? Schreibt nichts."""
+    ids = [int(x) for x in quellen.split(",") if x.strip().isdigit()]
+    _, qs = await _zusammen_pruefen(db, user, kurs_id, ids)
+    return [{"id": q.id, "name": q.name, "zeilen": await _zusammen_zaehlen(db, q.id)} for q in qs]
+
+
+class ZusammenIn(BaseModel):
+    quellen: List[int]
+    password: str = ""
+
+
+@router.post("/{kurs_id}/zusammenfuehren")
+async def zusammenfuehren(kurs_id: int, body: ZusammenIn, user: User = Depends(get_current_user),
+                          db: AsyncSession = Depends(get_db)):
+    """Die Quellkurse in den Zielkurs verschieben. Verlangt das Passwort (wie jede Massenaenderung);
+    die Quellkurse landen im Papierkorb, ihre Daten stehen danach beim Ziel."""
+    rate_limit("kurse_zusammen", f"u{user.id}", 10, 3600, "Zu viele Zusammenführungen in kurzer Zeit.")
+    _passwort_bestaetigt(user, body.password)
+    ziel, qs = await _zusammen_pruefen(db, user, kurs_id, body.quellen)
+    bewegt = {}
+    for q in qs:
+        for t in _kurs_tabellen():
+            spalte = _EINDEUTIG.get(t.name)
+            if spalte:
+                schon = select(t.c[spalte]).where(t.c.kurs_id == ziel.id)
+                await db.execute(delete(t).where(t.c.kurs_id == q.id, t.c[spalte].in_(schon)))
+            res = await db.execute(update(t).where(t.c.kurs_id == q.id).values(kurs_id=ziel.id))
+            if res.rowcount:
+                bewegt[t.name] = bewegt.get(t.name, 0) + res.rowcount
+        # Wer die Quelle als Vorjahr fuehrte, fuehrt jetzt das Ziel.
+        await db.execute(update(Kurs).where(Kurs.vorgaenger_id == q.id, Kurs.id != ziel.id).values(vorgaenger_id=ziel.id))
+        if ziel.vorgaenger_id == q.id:
+            ziel.vorgaenger_id = None
+        q.deleted_members = []
+        q.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"ziel": ziel.id, "verschoben": bewegt, "quellen": [q.id for q in qs]}
