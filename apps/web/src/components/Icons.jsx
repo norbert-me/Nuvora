@@ -846,7 +846,8 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false, 
           rows[row] = x;
           return { lbl, v, x, row };
         });
-        const nRows = Math.max(1, rows.length);
+        // Mindestens zwei Zeilen: sonst springt die Hoehe beim Umschalten (% / Note), sobald eine Beschriftung in eine andere Zeile rutscht.
+        const nRows = Math.max(2, rows.length);
         return (
           <div style={{ position: "relative", height: nRows * 14 + 2, margin: "4px 20px 0", fontSize: 10.5, color: "var(--text3)" }}>
             {items.map((it, i) => (
