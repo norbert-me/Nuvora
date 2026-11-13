@@ -16,6 +16,7 @@ Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweima
 
 ## Unveröffentlicht
 
+- **CardVote-Auswertung:** „Werten“ steht jetzt als Häkchen-Zeile unten in der Ergebnistabelle (statt Knöpfe in „Fragen“); ausgenommene Fragen stehen rechts daneben und lassen sich wieder anhaken.
 - **CardVote-Sitzung:** abwesende Kinder verschwinden auch dann aus der Liste der noch zu scannenden, wenn sie in einer anderen Klasse des Kurses stehen (die Anwesenheit wird für alle Klassen des Kurses geholt).
 
 ## 4.5.5 — 12.11.2026

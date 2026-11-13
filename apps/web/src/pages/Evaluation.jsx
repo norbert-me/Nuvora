@@ -900,55 +900,6 @@ const gradeDistribution = (() => {
                   {stat ? `${stat.correct}/${stat.answered}` : ""}
                 </span>
               </button>
-              <button type="button" className="link-btn" style={linkBtn} title={t("cv.nichtWertenHint")}
-                onClick={() => eConf.setz({ ausgeschlossen: [...new Set([...(eConf.wert.ausgeschlossen || []), q.id])] })}>
-                {t("cv.nichtWerten")}
-              </button>
-              </div>
-            );
-          })}
-          {/* Aus der Wertung genommen: nicht gestellt oder abgebrochen. Bleibt sichtbar, damit es sich zurücknehmen lässt. */}
-          {(data.ausgeschlossen || []).map((q) => {
-            const aus = (eConf.wert.ausgeschlossen || []).includes(q.id);
-            return (
-              <div key={`aus-${q.id}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px dashed var(--border3)", opacity: aus ? 0.6 : 1 }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, textDecoration: aus ? "line-through" : "none" }}><Latex>{q.text}</Latex></span>
-                <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("cv.nichtGewertet")}</span>
-                <button type="button" className="link-btn" style={linkBtn}
-                  onClick={() => eConf.setz({ ausgeschlossen: aus ? (eConf.wert.ausgeschlossen || []).filter((x) => x !== q.id) : [...(eConf.wert.ausgeschlossen || []), q.id] })}>
-                  {aus ? t("cv.wiederWerten") : t("cv.nichtWerten")}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Vorschläge */}
-      {suggestions.length > 0 && (
-        <div style={{ ...panelStyle, padding: 16, background: "var(--warn-bg)", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <Icon d={ICONS.bulb} size={18} color="var(--text2)" />
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{t("cv.suggestions")}</h3>
-          </div>
-          {suggestions.map((tip, i) => {
-            const text = typeof tip === "string" ? tip : tip.text;
-            const fragen = typeof tip === "string" ? [] : (tip.fragen || []);
-            return (
-              <div key={i} style={{ fontSize: 13, color: "var(--text)", marginBottom: 8, lineHeight: 1.5, paddingLeft: 12, borderLeft: `2px solid ${C.warning}` }}>
-                {text}
-                {(fragen.length > 0 || (typeof tip !== "string" && tip.gewicht)) && (
-                  <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", marginLeft: 8, verticalAlign: "middle" }}>
-                    {fragen.map((qi) => (
-                      <button key={qi} onClick={() => setSelectedQ(qi)} title={t("cv.tipOeffnen", { n: qi + 1 })}
-                        style={{ ...chipStyle, cursor: "pointer", border: "1px solid var(--border2)", background: "var(--card)", fontSize: 12, fontWeight: 700, padding: "1px 8px" }}>F{qi + 1}</button>
-                    ))}
-                    {typeof tip !== "string" && tip.gewicht && (
-                      <button onClick={() => { setShowScale(false); setShowFragen(false); setShowWeights(true); setTimeout(() => document.getElementById("gewichte")?.scrollIntoView({ block: "center", behavior: "smooth" }), 50); }}
-                        style={{ ...chipStyle, cursor: "pointer", border: "1px solid var(--accent)", color: "var(--accent)", background: "var(--card)", fontSize: 12, fontWeight: 700, padding: "1px 8px" }}>{t("cv.tipGewichtOeffnen")}</button>
-                    )}
-                  </span>
-                )}
               </div>
             );
           })}
@@ -1117,7 +1068,30 @@ const gradeDistribution = (() => {
             ))}
           </tbody>
           <tfoot>
+            {/* Fragen, die nie gestellt wurden (Versuch abgebrochen), lassen sich hier aus der Wertung nehmen:
+                fehlende Antworten waeren sonst fuer alle falsch. Ausgenommene stehen rechts und lassen sich zurueckholen. */}
             <tr style={{ borderTop: "2px solid var(--border3)" }}>
+              <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }} title={t("cv.nichtWertenHint")}>{t("cv.werten")}</td>
+              {questions.map((q) => (
+                <td key={q.id} style={{ ...td, textAlign: "center" }}>
+                  <input type="checkbox" checked aria-label={`${t("cv.werten")} ${q.text}`}
+                    onChange={() => eConf.setz({ ausgeschlossen: [...new Set([...(eConf.wert.ausgeschlossen || []), q.id])] })} />
+                </td>
+              ))}
+              <td style={{ ...td, whiteSpace: "normal", fontSize: 12 }} colSpan={3}>
+                {(data.ausgeschlossen || []).map((q) => {
+                  const aus = (eConf.wert.ausgeschlossen || []).includes(q.id);
+                  return (
+                    <label key={q.id} style={{ display: "flex", alignItems: "center", gap: 6, color: aus ? "var(--text3)" : "var(--text)", textDecoration: aus ? "line-through" : "none", maxWidth: 260 }}>
+                      <input type="checkbox" checked={!aus}
+                        onChange={() => eConf.setz({ ausgeschlossen: aus ? (eConf.wert.ausgeschlossen || []).filter((x) => x !== q.id) : [...(eConf.wert.ausgeschlossen || []), q.id] })} />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.text}</span>
+                    </label>
+                  );
+                })}
+              </td>
+            </tr>
+            <tr>
               <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }}>{t("cv.statCorrect")}</td>
               {questionStats.map((stat, i) => (
                 <td key={i} style={{ ...td, textAlign: "center", fontSize: 12, fontWeight: "bold", color: quoteFarbe(stat.pct) }}>
