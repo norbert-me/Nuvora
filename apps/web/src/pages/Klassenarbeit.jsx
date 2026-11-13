@@ -924,9 +924,9 @@ export default function Klassenarbeit() {
   const [alleTeil, setAlleTeil] = useState("alle");   // welche Auswertung oben steht
   // In der Auswahl steht ein Paar EINMAL: das G-Blatt faellt heraus, wenn sein
   // E-Blatt daneben steht.
-  // Nach Datum der Arbeit, neueste zuerst (ohne Datum nach Anlage = hoechste id).
-  const auswahl = works.filter((w) => !(w.niveau === "G" && partnerVon(w)))
-    .sort((a, b) => (b.datum || "").localeCompare(a.datum || "") || b.id - a.id);
+  // Nach Datum der Arbeit, aelteste oben (ohne Datum ans Ende, nach Anlage).
+  const nachDatum = (a, b) => (a.datum ? 0 : 1) - (b.datum ? 0 : 1) || (a.datum || "").localeCompare(b.datum || "") || a.id - b.id;
+  const auswahl = works.filter((w) => !(w.niveau === "G" && partnerVon(w))).sort(nachDatum);
   const auswahlLabel = (w) => {
     const basis = partnerVon(w) ? `${w.name} (E/G)` : w.niveau ? `${w.name} (${w.niveau})` : w.name;
     const tag = datumKurz(w.datum);
@@ -2138,7 +2138,7 @@ export function KlassenarbeitVergleich() {
         <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
         {works.length > 0 && (
           <SuchSelect value={workId ? String(workId) : ""} onChange={(v) => setWorkId(Number(v))} style={{ minWidth: 0, maxWidth: 320 }}
-            optionen={works.map((w) => ({ wert: String(w.id), label: `${w.niveau ? `${w.name} (${w.niveau})` : w.name}${datumKurz(w.datum) ? ` · ${datumKurz(w.datum)}` : ""}` }))} />
+            optionen={[...works].sort((a, b) => (a.datum ? 0 : 1) - (b.datum ? 0 : 1) || (a.datum || "").localeCompare(b.datum || "") || a.id - b.id).map((w) => ({ wert: String(w.id), label: `${w.niveau ? `${w.name} (${w.niveau})` : w.name}${datumKurz(w.datum) ? ` · ${datumKurz(w.datum)}` : ""}` }))} />
         )}
       </div>
 
