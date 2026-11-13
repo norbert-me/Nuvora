@@ -167,7 +167,6 @@ export default {
   "kursLinks.klassenleitung": "Tutoría",
   "kursLinks.lernpfad": "Itinerario",
   "kursLinks.zufall": "Azar",
-  "kursLinks.lernstand": "Nivel de aprendizaje",
   "classes.trash": "Papelera",
   "kurse.emptyTitle": "Aún no hay curso",
   "kurse.emptyHint": "Un curso es una asignatura de una clase (p.ej. Mates 7.5). Escribe un nombre arriba para crear uno.",

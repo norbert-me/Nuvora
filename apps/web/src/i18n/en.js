@@ -166,7 +166,6 @@ export default {
   "kursLinks.klassenleitung": "Class teacher log",
   "kursLinks.lernpfad": "Learning path",
   "kursLinks.zufall": "Random picker",
-  "kursLinks.lernstand": "Learning status",
   "classes.trash": "Trash",
   "kurse.emptyTitle": "No course yet",
   "kurse.emptyHint": "A course is a subject of a class (e.g. Maths 7.5). Enter a name above to create one.",
