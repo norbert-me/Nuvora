@@ -776,11 +776,12 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false, 
   if (!values || values.length < 3) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const q1 = quantileOf(sorted, 0.25), med = quantileOf(sorted, 0.5), q3 = quantileOf(sorted, 0.75);
-  const iqr = q3 - q1, loBound = q1 - 1.5 * iqr, hiBound = q3 + 1.5 * iqr;
-  const inliers = sorted.filter((v) => v >= loBound && v <= hiBound);
-  const lo = inliers.length ? inliers[0] : sorted[0];
-  const hi = inliers.length ? inliers[inliers.length - 1] : sorted[sorted.length - 1];
-  const outliers = sorted.filter((v) => v < loBound || v > hiBound);
+  // Klassischer Kastenplot (Lehrbuch): die Antennen reichen bis zum kleinsten und groessten Wert,
+  // es gibt keine „Ausreisser"-Punkte. Mit der 1,5-IQR-Regel wurde bei einer kleinen Klasse schon ein
+  // einzelner schwacher Wert als roter Punkt abgesetzt, und die Antenne endete ohne Beschriftung.
+  const lo = sorted[0];
+  const hi = sorted[sorted.length - 1];
+  const outliers = [];
   const roh = (v) => (max > 0 ? (v / max) * 100 : 0);
   const pct = (v) => (umgekehrt ? 100 - roh(v) : roh(v));
   // Ein Abschnitt von a bis b: links ist das kleinere Ende in BILDkoordinaten.
