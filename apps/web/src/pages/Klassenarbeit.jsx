@@ -793,6 +793,7 @@ export default function Klassenarbeit() {
       const sc = (next.scale && Object.keys(next.scale).length) ? next.scale : scale;
       await fetch(`/api/noten/verknuepft/${next.id}`, alsJson("PUT", {
         student_ids: students.map((s) => s.id), grades: notenAusArbeit(students, partner ? { ...next, _alt: partner.tasks || [] } : next, sc), note: "",
+        nb_ids: students.filter((s) => (next.unbewertet || []).map(String).includes(String(s.id))).map((s) => s.id),
       })).catch(() => null);
     }
     // Die Liste der Arbeiten bekommt den GANZEN gespeicherten Stand, nicht nur

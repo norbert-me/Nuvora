@@ -1133,6 +1133,9 @@ class VerknuepftSyncBody(BaseModel):
     student_ids: List[int]
     grades: List[GradeCell]
     note: str = ""
+    # Kinder, die in dieser Arbeit nicht bewertet werden (NB): die Zelle bekommt
+    # keinen Wert, aber den Vermerk „NB" — sonst gilt sie im Notenbuch als fehlend.
+    nb_ids: List[int] = []
 
 
 @router.put("/verknuepft/{work_id}")
@@ -1142,7 +1145,8 @@ async def verknuepft_sync(work_id: int, body: VerknuepftSyncBody, user: User = D
     if not spalten:
         return {"spalten": 0}
     werte = {g.student_id: g.value for g in body.grades}
-    bereich = set(body.student_ids) | set(werte)
+    nb = {s for s in body.nb_ids if s not in werte}
+    bereich = set(body.student_ids) | set(werte) | nb
     for cat in spalten:
         # Nur Kinder dieser Klassenfamilie — eine fremde student_id faellt still heraus.
         geschwister = await sibling_class_ids(db, cat.class_id)
@@ -1156,8 +1160,17 @@ async def verknuepft_sync(work_id: int, body: VerknuepftSyncBody, user: User = D
             if sid in werte:
                 if e is None:
                     db.add(GradeEntry(category_id=cat.id, student_id=sid, kind="grade", value=werte[sid], note=body.note or ""))
-                elif e.value != werte[sid]:
-                    e.value = werte[sid]
+                else:
+                    if e.value != werte[sid]:
+                        e.value = werte[sid]
+                    if (e.note or "") in ("NB", "UB"):
+                        e.note = body.note or ""
+            elif sid in nb:
+                if e is None:
+                    db.add(GradeEntry(category_id=cat.id, student_id=sid, kind="grade", value=None, note="NB"))
+                else:
+                    e.value = None
+                    e.note = "NB"
             elif e is not None:
                 # Keine Note mehr (abwesend, Punkte geleert): die Zelle folgt.
                 await db.delete(e)

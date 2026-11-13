@@ -73,3 +73,26 @@ async def test_ohne_verknuepfung_passiert_nichts_und_fremde_arbeit_gesperrt(s):
     with pytest.raises(Exception):
         await N.import_grades(N.ImportGradesBody(class_id=cls.id, section_id=sec.id, column_name="X",
                                                  source_work_id=e.id, grades=[]), user=fremd, db=s)
+
+
+@pytest.mark.asyncio
+async def test_nb_kind_bekommt_vermerk_statt_note(s):
+    u, cls, sec, e, g, a, b, c = await _grund(s)
+    await N.import_grades(N.ImportGradesBody(class_id=cls.id, section_id=sec.id, column_name="KA1",
+                                             source_kind="klassenarbeit", source_work_id=e.id, grades=[]), user=u, db=s)
+    async def sync(grades, nb):
+        await N.verknuepft_sync(e.id, N.VerknuepftSyncBody(student_ids=[a.id, b.id], grades=grades, nb_ids=nb), user=u, db=s)
+    async def notizen():
+        return {x.student_id: (x.value, x.note) for x in (await s.execute(select(GradeEntry))).scalars().all()}
+
+    await sync([N.GradeCell(student_id=a.id, value=2.0)], [b.id])
+    assert await notizen() == {a.id: (2.0, ""), b.id: (None, "NB")}
+    # NB wieder aufgehoben, Note da: der Vermerk verschwindet.
+    await sync([N.GradeCell(student_id=a.id, value=2.0), N.GradeCell(student_id=b.id, value=3.0)], [])
+    assert await notizen() == {a.id: (2.0, ""), b.id: (3.0, "")}
+    # Wieder NB: Wert weg, Vermerk da.
+    await sync([N.GradeCell(student_id=a.id, value=2.0)], [b.id])
+    assert (await notizen())[b.id] == (None, "NB")
+    # NB aufgehoben ohne Note: die Zelle verschwindet.
+    await sync([N.GradeCell(student_id=a.id, value=2.0)], [])
+    assert b.id not in await notizen()
