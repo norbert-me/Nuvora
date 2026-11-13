@@ -14,6 +14,12 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## 4.5.8 — 13.11.2026
+
+- **Klassenarbeit:** die Auswahl der Arbeiten bleibt nach Datum sortiert, die älteste oben (in 4.5.7 sortierte sie danach noch einmal nach Namen).
+- **Notenbuch:** NB steht nicht mehr als Kommentar da — der Kommentar-Dialog öffnet sich bei einer NB-Zelle leer.
+- **Reihen:** in der Auswahl stehen alle Stunden des Kurses (auch ohne Inhalt), abhaken was in die Reihe soll; beim „In einen Kurs spielen“ lassen sich einzelne Stunden der Reihe abhaken.
+
 ## 4.5.7 — 13.11.2026
 
 - **Klassenarbeit:** ein Klick auf die Note wechselt zwischen NB (nicht bewertet) und der Note; der UB-Knopf am Namen entfällt, überall heißt es jetzt NB. Die Auswahl der Arbeiten ist nach Datum sortiert, die älteste oben.
