@@ -1089,7 +1089,8 @@ async def import_grades(body: ImportGradesBody, user: User = Depends(require_mod
     for g in body.grades:
         if g.student_id not in roster:
             continue
-        db.add(GradeEntry(category_id=cat.id, student_id=g.student_id, kind="grade", value=g.value, note=body.note or ""))
+        db.add(GradeEntry(category_id=cat.id, student_id=g.student_id, kind="grade", value=g.value,
+                         note="" if body.source_kind == "klassenarbeit" else (body.note or "")))
         angelegt += 1
     if angelegt == 0 and work_id is None:
         # Keine einzige Zuordnung -> leere Spalte waere nur Ballast. Eine
@@ -1163,7 +1164,8 @@ async def verknuepft_sync(work_id: int, body: VerknuepftSyncBody, user: User = D
                 else:
                     if e.value != werte[sid]:
                         e.value = werte[sid]
-                    if (e.note or "") in ("NB", "UB"):
+                    # NB-Vermerk und der frühere Herkunftstext „Klassenarbeit" fallen weg.
+                    if (e.note or "") in ("NB", "UB", "Klassenarbeit"):
                         e.note = body.note or ""
             elif sid in nb:
                 if e is None:
