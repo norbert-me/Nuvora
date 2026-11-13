@@ -19,6 +19,7 @@ import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
+import Verteilung from "../components/Verteilung.jsx";
 import { DialogFuss, nurGeaendertIn, useAutoSpeichern, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useAktiv, useZielFilter } from "../core/modules.js";
@@ -673,7 +674,7 @@ export default function Noten() {
                   ))}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colDist")}</div>
-                <NotenVerteilung werte={st.werte} stufung={stufung} hoehe={100} t={t} />
+                <NotenVerteilung werte={st.werte} stufung={stufung} />
               </div>
             )}
           </Modal>
@@ -1196,45 +1197,10 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
   );
 }
 
-// Notenverteilung als Balken oder Boxplot — eine Anzeige fuer beide
-// Statistiken (Spalte und Halbjahr). Die Stufung (ganz/halb/Teilnoten) kommt
-// aus dem Zahnrad; Balken oder Boxplot ist ein Umschalter direkt daran, weil
-// man beim Lesen wechselt, nicht beim Einrichten.
-function NotenVerteilung({ werte, stufung, hoehe = 90, t }) {
-  const [box, setBox] = useState(false);
-  // Teilnoten direkt am Diagramm umschaltbar (wie in der Klassenarbeit); Startwert ist die Wahl aus dem Zahnrad.
-  const [fein, setFein] = useState(stufung === "teil");
-  stufung = fein ? "teil" : (stufung === "teil" ? "ganz" : stufung);
-  const dist = verteilung(werte, stufung);
-  const maxD = Math.max(...dist.map((d) => d.n), 1);
-  const zahlen = (werte || []).filter((v) => v != null && Number.isFinite(Number(v))).map(Number);
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-        <Tabs value={box ? "box" : "balken"} onChange={(v) => setBox(v === "box")}
-          options={[["balken", t("noten.distBalken")], ["box", t("noten.distBox")]]} />
-        {!box && (
-          <Tabs value={fein ? "fein" : "ganz"} onChange={(v) => setFein(v === "fein")}
-            options={[["ganz", t("klassenarbeit.distWhole")], ["fein", t("klassenarbeit.distFine")]]} />
-        )}
-      </div>
-      {box ? (
-        zahlen.length >= 3 ? <Boxplot values={zahlen} max={6} />
-          : <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("noten.distZuWenig")}</p>
-      ) : (
-        <div style={{ display: "flex", alignItems: "flex-end", gap: stufung === "teil" ? 3 : 8, height: hoehe }}>
-          {dist.map(({ g, n: c }) => (
-            <div key={g} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 0 }}>
-              <div style={{ fontSize: 11, color: "var(--text3)" }}>{c || ""}</div>
-              {/* Saeule: Radius rundet nur die Kappe der Grafik. */}
-              <div style={{ width: "100%", maxWidth: 44, height: `${(c / maxD) * (hoehe - 30)}px`, minHeight: c ? 3 : 0, background: "var(--accent)", borderRadius: "5px 5px 0 0", opacity: c ? 0.85 : 0.15 }} />
-              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)", whiteSpace: "nowrap" }}>{typeof g === "number" ? komma(g) : g}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+// Notenverteilung: das gemeinsame Feld (components/Verteilung.jsx). Die Stufung kommt
+// aus dem Zahnrad und ist nur der Startwert des Ganz/Teilnoten-Schalters.
+function NotenVerteilung({ werte, stufung }) {
+  return <Verteilung noten={werte} stufung={stufung} />;
 }
 
 // Statistische Auswertung der Halbjahresnoten — analog CardVote: Kennzahlen und
@@ -1270,7 +1236,7 @@ function NotenStatistik({ noten, stufung, t }) {
             {tile(t("noten.statMedian"), kommaRund(median, 2))}
             {tile(t("noten.statSd"), `±${kommaRund(sd, 2)}`)}
           </div>
-          <NotenVerteilung werte={noten} stufung={stufung} hoehe={90} t={t} />
+          <NotenVerteilung werte={noten} stufung={stufung} />
         </div>
       )}
     </div>

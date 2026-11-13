@@ -5,6 +5,7 @@ import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
 import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, linkBtn, pageApp, panelStyle, quoteFarbe, quoteFlaeche, selectStyle, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
+import Verteilung from "../components/Verteilung.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
 import { bogenName, druckenMitTitel } from "../core/drucken.js";
@@ -48,7 +49,6 @@ function tendencyGrade(pct, scale) {
   return result;
 }
 
-const TENDENCY_GRADES = [1, 2, 3, 4, 5].flatMap((g) => [g, Math.round((g + 0.3) * 10) / 10, Math.round((g + 0.7) * 10) / 10]).concat([6]);
 
 // Boxplot liegt jetzt zentral in Icons.jsx (eine Quelle für CardVote,
 // Klassen-Auswertung und Klassenarbeit). Hier nur noch importiert.
@@ -73,7 +73,6 @@ export default function Evaluation() {
   // Erklaerung erschien sonst ganz unten unter der Fragetabelle statt bei der
   // Kachel.
   const [showCiTop, setShowCiTop] = useState(false);
-  const [gradeView, setGradeView] = useState("bar");
   // Voreinstellung aus dem Profil (grade_tendency): mit Tendenz (2+) oder ganz.
   const [gradeMode, setGradeMode] = useState(() => { try { const u = JSON.parse(localStorage.getItem("user")); return u && u.grade_tendency === false ? "whole" : "tendency"; } catch { return "whole"; } }); // "whole" | "tendency"
   const aktiv = useAktiv();
@@ -331,18 +330,6 @@ export default function Evaluation() {
   const sd = stddev(scores);
   const sdPct = pcts.length > 0 ? stddev(pcts) : 0;
 
-const gradeDistribution = (() => {
-    if (gradeMode === "tendency") {
-      const dist = {};
-      TENDENCY_GRADES.forEach((g) => { dist[g] = 0; });
-      notenPcts.forEach((p) => { dist[tendencyGrade(p, gradeScale)]++; });
-      return dist;
-    }
-    const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-    notenPcts.forEach((p) => { dist[Math.round(gradeFromPct(p, gradeScale))]++; });
-    return dist;
-  })();
-
   const questionStats = questions.map((q, qi) => {
     let correct = 0;
     let answered = 0;
@@ -590,8 +577,6 @@ const gradeDistribution = (() => {
     );
   }
 
-  const maxGrade = Math.max(...Object.values(gradeDistribution), 1);
-
   return (
     <div>
       <Link to="/cardvote/tests" style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 5 }}>
@@ -758,50 +743,12 @@ const gradeDistribution = (() => {
       {/* KI-Erklaerung der oberen Kachel — direkt hier, nicht am Seitenende. */}
       {showCiTop && <CiInfoBox onClose={() => setShowCiTop(false)} />}
 
-      {/* Notenverteilung / Boxplot toggle */}
+      {/* Notenverteilung / Boxplot: das gemeinsame Feld. */}
       <div style={{ ...panelStyle, padding: 16, marginBottom: 12 }}>
-        {/* Reiter aus dem Kern (Tabs) statt vier nachgebauter Pillen. */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-          <Tabs value={unbenotet ? "box" : gradeView} onChange={setGradeView}
-            options={unbenotet ? [["box", t("cv.boxplot")]] : [["bar", t("cv.gradeDistribution")], ["box", t("cv.boxplot")]]} />
-          {gradeView === "bar" && !unbenotet && (
-            <Tabs value={gradeMode} onChange={setGradeMode} style={{ marginLeft: "auto" }}
-              options={[["whole", t("cv.wholeGrades")], ["tendency", t("cv.tendencyGrades")]]} />
-          )}
-        </div>
-        {gradeView === "bar" && !unbenotet ? (
-          <div style={{ display: "flex", alignItems: "flex-end", gap: gradeMode === "tendency" ? 3 : 8 }}>
-            {(gradeMode === "tendency" ? TENDENCY_GRADES : [1, 2, 3, 4, 5, 6]).map((g) => {
-              const count = gradeDistribution[g];
-              const barH = maxGrade > 0 ? Math.round((count / maxGrade) * 80) : 0;
-              const colorGrade = gradeMode === "tendency" ? Math.min(6, Math.round(g)) : g;
-              return (
-                <div key={g} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <span style={{ fontSize: gradeMode === "tendency" ? 11 : 12, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{count || ""}</span>
-                  <div style={{
-                    width: "100%", maxWidth: gradeMode === "tendency" ? 26 : 48, height: barH, minHeight: count > 0 ? 8 : 2,
-                    background: count > 0 ? GRADE_COLORS[colorGrade] : "var(--border3)", borderRadius: "6px 6px 0 0", transition: "height 0.3s", opacity: count > 0 ? 0.85 : 0.3,
-                  }} />
-                  <span style={{ fontSize: gradeMode === "tendency" ? 11 : 13, fontWeight: 600, color: "var(--text3)", marginTop: 4, whiteSpace: "nowrap" }}>{gradeMode === "tendency" ? g.toFixed(1) : g}</span>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          scores.length >= 3
-            // Bei E/G ist die erreichbare Punktzahl je Kind verschieden — dann
-            // ist Prozent die einzige gemeinsame Achse.
-            ? (<>
-                {/* Was die Achse zeigt, muss dranstehen: neben einer
-                    Notenverteilung im Reiter daneben liest man die Zahlen
-                    sonst als Noten — und 85 waere dort eine sehr schlechte. */}
-                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}>
-                  {t("cv.boxplotAxisPct")}
-                </div>
-                <Boxplot values={pcts} max={100} unit="%" />
-              </>)
-            : <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("cv.needThree")}</p>
-        )}
+        <Verteilung
+          noten={unbenotet ? null : notenPcts.map((p) => tendencyGrade(p, gradeScale))}
+          pct={pcts}
+          fein={gradeMode === "tendency"} onFein={(v) => setGradeMode(v ? "tendency" : "whole")} />
       </div>
 
       {/* Notenschlüssel + Gewichtung */}

@@ -15,6 +15,7 @@ import { mitNummer, themenFuerKurs, themenIndex, useThemen } from "../core/topic
 import { useKurs } from "../core/kurs.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
+import Verteilung from "../components/Verteilung.jsx";
 import { leIst } from "../core/foerderung.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -709,9 +710,6 @@ export default function Klassenarbeit() {
   const [scaleOpen, setScaleOpen] = useState(false); // Notenschlüssel-Editor auf/zu
   const [expandedTasks, setExpandedTasks] = useState(() => new Set()); // aufgeklappte Teilaufgaben-Auswertung
   const [infoOpen, setInfoOpen] = useState(false); // „Auswertung verstehen"
-  const [distMode, setDistMode] = useState("bar");   // Notenverteilung: "bar" | "box"
-  const [barMode, setBarMode] = useState("whole");   // Balken: "whole" (1..6) | "fine" (Teilnoten)
-  const [boxMode, setBoxMode] = useState("pct");     // Boxplot: "pct" (%) | "note" (Noten)
   // Note-Anzeige NUR aus der Profil-Präferenz (eine Person, eine Präferenz —
   // kein Umschalter je Seite mehr). "note" = Symbol 2+, "wert" = Dezimal 2,3.
   const gradeMode = (() => { try { const u = JSON.parse(localStorage.getItem("user")); return u && u.grade_tendency === false ? "wert" : "note"; } catch { return "note"; } })();
@@ -1429,45 +1427,9 @@ export default function Klassenarbeit() {
                     </div>
                   );
                 })()}
-                {/* Verteilung / Boxplot — Panel + Pillen-Umschalter wie CardVote. */}
+                {/* Verteilung / Boxplot: das gemeinsame Feld. */}
                 <div style={{ padding: 16, background: "var(--bg3)", borderRadius: cardStyle.borderRadius, border: "1px solid var(--border)" }}>
-                  {/* Zweimal dieselbe Frage („welche Ansicht?"), also zweimal
-                      dieselbe Form. Links standen vorher zwei Einzelpillen
-                      (r980), rechts eine Gruppe mit r8 — nebeneinander sah das
-                      aus wie zwei verschiedene Bedienarten. */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                    <Tabs value={distMode} onChange={setDistMode}
-                      options={[["bar", t("klassenarbeit.distGrades")], ["box", t("klassenarbeit.distBox")]]} />
-                    {/* Sekundär-Umschalter: Balken = Noten/Teilnoten, Boxplot = %/Noten. */}
-                    <Tabs style={{ marginLeft: "auto" }}
-                      value={distMode === "bar" ? barMode : boxMode}
-                      onChange={distMode === "bar" ? setBarMode : setBoxMode}
-                      options={distMode === "bar"
-                        ? [["whole", t("klassenarbeit.distWhole")], ["fine", t("klassenarbeit.distFine")]]
-                        : [["pct", "%"], ["note", t("klassenarbeit.grade")]]} />
-                  </div>
-                  {distMode === "bar" ? (() => {
-                    const data = barMode === "fine"
-                      ? A.noten.distFine.map((d) => ({ count: d.count, label: d.label, grade: d.grade }))
-                      : A.noten.dist.map((c, i) => ({ count: c, label: String(i + 1), grade: i + 1 }));
-                    const mxc = Math.max(...data.map((d) => d.count), 1);
-                    return (
-                      <div style={{ display: "flex", alignItems: "flex-end", gap: barMode === "fine" ? 3 : 6, height: 105 }}>
-                        {data.map((d, i) => (
-                          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                            {/* Saeule: Radius rundet nur die Kappe der Grafik. */}
-                            <div style={{ width: barMode === "fine" ? "80%" : "60%", height: `${Math.max(3, (d.count / mxc) * 75)}px`, background: d.grade <= 2 ? C.success : d.grade <= 4 ? C.warning : C.danger, borderRadius: 3 }} title={`${d.count}`} />
-                            <span style={{ fontSize: 11, color: "var(--text3)" }}>{d.count}</span>
-                            <span style={{ fontSize: 11, fontWeight: 700 }}>{d.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })() : (
-                    boxMode === "note"
-                      ? <Boxplot values={A.noten.werte} max={6} />
-                      : <Boxplot values={A.noten.pctArr} max={100} unit="%" umgekehrt />
-                  )}
+                  <Verteilung noten={A.noten.werte} pct={A.noten.pctArr} />
                 </div>
                 {/* Min-Punkte je Note entfernt — steht im Notenschlüssel. */}
               </>)}
