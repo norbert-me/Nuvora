@@ -34,7 +34,7 @@ from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
 from ..importe import geprueft
 from ..models import (
     GradeCategory, GradeEntry, GradeSection, GradeOverride, QuartalDivider,
-    Session as TestSession, Student, User, CodeSession, WorkAnalysis, QuestionSet,
+    Session as TestSession, SchoolClass, Student, User, CodeSession, WorkAnalysis, QuestionSet,
 )
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
@@ -753,6 +753,8 @@ class StudentSummary(BaseModel):
     # Foerderschwerpunkt Lernen („LE"): keine Gesamtnote, zaehlt nicht in Klassenwerten.
     le: bool = False
     observations: int
+    # Klasse des Kindes (in gemischten Kursen sitzen mehrere Klassen in einer Tabelle).
+    klasse: str = ""
 
 
 def _agg(werte, mode):
@@ -790,6 +792,9 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
     cat_ids = {c.id for c in cats}
 
     students = await _kurs_roster(db, user, class_id, kurs_id)
+    klassen_namen = {c.id: c.name for c in (await db.execute(
+        select(SchoolClass).where(SchoolClass.id.in_({st.class_id for st in students}))
+    )).scalars().all()} if students else {}
 
     entries = (await db.execute(
         select(GradeEntry)
@@ -866,7 +871,7 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
             fallback = True
 
         out.append(StudentSummary(
-            student_id=st.id, name=st.name,
+            student_id=st.id, name=st.name, klasse=klassen_namen.get(st.class_id, ""),
             per_category=per_cat, per_section=per_sec,
             section_overrides=sec_ovr, section_effective=sec_eff,
             weighted=None if _ist_le(st) else weighted,

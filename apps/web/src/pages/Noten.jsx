@@ -34,6 +34,7 @@ import { verteilung } from "../core/notenstufen.js";
 import { kurzName, kurzNameAn, useKurzName } from "../core/namen.js";
 import { notenTrend, spaltenNachZeit } from "../core/notentrend.js";
 import { teilen } from "../core/teilen.js";
+import { sortiereKinder } from "../core/namen.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
 
 const API = "/api/noten";
@@ -359,7 +360,7 @@ export default function Noten() {
   const zellFolge = () => {
     const cats = secListe.filter((sec) => !collapsed.has(sec.id))
       .flatMap((sec) => catsVon(sec).map((c) => c.id));
-    return { cats, kinder: (summary || []).map((s) => s.student_id) };
+    return { cats, kinder: zeilen.map((s) => s.student_id) };
   };
   const nachbar = (studentId, catId, rueckwaerts) => {
     const { cats, kinder } = zellFolge();
@@ -564,6 +565,13 @@ export default function Noten() {
   // keine — und war an dem Tag nicht abwesend und hat keinen Kommentar dort.
   // (Eine ganz leere Spalte ist Zukunft, kein Fehlen.)
   const spaltenMitNoten = useMemo(() => new Set(summary ? summary.flatMap((r) => Object.keys(r.per_category || {})).map(Number) : []), [summary]);
+  // Reihenfolge der Kinder in der Tabelle: wie gepflegt, nach Nach- oder Vornamen, bzw. nach Klasse
+  // (in gemischten Kursen). Eine Anzeigeoption je Gerät, kein Eingriff in die Daten.
+  const [sortierung, setSortierung] = useState(() => { try { return localStorage.getItem("noten_sort") || "liste"; } catch { return "liste"; } });
+  const setSortierungPersist = (v) => { setSortierung(v || "liste"); try { localStorage.setItem("noten_sort", v || "liste"); } catch { /* egal */ } };
+  const mehrereKlassen = useMemo(() => new Set((summary || []).map((r) => r.klasse).filter(Boolean)).size > 1, [summary]);
+  const wirksameSortierung = sortierung === "klasse" && !mehrereKlassen ? "liste" : sortierung;
+  const zeilen = useMemo(() => sortiereKinder(summary || [], wirksameSortierung), [summary, wirksameSortierung]);
   const leKinder = useMemo(() => new Set((summary || []).filter((r) => r.le).map((r) => r.student_id)), [summary]);
   // Freiwillige Spalten (Raketenaufgaben, c.optional) zaehlen nie als fehlend.
   const noteFehltIn = (sid, c) => {
@@ -609,7 +617,7 @@ export default function Noten() {
   // Was die Zeile von ANDEREN Kindern abhaengt: welche Spalten irgendwo Noten haben, wer LE ist,
   // wer in der Tabelle steht (Tab/Enter springen zum Nachbarn). Als Zeichenkette statt der
   // Liste selbst — die Liste ist nach jedem Laden eine neue.
-  const kinderKey = `${[...spaltenMitNoten].sort((a, b) => a - b).join(",")}#${[...leKinder].join(",")}#${(summary || []).map((r) => r.student_id).join(",")}`;
+  const kinderKey = `${[...spaltenMitNoten].sort((a, b) => a - b).join(",")}#${[...leKinder].join(",")}#${zeilen.map((r) => r.student_id).join(",")}`;
   const ordnungsKey = secListe.map((sec) => `${sec.id}:${catsVon(sec).map((c) => c.id).join(",")}`).join("|");
   const zeilenKey = (s) => {
     const w = entwurf.wert;
@@ -672,6 +680,13 @@ export default function Noten() {
             value: agg === "median" ? "median" : "",
             onChange: (v) => setAggPersist(v || "mean"),
             optionen: [{ wert: "", label: t("noten.aggMean") }, { wert: "median", label: t("noten.aggMedian") }],
+          }, {
+            key: "sort", art: "wahl",
+            label: t("noten.sort"),
+            value: wirksameSortierung === "liste" ? "" : wirksameSortierung,
+            onChange: setSortierungPersist,
+            optionen: [{ wert: "", label: t("noten.sortListe") }, { wert: "nachname", label: t("noten.sortNachname") },
+              { wert: "vorname", label: t("noten.sortVorname") }, ...(mehrereKlassen ? [{ wert: "klasse", label: t("noten.sortKlasse") }] : [])],
           }, {
             key: "stellen", art: "wahl",
             label: t("noten.stellen"),
@@ -941,7 +956,7 @@ export default function Noten() {
               </tr>
             </thead>
             <tbody>
-              {summary.map((s, si) => {
+              {zeilen.map((s, si) => {
                 if (!suchTreffer(s)) return null;
                 // Was diese Zeile lesen darf, steht hier — aendert sich nichts davon, bleibt ihr
                 // DOM unberuehrt. Ein Klick auf EINE Zelle zeichnete vorher alle 1200 neu.
