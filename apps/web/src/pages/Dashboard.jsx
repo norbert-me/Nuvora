@@ -15,7 +15,9 @@ import ZoomImage from "../components/ZoomImage.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import { useAktiv } from "../core/modules.js";
 import { useZiehVorschau } from "../core/ziehsortieren.js";
-import { alsJson, hol } from "../core/melden.js";
+import { alsJson, hol, pruefeAntwort } from "../core/melden.js";
+import { zeigeFehler } from "../core/undo.jsx";
+import { istSvg, svgZuPng } from "../core/bilder.js";
 import { raeumeBrowser } from "../core/abmelden.js";
 import { formelEinfuegen, LATEX_TASTEN_LANG } from "../core/latextabelle.js";
 
@@ -24,11 +26,20 @@ const API = "/api";
 // Bild zu einer Frage hochladen. Stand zweimal in dieser Datei (verwaiste
 // Fragen und Frageeditor) — dieselben vierzehn Zeilen. `dateiWaehlen` aus
 // Icons.jsx macht den Dialog, hier bleibt nur das Hochladen.
-const bildHochladen = (setter) => dateiWaehlen(async (file) => {
+const bildHochladen = (setter) => dateiWaehlen(async (gewaehlt) => {
+  // SVG nimmt der Server nicht an (bewusst, siehe core/bilder.js) — hier wird es zu PNG. Vorher scheiterte es
+  // STILL: das Auswahlfeld bot .svg an, der Server sagte 400, und die Oberflaeche zeigte nichts.
+  let file = gewaehlt;
+  if (istSvg(gewaehlt)) {
+    file = await svgZuPng(gewaehlt);
+    if (!file) { zeigeFehler("Dieses SVG lässt sich nicht in ein Bild umwandeln. Bitte als PNG oder JPEG exportieren."); return; }
+  }
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API}/questions/upload-image`, { method: "POST", body: form });
-  if (res.ok) setter((await res.json()).url);
+  const res = await fetch(`${API}/questions/upload-image`, { method: "POST", body: form }).catch(() => null);
+  // Ein Fehler wird gesagt (Format, Groesse, Verbindung) — nicht verschluckt.
+  if (res && res.ok) setter((await res.json()).url);
+  else await pruefeAntwort(res, "Bild hochladen");
 }, "image/*,.svg");
 
 
