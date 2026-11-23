@@ -285,8 +285,18 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
         students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or "", "le": s.id in le}
                     for s in roster_zeilen]
         sc = await db.get(SchoolClass, session.class_id)
-        # Der Kurs, dem die Session zugewiesen ist — ohne Zuweisung der der Klasse.
-        kurs_id = session.kurs_id or (sc.kurs_id if sc else None)
+        # Der Kurs, dem die Session zugewiesen ist. Ohne Zuweisung wird NICHT geraten, wenn die Klasse in
+        # mehreren Kursen liegt: der Standard-Kurs der Klasse (`school_classes.kurs_id`) ist dann einer von
+        # mehreren, und die Note landete im Notenbuch des falschen Fachs. Gibt es genau einen Kurs, ist er es;
+        # ohne Kurse bleibt der alte Weg ueber die Klasse.
+        if session.kurs_id:
+            kurs_id = session.kurs_id
+        elif len(kurse_der_klasse) == 1:
+            kurs_id = kurse_der_klasse[0]["id"]
+        elif not kurse_der_klasse:
+            kurs_id = sc.kurs_id if sc else None
+        else:
+            kurs_id = None
 
     # E/G-Differenzierung und Minuspunkte haengen am Quiz, nicht an der Session.
     niveau_aktiv = False

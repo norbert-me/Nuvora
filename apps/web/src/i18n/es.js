@@ -2958,6 +2958,8 @@ export default {
   "cv.eModusKeineText": "Para un alumno del curso G, el 100 % son las tareas G; las tareas E no cuentan en absoluto.",
   "cv.eModusAlleText": "Sin diferenciación: todos se miden con todas las tareas — solo para esta evaluación.",
   "cv.kursZuweisen": "Curso:",
+  "cv.kursWaehlen": "Elige un curso",
+  "cv.kursErstWaehlen": "Esta prueba no pertenece a ningún curso. Elige primero el curso arriba; solo entonces se pueden elegir secciones para las notas.",
   "cv.bonusMax": "Bonus total como máximo (niveles de nota)",
   "cv.bonusNenner": "Con una sola pregunta E como máximo",
   "cv.bonusNennerVoll": "1",

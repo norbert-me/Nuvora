@@ -2947,6 +2947,8 @@ export default {
   "cv.eModusKeineText": "Für ein Kind im G-Kurs sind die 100 % die G-Aufgaben; die E-Aufgaben zählen gar nicht — weder dafür noch dagegen. Für Arbeiten, in denen die Anforderung erkennbar Zusatz ist und die Note allein aus der Grundlage kommt.",
   "cv.eModusAlleText": "Keine Unterscheidung: alle werden an allen Aufgaben gemessen, E-Kurs wie G-Kurs. Dasselbe, als wäre E/G am Quiz nicht eingeschaltet — nur für diese Auswertung.",
   "cv.kursZuweisen": "Kurs:",
+  "cv.kursWaehlen": "Bitte erst einen Kurs wählen",
+  "cv.kursErstWaehlen": "Dieser Test gehört keinem Kurs. Bitte oben den Kurs wählen — erst dann lassen sich Abschnitte für die Noten auswählen.",
   "cv.bonusMax": "Bonus insgesamt höchstens (Notenstufen)",
   "cv.bonusNenner": "Bei nur einer E-Aufgabe höchstens",
   "cv.bonusNennerVoll": "1",

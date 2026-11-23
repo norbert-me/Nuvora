@@ -2957,6 +2957,8 @@ export default {
   "cv.eModusKeineText": "For a standard-course student the standard tasks are the 100 %; higher-level tasks do not count at all — neither for nor against. For tests where the extra tasks are clearly optional.",
   "cv.eModusAlleText": "No differentiation: everyone is measured on every task. The same as if the level flag were off — for this evaluation only.",
   "cv.kursZuweisen": "Course:",
+  "cv.kursWaehlen": "Choose a course",
+  "cv.kursErstWaehlen": "This test belongs to no course. Please choose the course above first — only then can sections for the grades be selected.",
   "cv.bonusMax": "Bonus in total at most (grade steps)",
   "cv.bonusNenner": "With only one E question at most",
   "cv.bonusNennerVoll": "1",

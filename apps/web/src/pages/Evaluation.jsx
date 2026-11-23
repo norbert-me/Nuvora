@@ -584,7 +584,7 @@ export default function Evaluation() {
       </Link>
       {notenDialog && (
         <NotenImport
-          sessionId={Number(id)} classId={data.class_id} kursId={data.kurs_id ?? null} sessionName={data.session_name}
+          sessionId={Number(id)} classId={data.class_id} kursId={data.kurs_id ?? null} mehrereKurse={(data.kurse || []).length > 1} sessionName={data.session_name}
           grades={alleAnwesend.map((st) => ({
             card_id: st.card_id, name: st.name,
             value: gradeMode === "tendency"
@@ -620,6 +620,7 @@ export default function Evaluation() {
               const r = await fetch(`/api/sessions/${id}/kurs`, alsJson("PUT", { kurs_id: neu })).catch(() => null);
               if (r && r.ok) setData((d) => ({ ...d, kurs_id: neu }));
             }}>
+            {data.kurs_id == null && <option value="">{t("cv.kursWaehlen")}</option>}
             {data.kurse.map((k) => <option key={k.id} value={k.id}>{k.fach ? `${k.fach} · ` : ""}{k.name}</option>)}
           </select>
         </label>
@@ -1225,7 +1226,7 @@ function SchliessenBtn({ onClick, t }) {
 
 
 // Dialog: CardVote-Testnoten in eine Kategorie des Notenmoduls uebernehmen.
-function NotenImport({ sessionId, classId, kursId = null, sessionName, grades, onClose }) {
+function NotenImport({ sessionId, classId, kursId = null, mehrereKurse = false, sessionName, grades, onClose }) {
   const { t } = useLanguage();
   const heute = () => { const d = new Date(); return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`; };
   const [sectionId, setSectionId] = useState(null);
@@ -1267,7 +1268,11 @@ function NotenImport({ sessionId, classId, kursId = null, sessionName, grades, o
                 {/* Mit kursId: ohne ihn standen hier die Abschnitte ALLER
                     Faecher dieser Klasse, und die Spalte landete im Notenbuch
                     eines anderen Fachs — dort, wo sie niemand sucht. */}
-                <AbschnittWahl classId={classId} kursId={kursId} value={sectionId} onChange={setSectionId} />
+                {/* Liegt die Klasse in mehreren Kursen und dieser Test ist keinem zugewiesen, wird nicht geraten:
+                    erst den Kurs waehlen (oben auf der Seite), dann die Abschnitte. */}
+                {kursId == null && mehrereKurse
+                  ? <p style={{ fontSize: 13, color: C.warning, margin: 0 }}>{t("cv.kursErstWaehlen")}</p>
+                  : <AbschnittWahl classId={classId} kursId={kursId} value={sectionId} onChange={setSectionId} />}
 
                 <div style={lbl}>{t("notenimp.colName")}</div>
                 <div style={{ display: "flex", gap: 6 }}>
