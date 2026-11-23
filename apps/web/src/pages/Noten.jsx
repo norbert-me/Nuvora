@@ -7,7 +7,7 @@
 //
 // Klick auf einen Namen öffnet alle Infos zur Person. Beobachtungen zählen nie
 // in den Schnitt — „Anstrengungsbereitschaft“ ist kein Messwert.
-import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { memo, useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
@@ -33,6 +33,7 @@ import { median as medianVon, mittel, streuung } from "../core/statistik.js";
 import { verteilung } from "../core/notenstufen.js";
 import { kurzName, kurzNameAn, useKurzName } from "../core/namen.js";
 import { notenTrend, spaltenNachZeit } from "../core/notentrend.js";
+import { teilen } from "../core/teilen.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
 
 const API = "/api/noten";
@@ -156,7 +157,7 @@ export default function Noten() {
   // zweite braucht die Hoehe der ersten als Abstand, sonst liegen sie
   // uebereinander. Gemessen statt geraten: die erste Zeile ist je nach Inhalt
   // unterschiedlich hoch.
-  const { rahmenRef, kopf1Ref, th2 } = useKlebenderKopf();
+  const { rahmenRef, kopf1Ref, th2 } = useKlebenderKopf(`${sections.length}:${summary.length}:${loading}:${term}:${collapsed.size}:${kurz.an}`);
   // Abschnitte und Spalten ziehen beide „links/rechts neben den Nachbarn" — das
   // ist dieselbe Bauform wie bei Themen, Kartenstapeln und Karten und steht seit
   // dem Zusammenfuehren nur noch in core/ziehsortieren.js. Die Spalten laufen
@@ -210,7 +211,8 @@ export default function Noten() {
       fetch(`${API}/classes/${id}/entries?term=${term === "year" ? "" : term}${kp}`).then((r) => (r.ok ? r.json() : [])),
       fetch(`${API}/classes/${id}/summary?term=${term}&agg=${agg}${kp}`).then((r) => (r.ok ? r.json() : [])),
     ]);
-    setSections(sec); setEntries(ent); setSummary(sum); setLoading(false);
+    setSections((p) => teilen(p, sec, (x) => x.id)); setEntries((p) => teilen(p, ent, (x) => x.id));
+    setSummary((p) => teilen(p, sum, (x) => x.student_id)); setLoading(false);
     loadedOnce.current = true; // ab jetzt kein Skeleton mehr (Reloads z.B. bei Median/Mittel nicht flackern lassen)
     hol(`${API}/classes/${id}/dividers?term=${term}${kp}`).then((d) => setDividers(Array.isArray(d) ? d : []));
   };
@@ -387,7 +389,7 @@ export default function Noten() {
     if (!cat) return false;
     const st = statusVon(sid, cat);
     if (st === "fehlt" || st === "entsch") return true;
-    return !!(summary || []).find((r) => r.student_id === sid)?.le && !!cat.source_work_id;
+    return leKinder.has(sid) && !!cat.source_work_id;
   };
 
   // Note in den Entwurf legen. Leeres Feld = Note löschen (beim Speichern);
@@ -425,6 +427,26 @@ export default function Noten() {
   // Der Plan ist flach (`n:` Note, `k:` Kommentar, `so:`/`to:` gesetzte Note,
   // `os`/`oc:` Reihenfolgen) — nur Zahlen, Zeichenketten und ID-Listen, damit
   // ein Neuladen die Arbeitskopie wieder einholt.
+  // Index der Noten-Eintraege: (Kind, Spalte) -> Noten, und Spalte -> alle Werte.
+  // Vorher suchte jede Zelle bei JEDEM Render mit `entries.filter/find` in allen
+  // Eintraegen — bei ~1000 Noten und 1200 Zellen waren das Millionen Vergleiche pro
+  // Klick. Der Index entsteht einmal je Datenstand.
+  const LEER = useMemo(() => [], []);
+  const { notenIndex, werteJeSpalte } = useMemo(() => {
+    const idx = new Map();
+    const je = new Map();
+    for (const e of entries) {
+      if (e.kind !== "grade") continue;
+      const k = `${e.student_id}:${e.category_id}`;
+      const a = idx.get(k);
+      if (a) a.push(e); else idx.set(k, [e]);
+      if (e.value != null) {
+        const w = je.get(e.category_id);
+        if (w) w.push(e.value); else je.set(e.category_id, [e.value]);
+      }
+    }
+    return { notenIndex: idx, werteJeSpalte: je };
+  }, [entries]);
   const basis = useMemo(() => {
     const o = { os: sections.map((x) => x.id) };
     sections.forEach((sec) => {
@@ -433,14 +455,14 @@ export default function Noten() {
         summary.forEach((s) => {
           const v = s.per_category ? s.per_category[String(c.id)] : undefined;
           o[`n:${s.student_id}:${c.id}`] = v === undefined ? null : v;
-          o[`k:${s.student_id}:${c.id}`] = (entries.find((x) => x.student_id === s.student_id && x.category_id === c.id && x.kind === "grade")?.note) || "";
+          o[`k:${s.student_id}:${c.id}`] = (notenIndex.get(`${s.student_id}:${c.id}`)?.[0]?.note) || "";
         });
       });
       summary.forEach((s) => { o[`so:${s.student_id}:${sec.id}`] = s.section_overrides?.[String(sec.id)] ?? null; });
     });
     summary.forEach((s) => { o[`to:${s.student_id}`] = s.total_override ?? null; });
     return o;
-  }, [sections, summary, entries]);
+  }, [sections, summary, notenIndex]);
   const frisch = useRef(false);
   const entwurf = useEntwurf(basis, async (wert) => {
     let ok = true;
@@ -516,8 +538,16 @@ export default function Noten() {
   // zu bleiben.
   const mitNeuen = (reihenfolge, alle) => (reihenfolge ? [...reihenfolge, ...alle.filter((id) => !reihenfolge.includes(id))] : alle);
   const secListe = mitNeuen(entwurf.wert.os, sections.map((x) => x.id)).map((id) => sections.find((x) => x.id === id)).filter(Boolean);
-  const catsVon = (sec) => mitNeuen(entwurf.wert[`oc:${sec.id}`], (sec.categories || []).map((c) => c.id))
-    .map((id) => (sec.categories || []).find((c) => c.id === id)).filter(Boolean);
+  const catsMerk = new Map();   // je Render einmal je Abschnitt (wurde je Zeile neu gerechnet)
+  const catsVon = (sec) => {
+    let r = catsMerk.get(sec.id);
+    if (!r) {
+      const nachId = new Map((sec.categories || []).map((c) => [c.id, c]));
+      r = mitNeuen(entwurf.wert[`oc:${sec.id}`], (sec.categories || []).map((c) => c.id)).map((id) => nachId.get(id)).filter(Boolean);
+      catsMerk.set(sec.id, r);
+    }
+    return r;
+  };
   const noteVon = (sid, cid) => entwurf.wert[`n:${sid}:${cid}`] ?? null;
   // „NB" (nicht bewertet) liegt als Vermerk an der Zelle, ist aber KEIN Kommentar: der Dialog zeigt
   // ihn nicht, die Ecke sieht ihn nicht, und er zaehlt nicht als „Kommentar da".
@@ -529,15 +559,16 @@ export default function Noten() {
   const endNoteVon = (s) => (s.le ? null : (entwurf.wert[`to:${s.student_id}`] ?? s.weighted));
   const istEndOverride = (s) => entwurf.wert[`to:${s.student_id}`] != null;
 
-  const allCats = sections.flatMap((s) => s.categories || []);
+  const allCats = useMemo(() => sections.flatMap((s) => s.categories || []), [sections]);
   // Fehlende Note: in einer Spalte, in der andere schon eine haben, hat das Kind
   // keine — und war an dem Tag nicht abwesend und hat keinen Kommentar dort.
   // (Eine ganz leere Spalte ist Zukunft, kein Fehlen.)
-  const spaltenMitNoten = new Set(summary ? summary.flatMap((r) => Object.keys(r.per_category || {})).map(Number) : []);
+  const spaltenMitNoten = useMemo(() => new Set(summary ? summary.flatMap((r) => Object.keys(r.per_category || {})).map(Number) : []), [summary]);
+  const leKinder = useMemo(() => new Set((summary || []).filter((r) => r.le).map((r) => r.student_id)), [summary]);
   // Freiwillige Spalten (Raketenaufgaben, c.optional) zaehlen nie als fehlend.
   const noteFehltIn = (sid, c) => {
     // LE-Kinder werden in Klassenarbeiten nicht benotet („NB") — das ist keine Luecke.
-    if (c.source_work_id && (summary || []).find((r) => r.student_id === sid)?.le) return false;
+    if (c.source_work_id && leKinder.has(sid)) return false;
     if (c.optional || !spaltenMitNoten.has(c.id) || noteVon(sid, c.id) != null || rohKommentar(sid, c.id)) return false;
     const stat = statusVon(sid, c);
     return stat !== "fehlt" && stat !== "entsch";
@@ -545,21 +576,48 @@ export default function Noten() {
   const notenFehlen = (sid) => allCats.some((c) => noteFehltIn(sid, c));
 
   const gewichtSumme = sections.reduce((n, s) => n + (s.weight || 0), 0);
-  const notenVon = (sid, cid) => entries.filter((e) => e.student_id === sid && e.category_id === cid && e.kind === "grade");
+  const notenVon = (sid, cid) => notenIndex.get(`${sid}:${cid}`) || LEER;
   // Besser oder schlechter? Je Bereich (Teilnote) und für alle Spalten zusammen.
-  const trendVon = (sid, cats) => notenTrend(spaltenNachZeit(cats).map((c) => {
-    const w = notenVon(sid, c.id).filter((e) => e.value != null);
-    return w.length ? w[w.length - 1].value : null;
-  }).filter((v) => v != null));
+  // Zeitfolge der Spalten und fertige Trends werden je Datenstand gemerkt: das Sortieren
+  // mit localeCompare und das Durchsuchen aller Noten lief je Kind und Abschnitt neu.
+  const zeitFolge = useMemo(() => new WeakMap(), [sections]);
+  const trendMerk = useMemo(() => new WeakMap(), [sections, notenIndex]);
+  const trendVon = (sid, cats) => {
+    let je = trendMerk.get(cats);
+    if (!je) { je = new Map(); trendMerk.set(cats, je); }
+    if (je.has(sid)) return je.get(sid);
+    let folge = zeitFolge.get(cats);
+    if (!folge) { folge = spaltenNachZeit(cats); zeitFolge.set(cats, folge); }
+    const r = notenTrend(folge.map((c) => {
+      const w = notenVon(sid, c.id).filter((e) => e.value != null);
+      return w.length ? w[w.length - 1].value : null;
+    }).filter((v) => v != null));
+    je.set(sid, r);
+    return r;
+  };
   // Auswertung je Spalte: Anzahl, Schnitt, Spanne über alle eingetragenen Noten.
   const colStats = (cid) => {
-    const vals = entries.filter((e) => e.category_id === cid && e.kind === "grade" && e.value != null).map((e) => e.value).sort((a, b) => a - b);
+    const vals = [...(werteJeSpalte.get(cid) || [])].sort((a, b) => a - b);
     if (!vals.length) return null;
     const n = vals.length;
     const median = n % 2 ? vals[(n - 1) / 2] : (vals[n / 2 - 1] + vals[n / 2]) / 2;
     return { n, avg: rund(mittel(vals), 2), median: rund(median, 2), min: vals[0], max: vals[n - 1], werte: vals };
   };
   const sumOf = (studentId) => summary.find((s) => s.student_id === studentId);
+  // Schluessel fuer die Zeilen-Huelle: Reihenfolge von Abschnitten/Spalten und die Eingaben
+  // EINES Kindes (Note, Kommentar, gesetzte Noten). Zeichenketten, damit ein Vergleich billig ist.
+  // Was die Zeile von ANDEREN Kindern abhaengt: welche Spalten irgendwo Noten haben, wer LE ist,
+  // wer in der Tabelle steht (Tab/Enter springen zum Nachbarn). Als Zeichenkette statt der
+  // Liste selbst — die Liste ist nach jedem Laden eine neue.
+  const kinderKey = `${[...spaltenMitNoten].sort((a, b) => a - b).join(",")}#${[...leKinder].join(",")}#${(summary || []).map((r) => r.student_id).join(",")}`;
+  const ordnungsKey = secListe.map((sec) => `${sec.id}:${catsVon(sec).map((c) => c.id).join(",")}`).join("|");
+  const zeilenKey = (s) => {
+    const w = entwurf.wert;
+    let k = "";
+    for (const c of allCats) k += `${w[`n:${s.student_id}:${c.id}`] ?? ""}|${w[`k:${s.student_id}:${c.id}`] || ""};`;
+    for (const sec of sections) k += `${w[`so:${s.student_id}:${sec.id}`] ?? ""}|`;
+    return k + (w[`to:${s.student_id}`] ?? "");
+  };
 
   if (classes.length === 0) {
     return (
@@ -755,7 +813,11 @@ export default function Noten() {
           {/* SuS-Modus: alle Zellen ausser dem Namen bleiben leer — Platz und
               Raster bleiben, nur die Zahlen sind weg. */}
           {susModus && <style>{".sus-modus tbody td:not(:first-child) > * { visibility: hidden; }"}</style>}
-          <table className={susModus ? "sus-modus" : undefined} style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 14, minWidth: "100%" }}>
+          {/* Die Spalte der offenen Zelle: als Tönung ÜBER der Zelle, per CSS. Als Inline-Stil
+              je Zelle hing die Hervorhebung an jeder Zeile — jede geöffnete Zelle zeichnete
+              die ganze Tabelle neu. Die Tönung ist durchsichtig, Markierungen darunter bleiben sichtbar. */}
+          {fokusSpalte && <style>{`.noten-tab td[data-spalte="${String(fokusSpalte).replace(/[^0-9a-zA-Z_-]/g, "")}"]::after { content: ""; position: absolute; inset: 0; background: ${FOKUS_TON}; pointer-events: none; }`}</style>}
+          <table className={`noten-tab${susModus ? " sus-modus" : ""}`} style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 14, minWidth: "100%" }}>
             <thead>
               <tr ref={kopf1Ref}>
                 <th style={{ ...th, ...stickyLh, whiteSpace: "nowrap", textAlign: "left", fontWeight: 400, fontSize: 13, color: gewichtSumme === 100 ? "var(--text3)" : C.warning }}>
@@ -879,8 +941,17 @@ export default function Noten() {
               </tr>
             </thead>
             <tbody>
-              {summary.map((s, si) => !suchTreffer(s) ? null : (
-                <tr key={s.student_id} style={fokusKind === String(s.student_id) ? { background: FOKUS_TON } : undefined}>
+              {summary.map((s, si) => {
+                if (!suchTreffer(s)) return null;
+                // Was diese Zeile lesen darf, steht hier — aendert sich nichts davon, bleibt ihr
+                // DOM unberuehrt. Ein Klick auf EINE Zelle zeichnete vorher alle 1200 neu.
+                const zHier = zelle && (String(zelle).startsWith(`${s.student_id}:`) || String(zelle).startsWith(`sec:${s.student_id}:`)
+                  || zelle === `end:${s.student_id}`) ? zelle : null;
+                return (
+                <ZeilenHuelle key={s.student_id} deps={[s, si, kinderKey, sections, fehlzeiten, collapsed, ordnungsKey, zeilenKey(s), zHier,
+                  fokusKind === String(s.student_id), kurz.an, t, stellen, form, stufung, susModus]}
+                  zeile={() => (
+                <tr style={fokusKind === String(s.student_id) ? { background: FOKUS_TON } : undefined}>
                   <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0,
                     ...(fokusKind === String(s.student_id) ? { background: FOKUS_TON_DECKEND, boxShadow: "inset 3px 0 0 var(--accent)" } : null) }}>
                     <button onClick={() => setInfoFuer(s.student_id)} title={t("noten.studentInfo")}
@@ -922,10 +993,9 @@ export default function Noten() {
                         const stat = statusVon(s.student_id, c);
                         const statFarbe = (stat === "fehlt" || stat === "entsch") ? C.danger : null;
                         return (
-                          <td key={c.id} title={statFarbe ? t(`anwesenheit.${stat}`) : undefined}
+                          <td key={c.id} data-spalte={c.id} title={statFarbe ? t(`anwesenheit.${stat}`) : undefined}
                             style={{ ...td, padding: 0, position: "relative", width: 56, minWidth: 56, maxWidth: 56, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
                                      // Die Spalte der offenen Zelle; die Abwesenheit geht vor (sie ist eine Aussage, die Toenung nur Orientierung).
-                                     ...(fokusSpalte === String(c.id) ? { background: FOKUS_TON } : null),
                                      ...(statFarbe ? { background: `${statFarbe}1f`, boxShadow: `inset 3px 0 0 ${statFarbe}` } : null),
                                      // Hier fehlt die Note: die Zelle selbst leuchtet, nicht nur der Name —
                                      // sonst sucht man in einer breiten Tabelle die Luecke.
@@ -1038,7 +1108,9 @@ export default function Noten() {
                     </button>
                   </td>
                 </tr>
-              ))}
+                  )} />
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1085,6 +1157,14 @@ export default function Noten() {
 // fuer die schwebende Speicherleiste, die ueber der Tastatur liegt.
 const FREIE_ZEILEN = 3;
 const LEISTE_PX = 64;
+
+// Eine Tabellenzeile, die sich nur neu zeichnet, wenn sich eine ihrer Abhaengigkeiten aendert.
+// `zeile` ist die Zeichenfunktion der LETZTEN Darstellung — gilt eine Zeile als unveraendert,
+// bleiben auch ihre Handler die von damals; das ist unschaedlich, weil alles, was sie lesen
+// (Zustand der Zeile, Kinder, Spalten, Fehlzeiten, Reihenfolge), in `deps` steht und
+// `entwurf.setz` mit einer Funktion arbeitet (nie mit einem alten Stand).
+const ZeilenHuelle = memo(function ZeilenHuelle({ zeile }) { return zeile(); },
+  (a, b) => a.deps.length === b.deps.length && a.deps.every((v, i) => Object.is(v, b.deps[i])));
 
 function scrollBehaelter(el) {
   for (let p = el?.parentElement; p && p !== document.body; p = p.parentElement) {
@@ -1559,9 +1639,13 @@ function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "", initialDat
  * Beide Tabellen der Seite (Halbjahr und Jahr) nutzen denselben Haken — die
  * Jahresansicht hatte den Mechanismus zuerst nicht und sah genau so kaputt aus.
  */
-function useKlebenderKopf() {
+function useKlebenderKopf(abhaengig) {
   const rahmenRef = useRef(null);
   const kopf1Ref = useRef(null);
+  // Ohne Angabe bei jedem Render (Klassenarbeit). Die Noten geben einen Schluessel
+  // mit: das Messen erzwingt ein Layout der ganzen Tabelle, und das nach JEDEM
+  // Klick war ein Teil der Traegheit — der ResizeObserver unten meldet jede echte
+  // Groessenaenderung ohnehin selbst.
   useLayoutEffect(() => {
     const zeile = kopf1Ref.current, rahmen = rahmenRef.current;
     if (!zeile || !rahmen) return undefined;
@@ -1575,7 +1659,7 @@ function useKlebenderKopf() {
     const beob = new ResizeObserver(mess);
     beob.observe(zeile);
     return () => beob.disconnect();
-  });
+  }, abhaengig === undefined ? undefined : [abhaengig]);
   return { rahmenRef, kopf1Ref, th2: { ...th, top: "var(--kopf2, 0px)" } };
 }
 
