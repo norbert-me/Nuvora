@@ -729,6 +729,23 @@ async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None 
                         continue
                     zeilen, hinweise = _passend_machen(tabelle, zeilen)
                     angepasst.extend(hinweise)
+                    # Verwaiste Bezuege: die Produktionsdatenbank ist gewachsen, nicht jede Spalte hatte von
+                    # Anfang an ihren Fremdschluessel — so stehen dort Verweise auf Zeilen, die es nicht mehr
+                    # gibt (gesehen: grade_categories.source_session_id, calendar_entries.karten_deck_id).
+                    # Eine frische Datenbank lehnt sie ab und das ganze Zurueckspielen scheitert. Nullbare
+                    # Bezuege ohne Ziel werden deshalb geleert — und gemeldet, nicht still.
+                    for fk in tabelle.foreign_keys:
+                        ziel = fk.column.table.name
+                        if not fk.parent.nullable or ziel not in tabellen or fk.column.name != "id" or ziel == name:
+                            continue
+                        da = {z.get("id") for z in eimer.get(ziel, [])}
+                        n = 0
+                        for z in zeilen:
+                            if z.get(fk.parent.name) is not None and z[fk.parent.name] not in da:
+                                z[fk.parent.name] = None
+                                n += 1
+                        if n:
+                            angepasst.append(f"{name}.{fk.parent.name}: {n} verwaister Bezug auf {ziel} entfernt")
                     # Roh einspielen: Chiffretext bleibt Chiffretext (sonst wuerde er ein
                     # zweites Mal verschluesselt); Klartext aus aelteren Sicherungen
                     # steht danach als Klartext da und wird beim naechsten Start umgeschrieben.

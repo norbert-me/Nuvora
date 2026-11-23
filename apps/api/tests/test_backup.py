@@ -453,6 +453,31 @@ async def test_zurueckspielen_traegt_selbstbezuege_nach_auch_bei_hoeherer_id(wel
 
 
 @pytest.mark.asyncio
+async def test_zurueckspielen_kommt_mit_verwaisten_bezuegen_zurecht(welt):
+    """Gefunden im Probelauf mit den echten Daten: calendar_entries.karten_deck_id zeigte auf einen Stapel, den
+    es nicht mehr gab (dort fehlte der Fremdschluessel). Eine frische Datenbank lehnt das ab. Der Bezug wird
+    geleert und gemeldet; alles Uebrige der Zeile bleibt."""
+    from sqlalchemy import text
+    from app import models as m
+    async with welt["Sitzung"]() as s:
+        await s.execute(text("PRAGMA foreign_keys=OFF"))
+        await s.execute(text("INSERT INTO calendar_entries (id, owner_id, date, title, karten_deck_id) "
+                             "VALUES (7, 2, '2026-11-02 00:00:00', 'Waise', 4711)"))
+        await s.commit()
+    eintrag = await _sichern()
+    url = f"sqlite+aiosqlite:///{welt['tmp'] / 'waise.db'}"
+    bericht = await backup.zurueckspielen(str(welt["sicherungen"] / eintrag["name"]), url)
+    assert any("calendar_entries.karten_deck_id" in h and "verwaister Bezug" in h for h in bericht["angepasst"]), bericht["angepasst"]
+    probe = create_async_engine(url)
+    try:
+        async with async_sessionmaker(probe, class_=AsyncSession)() as s:
+            e = (await s.execute(select(m.CalendarEntry).where(m.CalendarEntry.id == 7))).scalar_one()
+        assert e.title == "Waise" and e.karten_deck_id is None
+    finally:
+        await probe.dispose()
+
+
+@pytest.mark.asyncio
 async def test_zurueckspielen_ueberschreibt_vorhandene_zeilen(welt):
     """Zweimal dieselbe Sicherung einspielen darf nicht an Schlüsselkonflikten
     scheitern — sonst ist der zweite Versuch im Ernstfall der, der scheitert."""
