@@ -678,51 +678,66 @@ export const popoverPanel = {
 };
 
 // Aufklappmenü an einem Knopf. Die Ausrichtung (links/rechts/mittig) ist nur
-// der Wunsch — nach dem Öffnen schiebt sich das Panel in den sichtbaren
-// Bereich zurück. Auf dem Handy hing ein Menü sonst halb außerhalb, je nachdem
-// wo sein Knopf stand. Der Elternknoten braucht position: relative.
+// der Wunsch: das Panel steht FEST im Fenster (`position: fixed`, nicht absolut im Elternknoten) und
+// wird nach dem Öffnen in den sichtbaren Bereich gerückt — waagerecht an den Rand geklemmt, senkrecht
+// unter dem Knopf oder, wenn dort kein Platz ist, darüber; reicht beides nicht, wird es scrollbar.
+//
+// Warum fest: ein Menü in einer Karte mit `overflow: hidden` (abgerundete Ecken!) wurde am Kartenrand
+// abgeschnitten — gemeldet an den Import-Menüs der Fragenliste. Fixierte Elemente schneidet `overflow`
+// nicht ab. Der Elternknoten bleibt der Anker (er braucht kein `position: relative` mehr, schadet aber nicht).
+//
+// Gemessen statt gerechnet: #root ist gezoomt (index.html) und ein Vorfahr kann transformiert sein —
+// beides verschiebt `fixed`. Deshalb wird nach dem Setzen die tatsächliche Lage gelesen und der
+// Unterschied ausgeglichen.
 export function Popover({ align = "left", style, children, ...rest }) {
   const ref = useRef(null);
-  const basis = align === "center" ? "translateX(-50%)" : "";
+  // Die Lage bestimmt das Menü selbst: alte Aufrufer gaben top/left/right für die absolute Lage mit.
+  // Hier würden sie das feste Layout verzerren (links UND rechts gesetzt = über die ganze Breite gezogen).
+  const { top: _t, left: _l, right: _r, bottom: _b, ...stilOhneLage } = style || {};
+  const basisMax = stilOhneLage.maxHeight != null ? (typeof stilOhneLage.maxHeight === "number" ? `${stilOhneLage.maxHeight}px` : stilOhneLage.maxHeight) : "";
+  const basisUeber = stilOhneLage.overflowY ?? stilOhneLage.overflow ?? "";
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
-    // Naechster waagerecht scrollbarer Vorfahre — in einer breiten Tabelle wird
-    // dort abgeschnitten, nicht am Fensterrand.
-    const scrollElter = () => {
-      for (let p = el.parentElement; p; p = p.parentElement) {
-        const o = getComputedStyle(p).overflowX;
-        if ((o === "auto" || o === "scroll") && p.scrollWidth > p.clientWidth + 1) return p;
-      }
-      return null;
+    const anker = el && el.parentElement;
+    if (!el || !anker) return undefined;
+    const rand = 12;
+    const platzieren = () => {
+      const a = anker.getBoundingClientRect();
+      // Natürliche Größe messen: Begrenzungen aus dem letzten Durchlauf zurücknehmen.
+      el.style.maxHeight = basisMax; el.style.overflowY = basisUeber;
+      el.style.left = "0px"; el.style.top = "0px";
+      const g = el.getBoundingClientRect();
+      const w = g.width, h = g.height;
+      // Sichtbare Pixel / CSS-Pixel: #root ist gezoomt, `maxHeight` gilt aber in CSS-Pixeln.
+      const zoom0 = el.offsetWidth ? g.width / el.offsetWidth : 1;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      let links = align === "right" ? a.right - w : align === "center" ? a.left + a.width / 2 - w / 2 : a.left;
+      links = Math.max(rand, Math.min(links, vw - rand - w));
+      const unten = a.bottom + 6, platzUnten = vh - rand - unten;
+      const platzOben = a.top - 6 - rand;
+      let oben;
+      if (h <= platzUnten) oben = unten;
+      else if (h <= platzOben) oben = a.top - 6 - h;
+      else if (platzUnten >= platzOben) { oben = unten; el.style.maxHeight = `${Math.max(120, platzUnten) / zoom0}px`; el.style.overflowY = "auto"; }
+      else { const m = Math.max(120, platzOben); oben = a.top - 6 - Math.min(h, m); el.style.maxHeight = `${m / zoom0}px`; el.style.overflowY = "auto"; }
+      // Erst setzen, dann lesen, dann den Rest ausgleichen (Zoom, transformierte Vorfahren).
+      el.style.left = `${links}px`; el.style.top = `${oben}px`;
+      const ist = el.getBoundingClientRect();
+      const zoom = (ist.width && el.offsetWidth) ? ist.width / el.offsetWidth : 1;
+      if (Math.abs(ist.left - links) > 0.5) el.style.left = `${links - (ist.left - links) / (zoom || 1)}px`;
+      if (Math.abs(ist.top - oben) > 0.5) el.style.top = `${oben - (ist.top - oben) / (zoom || 1)}px`;
     };
-    const schieben = () => {
-      el.style.transform = basis;
-      const rand = 12;
-      // Erst den Container mitziehen: ein Menue am rechten Rand einer breiten
-      // Tabelle stand sonst halb ausserhalb — verschoben werden soll die
-      // Tabelle, nicht das Menue aus seiner Zelle heraus.
-      const box = scrollElter();
-      if (box) {
-        const r0 = el.getBoundingClientRect(), c = box.getBoundingClientRect();
-        let ds = 0;
-        if (r0.right > c.right - rand) ds = r0.right - (c.right - rand);
-        else if (r0.left < c.left + rand) ds = r0.left - (c.left + rand);
-        if (ds) box.scrollLeft += ds;
-      }
-      const r = el.getBoundingClientRect();
-      let dx = 0;
-      if (r.right > window.innerWidth - rand) dx = window.innerWidth - rand - r.right;
-      if (r.left + dx < rand) dx = rand - r.left;
-      el.style.transform = dx ? `${basis} translateX(${dx}px)`.trim() : basis;
-    };
-    schieben();
-    window.addEventListener("resize", schieben);
-    return () => window.removeEventListener("resize", schieben);
+    platzieren();
+    const spaeter = () => platzieren();
+    window.addEventListener("resize", spaeter);
+    window.addEventListener("scroll", spaeter, true);   // auch in scrollenden Containern: das Menue folgt seinem Knopf
+    return () => { window.removeEventListener("resize", spaeter); window.removeEventListener("scroll", spaeter, true); };
   });
-  const pos = align === "center" ? { left: "50%", transform: basis } : { [align]: 0 };
   return (
-    <div ref={ref} data-nodrag style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", zIndex: 50, ...pos, ...style }} {...rest}>
+    <div ref={ref} data-nodrag style={{ ...popoverPanel, position: "fixed", left: 0, top: 0, zIndex: 50,
+      // Eigene Breite nach Inhalt, aber nicht ueber den ganzen Bildschirm: absolut im schmalen Knopf umbrachen
+      // lange Texte von selbst, fest im Fenster taten sie das nicht und das Menue wurde 600 px breit.
+      width: "max-content", maxWidth: "min(340px, calc(100vw - 24px))", ...stilOhneLage }} {...rest}>
       {children}
     </div>
   );
