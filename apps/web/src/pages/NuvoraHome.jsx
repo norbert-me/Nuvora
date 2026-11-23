@@ -9,7 +9,7 @@ import { lokal, sichern } from "../core/ansichten.js";
 import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLORS as C, pageApp, cardStyle, chipStyle, badge, btnSmall, CONTROL_H, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson, hol } from "../core/melden.js";
-import { WIDGETS } from "../components/Widgets.jsx";
+import { WIDGETS, WidgetPlatz } from "../components/Widgets.jsx";
 import { BEAMER_MODULE, useBeamer } from "../core/beamer.js";
 import { ZIELE } from "../core/ziele.js";
 import { hmToMin, ymd } from "../core/datum.js";
@@ -558,12 +558,12 @@ export default function NuvoraHome({ user }) {
               — dieselbe Frage wie in Navigation, Suche und Modul-Kachel, und
               deshalb dieselbe Funktion (useZielFilter). */}
           {!edit && WIDGETS.filter((w) => kacheln.wert.widgets.includes(w.key) && zielDa({ modul: w.modul, option: w.option }) && !(beamer.aktiv && (BEAMER_MODULE.includes(w.modul) || w.sensibel))).map((w) => {
-            if (w.key === "heute") return <HeutePanel key={w.key} t={t} />;
+            if (w.key === "heute") return <WidgetPlatz key={w.key} id={w.key} abstand={24}><HeutePanel t={t} /></WidgetPlatz>;
             if (w.key === "schwach") {
-              return <SchwacheWoche key={w.key} t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} />;
+              return <WidgetPlatz key={w.key} id={w.key} abstand={24}><SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} /></WidgetPlatz>;
             }
             const K = w.komponente;
-            return <div key={w.key} style={{ marginBottom: 16 }}><K /></div>;
+            return <WidgetPlatz key={w.key} id={w.key}><div style={{ marginBottom: 16 }}><K /></div></WidgetPlatz>;
           })}
 
           {/* Bearbeiten: was soll die Startseite zeigen? Widgets zum An- und

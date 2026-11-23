@@ -12,13 +12,79 @@
 //
 // Wer eins ergänzt, trägt es in WIDGETS ein — mehr ist nicht nötig; die
 // Startseite und der Bearbeiten-Bereich zählen die Liste zur Laufzeit durch.
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { COLORS as C, cardStyle, chipStyle, Icon, ICONS, linkBtn } from "./Icons.jsx";
+import { COLORS as C, cardStyle, chipStyle, Icon, ICONS, linkBtn, Skeleton } from "./Icons.jsx";
 import { hol } from "../core/melden.js";
 import { ymd } from "../core/datum.js";
 import { useLanguage } from "../i18n/index.jsx";
+
+// ── Platz fuer ein Widget, bevor es da ist ──
+// Die Widgets holen ihre Daten selbst und zeichneten bis dahin NICHTS: beim Laden der Startseite
+// sprang jede Kachel erst auf, und alles darunter rutschte mit. Dieser Rahmen merkt sich, wie hoch
+// das Widget beim letzten Mal war (localStorage, je Geraet), und haelt genau diesen Platz frei —
+// mit einem Skeleton darin, bis der Inhalt da ist. War es beim letzten Mal leer (Hoehe 0), bleibt
+// auch jetzt kein Platz stehen: dann springt nichts, denn es kommt auch nichts.
+// Beim allerersten Besuch gibt es noch keine Erinnerung; dort bleibt alles wie vorher, danach springt nichts mehr.
+const HOEHE_KEY = (id) => `nuvora_widget_h_${id}`;
+const gemerkteHoehe = (id) => {
+  try { const v = localStorage.getItem(HOEHE_KEY(id)); return v == null ? null : Number(v); } catch { return null; }
+};
+const LEER_NACH_MS = 2500; // so lange gilt „null Hoehe" noch als „laedt", erst danach als „leer"
+
+export function WidgetPlatz({ id, children, abstand = 16 }) {
+  const innen = useRef(null);
+  const [h, setH] = useState(() => gemerkteHoehe(id));   // zuletzt bekannte Hoehe, null = unbekannt
+  const [inhalt, setInhalt] = useState(false);           // ist der Inhalt da?
+  const [abgelaufen, setAbgelaufen] = useState(false);   // Wartezeit fuer „leer" vorbei
+
+  useEffect(() => { const z = setTimeout(() => setAbgelaufen(true), LEER_NACH_MS); return () => clearTimeout(z); }, []);
+
+  useLayoutEffect(() => {
+    const el = innen.current;
+    if (!el) return undefined;
+    let timer = null;
+    const messen = () => {
+      const nh = Math.round(el.offsetHeight);
+      setInhalt(nh > 0);
+      clearTimeout(timer);
+      // Entprellt: eine Kachel waehrend des Aufbaus nicht bei jedem Zwischenstand merken.
+      timer = setTimeout(() => {
+        if (nh > 0) { try { localStorage.setItem(HOEHE_KEY(id), String(nh + abstand)); } catch { /* egal */ } }
+      }, 400);
+    };
+    messen();
+    const beob = new ResizeObserver(messen);
+    beob.observe(el);
+    return () => { clearTimeout(timer); beob.disconnect(); };
+  }, [id, abstand]);
+
+  // Leer gemeldet: Hoehe 0 erinnern, sobald die Wartezeit um ist und noch immer nichts kam.
+  useEffect(() => {
+    if (abgelaufen && !inhalt) { try { localStorage.setItem(HOEHE_KEY(id), "0"); } catch { /* egal */ } }
+  }, [abgelaufen, inhalt, id]);
+
+  // Platz halten, solange der Inhalt fehlt — und nur, wenn beim letzten Mal einer da war.
+  // Ohne Erinnerung (erster Besuch) wird nichts geraten: ein falsch geschaetzter Platz springt genauso.
+  const reserviert = !inhalt && !abgelaufen && h != null && h > 0;
+  const platz = h ?? 0;
+  // EIN Container: das Skeleton liegt HINTER dem Inhalt (absolut), nicht davor. Lagen beide
+  // untereinander, standen sie einen Frame lang zusammen da — genau der Sprung, den es zu
+  // vermeiden gilt. Der Inhalt deckt das Skeleton ab, sobald er etwas zeichnet.
+  return (
+    <div style={{ position: "relative", minHeight: reserviert ? platz : undefined }}>
+      {reserviert && (
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: abstand }} aria-hidden="true">
+          <div style={{ ...cardStyle, padding: 16, height: "100%", boxSizing: "border-box", overflow: "hidden" }}>
+            <Skeleton rows={Math.max(1, Math.floor((platz - abstand - 32) / 40))} height={28} gap={12} />
+          </div>
+        </div>
+      )}
+      <div ref={innen} style={{ position: "relative" }}>{children}</div>
+    </div>
+  );
+}
 
 // Gemeinsamer Rahmen: Überschrift mit Weg ins Modul, darunter der Inhalt.
 // Ohne den hätte jedes Widget seinen eigenen Kasten erfunden — genau das, was
