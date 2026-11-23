@@ -71,7 +71,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import bindparam, select
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.responses import FileResponse
 
@@ -794,6 +794,20 @@ async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None 
                     # zweites Mal verschluesselt); Klartext aus aelteren Sicherungen
                     # steht danach als Klartext da und wird beim naechsten Start umgeschrieben.
                     ziel_tab, zeilen = krypto.fuer_einspielen(tabelle, zeilen)
+                    # Selbstbezuege (kurse.vorgaenger_id, folders.parent_id, …): „aufsteigende id
+                    # heisst, das Elternteil war zuerst da" stimmt nicht immer — ein Kurs kann auf
+                    # einen Vorgaenger mit HOEHERER id zeigen (so in der Produktion gesehen), und
+                    # Postgres lehnt die Zeile ab. Deshalb zwei Phasen: erst ohne den Bezug einfuegen,
+                    # danach nachtragen, wenn alle Zeilen da sind.
+                    selbst = [fk.parent.name for fk in tabelle.foreign_keys if fk.column.table is tabelle and fk.parent.nullable]
+                    nachtrag = []
+                    if selbst and "id" in tabelle.c:
+                        for z in zeilen:
+                            teil = {c: z[c] for c in selbst if z.get(c) is not None}
+                            if teil:
+                                nachtrag.append({"b_id": z["id"], **{f"b_{c}": v for c, v in teil.items()}})
+                                for c in teil:
+                                    z[c] = None
                     for i in range(0, len(zeilen), 500):
                         try:
                             await conn.execute(ziel_tab.insert(), zeilen[i:i + 500])
@@ -803,6 +817,13 @@ async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None 
                             # Container-Protokoll. Genau das hat hier einmal
                             # zwei Tage gekostet.
                             raise Einspielfehler(name, e) from e
+                    if nachtrag:
+                        # Je Spalte ein Lauf: nicht jede Zeile hat jede Bezugsspalte.
+                        for c in selbst:
+                            teil = [{"b_id": n["b_id"], f"b_{c}": n[f"b_{c}"]} for n in nachtrag if f"b_{c}" in n]
+                            if teil:
+                                await conn.execute(
+                                    ziel_tab.update().where(ziel_tab.c.id == bindparam("b_id")).values({c: bindparam(f"b_{c}")}), teil)
                     zaehlung[name] = len(zeilen)
                 unbekannt = set(eimer) - set(tabellen)
                 if unbekannt:

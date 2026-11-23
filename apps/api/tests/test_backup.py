@@ -430,6 +430,29 @@ async def test_zurueckspielen_in_eine_wegwerf_datenbank(welt):
 
 
 @pytest.mark.asyncio
+async def test_zurueckspielen_traegt_selbstbezuege_nach_auch_bei_hoeherer_id(welt):
+    """Gefunden im Probelauf mit den echten Daten: ein Kurs kann auf einen Vorgaenger mit
+    HOEHERER id zeigen (Kurs 2 -> 183). Die Sicherung steht nach id sortiert, das Kind kommt also
+    vor dem Elternteil, und Postgres lehnt die Zeile ab. Der Bezug wird deshalb erst nachgetragen."""
+    from app import models as m
+    async with welt["Sitzung"]() as s:
+        s.add(m.Kurs(id=9, owner_id=2, name="Alt"))
+        await s.commit()
+        s.add(m.Kurs(id=5, owner_id=2, name="Neu", vorgaenger_id=9))
+        await s.commit()
+    eintrag = await _sichern()
+    url = f"sqlite+aiosqlite:///{welt['tmp'] / 'selbst.db'}"
+    await backup.zurueckspielen(str(welt["sicherungen"] / eintrag["name"]), url)
+    probe = create_async_engine(url)
+    try:
+        async with async_sessionmaker(probe, class_=AsyncSession)() as s:
+            kurse = {k.id: k.vorgaenger_id for k in (await s.execute(select(m.Kurs))).scalars().all()}
+        assert kurse[5] == 9 and kurse[9] is None, kurse
+    finally:
+        await probe.dispose()
+
+
+@pytest.mark.asyncio
 async def test_zurueckspielen_ueberschreibt_vorhandene_zeilen(welt):
     """Zweimal dieselbe Sicherung einspielen darf nicht an Schlüsselkonflikten
     scheitern — sonst ist der zweite Versuch im Ernstfall der, der scheitert."""
