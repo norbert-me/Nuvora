@@ -14,6 +14,22 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## 4.6.0 — 23.11.2026
+
+- **Sicherheit:** Namen, Noten, Förder- und Maßnahmenangaben, Fotos, Notizen und die Konto-E-Mail liegen jetzt **verschlüsselt** in der Datenbank (AES-256-GCM). Der Schlüssel steht nur in der `.env` des Servers (Kopie: `.deploy.env`), nie in der Sicherung. **Beim ersten Deploy zeigt `deploy.sh` ihn einmal an — in den Passwortmanager legen.**
+- **Sicherheit:** Pillow 13.0.0 und aktualisierte Abhängigkeiten (schließen die offenen GitHub-Warnungen); Pfadprüfung in der lokalen App gehärtet.
+- **Wiederherstellung:** neu unter `/wiederherstellung` (Link im Papierkorb): je Modul mit einer Sicherung vergleichen und zurückholen — was fehlt, was anders ist, was neu ist. Nur eigene Daten, nichts wird gelöscht.
+- **Sicherung:** das Zurückspielen läuft jetzt auch mit den echten Daten (Kurs-Vorgänger und verwaiste Bezüge brachten es zum Scheitern); Chiffretext bleibt in der Sicherung verschlüsselt.
+- **Notenbuch:** deutlich flotter bei vielen Noten (Klick, Eintragen, Scrollen); Kinder sortierbar nach Nachname, Vorname oder Klasse; Quartalsstriche im Verlauf der Gesamtnoten; schlägt das Laden fehl, steht ein Hinweis mit „Erneut laden“ statt einer leeren Tabelle.
+- **Startseite:** die Widgets halten beim Laden ihren Platz und springen nicht mehr.
+- **Untis:** ausgefallene Stunden verschwinden aus dem Stundenplan (kein „Entfall“-Eintrag mehr); ersetzte Klasse, Fach oder Lehrkraft wird als Vertretung erkannt, auch wenn Untis die Stunde als normal führt.
+- **Kurse:** Klick auf den Namen zeigt Kinder, nächste Arbeit, Notenschnitt und Wiederholungsbedarf.
+- **CardVote:** Bilder als SVG lassen sich wieder einfügen (werden zu PNG), Upload-Fehler werden angezeigt; die Note einer Auswertung landet nicht mehr im Standard-Kurs der Klasse, wenn die Klasse in mehreren Kursen liegt.
+- **Klassenarbeit:** der Vergleich nimmt nur Klassen derselben Stufe; ein Klick auf eine Klasse öffnet deren Arbeit.
+- **Kalender:** ein fremder Termin lässt sich als eigener übernehmen und ändern — das Original wird dabei ausgeblendet.
+- **Menüs und Seite:** Aufklappmenüs werden nicht mehr von abgerundeten Karten abgeschnitten; die Fußzeile steht auch bei kurzen Seiten unten.
+- **Fehler melden:** Dateien per Drag & Drop oder als eingefügter Screenshot anhängen.
+
 ## 4.5.8 — 13.11.2026
 
 - **Klassenarbeit:** die Auswahl der Arbeiten bleibt nach Datum sortiert, die älteste oben (in 4.5.7 sortierte sie danach noch einmal nach Namen).
