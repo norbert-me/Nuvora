@@ -11,7 +11,7 @@ import { memo, useState, useEffect, useLayoutEffect, useMemo, useRef } from "rea
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
-import { Boxplot, COLORS as C, CONTROL_R, DialogKopf, Empty, FOKUS_TON, FOKUS_TON_DECKEND, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Segment, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, segmentBtn, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { Boxplot, COLORS as C, CONTROL_R, DialogKopf, linkBtn, toolbarBtn, Empty, FOKUS_TON, FOKUS_TON_DECKEND, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Segment, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, segmentBtn, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import { themenFuerKurs, themenIndex, useThemen } from "../core/topics.js";
 import { useKurs } from "../core/kurs.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -196,22 +196,48 @@ export default function Noten() {
 
   // Noten-Zeilen kommen aus dem KURS (dedupliziert), nicht aus der Fach-Klasse.
   const loadRoster = (id) => hol(`${API}/classes/${id}/students`).then((d) => setStudents(Array.isArray(d) ? d : []));
-  const load = async (id) => {
+  // Jeder Ladevorgang bekommt eine Nummer; gilt am Ende nicht mehr die eigene, ist ein neuerer
+  // gestartet (Klassen-, Kurs-, Halbjahrwechsel, `classes` meldet sich erneut) und diese Antwort
+  // darf nichts mehr ueberschreiben. Vorher gewann, wer ZULETZT ANKAM — nicht, wer zuletzt gefragt
+  // hatte, und eine alte Antwort legte die Tabelle eines anderen Kurses ueber die neue.
+  const ladeNr = useRef(0);
+  // Schlaegt ein Abruf fehl (Netz, Zeitueberschreitung, 429), war das bisher eine LEERE Antwort:
+  // die Tabelle zeigte keine Noten, und nichts sagte, dass sie nur nicht angekommen waren.
+  const [ladefehler, setLadefehler] = useState(false);
+  const holeOderWirf = async (url) => {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(String(r.status));
+    return r.json();
+  };
+  const load = async (id, versuch = 0) => {
     if (!id) return;
+    const meine = ++ladeNr.current;
     setLoading(true);
     loadRoster(id);
-    if (term === "year") {
-      const y = await fetch(`${API}/classes/${id}/year?agg=${agg}${kp}`).then((r) => (r.ok ? r.json() : { sections: [], rows: [] }));
-      setYearData(y); setLoading(false);
+    let sec, ent, sum;
+    try {
+      if (term === "year") {
+        const y = await holeOderWirf(`${API}/classes/${id}/year?agg=${agg}${kp}`);
+        if (meine !== ladeNr.current) return;
+        setYearData(y); setLoading(false); setLadefehler(false);
+        return;
+      }
+      [sec, ent, sum] = await Promise.all([
+        holeOderWirf(`${API}/classes/${id}/sections?term=${term}${kp}`),
+        // term wirkt nur auf die spaltenlosen Beobachtungen (sie tragen das
+        // Halbjahr selbst); Noten kommen ueber ihre Spalte ohnehin je Halbjahr.
+        holeOderWirf(`${API}/classes/${id}/entries?term=${term === "year" ? "" : term}${kp}`),
+        holeOderWirf(`${API}/classes/${id}/summary?term=${term}&agg=${agg}${kp}`),
+      ]);
+    } catch {
+      if (meine !== ladeNr.current) return;
+      // Einmal still nachfassen (kurze Aussetzer sind der Normalfall), danach sagen, dass es klemmt.
+      if (versuch < 2) { setTimeout(() => { if (meine === ladeNr.current) load(id, versuch + 1); }, 1200 * (versuch + 1)); return; }
+      setLoading(false); setLadefehler(true);
       return;
     }
-    const [sec, ent, sum] = await Promise.all([
-      fetch(`${API}/classes/${id}/sections?term=${term}${kp}`).then((r) => (r.ok ? r.json() : [])),
-      // term wirkt nur auf die spaltenlosen Beobachtungen (sie tragen das
-      // Halbjahr selbst); Noten kommen ueber ihre Spalte ohnehin je Halbjahr.
-      fetch(`${API}/classes/${id}/entries?term=${term === "year" ? "" : term}${kp}`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API}/classes/${id}/summary?term=${term}&agg=${agg}${kp}`).then((r) => (r.ok ? r.json() : [])),
-    ]);
+    if (meine !== ladeNr.current) return;
+    setLadefehler(false);
     setSections((p) => teilen(p, sec, (x) => x.id)); setEntries((p) => teilen(p, ent, (x) => x.id));
     setSummary((p) => teilen(p, sum, (x) => x.student_id)); setLoading(false);
     loadedOnce.current = true; // ab jetzt kein Skeleton mehr (Reloads z.B. bei Median/Mittel nicht flackern lassen)
@@ -780,7 +806,15 @@ export default function Noten() {
         ? (yearData.rows || []).length > 0 && <NotenStatistik noten={(yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))} stufung={stufung} t={t} />
         : sections.length > 0 && <NotenStatistik noten={(summary || []).filter((s) => !s.le).map((s) => endNoteVon(s))} stufung={stufung} t={t} />}
 
-      {loading && !loadedOnce.current && term !== "year" ? (
+      {ladefehler && loadedOnce.current && (
+        <div role="alert" style={{ fontSize: 13, color: C.danger, marginBottom: 8 }}>{t("noten.ladefehlerAlt")} <button onClick={() => load(classId)} style={linkBtn}>{t("noten.nochmalLaden")}</button></div>
+      )}
+      {ladefehler && !loadedOnce.current ? (
+        <div role="alert" style={{ ...panelStyle, padding: 16, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", borderColor: C.danger }}>
+          <span style={{ flex: 1, minWidth: 0, color: C.danger, fontWeight: 600, fontSize: 14 }}>{t("noten.ladefehler")}</span>
+          <button onClick={() => load(classId)} style={toolbarBtn}>{t("noten.nochmalLaden")}</button>
+        </div>
+      ) : loading && !loadedOnce.current && term !== "year" ? (
         <Skeleton rows={6} height={38} />
       ) : term === "year" ? (
         <YearTable t={t} data={yearData} cls={cls} suche={suche}
@@ -1162,7 +1196,7 @@ export default function Noten() {
       <SpeicherBalken entwurf={entwurf} zeigen={autoSpeichern.zeigen} />
 
       {infoFuer && (
-        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} classId={classId} kursId={kursId} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} form={form} setForm={setFormPersist} />
+        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} classId={classId} kursId={kursId} dividers={dividers} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} form={form} setForm={setFormPersist} />
       )}
     </div>
   );
@@ -1708,7 +1742,7 @@ function punktText(p, t) {
   return zeilen.join("\n");
 }
 
-function GradeChart({ series, t, titel, hinweis, rechts }) {
+function GradeChart({ series, t, titel, hinweis, rechts, striche = null }) {
   // Eigenes Hinweisfeld statt `<title>` im SVG: das zeigt der Browser
   // unzuverlaessig (und nur einzeilig, nach Verzoegerung). Hier steht es sofort
   // und mehrzeilig — Datum, Spalte, Note.
@@ -1743,6 +1777,22 @@ function GradeChart({ series, t, titel, hinweis, rechts }) {
             <text x={padL - 6} y={y(g) + 3.5} textAnchor="end" fontSize="10" fill="var(--text3)">{g}</text>
           </g>
         ))}
+        {/* Quartalsstriche: dieselben Striche wie in der Tabelle, hier als gestrichelte Linie zwischen
+            dem Punkt der Spalte und dem naechsten. Ein Quartal ist der Abschnitt zwischen zwei Strichen. */}
+        {striche && (() => {
+          let q = 1;
+          return pts.slice(0, -1).map((p, i) => {
+            if (!striche.has(p.s.cat?.id)) return null;
+            q += 1;
+            const xs = (p.cx + pts[i + 1].cx) / 2;
+            return (
+              <g key={`q${i}`} style={{ pointerEvents: "none" }}>
+                <line x1={xs} y1={padT} x2={xs} y2={H - padB} stroke="var(--text3)" strokeWidth="1" strokeDasharray="4 3" />
+                <text x={xs + 3} y={padT + 8} fontSize="9" fill="var(--text3)">Q{q}</text>
+              </g>
+            );
+          });
+        })()}
         <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {pts.map((p, i) => (
           <g key={i}>
@@ -1840,7 +1890,7 @@ function Fehlzeiten({ classId, studentId, t }) {
 // Der Name im Dialog folgt derselben Option (ausserhalb des Hooks gelesen).
 const kurzNameOrt = (n) => (kurzNameAn() ? kurzName(n) : n);
 
-function StudentInfo({ t, student, summary, sections, entries = [], classId = null, kursId = null, onZeugnis, onClose, form, setForm }) {
+function StudentInfo({ t, student, summary, sections, entries = [], classId = null, kursId = null, dividers = [], onZeugnis, onClose, form, setForm }) {
   // Hook vor jedem fruehen Ausstieg: sonst haengt die Hook-Reihenfolge daran,
   // ob gerade ein Kind gewaehlt ist.
   const [bereich, setBereich] = useState("gesamt");
@@ -1935,7 +1985,7 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
         <Fehlzeiten classId={classId} studentId={student.id} t={t} />
         <SchuelerAngaben studentId={student.id} kursId={kursId} nurLesen t={t} />
 
-        <GradeChart series={serie} t={t}
+        <GradeChart series={serie} t={t} striche={bereich === "gesamt" && dividers.length ? new Set(dividers) : null}
           titel={bereich === "gesamt" ? t("noten.verlauf") : t("noten.verlaufSection", { name: secName })}
           hinweis={modus === "einzeln" ? t("noten.verlaufSingle")
                    : bereich === "gesamt" ? t("noten.verlaufRunning") : t("noten.verlaufRunningSection")}
