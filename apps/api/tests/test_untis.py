@@ -350,9 +350,11 @@ async def test_vertretungen_holen_speichert_titel_und_zeigt_sie(s, monkeypatch):
     cal = K._untis_kalender(u)
     assert cal, "ein Stand allein macht den Untis-Kalender (auch ohne Abo-Link)"
     heute = date.today()
-    zeilen = await K._untis_vertretungen(u, s, "", cal, heute, heute + timedelta(days=30))
+    zeilen, ausfaelle = await K._untis_vertretungen(u, s, "", cal, heute, heute + timedelta(days=30))
     titel = sorted(z["title"] for z in zeilen)
-    assert titel == ["Entfall: E 7a", "Vertretung: M 8.3 (statt D)", "Zusatz: Frei"]
+    # Der Ausfall ist KEIN Eintrag mehr: die Stunde verschwindet aus dem Stundenplan.
+    assert titel == ["Vertretung: M 8.3 (statt D)", "Zusatz: Frei"]
+    assert [a["titel"] for a in ausfaelle] == ["E 7a"]
     assert [z for z in zeilen if z["title"].startswith("Vertretung")][0]["description"] == "Aufgaben im Buch"
 
 
@@ -401,13 +403,13 @@ def test_perioden_werden_zu_stunden():
           "rooms": [{"id": 4, "name": "A1"}], "teachers": [{"id": 5, "lastName": "Ich"}, {"id": 6, "lastName": "Muster"}],
           "timeGrid": {"days": [{"day": "MON", "units": [{"startTime": "08:10"}, {"startTime": "11:45"}]}]}}
 
-    def p(start, ende, kennz, text=None, tid=5, torg=5):
+    def p(start, ende, kennz, text=None, tid=5, torg=5, sorg=2):
         return {"startDateTime": start, "endDateTime": ende, "is": kennz, "text": text or {},
-                "elements": [{"type": "CLASS", "id": 1, "orgId": 1}, {"type": "SUBJECT", "id": 2, "orgId": 3},
+                "elements": [{"type": "CLASS", "id": 1, "orgId": 1}, {"type": "SUBJECT", "id": 2, "orgId": sorg},
                              {"type": "ROOM", "id": 4, "orgId": 4}, {"type": "TEACHER", "id": tid, "orgId": torg}]}
 
     st = stunden_aus_perioden([
-        p("2026-11-11T10:45Z", "2026-11-11T11:35Z", ["IRREGULAR"], {"substitution": "Aufgaben", "info": ""}, torg=6),
+        p("2026-11-11T10:45Z", "2026-11-11T11:35Z", ["IRREGULAR"], {"substitution": "Aufgaben", "info": ""}, torg=6, sorg=3),
         p("2026-11-12T08:10", "2026-11-12T09:00", ["CANCELLED"]),
         p("2026-11-13T08:10", "2026-11-13T09:00", ["REGULAR"]),
     ], md)
@@ -419,6 +421,52 @@ def test_perioden_werden_zu_stunden():
     assert r["vertretung"] is False and r["faellt_aus"] is False
 
 
+def test_ersetzte_klasse_ist_eine_vertretung_auch_wenn_untis_regular_sagt():
+    """Gesehen am 26.11. im echten Stundenplan: eine Klasse wurde ersetzt (`orgId` != `id`), Untis fuehrte die
+    Stunde aber als REGULAR — und die Vertretung fiel durch. Ein Vertretungstext allein genuegt ebenfalls."""
+    from app.untis_mobile import stunden_aus_perioden
+    md = {"klassen": [{"id": 1, "name": "7.5"}, {"id": 9, "name": "7.4"}], "subjects": [{"id": 2, "name": "M"}],
+          "rooms": [], "teachers": [{"id": 5, "lastName": "Ich"}], "timeGrid": {"days": []}}
+    ersetzt = {"startDateTime": "2026-11-26T11:45", "endDateTime": "2026-11-26T12:30", "is": ["REGULAR"], "text": {},
+               "elements": [{"type": "CLASS", "id": 1, "orgId": 9}, {"type": "SUBJECT", "id": 2, "orgId": 2}, {"type": "TEACHER", "id": 5, "orgId": 5}]}
+    mit_text = {"startDateTime": "2026-11-27T11:45", "endDateTime": "2026-11-27T12:30", "is": ["REGULAR"], "text": {"substitution": "Raumtausch"},
+                "elements": [{"type": "CLASS", "id": 1, "orgId": 1}, {"type": "SUBJECT", "id": 2, "orgId": 2}]}
+    normal = {"startDateTime": "2026-11-28T11:45", "endDateTime": "2026-11-28T12:30", "is": ["REGULAR"], "text": {},
+              "elements": [{"type": "CLASS", "id": 1, "orgId": 1}, {"type": "SUBJECT", "id": 2, "orgId": 2}]}
+    a, b, c = stunden_aus_perioden([ersetzt, mit_text, normal], md)
+    assert a["vertretung"] is True and "7.4" in a["orig"]
+    assert b["vertretung"] is True
+    assert c["vertretung"] is False
+    # Ausgefallen ist keine Vertretung
+    ausfall = {**normal, "is": ["CANCELLED"], "elements": [{"type": "CLASS", "id": 1, "orgId": 9}]}
+    assert stunden_aus_perioden([ausfall], md)[0]["vertretung"] is False
+
+
+@pytest.mark.asyncio
+async def test_untis_ausfall_nimmt_die_stunde_aus_dem_plan_statt_einen_eintrag_zu_zeigen(s, monkeypatch):
+    from datetime import date, timedelta
+    from app.models import User, UserModule
+    from app.routers import kalender as K
+
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 40)
+    tag = (date.today() + timedelta(days=2)).isoformat()
+    u = User(email="untis6@b.de", password_hash="x", name="L", email_verified=True,
+             timetable_times=[{"start": "08:00", "end": "08:45"}, {"start": "08:50", "end": "09:35"}],
+             untis_stand={"stand": "2026-11-23T10:00:00+00:00", "von": tag, "bis": tag,
+                          "stunden": [{"datum": tag, "start": "08:50", "ende": "09:35", "titel": "E 7a", "faellt_aus": True}]})
+    s.add(u)
+    await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    await s.commit()
+    K._AUSFALL_CACHE.pop(u.id, None)
+    K._EXT_CACHE.pop(u.id, None)
+
+    # 1. kein Eintrag im Kalender
+    zeilen = await K.externe_ereignisse(u, db=s)
+    assert not [z for z in zeilen if z["title"].startswith("Entfall")], zeilen
+    # 2. die Stunde (2.) faellt aus dem Plan, nicht wieder einblendbar
+    erg = await K.list_slot_cancellations(user=u, db=s)
+    assert {"date": f"{tag}T00:00:00", "period": 2, "untis": True} in erg
 @pytest.mark.asyncio
 async def test_mobil_verbinden_holen_und_trennen(s, monkeypatch):
     from datetime import date, timedelta

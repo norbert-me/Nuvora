@@ -655,7 +655,9 @@ export default function Kalender() {
       gesehen.add(id);
       return true;
     });
-    const stunden = (slotCancels || []).map((c) => {
+    // Von Untis ausgefallene Stunden (`untis: true`) stehen nicht in der Liste: sie sind keine Entscheidung
+    // dieser Lehrkraft und lassen sich hier nicht „wieder einblenden" — Untis sagt, dass sie ausfallen.
+    const stunden = (slotCancels || []).filter((c) => !c.untis).map((c) => {
       const d = new Date(c.date);
       const s = tt.slots.find((x) => x.weekday === wochentagMo0(d) && x.period === c.period && slotActiveOn(x, d));
       return { ...c, d, name: (s && (slotName(s) || s.title)) || "" };

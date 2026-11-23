@@ -179,6 +179,7 @@ def stunden_aus_perioden(perioden: list, md: dict) -> list:
             continue
         gruppen = {"CLASS": [], "SUBJECT": [], "ROOM": []}
         statt = []
+        ersetzt = False
         for e in p.get("elements") or []:
             if not isinstance(e, dict):
                 continue
@@ -187,7 +188,8 @@ def stunden_aus_perioden(perioden: list, md: dict) -> list:
             if art in gruppen and name:
                 gruppen[art].append(name)
             org = e.get("orgId")
-            if org and org != e.get("id") and art in ("SUBJECT", "TEACHER"):
+            if org and org != e.get("id") and art in ("SUBJECT", "TEACHER", "CLASS"):
+                ersetzt = True
                 alt = namen.get(art, {}).get(org, "")
                 if alt:
                     statt.append(alt)
@@ -200,6 +202,11 @@ def stunden_aus_perioden(perioden: list, md: dict) -> list:
             "datum": tag, "start": start, "ende": ende, "titel": titel[:200],
             "klassen": gruppen["CLASS"], "faecher": gruppen["SUBJECT"],
             "raum": ", ".join(gruppen["ROOM"])[:60], "info": info[:300], "orig": ", ".join(statt)[:80],
-            "faellt_aus": "CANCELLED" in kennz, "vertretung": "IRREGULAR" in kennz,
+            "faellt_aus": "CANCELLED" in kennz,
+            # Eine Vertretung kennzeichnet Untis nicht immer mit IRREGULAR: wird Klasse, Fach oder
+            # Lehrkraft ersetzt (`orgId` != `id`) oder steht ein Vertretungstext dabei, bleibt die
+            # Stunde oft REGULAR — und fiel durch (am 26.11. gesehen: eine Klasse ersetzt, REGULAR).
+            "vertretung": ("CANCELLED" not in kennz)
+                          and ("IRREGULAR" in kennz or ersetzt or bool((text.get("substitution") or "").strip())),
         })
     return out
