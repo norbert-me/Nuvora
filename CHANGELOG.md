@@ -14,6 +14,11 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## 4.6.1 — 23.11.2026
+
+- **Notenbuch:** Quartalsstriche stehen nicht mehr in der Tabelle, sondern im Verlauf der Gesamtnoten — per Datum setzen („Strich setzen“) und mit dem Kreuz wieder entfernen. Bestehende Striche werden einmalig in das Datum ihrer Spalte umgewandelt.
+- **Hilfe:** neue FAQ — Noten den Kindern mitteilen, Notenbuch am Beamer, Daten aus einer Sicherung zurückholen, Quartal im Verlauf markieren, fremden Kalendertermin ändern, fehlende Stunde bei Untis, Datenschutz.
+
 ## 4.6.0 — 23.11.2026
 
 - **Sicherheit:** Namen, Noten, Förder- und Maßnahmenangaben, Fotos, Notizen und die Konto-E-Mail liegen jetzt **verschlüsselt** in der Datenbank (AES-256-GCM). Der Schlüssel steht nur in der `.env` des Servers (Kopie: `.deploy.env`), nie in der Sicherung. **Beim ersten Deploy zeigt `deploy.sh` ihn einmal an — in den Passwortmanager legen.**
