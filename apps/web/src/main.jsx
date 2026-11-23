@@ -1128,14 +1128,14 @@ function ContentWrapper({ children }) {
   // einheitlich zentriert — dieselbe Spaltenbreite auf jeder Seite, damit die
   // Oberflaeche nicht je Modul anders links klebt.
   const isSession = p.startsWith("/session") || p.startsWith("/cardvote/session");
-  if (isSession) return <div style={{ padding: "24px 16px 64px" }}>{children}</div>;
+  if (isSession) return <div style={{ padding: "24px 16px 64px", flex: "1 0 auto" }}>{children}</div>;
   // Code-Detektiv laeuft ohne Nuvora-Navbar im Vollbild — kein Padding, keine
   // Spaltenbreite, damit das Spiel den ganzen Platz nutzt.
   if (p.startsWith(CD)) return children;
   return (
     <>
       <style>{`@media (max-width: 640px) { .content-wrap { padding: 16px 12px 64px !important; } }`}</style>
-      <div className="content-wrap" style={{ padding: "32px 32px 64px", maxWidth: 1080, margin: "0 auto" }}>{children}</div>
+      <div className="content-wrap" style={{ padding: "32px 32px 64px", maxWidth: 1080, margin: "0 auto", width: "100%", flex: "1 0 auto" }}>{children}</div>
     </>
   );
 }

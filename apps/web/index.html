@@ -129,6 +129,9 @@
          einheitlicher Zoom vergrößert ALLE Module gleich (auch die eingebetteten
          Lernpfad-/Code-Detektiv-Ansichten liegen in #root). */
       #root { zoom: 1.06; }
+      /* Der Fuss (Hilfe · Kontakt · Impressum) steht am unteren Bildschirmrand, auch wenn die Seite
+         kurz ist: #root fuellt das Fenster, der Inhalt waechst (`.content-wrap`), der Fuss bleibt unten. */
+      #root { display: flex; flex-direction: column; min-height: var(--voll, 100dvh); }
       /* Eine volle Fensterhoehe INNERHALB von #root: `100dvh` wird dort mit dem Zoom
          mitgerechnet (×1,06) und ueberragt das Fenster — eine Scrollleiste an einer leeren
          Seite. Seiten, die das Fenster fuellen, nehmen deshalb diese Groesse. */
