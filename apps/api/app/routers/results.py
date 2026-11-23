@@ -377,6 +377,8 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
     return {
         "session_id": session_id,
         "session_name": session.name,
+        # Fuer den Link zur Fragensammlung in der Auswertung (Deep-Link ?set=).
+        "question_set_id": session.question_set_id,
         "class_id": session.class_id,
         # Der Kurs (Fach) der Klasse. Ohne ihn schlaegt die Uebernahme ins
         # Notenbuch die Abschnitte ALLER Faecher dieser Klasse vor — und die

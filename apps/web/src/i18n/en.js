@@ -2803,7 +2803,7 @@ export default {
   "cv.downloadPdf": "Download PDF",
   "cv.pdfOverviewFile": "Overview",
   "cv.questionN": "Question {{n}}",
-  "cv.allQuestions": "Questions",
+  "cv.zurFragensammlung": "Open question set",
   "cv.noSolution": "no answer key",
   "cv.werten": "Count",
   "cv.nichtWertenHint": "This question doesn't count in this evaluation (e.g. never asked) — missing answers would otherwise be wrong for everyone",

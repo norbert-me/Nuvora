@@ -2804,7 +2804,7 @@ export default {
   "cv.downloadPdf": "Descargar PDF",
   "cv.pdfOverviewFile": "Resumen",
   "cv.questionN": "Pregunta {{n}}",
-  "cv.allQuestions": "Preguntas",
+  "cv.zurFragensammlung": "Ir al conjunto de preguntas",
   "cv.noSolution": "sin solución",
   "cv.werten": "Contar",
   "cv.nichtWertenHint": "Esta pregunta no cuenta en esta evaluación (p. ej. nunca se hizo): las respuestas que faltan serían incorrectas para todos",

@@ -2793,7 +2793,7 @@ export default {
   "cv.downloadPdf": "PDF herunterladen",
   "cv.pdfOverviewFile": "Gesamtübersicht",
   "cv.questionN": "Frage {{n}}",
-  "cv.allQuestions": "Fragen",
+  "cv.zurFragensammlung": "Zur Fragensammlung",
   "cv.noSolution": "keine Lösung hinterlegt",
   "cv.werten": "Werten",
   "cv.nichtWertenHint": "Diese Frage zählt in dieser Auswertung nicht (z. B. nie gestellt) — fehlende Antworten sind sonst für alle falsch",

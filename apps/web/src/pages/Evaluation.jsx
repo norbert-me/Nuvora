@@ -60,7 +60,7 @@ export default function Evaluation() {
   const [selectedQ, setSelectedQ] = useState(null);
   const [showWeights, setShowWeights] = useState(false);
   const [showScale, setShowScale] = useState(false);
-  const [showFragen, setShowFragen] = useState(false);
+  const [eOffen, setEOffen] = useState(false);   // „E-Aufgaben fuer G-Kinder": standardmaessig zu
   // SuS-Ansicht: alles Persönliche aus (Namen, Punkte, Noten je Kind). Dieselbe
   // Bauform wie in der Klassenarbeit — die Auswertung wird im Unterricht
   // besprochen, und dabei gehört die Leistung eines Kindes nicht an die Wand.
@@ -596,6 +596,12 @@ export default function Evaluation() {
       )}
       <h2 style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{session_name || t("cv.sessionFallback", { id })}
         {unbenotet && <span style={{ ...chipStyle, marginLeft: 10, fontSize: 12, verticalAlign: "middle" }}>{t("dash.unbenotetToggle")}</span>}</h2>
+      {data.question_set_id && (
+        <Link to={`/cardvote/questions?set=${data.question_set_id}`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--accent)", textDecoration: "none", fontWeight: 500, marginTop: 2 }}>
+          <Icon d={ICONS.chevronRight} size={13} color="var(--accent)" /> {t("cv.zurFragensammlung")}
+        </Link>
+      )}
       {/* Nicht benotet: diese Auswertung zaehlt nicht als Note. Die Kinder sehen es an ihrem Zugang
           („Übung"), die Notenverteilung fällt weg. Ist schon das Quiz so markiert, steht es oben als Marke. */}
       {!data.unbenotet_quiz && (
@@ -681,18 +687,35 @@ export default function Evaluation() {
           und Notenschluessel. */}
       {niveauAktiv && (
         <div style={{ ...panelStyle, padding: 16, marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-            <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{t("cv.eModusTitle")}</h4>
-            <Tabs value={eModus} onChange={(v) => eConf.setz({ eModus: v })} style={{ marginLeft: "auto" }}
-              options={[["bonus", t("cv.eModusBonus")], ["ausgleich", t("cv.eModusAusgleich")], ["keine", t("cv.eModusKeine")], ["alle", t("cv.eModusAlle")]]} />
+          {/* Eingeklappt steht nur die Ueberschrift mit der gewaehlten Regel: die Erklaerung
+              braucht man beim Einstellen, nicht bei jedem Blick auf die Auswertung. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: eOffen ? 8 : 0 }}>
+            <button onClick={() => setEOffen((v) => !v)} aria-expanded={eOffen}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--text)" }}>
+              <Icon d={eOffen ? ICONS.chevronDown : ICONS.chevronRight} size={14} color="var(--text3)" />
+              <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: 0 }}>{t("cv.eModusTitle")}</h4>
+            </button>
+            {eOffen ? (
+              <Tabs value={eModus} onChange={(v) => eConf.setz({ eModus: v })} style={{ marginLeft: "auto" }}
+                options={[["bonus", t("cv.eModusBonus")], ["ausgleich", t("cv.eModusAusgleich")], ["keine", t("cv.eModusKeine")], ["alle", t("cv.eModusAlle")]]} />
+            ) : (
+              <span style={{ ...chipStyle, fontSize: 12 }}>
+                {eModus === "bonus" ? t("cv.eModusBonus") : eModus === "ausgleich" ? t("cv.eModusAusgleich")
+                  : eModus === "keine" ? t("cv.eModusKeine") : t("cv.eModusAlle")}
+              </span>
+            )}
           </div>
-          <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6 }}>
-            {eModus === "bonus" ? t("cv.eModusBonusText")
-              : eModus === "ausgleich" ? t("cv.eModusAusgleichText")
-              : eModus === "keine" ? t("cv.eModusKeineText")
-              : t("cv.eModusAlleText")}
-          </p>
-          {(eModus === "bonus" || eModus === "ausgleich") && <BonusRegel wert={bonus} onChange={(b) => eConf.setz({ bonus: b })} t={t} />}
+          {eOffen && (
+            <>
+              <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6 }}>
+                {eModus === "bonus" ? t("cv.eModusBonusText")
+                  : eModus === "ausgleich" ? t("cv.eModusAusgleichText")
+                  : eModus === "keine" ? t("cv.eModusKeineText")
+                  : t("cv.eModusAlleText")}
+              </p>
+              {(eModus === "bonus" || eModus === "ausgleich") && <BonusRegel wert={bonus} onChange={(b) => eConf.setz({ bonus: b })} t={t} />}
+            </>
+          )}
         </div>
       )}
 
@@ -758,13 +781,12 @@ export default function Evaluation() {
       <Werkzeugleiste style={{ marginBottom: 12 }}
         links={
           <Tabs
-            value={showScale ? "scale" : showWeights ? "weights" : showFragen ? "fragen" : ""}
+            value={showScale ? "scale" : showWeights ? "weights" : ""}
             onChange={(v) => {
               setShowScale(v === "scale" && !showScale);
               setShowWeights(v === "weights" && !showWeights);
-              setShowFragen(v === "fragen" && !showFragen);
             }}
-            options={[...(unbenotet ? [] : [["scale", t("cv.gradeScale")]]), ["weights", t("cv.weights")], ["fragen", t("cv.allQuestions")]]}
+            options={[...(unbenotet ? [] : [["scale", t("cv.gradeScale")]]), ["weights", t("cv.weights")]]}
           />
         }
       />
@@ -809,49 +831,9 @@ export default function Evaluation() {
         </div>
       )}
 
-      {/* Alle Fragen des Tests zum Nachlesen.
-          Bisher kam man an eine Frage nur ueber die senkrecht gestellten
-          Spaltenkoepfe der Tabelle („F3") — das findet niemand, der nicht
-          weiss, dass sie anklickbar sind, und beim Besprechen im Unterricht
-          ist „was stand in Frage 3?" die haeufigste Frage. Hier steht der
-          Wortlaut, die richtige Antwort und wie viele sie hatten; ein Klick
-          fuehrt in die bestehende Einzelansicht. */}
-      {showFragen && (
-        <div style={{ ...cardStyle, marginBottom: 12, display: "grid", gap: 8 }}>
-          {questions.map((q, i) => {
-            const stat = questionStats[i];
-            const loesung = (q.correct_answer || "").split("").filter(Boolean);
-            return (
-              <div key={q.id}>
-              <button onClick={() => setSelectedQ(i)}
-                style={{
-                  display: "flex", alignItems: "flex-start", gap: 12, textAlign: "left", width: "100%",
-                  padding: "10px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border3)",
-                  background: "var(--bg3)", cursor: "pointer", color: "var(--text)",
-                }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", flexShrink: 0, paddingTop: 2 }}>
-                  F{i + 1}{niveauAktiv && (q.niveau || "") === "E" ? " · E" : ""}
-                </span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5 }}>
-                  <Latex>{q.text}</Latex>
-                  <span style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-                    {loesung.map((k) => (
-                      <span key={k} style={{ ...chipStyle, fontSize: 12, fontWeight: 700, padding: "2px 8px", background: ANTWORT_COLORS[k], color: C.aufAkzent }}>
-                        {k} <Latex>{q.choices?.[k] || ""}</Latex>
-                      </span>
-                    ))}
-                    {!loesung.length && <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("cv.noSolution")}</span>}
-                  </span>
-                </span>
-                <span style={{ fontSize: 12, color: "var(--text3)", flexShrink: 0, paddingTop: 2 }}>
-                  {stat ? `${stat.correct}/${stat.answered}` : ""}
-                </span>
-              </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* Die Fragen erreicht man ueber die Spaltenkoepfe der Tabelle (F1, F2 …) und ueber
+          den Link zur Fragensammlung oben — ein eigener „Fragen"-Reiter war die dritte
+          Kopie derselben Navigation. */}
 
       <TopicAnalysis questions={questions} presentStudents={presentStudents} />
 
