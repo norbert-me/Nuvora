@@ -42,18 +42,22 @@ def einhaengen(app) -> None:
     async def oberflaeche(pfad: str):
         if pfad.startswith(("api/", "ws/")) or pfad in ("api", "ws"):
             raise HTTPException(404)
-        ziel = (wurzel / pfad).resolve() if pfad else wurzel / "index.html"
-        # Nie aus dem Web-Ordner heraus (../) — nur Dateien darin.
-        if not (ziel == wurzel or wurzel in ziel.parents):
+        # Mit os.path statt pathlib: so lassen sich Normalisieren (realpath) und die Pruefung auf den
+        # Web-Ordner in EINER Folge lesen — und die statische Analyse erkennt sie als Schranke.
+        wurzel_s = os.path.realpath(str(wurzel))
+        ziel = os.path.realpath(os.path.join(wurzel_s, pfad)) if pfad else os.path.join(wurzel_s, "index.html")
+        # Nie aus dem Web-Ordner heraus (../, Symlinks) — nur Dateien darin.
+        if not (ziel == wurzel_s or ziel.startswith(wurzel_s + os.sep)):
             raise HTTPException(404)
-        if ziel.is_dir():
-            ziel = ziel / "index.html"
-        if not ziel.is_file():
+        if os.path.isdir(ziel):
+            ziel = os.path.join(ziel, "index.html")
+        if not os.path.isfile(ziel):
             # Bekannte Statik-Endungen: 404 statt der Startseite (sonst bekommt
             # ein fehlendes Skript HTML und der Fehler zeigt in die falsche Richtung).
             if "." in pfad.rsplit("/", 1)[-1]:
                 raise HTTPException(404)
-            ziel = wurzel / "index.html"        # Seitenroute der Oberflaeche
-        kopf = {"Cache-Control": "no-cache"} if ziel.name in _NIE_CACHEN else (
-            {"Cache-Control": "public, max-age=31536000, immutable"} if "assets" in ziel.parts else {})
+            ziel = os.path.join(wurzel_s, "index.html")        # Seitenroute der Oberflaeche
+        teile = ziel[len(wurzel_s):].split(os.sep)
+        kopf = {"Cache-Control": "no-cache"} if os.path.basename(ziel) in _NIE_CACHEN else (
+            {"Cache-Control": "public, max-age=31536000, immutable"} if "assets" in teile else {})
         return FileResponse(ziel, headers=kopf)

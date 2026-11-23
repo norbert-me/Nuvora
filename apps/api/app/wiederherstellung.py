@@ -398,40 +398,12 @@ def sicherungs_pfad(name: str) -> str | None:
     if not DATEI_MUSTER.fullmatch(name or ""):
         return None
     ordner = os.path.realpath(sicherungs_ordner())
-    if name not in (os.listdir(ordner) if os.path.isdir(ordner) else []):
+    if not os.path.isdir(ordner):
         return None
-    voll = os.path.realpath(os.path.join(ordner, name))
-    return voll if os.path.dirname(voll) == ordner and os.path.isfile(voll) else None
-
-
-async def anreichern(db, ergebnis: dict, sicherung: dict) -> None:
-    """Zeilen erkennbar machen: eine Note heisst „Anna Muster · 7.1 · value 1.7", nicht nur „value 1.7".
-
-    Der Name kommt aus den verknuepften Zeilen, wie sie HEUTE in der Datenbank stehen (entschluesselt, also
-    nur fuer die angemeldete Lehrkraft, deren Zeilen es ohnehin sind). Ist das Elternteil selbst weg, bleibt
-    nur die Zeile selbst — dafuer gibt es dann den Hinweis „braucht students#…" beim Einspielen.
-    """
-    meta = Base.metadata.tables
-    gesucht: dict[str, set] = {}
-    for tb in ergebnis["tabellen"]:
-        for art in ("fehlt", "anders"):
-            for z in tb[art]:
-                row = sicherung["zeilen"].get(tb["tabelle"], {}).get(z["id"], {})
-                for col, ziel in PLAN[tb["tabelle"]]["fks"]:
-                    if row.get(col) is not None and ziel in meta and ("name" in meta[ziel].c or "title" in meta[ziel].c):
-                        gesucht.setdefault(ziel, set()).add(row[col])
-    namen: dict[str, dict] = {}
-    for ziel, ids in gesucht.items():
-        t = meta[ziel]
-        feld = t.c.name if "name" in t.c else t.c.title
-        namen[ziel] = {i: v for i, v in (await db.execute(select(t.c.id, feld).where(t.c.id.in_(list(ids))))).all() if v}
-    for tb in ergebnis["tabellen"]:
-        for art in ("fehlt", "anders"):
-            for z in tb[art]:
-                row = sicherung["zeilen"].get(tb["tabelle"], {}).get(z["id"], {})
-                paare = [(ziel, namen.get(ziel, {}).get(row.get(col))) for col, ziel in PLAN[tb["tabelle"]]["fks"]]
-                # Das Kind zuerst: „Anna · Spalte 2.1 · …" liest sich besser als umgekehrt.
-                paare.sort(key=lambda p: 0 if p[0] in ("students", "persons") else 1)
-                kontext = [n for _, n in paare if n][:2]
-                if kontext:
-                    z["bezeichnung"] = " · ".join(kontext + [z["bezeichnung"]])
+    for eintrag in os.listdir(ordner):
+        if eintrag != name or not DATEI_MUSTER.fullmatch(eintrag):
+            continue
+        voll = os.path.realpath(os.path.join(ordner, eintrag))   # `eintrag` kommt aus der Liste, nicht aus der Anfrage
+        if os.path.dirname(voll) == ordner and os.path.isfile(voll):
+            return voll
+    return None

@@ -97,7 +97,7 @@ export default function Session() {
   const [popups, setPopups] = useState([]);
   const scannedRef = useRef(new Set());
   const namenRef = useRef({});
-  const letzterScanRef = useRef({});
+  const letzterScanRef = useRef(new Map());   // Map statt Objekt: der Schluessel kommt aus dem WebSocket
 
   // Nach einer Unterbrechung: was an der aktuellen Frage inzwischen eingegangen ist, nachladen.
   const nachladenRef = useRef(null);
@@ -295,11 +295,11 @@ export default function Session() {
         // Eine Karte, die im Bild bleibt, wird alle paar Bilder erneut gemeldet — das soll
         // kein Dauerfeuer von Fenstern werden: nach dem ersten Mal poppt sie nur auf, wenn
         // sich die Antwort geaendert hat oder die Karte mehrere Sekunden weg war.
-        const frueher = letzterScanRef.current[data.student_id];
+        const frueher = letzterScanRef.current.get(data.student_id);
         const jetzt = Date.now();
         const zeigen = !erneut || !frueher || frueher.answer !== data.answer || jetzt - frueher.zeit > 6000;
         const geaendert = !!(erneut && frueher && frueher.answer !== data.answer);
-        letzterScanRef.current[data.student_id] = { answer: data.answer, zeit: jetzt };
+        letzterScanRef.current.set(data.student_id, { answer: data.answer, zeit: jetzt });
         if (name && zeigen) {
           const key = `${data.student_id}-${Date.now()}`;
           setPopups((p) => [...p.slice(-4), { key, name, erneut, geaendert }]);
@@ -361,7 +361,7 @@ export default function Session() {
     setQuestion(q);
     setQuestionIndex(idx);
     setCounts({ A: 0, B: 0, C: 0, D: 0 });
-    setScannedStudents([]); letzterScanRef.current = {};
+    setScannedStudents([]); letzterScanRef.current = new Map();
     setRevealed(false);
     setShowLeaderboard(false);
     broadcastState(false, idx + 1 >= questions.length);
