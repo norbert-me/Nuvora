@@ -150,7 +150,7 @@ def endpunkte(u):
             ("GET", f"/api/noten/classes/{c}/entries"),
             ("GET", f"/api/noten/classes/{c}/summary"),
             ("GET", f"/api/noten/classes/{c}/year"),
-            ("GET", f"/api/noten/classes/{c}/dividers"),
+            ("GET", f"/api/noten/classes/{c}/quartalsstriche"),
             ("GET", f"/api/noten/classes/{c}/export"),
             ("GET", "/api/noten/code-sessions"),
             ("GET", f"/api/klassenarbeit/classes/{c}/students"),

@@ -887,7 +887,7 @@ async def startup():
                         "work_analyses", "exam_dates", "calendar_entries",
                         "segel_status", "timetable_slots", "pap_aufgaben", "waage_aufgaben",
                         "attendance", "sessions", "zufall_draws",
-                        "quartal_dividers", "plan_weeks", "learning_ladders"):
+                        "quartal_dividers", "quartal_daten", "plan_weeks", "learning_ladders"):
                 await db.execute(text(f"""
                     WITH single AS (
                       SELECT class_id, MIN(kurs_id) AS kurs_id FROM (
@@ -1074,6 +1074,17 @@ async def startup():
             await db.rollback()
             _sw(f"[STARTUP-WARN] Defaults nicht gesetzt: {type(e).__name__}: {e}", flush=True)
 
+    # Quartalsstriche: vom Spaltenbezug zum Datum (siehe app/quartal.py). Idempotent.
+    async with async_session() as db:
+        try:
+            from .quartal import striche_zu_daten
+            n = await striche_zu_daten(db)
+            if n:
+                print(f"[STARTUP] Quartalsstriche: {n} auf ein Datum umgestellt.", flush=True)
+        except Exception as e:
+            await db.rollback()
+            print(f"[STARTUP-WARN] Quartalsstriche nicht umgestellt: {type(e).__name__}: {e}", flush=True)
+
     # Personen-Ebene: jede Listenzeile bekommt ihr Kind (siehe app/personen.py).
     # Idempotent und ohne Datenverlust — die alten Felder an `students` bleiben
     # stehen, solange die Module darauf rechnen.
@@ -1123,7 +1134,7 @@ async def startup():
             total = 0
             for tbl in ("school_classes", "folders", "questions", "sessions", "topics",
                         "exercises", "learning_paths", "grade_sections", "grade_categories",
-                        "grade_overrides", "card_decks", "quartal_dividers", "plan_weeks"):
+                        "grade_overrides", "card_decks", "quartal_dividers", "quartal_daten", "plan_weeks"):
                 try:
                     r = await db.execute(text(f"UPDATE {tbl} SET owner_id = :a WHERE owner_id IS NULL"), {"a": admin})
                     total += r.rowcount or 0

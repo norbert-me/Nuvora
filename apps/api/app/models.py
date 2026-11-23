@@ -1357,8 +1357,8 @@ class ExternalEventArchive(Base):
 
 
 class QuartalDivider(Base):
-    """Optischer Quartalsstrich in der Notentabelle — nach welcher Spalte er
-    steht. Mehrere je Klasse+Halbjahr moeglich, rein visuell."""
+    """ALTBESTAND: Quartalsstrich NACH einer Spalte der Notentabelle. Wird beim Start einmalig in ein
+    `QuartalDatum` umgewandelt und gelöscht (`app/quartal.py`); neue Zeilen entstehen hier nicht mehr."""
     __tablename__ = "quartal_dividers"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -1368,6 +1368,19 @@ class QuartalDivider(Base):
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     term: Mapped[str] = mapped_column(String(8), default="1", server_default="1")
     after_category_id: Mapped[int] = mapped_column(ForeignKey("grade_categories.id", ondelete="CASCADE"), index=True)
+
+
+class QuartalDatum(Base):
+    """Quartalsstrich im Verlauf der Gesamtnoten — an einem DATUM. Mehrere je Klasse/Kurs+Halbjahr moeglich,
+    rein visuell. (Der Verlauf ordnet nach Zeit; ein Strich „nach Spalte X" sagte dort nichts.)"""
+    __tablename__ = "quartal_daten"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
+    term: Mapped[str] = mapped_column(String(8), default="1", server_default="1")
+    datum: Mapped[date] = mapped_column(Date)
 
 
 # ─── Nuvora-Kern: Wochenplanung ───

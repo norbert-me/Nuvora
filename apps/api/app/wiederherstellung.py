@@ -41,7 +41,7 @@ MODULE: dict[str, tuple[str, ...]] = {
     "kern": ("school_classes", "kurse", "kurs_tags", "kurs_students", "persons", "students", "topics"),
     "cardvote": ("folders", "questions", "question_sets", "question_set_items", "sessions", "scans"),
     "lernpfad": ("exercises", "learning_paths", "learning_ladders"),
-    "auswertung": ("grade_sections", "grade_categories", "grade_entries", "grade_overrides", "quartal_dividers",
+    "auswertung": ("grade_sections", "grade_categories", "grade_entries", "grade_overrides", "quartal_dividers", "quartal_daten",
                    "work_analyses", "exam_dates", "observations", "parent_contacts"),
     "code-detektiv": ("code_puzzles", "code_sessions"),
     "karten": ("card_folders", "card_decks", "card_deck_kurse", "cards", "card_reviews"),

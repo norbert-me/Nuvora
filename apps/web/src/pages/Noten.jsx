@@ -32,7 +32,7 @@ import { parseYmd, ymd } from "../core/datum.js";
 import { median as medianVon, mittel, streuung } from "../core/statistik.js";
 import { verteilung } from "../core/notenstufen.js";
 import { kurzName, kurzNameAn, useKurzName } from "../core/namen.js";
-import { notenTrend, spaltenNachZeit } from "../core/notentrend.js";
+import { notenTrend, spaltenDatum, spaltenNachZeit, strichLuecken } from "../core/notentrend.js";
 import { teilen } from "../core/teilen.js";
 import { sortiereKinder } from "../core/namen.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
@@ -143,7 +143,7 @@ export default function Noten() {
   // sich die Wahl pro Browser. Die Abschnitts-Gewichtung bleibt unberuehrt.
   const [agg, setAgg] = useState(() => { try { return localStorage.getItem("noten_agg") === "median" ? "median" : "mean"; } catch { return "mean"; } });
   const [yearData, setYearData] = useState({ sections: [], rows: [] });
-  const [dividers, setDividers] = useState([]); // Quartalsstriche: after_category_id[]
+  const [dividers, setDividers] = useState([]); // Quartalsstriche im Verlauf: Daten ("JJJJ-MM-TT")
   // Beim Oeffnen sind IMMER alle Spalten ausgeklappt (Wunsch des Nutzers): zugeklappt gilt nur
   // fuer diese Sitzung und wird nicht gemerkt — sonst fehlen beim naechsten Mal Noten, ohne dass
   // man sich erinnert, sie eingeklappt zu haben.
@@ -241,7 +241,7 @@ export default function Noten() {
     setSections((p) => teilen(p, sec, (x) => x.id)); setEntries((p) => teilen(p, ent, (x) => x.id));
     setSummary((p) => teilen(p, sum, (x) => x.student_id)); setLoading(false);
     loadedOnce.current = true; // ab jetzt kein Skeleton mehr (Reloads z.B. bei Median/Mittel nicht flackern lassen)
-    hol(`${API}/classes/${id}/dividers?term=${term}${kp}`).then((d) => setDividers(Array.isArray(d) ? d : []));
+    hol(`${API}/classes/${id}/quartalsstriche?term=${term}${kp}`).then((d) => setDividers(Array.isArray(d) ? d : []));
   };
   // Fehlzeiten zu den Datumsangaben der Spalten — ein Aufruf fuer alle Tage.
   //
@@ -281,8 +281,14 @@ export default function Noten() {
     if (!cat.date) return "";
     return (fehlzeiten[cat.date] || {})[String(studentId)] || "";
   };
-  const toggleDivider = async (catId) => {
-    const r = await fetch(`${API}/classes/${classId}/dividers/toggle?term=${term}${kp}`, alsJson("POST", { after_category_id: catId })).catch(() => null);
+  // Quartalsstriche im Verlauf der Gesamtnoten: ein Strich = ein Datum. In der Tabelle gibt es keine mehr
+  // (dort standen sie hinter einer Spalte und sagten im zeitlich geordneten Verlauf nichts).
+  const strichSetzen = async (datum) => {
+    const r = await fetch(`${API}/classes/${classId}/quartalsstriche?term=${term}${kp}`, alsJson("POST", { datum })).catch(() => null);
+    if (r && r.ok) setDividers(await r.json());
+  };
+  const strichLoeschen = async (datum) => {
+    const r = await fetch(`${API}/classes/${classId}/quartalsstriche?term=${term}&datum=${encodeURIComponent(datum)}${kp}`, { method: "DELETE" }).catch(() => null);
     if (r && r.ok) setDividers(await r.json());
   };
   useEffect(() => { if (classId) load(classId); }, [classId, kursId, classes, term, agg]);
@@ -949,7 +955,6 @@ export default function Noten() {
                       onDragEnd={ziehCol.beenden}
                       style={{ ...th2, padding: 0, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500,
                         cursor: "grab", opacity: ziehCol.zieht === c.id ? 0.4 : 1,
-                        borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
                         boxShadow: colSeite === "vor" ? "inset 3px 0 0 var(--accent)" : colSeite === "nach" ? "inset -3px 0 0 var(--accent)" : undefined,
                         ...(fokusSpalte === String(c.id) ? { background: FOKUS_TON_DECKEND, color: "var(--accent)" } : null) }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center", position: "relative" }}>
@@ -971,7 +976,7 @@ export default function Noten() {
                           </span>
                         ) : null}
                         {renameCol === c.id && (
-                          <ColMenu t={t} cat={c} classId={classId} kursId={kursId} topics={topics} kartenAktiv={kartenAktiv} cvAktiv={cvAktiv} kalenderAktiv={kalenderAktiv} onNachhol={runNachhol} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
+                          <ColMenu t={t} cat={c} classId={classId} kursId={kursId} topics={topics} kartenAktiv={kartenAktiv} cvAktiv={cvAktiv} kalenderAktiv={kalenderAktiv} onNachhol={runNachhol} onStats={() => setStatsCol(c)}
                             onRename={async (name, topicId, datum, optional) => { if (await call(() => fetch(`${API}/categories/${c.id}`, alsJson("PUT", { name, section_id: sec.id, position: c.position ?? i, topic_id: topicId, date: datum, optional })))) setRenameCol(null); }}
                             onDelete={() => {
                               setRenameCol(null);
@@ -1196,7 +1201,7 @@ export default function Noten() {
       <SpeicherBalken entwurf={entwurf} zeigen={autoSpeichern.zeigen} />
 
       {infoFuer && (
-        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} classId={classId} kursId={kursId} dividers={dividers} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} form={form} setForm={setFormPersist} />
+        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} classId={classId} kursId={kursId} dividers={dividers} onStrichSetzen={strichSetzen} onStrichLoeschen={strichLoeschen} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} form={form} setForm={setFormPersist} />
       )}
     </div>
   );
@@ -1503,7 +1508,7 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol, onOpen }) {
 }
 
 // Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
-function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, kursId = null, topics = [], onNachhol, kartenAktiv, cvAktiv, kalenderAktiv = false }) {
+function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, classId, kursId = null, topics = [], onNachhol, kartenAktiv, cvAktiv, kalenderAktiv = false }) {
   const [name, setName] = useState(cat.name);
   const [topicId, setTopicId] = useState(cat.topic_id ?? "");
   const [datum, setDatum] = useState(cat.date || "");
@@ -1531,9 +1536,6 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
     return () => { ab = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datum, kalenderAktiv]);
-  // Auch der Quartalsstrich wartet auf „Speichern" — er schrieb bisher beim
-  // Klick, mitten in einer Maske, die sonst sammelt.
-  const [strich, setStrich] = useState(!!dividerOn);
   const angelegt = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
   // Siehe core/topics.js: Beschriftung und Reihenfolge kommen von dort, damit
   // dieselbe Auswahl ueberall gleich heisst und gleich sortiert ist.
@@ -1545,7 +1547,6 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
   const save = () => {
     const titel = name.trim() || datumKurz(datum);
     if (!titel) return;
-    if (strich !== !!dividerOn) onToggleDivider && onToggleDivider();
     onRename(titel, topicId === "" ? null : Number(topicId), datum || null, optional);
   };
   return (
@@ -1622,11 +1623,6 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
           <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text3)", boxSizing: "border-box" }}>
             <Icon d={ICONS.chart} size={14} color="var(--text3)" />{t("noten.fromCd")}
           </div>
-        )}
-        {onToggleDivider && (
-          <button onClick={() => setStrich((v) => !v)} style={{ width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 12, fontWeight: 600, borderRadius: CONTROL_R, cursor: "pointer", border: `1px solid ${strich ? "var(--accent)" : "var(--border2)"}`, background: strich ? "var(--accent)" : "transparent", color: strich ? C.aufAkzent : "var(--text2)" }}>
-            {strich ? t("noten.dividerOff") : t("noten.dividerOn")}
-          </button>
         )}
         <div style={{ display: "flex", gap: 6, justifyContent: "space-between", alignItems: "center" }}>
           <button onClick={save} style={{ ...btnPrimary, padding: "5px 12px", fontSize: 12 }}>{t("common.save")}</button>
@@ -1777,22 +1773,17 @@ function GradeChart({ series, t, titel, hinweis, rechts, striche = null }) {
             <text x={padL - 6} y={y(g) + 3.5} textAnchor="end" fontSize="10" fill="var(--text3)">{g}</text>
           </g>
         ))}
-        {/* Quartalsstriche: dieselben Striche wie in der Tabelle, hier als gestrichelte Linie zwischen
-            dem Punkt der Spalte und dem naechsten. Ein Quartal ist der Abschnitt zwischen zwei Strichen. */}
-        {striche && (() => {
-          let q = 1;
-          return pts.slice(0, -1).map((p, i) => {
-            if (!striche.has(p.s.cat?.id)) return null;
-            q += 1;
-            const xs = (p.cx + pts[i + 1].cx) / 2;
-            return (
-              <g key={`q${i}`} style={{ pointerEvents: "none" }}>
-                <line x1={xs} y1={padT} x2={xs} y2={H - padB} stroke="var(--text3)" strokeWidth="1" strokeDasharray="4 3" />
-                <text x={xs + 3} y={padT + 8} fontSize="9" fill="var(--text3)">Q{q}</text>
-              </g>
-            );
-          });
-        })()}
+        {/* Quartalsstriche als DATUM: die Striche der Tabelle stehen hinter einer Spalte, der Verlauf ordnet nach
+            Zeit. Gezeichnet wird deshalb dort, wo das Datum dieser Spalte zwischen zwei Noten liegt. */}
+        {striche && strichLuecken(pts.map((p) => spaltenDatum(p.s.cat)), striche).map((i, q) => {
+          const xs = (pts[i].cx + pts[i + 1].cx) / 2;
+          return (
+            <g key={`q${i}`} style={{ pointerEvents: "none" }}>
+              <line x1={xs} y1={padT} x2={xs} y2={H - padB} stroke="var(--text3)" strokeWidth="1" strokeDasharray="4 3" />
+              <text x={xs + 3} y={padT + 8} fontSize="9" fill="var(--text3)">Q{q + 2}</text>
+            </g>
+          );
+        })}
         <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {pts.map((p, i) => (
           <g key={i}>
@@ -1890,7 +1881,27 @@ function Fehlzeiten({ classId, studentId, t }) {
 // Der Name im Dialog folgt derselben Option (ausserhalb des Hooks gelesen).
 const kurzNameOrt = (n) => (kurzNameAn() ? kurzName(n) : n);
 
-function StudentInfo({ t, student, summary, sections, entries = [], classId = null, kursId = null, dividers = [], onZeugnis, onClose, form, setForm }) {
+// Quartalsstriche im Verlauf: Datum wählen, setzen; jeder Strich als Chip mit Kreuz zum Entfernen.
+function StrichLeiste({ t, daten, onSetzen, onLoeschen }) {
+  const [tag, setTag] = useState("");
+  const fmt = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(); } catch { return iso; } };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 6, fontSize: 12, color: "var(--text3)" }}>
+      <span>{t("noten.striche")}</span>
+      {daten.map((d, i) => (
+        <span key={d} style={{ ...chipStyle, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          Q{i + 2} · {fmt(d)}
+          <button onClick={() => onLoeschen(d)} title={t("noten.strichWeg")} aria-label={t("noten.strichWeg")}
+            style={{ ...iconBtn, padding: 0, minWidth: 20, minHeight: 20 }}><Icon d={ICONS.close} size={11} /></button>
+        </span>
+      ))}
+      <input type="date" value={tag} onChange={(e) => setTag(e.target.value)} aria-label={t("noten.strichDatum")} style={{ ...inputStyle, width: "auto", padding: "3px 6px", fontSize: 12 }} />
+      <button onClick={() => { if (tag) { onSetzen(tag); setTag(""); } }} disabled={!tag} style={{ ...btnSecondary, padding: "3px 10px", fontSize: 12, opacity: tag ? 1 : 0.5 }}>{t("noten.strichSetzen")}</button>
+    </div>
+  );
+}
+
+function StudentInfo({ t, student, summary, sections, entries = [], classId = null, kursId = null, dividers = [], onStrichSetzen, onStrichLoeschen, onZeugnis, onClose, form, setForm }) {
   // Hook vor jedem fruehen Ausstieg: sonst haengt die Hook-Reihenfolge daran,
   // ob gerade ein Kind gewaehlt ist.
   const [bereich, setBereich] = useState("gesamt");
@@ -1985,7 +1996,11 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
         <Fehlzeiten classId={classId} studentId={student.id} t={t} />
         <SchuelerAngaben studentId={student.id} kursId={kursId} nurLesen t={t} />
 
-        <GradeChart series={serie} t={t} striche={bereich === "gesamt" && dividers.length ? new Set(dividers) : null}
+        {/* Quartalsstriche setzt man mit einem Datum und löscht sie dort wieder — sie gelten für den ganzen Kurs. */}
+        {bereich === "gesamt" && onStrichSetzen && (
+          <StrichLeiste t={t} daten={dividers} onSetzen={onStrichSetzen} onLoeschen={onStrichLoeschen} />
+        )}
+        <GradeChart series={serie} t={t} striche={bereich === "gesamt" && dividers.length ? dividers : null}
           titel={bereich === "gesamt" ? t("noten.verlauf") : t("noten.verlaufSection", { name: secName })}
           hinweis={modus === "einzeln" ? t("noten.verlaufSingle")
                    : bereich === "gesamt" ? t("noten.verlaufRunning") : t("noten.verlaufRunningSection")}

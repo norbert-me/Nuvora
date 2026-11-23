@@ -112,6 +112,7 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
         )),
         "noten_overrides": await _rows(db, m.GradeOverride, m.GradeOverride.owner_id == uid),
         "quartalsstriche": await _rows(db, m.QuartalDivider, m.QuartalDivider.owner_id == uid),
+        "quartalsdaten": await _rows(db, m.QuartalDatum, m.QuartalDatum.owner_id == uid),
         "karten_decks": await _rows(db, m.CardDeck, m.CardDeck.owner_id == uid),
         "karten": await _rows(db, m.Card, in_(m.Card, "deck_id", deck_ids)),
         "karten_deck_kurse": await _rows(db, m.CardDeckKurs, in_(m.CardDeckKurs, "deck_id", deck_ids)),
