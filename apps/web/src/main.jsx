@@ -335,6 +335,7 @@ const Help = React.lazy(() => import("./pages/Help.jsx"));
 const Modules = React.lazy(() => import("./pages/Modules.jsx"));
 const Topics = React.lazy(() => import("./pages/Topics.jsx"));
 const Papierkorb = React.lazy(() => import("./pages/Papierkorb.jsx"));
+const Wiederherstellung = React.lazy(() => import("./pages/Wiederherstellung.jsx"));
 // Sicherungen: Serververwaltung, KEIN Modul — deshalb kein REGISTRY-Eintrag
 // und kein ModuleGate, sondern nur fuer die Administration (Nutzer-ID 1),
 // genau wie der Administrationsteil in /profile.
@@ -1216,6 +1217,7 @@ function AppRoutes({ user, setUser, logout }) {
           {/* Kern: ein Kind ueber alle Kurse hinweg (Personen-Ebene). */}
           <Route path="/personen" element={user ? <Personen /> : <Landing />} />
           <Route path="/papierkorb" element={user ? <Papierkorb /> : <Landing />} />
+          <Route path="/wiederherstellung" element={user ? <Wiederherstellung /> : <Landing />} />
           {/* Der Navigationspunkt war bereits auf die Administration beschraenkt,
               die Route nicht: jede Lehrkraft sah eine Seite voller Absagen der
               API. Dieselbe Quelle (`istAdmin`) entscheidet jetzt beides. */}

@@ -282,6 +282,11 @@ Uploads und `config/site.json` nicht.
 
 ### Fristen
 
+**Aus der Sicherung zurückholen** (`/wiederherstellung`, jede Lehrkraft für ihre eigenen Daten): je Modul
+vergleichen und gezielt zurückholen, ohne die ganze Installation zurückzusetzen. Drei Zustände je Zeile —
+*fehlt heute* (vorangehakt), *anders* (nur auf ausdrücklichen Haken) und *neu seitdem* (wird nie angefasst).
+Es wird nichts gelöscht. Verschlüsselte Spalten werden mit dem Datenschlüssel gelesen.
+
 Läuft automatisch, ohne Zutun:
 
 | Was | Frist |

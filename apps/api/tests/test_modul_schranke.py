@@ -64,6 +64,9 @@ KERN = (
     # Fehlermeldung aus der Oberflaeche: braucht ein Konto (das IST der
     # Spam-Schutz), aber kein Modul — gemeldet wird von ueberall.
     "/api/bugreport",
+    # Aus einer Sicherung zurueckholen: nur die eigenen Zeilen, je Modul — der Router prueft selbst,
+    # welche Module diese Lehrkraft nutzt (Regel 3), und gehoert deshalb dem Kern.
+    "/api/wiederherstellung",
 )
 
 CARDVOTE = (

@@ -29,6 +29,7 @@ export const ZIELE = [
   { pfad: "/topics", key: "nav.topics", modul: null, worte: ["thema", "themen", "unterthema", "lehrplan", "jahresplanung"] },
   { pfad: "/modules", key: "nav.modules", modul: null, worte: ["module", "einschalten", "aktivieren", "werkzeuge"] },
   { pfad: "/papierkorb", key: "nav.trash", modul: null, worte: ["gelöscht", "wiederherstellen"] },
+  { pfad: "/wiederherstellung", key: "wh.title", modul: null, worte: ["sicherung", "rollback", "zurückholen", "backup", "verloren", "weg", "noten weg", "wiederherstellen"] },
   { pfad: "/profile", key: "nav.profile", modul: null, worte: ["konto", "passwort", "sprache", "abmelden", "design"] },
   { pfad: "/marktplatz", key: "nav.marketplace", modul: null, worte: ["teilen", "veröffentlichen", "übernehmen"] },
   // Sicherungen sind Kern, aber nur die Administration sieht den Navigationspunkt.

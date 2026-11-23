@@ -3,9 +3,10 @@
 // eigenen Papierkorb mehr; sie löschen nur noch (Soft-Delete), gefunden wird
 // hier. Serverseite: apps/api/app/routers/trash.py.
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 import { askConfirm } from "../core/dialog.jsx";
-import { pageTitle, pageIntro, btnSecondary, btnSmall, Icon, ICONS, iconBtn, COLORS as C, panelStyle, sectionLabel, Empty, pageApp, LoadError } from "../components/Icons.jsx";
+import { linkBtn, pageTitle, pageIntro, btnSecondary, btnSmall, Icon, ICONS, iconBtn, COLORS as C, panelStyle, sectionLabel, Empty, pageApp, LoadError } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { sende } from "../core/melden.js";
 
@@ -68,6 +69,7 @@ export default function Papierkorb() {
     <div style={pageApp}>
       <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("trash.title")}</h1>
       <p style={pageIntro}>{t("trash.intro")}</p>
+      <Link to="/wiederherstellung" style={{ ...linkBtn, textDecoration: "none", display: "inline-block", marginBottom: 12 }}>{t("trash.zurSicherung")}</Link>
 
       {/* „Alles endgültig löschen" stand offen in der Kopfleiste, direkt neben
           dem Titel — der eine Knopf der Seite, der nichts zurückholt. Er gehört

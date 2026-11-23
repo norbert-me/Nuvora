@@ -80,7 +80,7 @@ from ..admin import APP_VERSION, _require_admin
 from ..rollen import ist_betreiber
 from ..database import DATABASE_URL, async_session, get_db
 from ..models import AppSetting, Base
-from ..spalten import fuellwert
+from ..sicherungsformat import dekodiere as _dekodiere, kodiere as _kodiere, passend_machen as _passend_machen
 from .auth import _verify_pw, get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/admin/backup", tags=["backup"])
@@ -254,27 +254,6 @@ async def aktuelles_ziel(db) -> str:
 
 
 # ── JSON-Kodierung für Werte, die JSON nicht kennt ───────────────────────────
-def _kodiere(v):
-    if isinstance(v, bytes):
-        return {"__b64__": base64.b64encode(v).decode("ascii")}
-    if isinstance(v, datetime):
-        return {"__dt__": v.isoformat()}
-    if isinstance(v, date):
-        return {"__d__": v.isoformat()}
-    return v
-
-
-def _dekodiere(v):
-    if isinstance(v, dict) and len(v) == 1:
-        if "__b64__" in v:
-            return base64.b64decode(v["__b64__"])
-        if "__dt__" in v:
-            return datetime.fromisoformat(v["__dt__"])
-        if "__d__" in v:
-            return date.fromisoformat(v["__d__"])
-    return v
-
-
 # ── Die Sicherung selbst ─────────────────────────────────────────────────────
 class _Zaehler(io.RawIOBase):
     """Schreibt durch und rechnet nebenbei sha256 und Bytes mit — damit die
@@ -700,46 +679,6 @@ def _grund(fehler: Exception) -> str:
     # Der gehoert nicht in die Antwort.
     roh = re.sub(r"\(([^()]*)\)=\(([^()]*)\)", "(…)=(…)", roh)
     return roh.strip().splitlines()[0][:200]
-
-
-def _passend_machen(tabelle, zeilen: list[dict]) -> tuple[list[dict], list[str]]:
-    """Zeilen aus der Datei an das heutige Schema anpassen — und sagen, was.
-
-    Eine Sicherung ist ein Stand von damals, das Zielschema ist von heute.
-    Zwei Abweichungen sind harmlos und wurden trotzdem zum Abbruch:
-
-      * **NULL in einer NOT-NULL-Spalte.** Entstanden in der Produktionsdatenbank
-        durch ein `ADD COLUMN` ohne DEFAULT (siehe `_ensure_columns` in
-        main.py). Die laufende Datenbank ist inzwischen repariert — in den
-        Dateien von davor steckt die NULL weiter drin. Gefüllt wird mit dem
-        Default des Modells, also mit dem, was die ORM beim Schreiben gesetzt
-        hätte.
-      * **Eine Spalte, die es nicht mehr gibt.** Sonst scheitert das Einspielen
-        einer älteren Sicherung an einem Feld, das niemand mehr liest.
-
-    Beides wird **gezählt und gemeldet**, nicht stillschweigend gemacht: wer
-    zurückspielt, muss erfahren, dass die Daten dabei angefasst wurden.
-    """
-    spalten = {c.name: c for c in tabelle.c}
-    hinweise: dict[str, int] = {}
-    fertig = []
-    for zeile in zeilen:
-        neu = {}
-        for k, v in zeile.items():
-            col = spalten.get(k)
-            if col is None:
-                hinweise[f"{tabelle.name}.{k} verworfen (Spalte gibt es nicht mehr)"] = \
-                    hinweise.get(f"{tabelle.name}.{k} verworfen (Spalte gibt es nicht mehr)", 0) + 1
-                continue
-            if v is None and not col.nullable and not col.primary_key:
-                ersatz = fuellwert(col)
-                if ersatz is not None:
-                    schluessel = f"{tabelle.name}.{k} war NULL, gefüllt"
-                    hinweise[schluessel] = hinweise.get(schluessel, 0) + 1
-                    v = ersatz
-            neu[k] = v
-        fertig.append(neu)
-    return fertig, [f"{text} ({n})" for text, n in sorted(hinweise.items())]
 
 
 async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None = None) -> dict:

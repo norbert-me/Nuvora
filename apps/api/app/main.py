@@ -15,7 +15,7 @@ from .models import AppSetting, Base, Kurs, Session as SessionModel, User
 # den frueheren Ring main -> routers.backup -> main aufloest. Hier nur noch
 # hereingeholt, damit die Routen weiter unten `_require_admin` benutzen koennen.
 from .admin import _require_admin, APP_VERSION  # noqa: F401 — Routen unten
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, caldav, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, pap, waage, reihen, qr, personen, tafel, trash, selftest, backup
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, caldav, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, pap, waage, reihen, qr, personen, tafel, trash, selftest, backup, wiederherstellung
 from . import websocket as ws
 from .routers.auth import _hash_pw, _token_teile, get_current_user, rate_limit, token_gueltig_bis
 from .routers.karten import uebernahme_deck_kurse
@@ -229,6 +229,7 @@ app.include_router(selftest.router)
 # Sicherungen: Serververwaltung, kein Modul (steht deshalb nicht in REGISTRY).
 # Haengt komplett an _require_admin — die Dateien enthalten Art.-9-Daten.
 app.include_router(backup.router)
+app.include_router(wiederherstellung.router)
 app.include_router(marketplace.router)
 
 # Im Container /app/uploads (Volume). Ueberschreibbar, damit Tests und die

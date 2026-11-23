@@ -860,6 +860,19 @@ def teste_kern(api, b, u):
 
     def papierkorb():
         api.call("GET", "/api/trash", erwartet=(200,))
+
+    def wiederherstellung():
+        """Aus Sicherung zurueckholen: Liste und Module antworten, und der Vergleich laeuft, wenn es eine
+        Sicherung gibt. Zurueckgespielt wird hier NIE — der Selbsttest fasst keine echten Daten an."""
+        module = api.call("GET", "/api/wiederherstellung/module", erwartet=(200,)) or []
+        if not any(m.get("key") == "kern" for m in module):
+            raise AssertionError("Das Kern-Modul fehlt in der Auswahl der Wiederherstellung")
+        sicherungen = api.call("GET", "/api/wiederherstellung/sicherungen", erwartet=(200,)) or []
+        if sicherungen:
+            erg = api.call("POST", "/api/wiederherstellung/vergleich",
+                           body={"sicherung": sicherungen[0]["name"], "modul": "kern"}, erwartet=(200,))
+            if "tabellen" not in (erg or {}):
+                raise AssertionError("Der Vergleich liefert keine Tabellen")
         return "erreichbar"
 
     def fruehwarnung():
@@ -1113,6 +1126,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Namensliste in den Kurs", kurs_namensliste)
     b.pruefe("Kern", "Themen", themen)
     b.pruefe("Kern", "Papierkorb", papierkorb)
+    b.pruefe("Kern", "Wiederherstellung aus Sicherung", wiederherstellung)
     b.pruefe("Kern", "Archiv", archiv)
     b.pruefe("Kern", "Dateiablage", material)
     b.pruefe("Kern", "Fruehwarnung", fruehwarnung)
