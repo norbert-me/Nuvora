@@ -1260,6 +1260,8 @@ export default {
   "kalender.extRefresh": "Refresh external",
   "kalender.extAdd": "Add calendar",
   "kalender.extHide": "Hide",
+  "kalender.extEigen": "Change as my own event",
+  "kalender.extEigenHint": "Copies the event into your calendar so you can change it. The original is hidden when you save.",
   "kalender.extHideHint": "Stop showing this single external event.",
   "kalender.extUnhideAll": "Show {{n}} hidden again",
   "kalender.extUnhideAllHint": "Show all hidden external events again.",

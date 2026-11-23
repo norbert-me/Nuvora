@@ -590,6 +590,9 @@ export default function Kalender() {
     // Tag verriet, dass die Stunde nie gespeichert wurde.
     if (!(await pruefeAntwort(res, t("common.save")))) return;
     if (res && res.ok) {
+      // Ein aus einem fremden Termin übernommener Eintrag ersetzt das Original: es wird erst JETZT
+      // ausgeblendet (nach dem Speichern), nicht schon beim Klick — wer abbricht, behält den Termin.
+      if (e._ersetzt) { await hideExtEvent(e._ersetzt); }
       // Nach dem Speichern den Eintrag ANZEIGEN (nicht schließen). _justSaved lässt
       // das Modal in die Ansicht wechseln; date wieder als Date, id vom Server.
       let saved = null; try { saved = await res.json(); } catch { /* egal */ }
@@ -1077,7 +1080,7 @@ export default function Kalender() {
         </Modal>
       )}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} kurse={kurse} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setSlotColor} onRaum={setKursRaum} onClose={() => setSlotEdit(null)} t={t} />}
-      {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} onHide={() => { hideExtEvent(extInfo); setExtInfo(null); }} t={t} />}
+      {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} onEigen={(ev) => { setExtInfo(null); setEditing(eigenerTerminAus(ev)); }} onHide={() => { hideExtEvent(extInfo); setExtInfo(null); }} t={t} />}
     </div>
   );
 }
@@ -1131,7 +1134,7 @@ function AusgeblendetModal({ ext, cancels, onExtBack, onSlotBack, onClose, t }) 
 
 // Read-only-Info zu einem angeklickten externen (abonnierten) Termin. Nicht
 // editierbar — fremder Kalender; nur Anzeige der ICS-Felder.
-function ExtInfoModal({ ev, onClose, onHide, t }) {
+function ExtInfoModal({ ev, onClose, onHide, onEigen, t }) {
   const fmt = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(); } catch { return iso; } };
   const zeitraum = ev.end && ev.end !== ev.start ? `${fmt(ev.start)} – ${fmt(ev.end)}` : fmt(ev.start || ev.date);
   const Zeile = ({ label, children }) => (
@@ -1157,12 +1160,27 @@ function ExtInfoModal({ ev, onClose, onHide, t }) {
               <Icon d={ICONS.eye} size={15} /> {t("kalender.extHide")}
             </button>
           )}
+          {onEigen && (
+            <button onClick={() => onEigen(ev)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("kalender.extEigenHint")}>
+              <Icon d={ICONS.edit || ICONS.plus} size={15} /> {t("kalender.extEigen")}
+            </button>
+          )}
           <span style={{ flex: 1 }} />
           <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
         </div>
     </Modal>
   );
 }
+
+// Aus einem fremden Termin den Entwurf eines EIGENEN machen (Titel, Tag, Uhrzeit, Ort, Beschreibung).
+// Fremde Termine sind schreibgeschützt: eine Änderung drüben lässt sich hier nicht machen. Wer sie braucht
+// (verschoben, anders benannt), übernimmt den Termin — das Original wird beim Speichern ausgeblendet.
+const eigenerTerminAus = (ev) => ({
+  date: parseYmd(ev.start || ev.date) || new Date(),
+  title: ev.title || "", notes: ev.description || "", location: ev.location || "",
+  start_time: ev.time || "", end_time: ev.endtime || "",
+  _ersetzt: ev,
+});
 
 // Editor für mehrere externe Kalender: je Zeile URL + Farbe + Löschen. „Speichern"
 // schreibt die ganze Liste (leere URLs fallen weg).

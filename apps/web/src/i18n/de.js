@@ -1249,6 +1249,8 @@ export default {
   "kalender.extRefresh": "Extern aktualisieren",
   "kalender.extAdd": "Kalender hinzufügen",
   "kalender.extHide": "Ausblenden",
+  "kalender.extEigen": "Als eigenen Termin ändern",
+  "kalender.extEigenHint": "Übernimmt den Termin in deinen Kalender, damit du ihn ändern kannst. Das Original wird beim Speichern ausgeblendet.",
   "kalender.extHideHint": "Diesen einzelnen externen Termin nicht mehr anzeigen.",
   "kalender.extUnhideAll": "{{n}} ausgeblendete wieder zeigen",
   "kalender.extUnhideAllHint": "Alle ausgeblendeten externen Termine wieder einblenden.",

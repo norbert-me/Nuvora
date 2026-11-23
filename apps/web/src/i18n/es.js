@@ -1261,6 +1261,8 @@ export default {
   "kalender.extRefresh": "Actualizar externo",
   "kalender.extAdd": "Añadir calendario",
   "kalender.extHide": "Ocultar",
+  "kalender.extEigen": "Cambiar como evento propio",
+  "kalender.extEigenHint": "Copia el evento a tu calendario para que puedas cambiarlo. El original se oculta al guardar.",
   "kalender.extHideHint": "Dejar de mostrar este evento externo.",
   "kalender.extUnhideAll": "Mostrar {{n}} ocultos",
   "kalender.extUnhideAllHint": "Volver a mostrar todos los eventos externos ocultos.",
