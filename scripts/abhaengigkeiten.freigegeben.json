@@ -3,6 +3,7 @@
     "aiosqlite",
     "argon2-cffi",
     "asyncpg",
+    "cryptography",
     "defusedxml",
     "fastapi",
     "greenlet",

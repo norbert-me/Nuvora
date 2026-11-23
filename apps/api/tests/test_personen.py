@@ -62,7 +62,7 @@ async def test_die_alten_felder_bleiben_stehen(s):
     import sqlalchemy as sa
     await _welt(s)
     await uebernahme_personen(s)
-    zeile = (await s.execute(sa.select(Student).where(Student.name == "Anna"))).scalars().first()
+    zeile = next(r for r in (await s.execute(sa.select(Student))).scalars().all() if r.name == "Anna")
     assert zeile.niveau == "E" and zeile.name == "Anna" and zeile.card_id == 1
 
 
@@ -82,7 +82,7 @@ async def test_fremde_lehrkraft_bleibt_getrennt(s):
     await s.commit()
 
     await uebernahme_personen(s)
-    annas = (await s.execute(sa.select(Person).where(Person.name == "Anna"))).scalars().all()
+    annas = [r for r in (await s.execute(sa.select(Person))).scalars().all() if r.name == "Anna"]
     assert {p.owner_id for p in annas} == {u1.id, u2.id}
     assert len(annas) == 2
 
@@ -113,7 +113,7 @@ async def test_uebernahme_verliert_keine_angaben(s):
     await s.commit()
 
     await uebernahme_personen(s)
-    p = (await s.execute(sa.select(Person).where(Person.name == "Dana"))).scalars().one()
+    p = next(r for r in (await s.execute(sa.select(Person))).scalars().all() if r.name == "Dana")
     assert p.niveau == "G"
     assert p.foerder == ["LRS", "Dyskalkulie"]
     assert p.massnahmen == [{"art": "Zeitzuschlag", "detail": "+25 %", "arbeit": True}]

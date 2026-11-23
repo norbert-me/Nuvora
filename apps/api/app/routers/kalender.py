@@ -1021,8 +1021,10 @@ async def _korrektur_todo(db, user, e: ExamDate, verschieben: bool = False) -> N
     lab = _kurs_label(await kurs_des_termins(db, user.id, e.kurs_id, e.class_id))
     if lab and lab.lower() not in titel.lower():
         titel = f"{lab}: {titel}"
-    schon = (await db.execute(select(Todo).where(
-        Todo.owner_id == user.id, Todo.text.like(f"%{marke}%")))).scalars().first()
+    # Der Text steht verschluesselt in der Datenbank: LIKE ist nicht mehr moeglich,
+    # gesucht wird unter den To-dos dieses Kontos in Python.
+    schon = next((t for t in (await db.execute(select(Todo).where(
+        Todo.owner_id == user.id))).scalars().all() if marke in (t.text or "")), None)
     if schon:
         if verschieben and not schon.done:
             schon.due_date = (e.date + timedelta(days=7)).date()
@@ -1094,9 +1096,9 @@ async def delete_exam(exam_id: int, user: User = Depends(require_module), db: As
     # Das automatisch angelegte Korrektur-To-do geht mit — aber nur, solange es
     # offen ist. Ein abgehaktes ist Verlauf und wird nicht nachtraeglich getilgt.
     from ..models import Todo
-    for t in (await db.execute(select(Todo).where(
-            Todo.owner_id == user.id, Todo.done.is_(False),
-            Todo.text.like(f"%#ka{e.id}%")))).scalars().all():
+    for t in [t for t in (await db.execute(select(Todo).where(
+            Todo.owner_id == user.id, Todo.done.is_(False)))).scalars().all()
+            if f"#ka{e.id}" in (t.text or "")]:
         await db.delete(t)
     await db.delete(e)
     await db.commit()

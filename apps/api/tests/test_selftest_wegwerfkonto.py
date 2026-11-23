@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from starlette.requests import Request
 
+from app.krypto import suchwert
 from app.models import User, UserModule
 from app.routers import auth
 from app.routers import selftest as st
@@ -70,7 +71,7 @@ async def test_ohne_token_auf_dem_server_immer_zu(db, monkeypatch):
 async def test_konto_ist_bestaetigt_kein_admin_alle_module(db):
     out = await st.wegwerf_konto_anlegen(_req(TOKEN), None, db)
     assert st.ist_wegwerf_adresse(out.email)
-    u = (await db.execute(select(User).where(User.email == out.email))).scalar_one()
+    u = (await db.execute(select(User).where(User.email_idx == suchwert(out.email)))).scalar_one()
     assert u.email_verified is True
     assert u.is_admin is False
     assert u.changelog_seen
@@ -86,7 +87,7 @@ async def test_loeschen_tilgt_das_konto(db):
     out = await st.wegwerf_konto_anlegen(_req(TOKEN), None, db)
     r = await st.wegwerf_konto_loeschen(out.email.upper(), _req(TOKEN), db)
     assert r["ok"]
-    assert (await db.execute(select(User).where(User.email == out.email))).scalar_one_or_none() is None
+    assert (await db.execute(select(User).where(User.email_idx == suchwert(out.email)))).scalar_one_or_none() is None
     assert (await db.execute(select(UserModule))).scalars().all() == []
     with pytest.raises(HTTPException) as e:
         await st.wegwerf_konto_loeschen(out.email, _req(TOKEN), db)
@@ -154,7 +155,7 @@ async def test_anlegen_ist_gebremst(db):
 async def test_mitgeschickte_touren_gelten_als_gesehen(db):
     body = st.WegwerfKontoIn(touren=["neueTour", "kern", "<script>", "x" * 41])
     out = await st.wegwerf_konto_anlegen(_req(TOKEN), body, db)
-    u = (await db.execute(select(User).where(User.email == out.email))).scalar_one()
+    u = (await db.execute(select(User).where(User.email_idx == suchwert(out.email)))).scalar_one()
     assert "neueTour" in u.tours_done
     assert set(st.WEGWERF_TOUREN) <= set(u.tours_done)
     assert "<script>" not in u.tours_done and "x" * 41 not in u.tours_done

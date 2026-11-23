@@ -568,8 +568,10 @@ async def list_student_members(kurs_id: int, user: User = Depends(get_current_us
     rows = (await db.execute(
         select(Student.id, Student.name, Student.class_id, SchoolClass.name)
         .join(SchoolClass, Student.class_id == SchoolClass.id)
-        .where(Student.id.in_(list(sids))).order_by(Student.name)
+        .where(Student.id.in_(list(sids)))
     )).all()
+    # Der Name steht verschluesselt in der Datenbank: sortiert wird hier, nicht in SQL.
+    rows = sorted(rows, key=lambda r: (r[1] or "").casefold())
     return [{"student_id": sid, "name": n, "class_id": cid, "class_name": cn} for (sid, n, cid, cn) in rows]
 
 

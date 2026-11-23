@@ -188,11 +188,12 @@ async def test_sicherung_enthaelt_datenbank_uploads_und_konfiguration(welt):
         assert zf.read("uploads/frage-4711.png") == UPLOAD_INHALT
 
         daten = zf.read("datenbank.ndjson").decode("utf-8")
-        assert "Anna Sicher" in daten, "Die Schülerdaten fehlen in der Sicherung"
-        assert NOTIZ in daten and DETAIL in daten, (
-            "Die besonders schützenswerten Felder (foerder/massnahmen/notizen) sind NICHT "
-            "in der Sicherung — dann wäre sie beim Zurückspielen unvollständig."
-        )
+        # Personenbezogene Spalten stehen im Dump als Chiffretext — nie im Klartext
+        # (app/krypto.py). Wer die Sicherung hat, aber nicht den Schluessel, liest nichts.
+        assert "Anna Sicher" not in daten, "Der Schuelername steht im Klartext in der Sicherung"
+        assert NOTIZ not in daten and DETAIL not in daten, (
+            "Foerder-/Massnahmen-/Notizfelder (Art. 9) stehen im Klartext in der Sicherung.")
+        assert '"enc1:' in daten, "Die Sicherung enthaelt keinen Chiffretext — wurde nichts verschluesselt?"
         manifest = json.loads(zf.read("manifest.json"))
 
     assert manifest["tabellen"]["students"] == 1

@@ -9,6 +9,7 @@ from .netz import client_ip
 from .uploads import anhang_kopf
 from .kursmitglieder import schuljahr_aus_name
 from .database import IST_SQLITE, async_session, engine, sql_jetzt, sql_vor
+from .krypto import suchwert
 from .models import AppSetting, Base, Kurs, Session as SessionModel, User
 # Admin-Pruefung und Programmfassung kommen aus app/admin.py — dem Blatt, das
 # den frueheren Ring main -> routers.backup -> main aufloest. Hier nur noch
@@ -250,6 +251,7 @@ def _ensure_columns(sync_conn):
         ("grade_entries", "kurs_id", "INTEGER"),
         ("grade_entries", "term", "VARCHAR(10) DEFAULT '' NOT NULL"),
         ("users", "tours_done", "JSON"),
+        ("users", "email_idx", "VARCHAR(64)"),    # Suchwert der verschluesselten E-Mail
         ("exercises", "quelle_id", "INTEGER"),
         ("exam_dates", "ersetzt_stunde", "BOOLEAN DEFAULT true NOT NULL"),
         ("work_analyses", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
@@ -722,6 +724,27 @@ async def startup():
         await conn.run_sync(_ensure_columns)
         await conn.run_sync(_check_module_tables)
 
+    # Personenbezogene Spalten liegen verschluesselt in der Datenbank
+    # (app/krypto.py). Zuerst pruefen, ob der Schluessel zu DIESER Datenbank passt —
+    # ein falscher Schluessel bricht den Start ab, statt unter einem zweiten
+    # Schluessel Daten zu schreiben. Dann Spaltentypen, Suchwert, Bestand.
+    from . import verschluesselung as _vk
+    async with async_session() as db:
+        zustand = await _vk.pruefwert_pruefen(db)
+    async with engine.begin() as conn:
+        for z in await conn.run_sync(_vk.spaltentypen_umstellen):
+            print(f"[STARTUP] Verschluesselung, Spalte umgestellt: {z}", flush=True)
+    async with async_session() as db:
+        n = await _vk.email_suchwerte(db)
+        if n:
+            print(f"[STARTUP] Verschluesselung: {n} E-Mail-Suchwert(e) nachgetragen.", flush=True)
+    zaehl = await _vk.bestand_verschluesseln(engine)
+    if zaehl:
+        print("[STARTUP] Verschluesselung, Bestand umgeschrieben: "
+              + ", ".join(f"{k} {v}" for k, v in zaehl.items()), flush=True)
+    elif zustand == "neu":
+        print("[STARTUP] Verschluesselung: Schluessel-Pruefwert angelegt.", flush=True)
+
     from sqlalchemy import func, select, text
 
     # Bestandskonten (vor Cutoff) als bestätigt markieren — Neue müssen bestätigen
@@ -1139,7 +1162,7 @@ async def startup():
                 # Bestandsinstallationen haben schon Konten — dann nur markieren,
                 # nicht erneut anlegen (die Mail koennte laengst geaendert sein).
                 any_user = (await db.execute(select(User).limit(1))).scalar_one_or_none()
-                exists = (await db.execute(select(User).where(User.email == admin_email))).scalar_one_or_none()
+                exists = (await db.execute(select(User).where(User.email_idx == suchwert(admin_email)))).scalar_one_or_none()
                 if not any_user and not exists:
                     db.add(User(email=admin_email, password_hash=_hash_pw(admin_pw), name="Admin", email_verified=True))
                 db.add(AppSetting(key="admin_bootstrapped", value="1"))

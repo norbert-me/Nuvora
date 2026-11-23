@@ -94,6 +94,7 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci-test-nur-fuer-den-build
           TOKEN_SECRET: ci-test-nur-fuer-den-build
+          NUVORA_DATENSCHLUESSEL: ci-test-nur-fuer-den-build
         run: |
           docker compose config >/dev/null
           docker compose build api web

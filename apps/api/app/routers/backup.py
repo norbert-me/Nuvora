@@ -75,6 +75,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.responses import FileResponse
 
+from .. import krypto
 from ..admin import APP_VERSION, _require_admin
 from ..rollen import ist_betreiber
 from ..database import DATABASE_URL, async_session, get_db
@@ -319,7 +320,9 @@ async def _datenbank_schreiben(zf: zipfile.ZipFile, conn) -> tuple[dict, dict]:
         # Ohne ORDER BY ist die Reihenfolge die des Heaps, also nach Updates und
         # VACUUM beliebig. Aufsteigende id heisst: das Elternteil war zuerst da
         # und steht zuerst in der Datei.
-        stmt = select(tabelle).order_by(*tabelle.primary_key.columns)
+        # Verschluesselte Spalten (krypto.py) bleiben im Dump Chiffretext: die Sicherung
+        # darf nichts entschluesseln, sonst laege der Klartext wieder in der Datei.
+        stmt = select(*krypto.roh_ausdruecke(tabelle)).order_by(*tabelle.primary_key.columns)
         try:
             ergebnis = await conn.stream(stmt)
             async for row in ergebnis:
@@ -787,9 +790,13 @@ async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None 
                         continue
                     zeilen, hinweise = _passend_machen(tabelle, zeilen)
                     angepasst.extend(hinweise)
+                    # Roh einspielen: Chiffretext bleibt Chiffretext (sonst wuerde er ein
+                    # zweites Mal verschluesselt); Klartext aus aelteren Sicherungen
+                    # steht danach als Klartext da und wird beim naechsten Start umgeschrieben.
+                    ziel_tab, zeilen = krypto.fuer_einspielen(tabelle, zeilen)
                     for i in range(0, len(zeilen), 500):
                         try:
-                            await conn.execute(tabelle.insert(), zeilen[i:i + 500])
+                            await conn.execute(ziel_tab.insert(), zeilen[i:i + 500])
                         except SQLAlchemyError as e:
                             # Ohne Tabelle und Bedingung waere die Meldung
                             # „IntegrityError" — und die Ursache nur im

@@ -55,6 +55,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-nuvora}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-nuvora}
       TOKEN_SECRET: ${TOKEN_SECRET:?TOKEN_SECRET nicht gesetzt — .env aus .env.example anlegen}
+      # Schluessel fuer die verschluesselten Personendaten (apps/api/app/krypto.py). Geht er verloren, sind die Daten weg.
+      NUVORA_DATENSCHLUESSEL: ${NUVORA_DATENSCHLUESSEL:?NUVORA_DATENSCHLUESSEL nicht gesetzt — deploy.sh erzeugt ihn beim ersten Lauf}
       CORS_ORIGINS: ${SITE_URL:-http://localhost:8080}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}

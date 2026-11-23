@@ -35,6 +35,7 @@ from sqlalchemy import select, text
 
 from app.database import async_session
 from app.models import GradeCategory, GradeEntry, Student
+from app import krypto
 from app.routers.backup import BACKUP_DIR, _dekodiere, _passend_machen
 
 
@@ -110,6 +111,7 @@ async def _lauf(datei: str, kurs: int, wirklich: bool) -> int:
 
     tabelle = GradeEntry.__table__
     zeilen, hinweise = _passend_machen(tabelle, fehlen)
+    tabelle, zeilen = krypto.fuer_einspielen(tabelle, zeilen)   # Chiffretext nicht doppelt verschluesseln
     for h in hinweise:
         print(f"  Hinweis: {h}")
     async with async_session() as db:

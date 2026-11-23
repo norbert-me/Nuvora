@@ -38,4 +38,5 @@ defusedxml>=0.7.1,<1.0
 # Ohne aiosqlite gaebe es diesen Probelauf nur in der Testumgebung — also
 # ausgerechnet nicht dort, wo im Ernstfall jemand vor der Entscheidung steht.
 aiosqlite>=0.22.1,<1.0
-
+# Verschluesselung personenbezogener Spalten (AES-256-GCM, app/krypto.py)
+cryptography>=50.0.2,<51.0

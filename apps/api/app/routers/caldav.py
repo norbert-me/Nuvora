@@ -49,6 +49,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import caldav as X
 from ..database import get_db
+from ..krypto import suchwert
 from ..models import (CaldavToken, CalendarEntry, Kurs, SchoolClass,
                       SlotCancellation, TimetableSlot, User)
 from ..oeffentlich import site_url as _site_url
@@ -272,7 +273,7 @@ async def _anmelden(request: Request, db: AsyncSession) -> User:
             return gast
         _ANGEMELDET.pop(schluessel, None)
 
-    u = (await db.execute(select(User).where(User.email == kennung.strip().lower()))).scalar_one_or_none()
+    u = (await db.execute(select(User).where(User.email_idx == suchwert(kennung)))).scalar_one_or_none()
     if not u:
         # Blindpruefung wie beim Login: sonst verraet die Antwortzeit, welche
         # Adresse ein Konto hat (unbekannt ~0 ms, bekannt ~14 ms je Passwort).

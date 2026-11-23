@@ -323,6 +323,36 @@ if [ -z "${SELFTEST_TOKEN:-}" ]; then
   echo "  Selbsttest-Token erzeugt und in .deploy.env gemerkt."
 fi
 
+# Datenschluessel fuer die verschluesselten Personendaten (apps/api/app/krypto.py).
+# DREI Orte muessen denselben Wert tragen: die .env auf dem Server (damit die API ihn
+# kennt), .deploy.env hier (die Kopie AUSSERHALB des Servers — wer nur den Server
+# verliert, behaelt die Daten) und dein Passwortmanager. Geht der Schluessel verloren,
+# sind Namen, Noten und Foerderangaben unwiederbringlich weg.
+# Reihenfolge: lokale Kopie > schon vorhandener Serverwert (uebernehmen, NIE neu wuerfeln,
+# sonst waere der Bestand unlesbar) > neu erzeugen.
+DSK_NEU=0
+if [ -z "${DATENSCHLUESSEL:-}" ]; then
+  DATENSCHLUESSEL=$(ssh "$SERVER" "cd '$REMOTE_DIR' 2>/dev/null && sed -n 's|^NUVORA_DATENSCHLUESSEL=\\([^# ]*\\).*|\\1|p' .env | head -1" 2>/dev/null || true)
+  if [ -z "$DATENSCHLUESSEL" ]; then
+    DATENSCHLUESSEL=$(python3 -c "import base64,secrets;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())")
+    DSK_NEU=1
+  fi
+  if grep -q '^DATENSCHLUESSEL=' "$DIR/.deploy.env"; then
+    awk -v v="$DATENSCHLUESSEL" 'index($0,"DATENSCHLUESSEL=")==1 { print "DATENSCHLUESSEL=\"" v "\""; next } { print }' \
+      "$DIR/.deploy.env" > "$DIR/.deploy.env.tmp" && mv "$DIR/.deploy.env.tmp" "$DIR/.deploy.env"
+  else
+    zeilenende_sichern "$DIR/.deploy.env"
+    printf 'DATENSCHLUESSEL="%s"\n' "$DATENSCHLUESSEL" >> "$DIR/.deploy.env"
+  fi
+  chmod 600 "$DIR/.deploy.env" 2>/dev/null || true
+  if [ "$DSK_NEU" = "1" ]; then
+    echo "  Datenschluessel NEU erzeugt und in .deploy.env gemerkt."
+    echo "  >>> JETZT eine zweite Kopie in den Passwortmanager legen: $DATENSCHLUESSEL"
+  else
+    echo "  Datenschluessel vom Server uebernommen und in .deploy.env gemerkt."
+  fi
+fi
+
 set +e
 BOOTSTRAP=$(ssh "$SERVER" sh -s <<REMOTE
 cd '$REMOTE_DIR' || exit 1
@@ -331,6 +361,7 @@ p='$GEN_PGPW'
 port='$PORT'
 site='$SITE_URL'
 selftest='$SELFTEST_TOKEN'
+dsk='$DATENSCHLUESSEL'
 $(cat "$DIR/scripts/ensure-env.sh")
 REMOTE
 )
@@ -347,6 +378,18 @@ if [ "$BOOT_RC" = "3" ]; then
 fi
 
 unset GEN_TOKEN GEN_PGPW
+
+# Stimmt der Schluessel auf dem Server mit der Kopie hier ueberein? Abweichung heisst:
+# die API wuerde mit einem anderen Schluessel starten als dem, der die Daten schuetzt.
+# Dann lieber hier stoppen, als unlesbare Daten auszuliefern (Start bricht ohnehin ab).
+SRV_DSK=$(ssh "$SERVER" "cd '$REMOTE_DIR' && sed -n 's|^NUVORA_DATENSCHLUESSEL=\\([^# ]*\\).*|\\1|p' .env | head -1" 2>/dev/null || true)
+if [ -n "$SRV_DSK" ] && [ "$SRV_DSK" != "$DATENSCHLUESSEL" ]; then
+  echo ""
+  echo "ABBRUCH: Datenschluessel auf dem Server weicht von .deploy.env ab."
+  echo "Nichts wurde gebaut oder neu gestartet. Den richtigen Wert in .deploy.env"
+  echo "(DATENSCHLUESSEL) bzw. in der .env auf dem Server eintragen — NICHT neu erzeugen."
+  exit 4
+fi
 
 if [ -n "$BOOTSTRAP" ]; then
   echo "  ✓ .env ergänzt (chmod 600):$BOOTSTRAP"
