@@ -2526,6 +2526,7 @@ export default {
   "melder.logZeigen": "View log",
   "melder.wasGeht": "What is sent?",
   "melder.anhang": "Attach file",
+  "melder.dateiHierher": "Drop file here",
   "melder.anhangZuGross": "Attachment too large (max. {{n}} MB)",
   "melder.anhangAnzahl": "At most {{n}} attachments.",
   "melder.anhangZusammen": "Attachments are too large together (max. {{n}} MB).",

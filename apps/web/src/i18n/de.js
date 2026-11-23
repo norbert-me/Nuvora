@@ -2516,6 +2516,7 @@ export default {
   "melder.logZeigen": "Protokoll ansehen",
   "melder.wasGeht": "Was wird mitgeschickt?",
   "melder.anhang": "Datei anhängen",
+  "melder.dateiHierher": "Datei hier ablegen",
   "melder.anhangZuGross": "Anhang zu groß (max. {{n}} MB)",
   "melder.anhangAnzahl": "Höchstens {{n}} Anhänge.",
   "melder.anhangZusammen": "Die Anhänge sind zusammen zu groß (höchstens {{n}} MB).",

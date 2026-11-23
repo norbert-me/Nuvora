@@ -2527,6 +2527,7 @@ export default {
   "melder.logZeigen": "Ver el registro",
   "melder.wasGeht": "¿Qué se envía?",
   "melder.anhang": "Adjuntar archivo",
+  "melder.dateiHierher": "Suelta el archivo aquí",
   "melder.anhangZuGross": "Adjunto demasiado grande (máx. {{n}} MB)",
   "melder.anhangAnzahl": "Como máximo {{n}} archivos adjuntos.",
   "melder.anhangZusammen": "Los adjuntos son demasiado grandes en total (máx. {{n}} MB).",
