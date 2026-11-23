@@ -2002,6 +2002,9 @@ const boxColor = (med) => (med < 50 ? C.danger : med < 75 ? C.warning : C.succes
 // Boxplot kommt zentral aus Icons.jsx (eine Quelle). Der Vergleich nutzt die
 // kompakte Variante (compact) je Zeile.
 
+// Die Arbeit einer Klasse öffnen (Deep-Link: Klasse, Kurs und Arbeit — ohne den Kurs riete die Auswahl den ersten).
+const arbeitLink = (a) => `/auswertung?tab=klassenarbeit&class=${a.class_id}${a.kurs_id ? `&kurs=${a.kurs_id}` : ""}&work=${a.id}`;
+
 export function KlassenarbeitVergleich() {
   const { t } = useLanguage();
   const [classId, setClassId] = useState(null);
@@ -2144,7 +2147,10 @@ export function KlassenarbeitVergleich() {
                   const q = quartiles(a.pct_liste);
                   return (
                     <tr key={a.id} style={a.eigene ? { background: "var(--bg2)" } : undefined}>
-                      <td style={{ ...zelle, textAlign: "left", fontWeight: 600 }} title={a.name}>{a.class_name || a.name}</td>
+                      <td style={{ ...zelle, textAlign: "left", fontWeight: 600 }} title={a.name}>
+                        {/* Klick öffnet die Arbeit dieser Klasse (Deep-Link wie aus dem Kalender). */}
+                        <Link to={arbeitLink(a)} style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dotted var(--text3)" }}>{a.class_name || a.name}</Link>
+                      </td>
                       <td style={{ ...zelle, textAlign: "left" }}><Boxplot values={a.pct_liste} max={100} compact umgekehrt /></td>
                       <td style={{ ...zelle, color: "var(--text3)" }}>{a.n}</td>
                       <td style={{ ...zelle, fontWeight: 600 }}>{fmt(a.schnitt)}</td>
@@ -2174,7 +2180,7 @@ export function KlassenarbeitVergleich() {
               <thead>
                 <tr>
                   <th style={{ ...kopf, textAlign: "left" }}>{t("klassenarbeit.cmpTask")}</th>
-                  {klassen.map((a) => <th key={a.id} style={kopf} title={a.name}>{a.class_name || "?"}</th>)}
+                  {klassen.map((a) => <th key={a.id} style={kopf} title={a.name}><Link to={arbeitLink(a)} style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dotted var(--text3)" }}>{a.class_name || "?"}</Link></th>)}
                   {klassen.length > 1 && <th style={kopf}>{t("klassenarbeit.cmpSpread")}</th>}
                   <th style={{ ...kopf, borderLeft: "1px solid var(--border)" }}>{t("klassenarbeit.cmpAll")}</th>
                   <th style={kopf} title={t("klassenarbeit.cmpEmptyHint")}>{t("klassenarbeit.cmpEmpty")}</th>

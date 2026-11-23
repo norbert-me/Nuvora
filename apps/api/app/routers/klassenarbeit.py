@@ -840,6 +840,13 @@ def _je_einheit(w: WorkAnalysis) -> list[dict]:
     return aus
 
 
+def klassenstufe(name: str):
+    """Die Stufe aus einem Klassennamen („7.5" -> 7, „10a" -> 10, „WP-INF 8" -> 8), sonst None."""
+    import re
+    m = re.search(r"(?<!\d)(\d{1,2})(?!\d)", name or "")
+    return int(m.group(1)) if m else None
+
+
 @router.get("/works/{work_id}/vergleich")
 async def vergleich(work_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Dieselbe Arbeit über alle Klassen, in denen sie geschrieben wurde."""
@@ -865,11 +872,18 @@ async def vergleich(work_id: int, user: User = Depends(require_module), db: Asyn
     klassen = {c.id: c.name for c in (await db.execute(
         select(SchoolClass).where(SchoolClass.id.in_([x.class_id for x in gruppe])))).scalars().all()}
 
+    # Nur Klassen DERSELBEN Stufe: eine 6. Klasse schreibt zu „Rechnen mit Brüchen" nicht dieselbe Arbeit wie eine 7.
+    # (gleicher Name oder Kopie reicht nicht — gemeldet mit einem Vergleich 6.1 gegen 7.5). Laesst sich die Stufe
+    # aus dem Klassennamen nicht lesen („WP-INF", „Blanko"), bleibt die Klasse drin: geraten wird nicht.
+    eigene_stufe = klassenstufe(klassen.get(w.class_id, ""))
+    if eigene_stufe is not None:
+        gruppe = [x for x in gruppe if x.id == w.id or klassenstufe(klassen.get(x.class_id, "")) in (None, eigene_stufe)]
+
     arbeiten = []
     for x in gruppe:
         pl = _pct_liste(x, user.grade_scale)
         arbeiten.append({
-            "id": x.id, "name": x.name, "class_id": x.class_id,
+            "id": x.id, "name": x.name, "class_id": x.class_id, "kurs_id": x.kurs_id,
             "class_name": klassen.get(x.class_id, ""),
             "eigene": x.id == w.id,
             "n": len(pl), "pct_liste": pl,
