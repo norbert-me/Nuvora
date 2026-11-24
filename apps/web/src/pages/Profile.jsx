@@ -1,12 +1,16 @@
+import { LetzteAenderungen } from "../components/WasIstNeu.jsx";
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
 import { sparsamAn, setzeSparsam } from "../core/sparsam.js";
+import { beamerWahl, setzeBeamerWahl } from "../core/beamer.js";
+import BonusRegel, { profilBonus } from "../components/BonusRegel.jsx";
+import { sichern as ansichtSichern } from "../core/ansichten.js";
 import { beobachteMelderKnopf, melderKnopfAus, setzeMelderKnopf } from "../core/melderKnopf.js";
 import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, Toggle, InfoDot, linkBtn,
-  sectionLabel, Tabs, th as thBasis, td as tdBasis, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
+  sectionLabel, Tabs, th as thBasis, td as tdBasis, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R, chipStyle } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson } from "../core/melden.js";
 import { raeumeBrowser } from "../core/abmelden.js";
@@ -63,12 +67,23 @@ const Abschnitt = ({ id, titel, zu = true, kopf = null, children }) => {
       return v === null ? !zu : v === "1";
     } catch { return !zu; }
   });
+  // Die Sprungleiste oben klappt den Abschnitt auf und scrollt hin.
+  useEffect(() => {
+    const h = (e) => {
+      if (e.detail !== id) return;
+      setOffen(true);
+      try { localStorage.setItem(`nuvora_profil_${id}`, "1"); } catch { /* egal */ }
+      setTimeout(() => document.getElementById(`profil-${id}`)?.scrollIntoView({ block: "start", behavior: "smooth" }), 30);
+    };
+    window.addEventListener("nuvora:profil-oeffne", h);
+    return () => window.removeEventListener("nuvora:profil-oeffne", h);
+  }, [id]);
   const um = () => setOffen((v) => {
     try { localStorage.setItem(`nuvora_profil_${id}`, v ? "0" : "1"); } catch { /* egal */ }
     return !v;
   });
   return (
-    <div style={abschnitt}>
+    <div id={`profil-${id}`} style={{ ...abschnitt, scrollMarginTop: 72 }}>
       <button type="button" onClick={um}
         // Polster statt `padding: 0`: der Kopf war 20 px hoch und damit ein
         // Tippziel unter der Fingerbreite, obwohl die ganze Karte darunter
@@ -116,7 +131,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     }
   });
   const { t, lang, setLang } = useLanguage();
+  const [neuOffen, setNeuOffen] = useState(false);
   const [sparsam, setSparsam] = useState(sparsamAn());
+  const [beamer, setBeamer] = useState(() => beamerWahl());
   const [melderKnopf, setMelderKnopf] = useState(() => !melderKnopfAus());
   useEffect(() => beobachteMelderKnopf(() => setMelderKnopf(!melderKnopfAus())), []);
   const [oldPw, setOldPw] = useState("");
@@ -140,6 +157,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     // dieser Lehrkraft dasselbe — je Klasse waere es dieselbe Angabe
     // fuenfzehnmal, und beim ersten Abweichen wuesste niemand, welche stimmt.
     hj1: user.hj1_start || "", hj2: user.hj2_start || "", ende: user.jahr_ende || "",
+    // Vorgabe fuer den E/G-Bonus neuer Auswertungen (am Konto, siehe core/ansichten.js).
+    bonus: profilBonus(),
   });
   const profil = useEntwurf(profilBasis, (w) => saveProfile(w));
   const { gradeScale, gradeTendency, anwDefault } = profil.wert;
@@ -244,6 +263,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     });
     if (res.ok) {
       const data = await res.json();
+      await ansichtSichern("bonus_regel", { max_stufen: w.bonus.maxStufen, mindest_nenner: w.bonus.mindestNenner, falsch_zehrt: w.bonus.falschZehrt });
       setProfileMsg(t("profile.saved"));
       setProfilBasis(w);
       const updated = { ...user, ...data };
@@ -309,6 +329,17 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   return (
     <div style={{ ...pageForm }}>
       <h1 style={pageTitle}>{t("nav.profile")}</h1>
+      {neuOffen && <LetzteAenderungen onClose={() => setNeuOffen(false)} />}
+
+      {/* Sprungleiste: die Abschnitte sind zugeklappt, und wer etwas sucht, soll
+          nicht vier Pfeile durchprobieren. */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {[["konto", t("profile.account")], ["unterricht", t("profile.settings")], ...(modulTeile.length ? [["modulteile", t("profile.modulTeile")]] : []),
+          ["sofort", t("profile.sofort")], ["apps", t("profile.apps")]].map(([id, l]) => (
+          <button key={id} type="button" onClick={() => window.dispatchEvent(new CustomEvent("nuvora:profil-oeffne", { detail: id }))}
+            style={{ ...chipStyle, cursor: "pointer", border: "1px solid var(--border2)", background: "var(--card)", fontSize: 13 }}>{l}</button>
+        ))}
+      </div>
 
       {/* Drei Karten, und jede hat GENAU EINE Art zu speichern: das Konto
           (jede Aenderung ihr eigenes Formular mit eigenem Knopf), der
@@ -373,7 +404,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
 
       {/* Bewusst kein <form>: die Knöpfe der Speicherleiste wären darin
           Submit-Knöpfe, und „Abbrechen" schickte das Formular ab. */}
-      <Abschnitt id="unterricht" titel={t("profile.settings")}>
+      <Abschnitt id="unterricht" titel={t("profile.settings")} zu={false}>
 
         {/* Schuljahr zuerst: die Achse, auf der jede Planung liegt. */}
         <Zeile label={t("profile.schuljahr")} hint={t("profile.schuljahrHint")} block erste>
@@ -412,6 +443,13 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             options={[["an", t("profile.gradeTendencyOn")], ["aus", t("profile.gradeTendencyOff")]]} />
         </Zeile>
 
+        {/* Gehoert zu CardVote (Wertung eines Quiz mit E/G) — ohne das Modul ein Schalter fuer nichts. */}
+        {modules.some((m) => m.key === "cardvote" && m.active) && (
+          <Zeile label={`CardVote: ${t("profile.bonusRegel")}`} hint={t("profile.bonusRegelHint")} block>
+            <BonusRegel wert={profil.wert.bonus} onChange={(b) => profil.setz({ bonus: b })} t={t} />
+          </Zeile>
+        )}
+
         <Zeile label={t("profile.anwDefault")} hint={t("profile.anwDefaultHint")}>
           <Tabs value={anwDefault} onChange={(v) => profil.setz({ anwDefault: v })}
             options={[["da", t("profile.anwDefaultDa")], ["fehlt", t("profile.anwDefaultFehlt")]]} />
@@ -422,46 +460,6 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             ist. Dauerhaft sichtbar stand dort ein Speichern-Knopf, der nichts
             zu speichern hatte. */}
         <Speicherleiste entwurf={profil} style={{ marginTop: 16 }} />
-      </Abschnitt>
-
-      {/* Was sofort wirkt, steht zusammen und ohne Speicherleiste: die Sprache
-          wechselt die Oberflaeche im selben Augenblick, das Tutorial startet.
-          Beides sind die begruendeten Ausnahmen von „ohne Speichern-Knopf geht
-          nichts" (siehe CLAUDE.md) — in einer eigenen Karte sieht man, dass
-          hier eine andere Regel gilt als eine Karte weiter oben. */}
-      <Abschnitt id="sofort" titel={t("profile.sofort")}>
-        {/* Datensparen wirkt sofort und hat keinen zweiten Wert daneben — wie
-            Sprache und Update-Kanal eine der begründeten Ausnahmen von der
-            Speichern-Regel. Der Hinweis bleibt stehen: dass danach offline
-            weniger da ist, sieht man dem Schalter nicht an. */}
-        <Zeile label={t("profile.sparsam")} hint={t("profile.sparsamHint")} erste>
-          <Toggle checked={sparsam} onChange={(v) => { setSparsam(v); setzeSparsam(v); }} label="" />
-        </Zeile>
-        {/* Derselbe Fall: ein Umschalter ohne zweiten Wert, Einstellung des
-            Geräts (am Beamer aus, am eigenen Rechner an). */}
-        <Zeile label={t("profile.melderKnopf")}>
-          <Toggle checked={melderKnopf} onChange={(v) => { setMelderKnopf(v); setzeMelderKnopf(v); }} label="" />
-        </Zeile>
-        <Zeile label={t("nav.language")}>
-          <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ ...selectStyle, minWidth: 160 }}>
-            {Object.entries(LANGUAGES).map(([code, label]) => (
-              <option key={code} value={code}>{label}</option>
-            ))}
-          </select>
-        </Zeile>
-        {/* Zwei verschiedene Dinge, deshalb zwei Knöpfe: die Tutorial-SEITE zum
-            Nachlesen und der Neustart der eingeblendeten Führung. Der Weg zur
-            Seite hing bisher in der Fußzeile — dort sucht ihn niemand, und
-            neben dem Neustart steht er bei der Frage, zu der er gehört. */}
-        <Zeile label={t("profile.tutorialTitle")}>
-          <Link to="/tutorial" style={{ ...btnSecondary, display: "inline-block", textDecoration: "none", marginRight: 8 }}>
-            {t("profile.tutorialOpen")}
-          </Link>
-          <button type="button" onClick={() => {
-            try { localStorage.removeItem(`nuvora_onboarded_${user?.id ?? "x"}`); } catch { /* egal */ }
-            window.location.href = "/";
-          }} style={btnSecondary}>{t("profile.tutorialRestart")}</button>
-        </Zeile>
       </Abschnitt>
 
       {/* Die abschaltbaren Teile ALLER eingeschalteten Module — an einer
@@ -490,32 +488,67 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         </Abschnitt>
       )}
 
+      {/* Was sofort wirkt, steht zusammen und ohne Speicherleiste: die Sprache
+          wechselt die Oberflaeche im selben Augenblick, das Tutorial startet.
+          Beides sind die begruendeten Ausnahmen von „ohne Speichern-Knopf geht
+          nichts" (siehe CLAUDE.md) — in einer eigenen Karte sieht man, dass
+          hier eine andere Regel gilt als eine Karte weiter oben. */}
+      <Abschnitt id="sofort" titel={t("profile.sofort")} zu={false}>
+        {/* Datensparen wirkt sofort und hat keinen zweiten Wert daneben — wie
+            Sprache und Update-Kanal eine der begründeten Ausnahmen von der
+            Speichern-Regel. Der Hinweis bleibt stehen: dass danach offline
+            weniger da ist, sieht man dem Schalter nicht an. */}
+        <Zeile label={t("nav.language")} erste>
+          <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ ...selectStyle, minWidth: 160 }}>
+            {Object.entries(LANGUAGES).map(([code, label]) => (
+              <option key={code} value={code}>{label}</option>
+            ))}
+          </select>
+        </Zeile>
+        <Zeile label={t("profile.sparsam")} hint={t("profile.sparsamHint")}>
+          <Toggle checked={sparsam} onChange={(v) => { setSparsam(v); setzeSparsam(v); }} label="" />
+        </Zeile>
+        {/* Derselbe Fall: ein Umschalter ohne zweiten Wert, Einstellung des
+            Geräts (am Beamer aus, am eigenen Rechner an). */}
+        {/* Gerätewahl wie der Melde-Knopf: wirkt sofort, kein zweiter Wert. */}
+        <Zeile label={t("profile.beamer")} hint={t("profile.beamerHint")}>
+          <select value={beamer} onChange={(e) => { setBeamer(e.target.value); setzeBeamerWahl(e.target.value); }} style={{ ...selectStyle, minWidth: 160 }}>
+            <option value="auto">{t("profile.beamerAuto")}</option>
+            <option value="an">{t("profile.beamerAn")}</option>
+            <option value="aus">{t("profile.beamerAus")}</option>
+          </select>
+        </Zeile>
+        <Zeile label={t("profile.melderKnopf")}>
+          <Toggle checked={melderKnopf} onChange={(v) => { setMelderKnopf(v); setzeMelderKnopf(v); }} label="" />
+        </Zeile>
+      </Abschnitt>
+
       {/* App laden: derselbe Nuvora-Server, nur in einem eigenen Fenster. Es
           steht hier und nicht in der Fusszeile, weil es zur eigenen
           Arbeitsumgebung gehoert wie die Sprache. Nur Plattformen mit einer
           Datei stehen in der Liste. */}
       <Abschnitt id="apps" titel={t("profile.apps")}>
-        {/* Nur in der iPhone-/iPad-Huelle: sie merkt sich die Serveradresse in
-            ihrer EIGENEN Herkunft (capacitor://localhost) — von hier aus ist
-            das die einzige Tuer zurueck zur Einrichtungsseite. Im Browser und
-            in der Desktop-App gibt es den Eintrag nicht: dort steht die
-            Adresse in der Adresszeile bzw. im Menue der App. */}
-        {typeof window !== "undefined" && window.Capacitor && (
-          <Zeile label={t("profile.appServer")} erste>
-            <button type="button" onClick={() => { window.location.href = "capacitor://localhost/index.html?setup=1"; }}
-              style={btnSecondary}>{t("profile.appServerAendern")}</button>
-          </Zeile>
-        )}
+        {/* Zwei verschiedene Dinge, deshalb zwei Knöpfe: die Tutorial-SEITE zum
+            Nachlesen und der Neustart der eingeblendeten Führung. Der Weg zur
+            Seite hing bisher in der Fußzeile — dort sucht ihn niemand, und
+            neben dem Neustart steht er bei der Frage, zu der er gehört. */}
+        <Zeile label={t("profile.letzteAenderungen")} erste>
+          <button type="button" onClick={() => setNeuOffen(true)} style={btnSecondary}>{t("profile.letzteAenderungenOeffnen")}</button>
+        </Zeile>
+        <Zeile label={t("profile.tutorialTitle")}>
+          <Link to="/tutorial" style={{ ...btnSecondary, display: "inline-block", textDecoration: "none", marginRight: 8 }}>
+            {t("profile.tutorialOpen")}
+          </Link>
+          <button type="button" onClick={() => {
+            try { localStorage.removeItem(`nuvora_onboarded_${user?.id ?? "x"}`); } catch { /* egal */ }
+            window.location.href = "/";
+          }} style={btnSecondary}>{t("profile.tutorialRestart")}</button>
+        </Zeile>
         {/* Der Server schickt nur noch Plattformen, fuer die es eine Datei
             gibt — „In Vorbereitung" stand vorher als Zeile ohne Handgriff da. */}
         {(apps?.plattformen || []).map((p, i) => (
-          <Zeile key={p.key} label={p.label} erste={i === 0 && !(typeof window !== "undefined" && window.Capacitor)}
+          <Zeile key={p.key} label={p.label} erste={false}
             hint={`${p.datei.name} · ${Math.round((p.datei.size || 0) / 1048576)} MB`}>
-            {/* Die iOS-Datei ist unsigniert und laesst sich nicht einfach
-                antippen — das sieht man ihr nicht an, deshalb steht es hier
-                als ein Satz (siehe „Kein Erklaertext fuer Selbsterklaerendes":
-                erlaubt ist, was man dem Bildschirm nicht ansieht). Nur bei
-                iOS: bei den uebrigen Plattformen laedt man und startet. */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {/* In der Desktop-Huelle wird die Fassung DRUEBERGELEGT statt
                   verlinkt — derselbe Weg wie im Update-Hinweis oben. Nur fuer
@@ -530,9 +563,6 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                 <a href={p.datei.url} style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>
                   {t("profile.appsLaden")}
                 </a>
-              )}
-              {p.key === "ios" && (
-                <span style={{ fontSize: 12, color: "var(--text3)", maxWidth: 360 }}>{t("profile.appsIos")}</span>
               )}
             </div>
           </Zeile>

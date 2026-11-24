@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { Boxplot, ICONS, Icon, LoadError, StatCard, Toggle, chipStyle, klebtLinks, pageApp, panelStyle, quoteFlaeche, td as tdBasis, th as thBasis } from "../components/Icons.jsx";
+import Verteilung from "../components/Verteilung.jsx";
 import { median, mittel, streuung } from "../core/statistik.js";
 import { kommaRund, prozent } from "../core/zahl.js";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
@@ -132,7 +133,7 @@ export default function ClassEvaluation() {
       {/* Frühwarnung: wer hängt über mehrere Tests hinweg hinterher? Steht VOR
           den Kennzahlen — eine Durchschnittsquote sagt nichts über einzelne
           Kinder, und genau danach wird hier gesucht. */}
-      <FruehwarnPanel classId={id} nurKind={suche.get("fw")} />
+      <FruehwarnPanel classId={id} nurKind={suche.get("fw")} nur="quiz" />
 
       {/* Stat tiles */}
       <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
@@ -161,7 +162,7 @@ export default function ClassEvaluation() {
               />
             }
           />
-          {chartView === "box" && <Boxplot values={pctValues} max={100} unit="%" />}
+          {chartView === "box" && <div style={{ padding: 16 }}><Verteilung pct={pctValues} /></div>}
         </div>
       )}
 

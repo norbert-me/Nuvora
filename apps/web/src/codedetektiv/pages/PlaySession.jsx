@@ -54,7 +54,7 @@ export default function PlaySession() {
 
   if (!session) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ minHeight: 'var(--voll, 100vh)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
         <div style={{ textAlign: 'center', maxWidth: 400 }}>
           <div style={{ marginBottom: 16 }}><IconX size={48} /></div>
           <h2 style={{ marginBottom: 8 }}>{t('cd.session.nicht_gefunden_kurz', 'Session nicht gefunden')}</h2>
@@ -69,7 +69,7 @@ export default function PlaySession() {
 
   if (session.ended) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: 24 }}>
+      <div style={{ minHeight: 'var(--voll, 100vh)', background: 'var(--bg)', padding: 24 }}>
         <div style={{ maxWidth: 600, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
             <IconTrophy size={64} />
@@ -87,7 +87,7 @@ export default function PlaySession() {
 
   if (!session.started) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ minHeight: 'var(--voll, 100vh)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
         <div style={{ textAlign: 'center', maxWidth: 450 }}>
           <div style={{ marginBottom: 16 }}><IconHourglass size={48} /></div>
           <h2 style={{ marginBottom: 8 }}>{t('cd.play.warte_start', 'Warte auf Start...')}</h2>
@@ -116,7 +116,7 @@ export default function PlaySession() {
 
   if (session.started && !isPlayer && !isAdmin) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ minHeight: 'var(--voll, 100vh)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
         <div style={{ textAlign: 'center', maxWidth: 400 }}>
           <div style={{ marginBottom: 16 }}><IconX size={48} /></div>
           <h2 style={{ marginBottom: 8 }}>{t('cd.play.laeuft', 'Session läuft bereits')}</h2>
@@ -129,7 +129,7 @@ export default function PlaySession() {
 
   if (isPlayer && !myResult && currentPuzzle && !allDone) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ minHeight: 'var(--voll, 100vh)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
         <div style={{ textAlign: 'center', maxWidth: 400 }}>
           <div style={{ marginBottom: 16 }}><IconPuzzle size={48} /></div>
           <h2 style={{ marginBottom: 8 }}>{t('cd.play.runde_von', 'Runde {{n}} von {{gesamt}}', { n: session.currentPuzzleIndex + 1, gesamt: session.puzzleIds.length })}</h2>
@@ -151,7 +151,7 @@ export default function PlaySession() {
       session.results.some(r => r.puzzleId === currentPuzzleId && r.playerName === p.name)
     ).length;
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ minHeight: 'var(--voll, 100vh)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
         <div style={{ textAlign: 'center', maxWidth: 450 }}>
           <div style={{ marginBottom: 16 }}>{myResult.solved ? <IconCheckCircle size={48} /> : <IconClock size={48} />}</div>
           <h2 style={{ marginBottom: 8 }}>
@@ -186,7 +186,7 @@ export default function PlaySession() {
   if (allDone && !session.ended) {
     const isLast = session.currentPuzzleIndex >= session.puzzleIds.length - 1;
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: 24 }}>
+      <div style={{ minHeight: 'var(--voll, 100vh)', background: 'var(--bg)', padding: 24 }}>
         <div style={{ maxWidth: 600, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
             <h2>{t('cd.play.runde_fertig', 'Runde {{n}} abgeschlossen!', { n: session.currentPuzzleIndex + 1 })}</h2>
@@ -232,7 +232,7 @@ export default function PlaySession() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+    <div style={{ minHeight: 'var(--voll, 100vh)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div style={{ textAlign: 'center' }}>
         <p style={{ color: 'var(--text3)' }}>{t('cd.laden', 'Lade...')}</p>
       </div>

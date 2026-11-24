@@ -5,11 +5,14 @@ import { useState, useEffect, useRef } from "react";
 import { liegtDavor, nachJahrAbsteigend } from "../core/schuljahr.js";
 import KursKinder from "../components/KursKinder.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { useAktiv } from "../core/modules.js";
+import KurseZusammen from "../components/KurseZusammen.jsx";
 import KursLinks from "../components/KursLinks.jsx";
+import KursInfo from "../components/KursInfo.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { alsJson, hol, sende } from "../core/melden.js";
 import { AddButton, pageTitle, btnSecondary, btnSmall, selectStyle, chipStyle,
-  Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, toolbarInput, sectionLabel, Toggle, Tabs, Empty, pageApp, LoadError } from "../components/Icons.jsx";
+  Icon, ICONS, iconBtn, linkBtn, COLORS as C, cardStyle, inputStyle, toolbarInput, sectionLabel, Toggle, Tabs, Empty, pageApp, LoadError } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
@@ -32,8 +35,10 @@ const FACH_VORSCHLAEGE = [
 const NEU = "\u0000neu";
 
 export default function Kurse() {
+  const [infoOffen, setInfoOffen] = useState({});
   const { t } = useLanguage();
   const [kurse, setKurse] = useState([]);
+  const [zusammen, setZusammen] = useState(null);   // Kurs, in den zusammengefuehrt wird
   const [allClasses, setAllClasses] = useState([]);
   // Gelöschte Kurse liegen im gemeinsamen Papierkorb des Kerns (/papierkorb).
   const [neu, setNeu] = useState("");
@@ -47,7 +52,8 @@ export default function Kurse() {
   // Jahresfolge: Schuljahr und der Kurs des Vorjahres. Die Daten bleiben
   // getrennt (Zeugnisnoten gelten je Schuljahr) — verbunden wird nur die Kette,
   // damit „6.5 Mathe" und „7.5 Mathe" nicht als zwei fremde Gruppen dastehen.
-  const LEER = { name: "", jahr: "", fach: "", stufe: "", raum: "", vorgaenger: "", niveauAktiv: false, archiviert: false, klassen: [] };
+  const aktiv = useAktiv();
+  const LEER = { name: "", jahr: "", fach: "", stufe: "", raum: "", vorgaenger: "", niveauAktiv: false, kartenAktiv: true, archiviert: false, klassen: [] };
   const [kursBasis, setKursBasis] = useState(LEER);
   const kurs = useEntwurf(kursBasis, (w) => kursSpeichern(w));
   const kursUebernehmen = (stand) => { setKursBasis(stand); kurs.setz(stand); };
@@ -93,7 +99,7 @@ export default function Kurse() {
     kursUebernehmen({
       name: k.name, jahr: k.schuljahr || "", fach: k.fach || "", stufe: k.jahrgang || "", raum: k.raum || "",
       vorgaenger: k.vorgaenger_id ? String(k.vorgaenger_id) : "",
-      niveauAktiv: !!k.niveau_aktiv, archiviert: archiv, klassen: k.classes.map((c) => c.id),
+      niveauAktiv: !!k.niveau_aktiv, kartenAktiv: k.karten_aktiv !== false, archiviert: archiv, klassen: k.classes.map((c) => c.id),
     });
     // Auswahl fuer „Vorjahr": aktive UND archivierte Kurse. Nach dem
     // Schuljahresende steht der Vorgaenger im Archiv, und genau dann braucht
@@ -111,7 +117,7 @@ export default function Kurse() {
     if (!k) return false;
     const name = w.name.trim();
     if (!name) return false;
-    const koerper = { name, schuljahr: w.jahr === NEU ? "" : w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv,
+    const koerper = { name, schuljahr: w.jahr === NEU ? "" : w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv, karten_aktiv: w.kartenAktiv,
                       fach: (w.fach || "").trim(), jahrgang: (w.stufe || "").trim(),
                       raum: (w.raum || "").trim() };
     if (!(await sende(`${API}/kurse/${k.id}`, alsJson("PUT", koerper), t("kurse.editName")))) return false;
@@ -168,7 +174,12 @@ export default function Kurse() {
         {kurse.map((k) => (
           <div key={k.id} style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <strong style={{ fontSize: 16 }}>{k.name}</strong>
+              {/* Klick auf den Namen klappt die Kurs-Info auf (Kinder, nächste Arbeit, Schnitt, Wiederholungsbedarf). */}
+              <button onClick={() => setInfoOffen((o) => ({ ...o, [k.id]: !o[k.id] }))} aria-expanded={!!infoOffen[k.id]} title={t("kurse.info.titel")}
+                style={{ ...linkBtn, color: "var(--text)", display: "inline-flex", alignItems: "center", gap: 6, margin: 0 }}>
+                <Icon d={infoOffen[k.id] ? ICONS.chevronDown : ICONS.chevronRight} size={13} color="var(--text3)" />
+                <strong style={{ fontSize: 16 }}>{k.name}</strong>
+              </button>
               {k.schuljahr && <span style={chipStyle}>{k.schuljahr}</span>}
               {k.fach && <span style={chipStyle}>{k.fach}</span>}
               {k.raum && <span style={chipStyle}>{k.raum}</span>}
@@ -188,6 +199,7 @@ export default function Kurse() {
                 {k.nachfolger_name && <span title={t("kurse.chainHint")}>{t("kurse.nextYear")}: {k.nachfolger_name} →</span>}
               </div>
             )}
+            {infoOffen[k.id] && <KursInfo kurs={k} />}
             <KursLinks kurs={k} />
 
             {/* Bearbeiten-Bereich (hinter dem Stift): klar gegliedert in Name,
@@ -211,6 +223,11 @@ export default function Kurse() {
                     title={t("classes.archiveHint")}>
                     {archiv ? t("classes.unarchive") : t("classes.archive")}
                   </button>
+                  {!archiv && kurse.length > 1 && (
+                    <button onClick={() => setZusammen(k)} style={{ ...btnSecondary, ...btnSmall }} title={t("kurse.zusammenHint")}>
+                      {t("kurse.zusammen")}
+                    </button>
+                  )}
                 </div>
 
                 {/* Die Kinder stehen im KURS — dort, wo mit ihnen gearbeitet
@@ -323,6 +340,12 @@ export default function Kurse() {
                     <div style={editLabel}>{t("kurse.editLevels")}</div>
                     <Toggle checked={kurs.wert.niveauAktiv} onChange={(v) => kurs.setz({ niveauAktiv: v })} label={t("kurse.niveauToggle")} />
                 </div>
+                {/* Regel 3: ohne das Kartenmodul gibt es nichts abzuschalten. */}
+                {aktiv("karten") && (
+                  <div>
+                    <Toggle checked={kurs.wert.kartenAktiv} onChange={(v) => kurs.setz({ kartenAktiv: v })} label={t("kurse.kartenToggle")} />
+                  </div>
+                )}
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
                   <button onClick={() => delKurs(k)} className="icon-btn" style={{ ...iconBtn }} title={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")} aria-label={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")}>
                     <Icon d={ICONS.trash} size={16} color={C.danger} />
@@ -333,6 +356,10 @@ export default function Kurse() {
           </div>
         ))}
       </div>
+      {zusammen && (
+        <KurseZusammen ziel={zusammen} kurse={kurse} onClose={() => setZusammen(null)}
+          onFertig={() => { setZusammen(null); load(); loadClasses(); }} />
+      )}
     </div>
   );
 }

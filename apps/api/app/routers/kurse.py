@@ -32,7 +32,7 @@ from ..models import Kurs, KursTag, KursStudent, Person, SchoolClass, Student, U
 from ..personen import sichere_personen
 # Optimistisches Sperren (siehe app/versionierung.py).
 from ..versionierung import VersionOut, pruefe, stand
-from .auth import get_current_user
+from .auth import _verify_pw, get_current_user, rate_limit
 from .classes import MASSNAHMEN_VALUES
 
 # Die Mitgliedschafts-Fragen („welche Klassen, welche SuS, welche Geschwister?")
@@ -45,6 +45,7 @@ router = APIRouter(prefix="/api/kurse", tags=["kurse"])
 class KursIn(BaseModel):
     name: str
     niveau_aktiv: Optional[bool] = None
+    karten_aktiv: Optional[bool] = None
     schuljahr: Optional[str] = None      # "2025/26" — Beschriftung, kein Zeitraum
     vorgaenger_id: Optional[int] = None  # dieselbe Lerngruppe im Vorjahr (0/None = keiner)
     # Fach — das Gegenstueck zu `topics.fach`. Erst dadurch ist „die Themen
@@ -80,6 +81,7 @@ class KursOut(VersionOut):
     name: str
     classes: List[ClassRef] = []
     niveau_aktiv: bool = False
+    karten_aktiv: bool = True
     color: str = ""
     member_count: int = 0    # einzeln hinzugefügte SuS (Kurs aus Teilen von Klassen)
     schuljahr: str = ""
@@ -189,7 +191,7 @@ async def list_kurse(archiviert: bool = False, user: User = Depends(get_current_
     for k2 in (await db.execute(select(Kurs.id, Kurs.name, Kurs.vorgaenger_id).where(
             Kurs.owner_id == user.id, Kurs.deleted_at.is_(None), Kurs.vorgaenger_id.is_not(None)))).all():
         nachfolger[k2[2]] = (k2[0], k2[1])
-    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv,
+    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv,
                     color=k.color, member_count=int(mc.get(k.id, 0)),
                     schuljahr=k.schuljahr, fach=k.fach or "", jahrgang=k.jahrgang or "",
                     raum=k.raum or "", vorgaenger_id=k.vorgaenger_id,
@@ -215,14 +217,14 @@ async def archive_kurs(kurs_id: int, mit_klassen: bool = True, user: User = Depe
             c.archived_at = jetzt
     await db.commit()
     await db.refresh(k)
-    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color)
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv, color=k.color)
 
 
 @router.get("/trash", response_model=List[KursOut])
 async def list_kurs_trash(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     kurse = (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id, Kurs.deleted_at.is_not(None)).order_by(Kurs.deleted_at.desc()))).scalars().all()
-    return [KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color) for k in kurse]
+    return [KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv, color=k.color) for k in kurse]
 
 
 @router.post("", response_model=KursOut, status_code=201)
@@ -257,7 +259,7 @@ async def create_kurs(body: KursIn, user: User = Depends(get_current_user), db: 
 
     await db.commit()
     await db.refresh(k)
-    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color,
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv, color=k.color,
                    member_count=uebernommen)
 
 
@@ -270,6 +272,8 @@ async def rename_kurs(kurs_id: int, body: KursIn, request: Request = None, user:
         k.name = name[:100]
     if body.niveau_aktiv is not None:
         k.niveau_aktiv = bool(body.niveau_aktiv)
+    if body.karten_aktiv is not None:
+        k.karten_aktiv = bool(body.karten_aktiv)
     if body.schuljahr is not None:
         k.schuljahr = (body.schuljahr or "").strip()[:9]
     if body.vorgaenger_id is not None:
@@ -284,7 +288,7 @@ async def rename_kurs(kurs_id: int, body: KursIn, request: Request = None, user:
     if body.raum is not None:
         k.raum = (body.raum or "").strip()[:60]
     await db.commit()
-    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color,
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv, color=k.color,
                    schuljahr=k.schuljahr, fach=k.fach or "", jahrgang=k.jahrgang or "",
                    raum=k.raum or "", vorgaenger_id=k.vorgaenger_id, **stand(k))
 
@@ -300,7 +304,7 @@ async def set_kurs_color(kurs_id: int, body: ColorIn, user: User = Depends(get_c
     c = (body.color or "").strip()[:9]
     k.color = c if (c.startswith("#") and len(c) in (4, 7, 9)) else ""
     await db.commit()
-    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color)
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv, color=k.color)
 
 
 @router.post("/{kurs_id}/classes/{class_id}", status_code=204)
@@ -359,6 +363,10 @@ class KindOut(BaseModel):
     # etwas beachten?"), ohne Art-9-Inhalte in eine Uebersicht zu ziehen — der
     # Text steht weiter nur im Dialog des einzelnen Kindes.
     nta: bool = False
+    # Nur die zwei Sonderfaelle, die die Benotung betreffen: „LRS" (Rechtschreibung
+    # zaehlt nicht) und „LE" (= Foerderschwerpunkt Lernen: keine Noten). Kuerzel
+    # statt Freitext, wie `nta` ein blosses Ja/Nein — mehr gehoert nicht in eine Liste.
+    sonder: List[str] = []
 
 
 async def _traegerklasse(db: AsyncSession, user: User, kurs: Kurs) -> SchoolClass:
@@ -392,8 +400,10 @@ async def list_kinder(kurs_id: int, user: User = Depends(get_current_user), db: 
         # Gilt fuer DIESEN Kurs: fachbezogene Massnahmen tragen ihre kurs_id,
         # aeltere ohne gelten ueberall.
         nta = any(m.get("kurs_id") in (None, kurs_id) for m in (z.massnahmen or []))
+        foerder = set((p.foerder or []) if p else []) | set(z.foerder or [])
+        sonder = [k for w, k in (("LRS", "LRS"), ("Lernen", "LE")) if w in foerder]
         out.append(KindOut(student_id=z.id, person_id=z.person_id, name=z.name,
-                           card_id=z.card_id, position=z.position or 0,
+                           card_id=z.card_id, position=z.position or 0, sonder=sonder,
                            niveau=(p.niveau if p else z.niveau) or "",
                            has_photo=bool((p and p.has_photo) or z.has_photo),
                            nta=nta))
@@ -558,8 +568,10 @@ async def list_student_members(kurs_id: int, user: User = Depends(get_current_us
     rows = (await db.execute(
         select(Student.id, Student.name, Student.class_id, SchoolClass.name)
         .join(SchoolClass, Student.class_id == SchoolClass.id)
-        .where(Student.id.in_(list(sids))).order_by(Student.name)
+        .where(Student.id.in_(list(sids)))
     )).all()
+    # Der Name steht verschluesselt in der Datenbank: sortiert wird hier, nicht in SQL.
+    rows = sorted(rows, key=lambda r: (r[1] or "").casefold())
     return [{"student_id": sid, "name": n, "class_id": cid, "class_name": cn} for (sid, n, cid, cn) in rows]
 
 
@@ -721,7 +733,7 @@ async def restore_kurs(kurs_id: int, user: User = Depends(get_current_user), db:
     k.deleted_members = None
     await db.commit()
     by = await _classes_by_kurs(db, user, [k])
-    return KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv, color=k.color)
+    return KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv, karten_aktiv=k.karten_aktiv, color=k.color)
 
 
 @router.delete("/{kurs_id}/purge", status_code=204)
@@ -731,3 +743,90 @@ async def purge_kurs(kurs_id: int, user: User = Depends(get_current_user), db: A
         raise HTTPException(400, "Kurs ist nicht im Papierkorb")
     await db.delete(k)
     await db.commit()
+
+
+# ─── Kurse zusammenfuehren ───
+# Zwei Kurse sind dieselbe Gruppe (Untis-Import und von Hand angelegt, „M 7.5" und
+# „7.5 Mathematik"): alles, was am Quellkurs haengt, wandert in den Zielkurs; der Quellkurs
+# kommt in den Papierkorb. Verschoben wird jede Tabelle mit `kurs_id` (zur Laufzeit aus den
+# Modellen gezaehlt — ein neues Modul braucht hier keinen Eintrag). NICHTS wird zusammengelegt:
+# zwei Notenbereiche „Muendlich" stehen danach nebeneinander, die Lehrkraft raeumt auf. Nur
+# Zeilen mit Eindeutigkeit (Klasse im Kurs, Kind im Kurs, Stapel im Kurs) werden nicht verdoppelt.
+
+MAX_QUELLEN = 5
+_EINDEUTIG = {"kurs_tags": "class_id", "kurs_students": "student_id", "card_deck_kurse": "deck_id"}
+
+
+def _kurs_tabellen() -> list:
+    from ..models import Base
+    return [t for t in Base.metadata.sorted_tables if t.name != "kurse" and "kurs_id" in t.c]
+
+
+def _passwort_bestaetigt(user, password: str):
+    """Eigenes Passwort — eine Zusammenfuehrung ist nicht mit einem Klick umkehrbar."""
+    if not _verify_pw(password or "", user.password_hash):
+        raise HTTPException(400, "Passwort falsch")
+
+
+async def _zusammen_pruefen(db, user, kurs_id: int, quellen: List[int]):
+    quellen = list(dict.fromkeys(quellen))
+    if not quellen or len(quellen) > MAX_QUELLEN:
+        raise HTTPException(400, f"Zwischen 1 und {MAX_QUELLEN} Kurse auswählen")
+    if kurs_id in quellen:
+        raise HTTPException(400, "Der Zielkurs kann nicht gleichzeitig Quelle sein")
+    ziel = await _owned_kurs(db, user, kurs_id)
+    qs = [await _owned_kurs(db, user, q) for q in quellen]
+    if ziel.deleted_at or any(q.deleted_at for q in qs):
+        raise HTTPException(400, "Kurse im Papierkorb lassen sich nicht zusammenführen")
+    return ziel, qs
+
+
+async def _zusammen_zaehlen(db, quelle_id: int) -> dict:
+    out = {}
+    for t in _kurs_tabellen():
+        n = (await db.execute(select(func.count()).select_from(t).where(t.c.kurs_id == quelle_id))).scalar() or 0
+        if n:
+            out[t.name] = n
+    return out
+
+
+@router.get("/{kurs_id}/zusammenfuehren")
+async def zusammenfuehren_vorschau(kurs_id: int, quellen: str, user: User = Depends(get_current_user),
+                                   db: AsyncSession = Depends(get_db)):
+    """Was wuerde verschoben? Schreibt nichts."""
+    ids = [int(x) for x in quellen.split(",") if x.strip().isdigit()]
+    _, qs = await _zusammen_pruefen(db, user, kurs_id, ids)
+    return [{"id": q.id, "name": q.name, "zeilen": await _zusammen_zaehlen(db, q.id)} for q in qs]
+
+
+class ZusammenIn(BaseModel):
+    quellen: List[int]
+    password: str = ""
+
+
+@router.post("/{kurs_id}/zusammenfuehren")
+async def zusammenfuehren(kurs_id: int, body: ZusammenIn, user: User = Depends(get_current_user),
+                          db: AsyncSession = Depends(get_db)):
+    """Die Quellkurse in den Zielkurs verschieben. Verlangt das Passwort (wie jede Massenaenderung);
+    die Quellkurse landen im Papierkorb, ihre Daten stehen danach beim Ziel."""
+    rate_limit("kurse_zusammen", f"u{user.id}", 10, 3600, "Zu viele Zusammenführungen in kurzer Zeit.")
+    _passwort_bestaetigt(user, body.password)
+    ziel, qs = await _zusammen_pruefen(db, user, kurs_id, body.quellen)
+    bewegt = {}
+    for q in qs:
+        for t in _kurs_tabellen():
+            spalte = _EINDEUTIG.get(t.name)
+            if spalte:
+                schon = select(t.c[spalte]).where(t.c.kurs_id == ziel.id)
+                await db.execute(delete(t).where(t.c.kurs_id == q.id, t.c[spalte].in_(schon)))
+            res = await db.execute(update(t).where(t.c.kurs_id == q.id).values(kurs_id=ziel.id))
+            if res.rowcount:
+                bewegt[t.name] = bewegt.get(t.name, 0) + res.rowcount
+        # Wer die Quelle als Vorjahr fuehrte, fuehrt jetzt das Ziel.
+        await db.execute(update(Kurs).where(Kurs.vorgaenger_id == q.id, Kurs.id != ziel.id).values(vorgaenger_id=ziel.id))
+        if ziel.vorgaenger_id == q.id:
+            ziel.vorgaenger_id = None
+        q.deleted_members = []
+        q.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"ziel": ziel.id, "verschoben": bewegt, "quellen": [q.id for q in qs]}

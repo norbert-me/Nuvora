@@ -188,11 +188,12 @@ async def test_sicherung_enthaelt_datenbank_uploads_und_konfiguration(welt):
         assert zf.read("uploads/frage-4711.png") == UPLOAD_INHALT
 
         daten = zf.read("datenbank.ndjson").decode("utf-8")
-        assert "Anna Sicher" in daten, "Die Schülerdaten fehlen in der Sicherung"
-        assert NOTIZ in daten and DETAIL in daten, (
-            "Die besonders schützenswerten Felder (foerder/massnahmen/notizen) sind NICHT "
-            "in der Sicherung — dann wäre sie beim Zurückspielen unvollständig."
-        )
+        # Personenbezogene Spalten stehen im Dump als Chiffretext — nie im Klartext
+        # (app/krypto.py). Wer die Sicherung hat, aber nicht den Schluessel, liest nichts.
+        assert "Anna Sicher" not in daten, "Der Schuelername steht im Klartext in der Sicherung"
+        assert NOTIZ not in daten and DETAIL not in daten, (
+            "Foerder-/Massnahmen-/Notizfelder (Art. 9) stehen im Klartext in der Sicherung.")
+        assert '"enc1:' in daten, "Die Sicherung enthaelt keinen Chiffretext — wurde nichts verschluesselt?"
         manifest = json.loads(zf.read("manifest.json"))
 
     assert manifest["tabellen"]["students"] == 1
@@ -424,6 +425,54 @@ async def test_zurueckspielen_in_eine_wegwerf_datenbank(welt):
             assert klassen[0].created_at is not None, "Zeitstempel ging beim Zurückspielen verloren"
             nutzer = (await s.execute(select(m.User))).scalars().all()
             assert {u.email for u in nutzer} == {"admin@test.de", "lehrkraft@test.de", "ernannt@test.de"}
+    finally:
+        await probe.dispose()
+
+
+@pytest.mark.asyncio
+async def test_zurueckspielen_traegt_selbstbezuege_nach_auch_bei_hoeherer_id(welt):
+    """Gefunden im Probelauf mit den echten Daten: ein Kurs kann auf einen Vorgaenger mit
+    HOEHERER id zeigen (Kurs 2 -> 183). Die Sicherung steht nach id sortiert, das Kind kommt also
+    vor dem Elternteil, und Postgres lehnt die Zeile ab. Der Bezug wird deshalb erst nachgetragen."""
+    from app import models as m
+    async with welt["Sitzung"]() as s:
+        s.add(m.Kurs(id=9, owner_id=2, name="Alt"))
+        await s.commit()
+        s.add(m.Kurs(id=5, owner_id=2, name="Neu", vorgaenger_id=9))
+        await s.commit()
+    eintrag = await _sichern()
+    url = f"sqlite+aiosqlite:///{welt['tmp'] / 'selbst.db'}"
+    await backup.zurueckspielen(str(welt["sicherungen"] / eintrag["name"]), url)
+    probe = create_async_engine(url)
+    try:
+        async with async_sessionmaker(probe, class_=AsyncSession)() as s:
+            kurse = {k.id: k.vorgaenger_id for k in (await s.execute(select(m.Kurs))).scalars().all()}
+        assert kurse[5] == 9 and kurse[9] is None, kurse
+    finally:
+        await probe.dispose()
+
+
+@pytest.mark.asyncio
+async def test_zurueckspielen_kommt_mit_verwaisten_bezuegen_zurecht(welt):
+    """Gefunden im Probelauf mit den echten Daten: calendar_entries.karten_deck_id zeigte auf einen Stapel, den
+    es nicht mehr gab (dort fehlte der Fremdschluessel). Eine frische Datenbank lehnt das ab. Der Bezug wird
+    geleert und gemeldet; alles Uebrige der Zeile bleibt."""
+    from sqlalchemy import text
+    from app import models as m
+    async with welt["Sitzung"]() as s:
+        await s.execute(text("PRAGMA foreign_keys=OFF"))
+        await s.execute(text("INSERT INTO calendar_entries (id, owner_id, date, title, karten_deck_id) "
+                             "VALUES (7, 2, '2026-11-02 00:00:00', 'Waise', 4711)"))
+        await s.commit()
+    eintrag = await _sichern()
+    url = f"sqlite+aiosqlite:///{welt['tmp'] / 'waise.db'}"
+    bericht = await backup.zurueckspielen(str(welt["sicherungen"] / eintrag["name"]), url)
+    assert any("calendar_entries.karten_deck_id" in h and "verwaister Bezug" in h for h in bericht["angepasst"]), bericht["angepasst"]
+    probe = create_async_engine(url)
+    try:
+        async with async_sessionmaker(probe, class_=AsyncSession)() as s:
+            e = (await s.execute(select(m.CalendarEntry).where(m.CalendarEntry.id == 7))).scalar_one()
+        assert e.title == "Waise" and e.karten_deck_id is None
     finally:
         await probe.dispose()
 

@@ -32,6 +32,23 @@ const SvgMedal = ({ place, size = 24 }) => {
   );
 };
 
+// Die beim Start gezeigte Reihenfolge samt gemischten Antworten wieder herstellen.
+// Ohne gemerkte Reihenfolge (ältere Sitzung, kein Mischen) bleibt es die des Sets.
+function ordnungAnwenden(fragen, layout) {
+  if (!Array.isArray(layout) || !layout.length) return fragen;
+  const nachId = new Map(fragen.map((q) => [q.id, q]));
+  const aus = [];
+  for (const e of layout) {
+    const q = nachId.get(e.id);
+    if (!q) continue;
+    aus.push({ ...q, ...(e.choices && Object.keys(e.choices).length ? { choices: e.choices } : {}),
+      choice_images: e.choice_images || (e.choices && Object.keys(e.choices).length ? null : q.choice_images),
+      ...(e.correct_answer != null ? { correct_answer: e.correct_answer } : {}) });
+    nachId.delete(e.id);
+  }
+  return [...aus, ...nachId.values()];      // später dazugekommene Fragen hinten anhängen
+}
+
 export default function Session() {
   const { t } = useLanguage();
   const { id } = useParams();
@@ -45,6 +62,7 @@ export default function Session() {
   const [selectedSet, setSelectedSet] = useState(null);
   const [showAnswers, setShowAnswers] = useState(false);
   const [gameMode, setGameMode] = useState(false);
+  const [nichtBenotet, setNichtBenotet] = useState(false);   // diese Sitzung zaehlt nicht als Note
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timeLeft, setTimeLeft] = useState(null);
   const timerRef = useRef(null);
@@ -74,7 +92,26 @@ export default function Session() {
   // Wer heute fehlt, braucht nicht gescannt zu werden (Namen, nicht ids —
   // siehe unten). Regel 3: ohne Modul Orga bleibt die Menge leer.
   const [abwesend, setAbwesend] = useState(() => new Set());
+  // Kurz aufpoppender Name beim Scannen (auch „nochmal gescannt"): gescannte Kinder
+  // verschwinden aus der Liste, also braucht die Klasse einen anderen Beleg fuer „erfasst".
+  const [popups, setPopups] = useState([]);
+  const scannedRef = useRef(new Set());
+  const namenRef = useRef({});
+  const letzterScanRef = useRef(new Map());   // Map statt Objekt: der Schluessel kommt aus dem WebSocket
 
+  // Nach einer Unterbrechung: was an der aktuellen Frage inzwischen eingegangen ist, nachladen.
+  const nachladenRef = useRef(null);
+  nachladenRef.current = async () => {
+    const qid = question?.id;
+    if (!sessionId || !qid) return;
+    try {
+      const r = await fetch(`${API}/sessions/${sessionId}/results?question_id=${qid}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      setScannedStudents((d.scans || []).map((sc) => ({ student_id: sc.student_id, answer: sc.answer, time: Date.now() })));
+      setCounts(d.counts || {});
+    } catch { /* weiter ohne Netz: der naechste Versuch holt es */ }
+  };
   useEffect(() => {
     fetch(`${API}/classes`).then((r) => r.ok ? r.json() : []).then((d) => setClasses(Array.isArray(d) ? d : []));
     fetch(`${API}/kurse`).then((r) => r.ok ? r.json() : []).then((d) => setKurse(Array.isArray(d) ? d : []));
@@ -96,24 +133,39 @@ export default function Session() {
   useEffect(() => {
     if (!selectedClass) { setAbwesend(new Set()); return; }
     let gilt = true;
+    // Wird neu geholt, wenn die Seite wieder in den Vordergrund kommt und alle 45 s:
+    // die Anwesenheit wird oft erst WAEHREND der Stunde eingetragen, und ein einmaliger
+    // Abruf beim Auswaehlen der Klasse sah das nie.
+    const holen = () => {
     const heute = new Date(); heute.setHours(12, 0, 0, 0);   // Tagesmitte: die Zeitzone soll den Tag nicht kippen
-    fetch(`${API}/anwesenheit/${selectedClass.id}?date=${encodeURIComponent(heute.toISOString())}`)
-      .then((r) => (r.ok ? r.json() : {}))
-      .catch(() => ({}))
-      .then((d) => {
-        if (!gilt) return;
+    // ALLE Klassen des Kurses fragen, nicht nur die gewaehlte: die Liste der Karten ist kursweit
+    // (Kinder aus mehreren Klassen oder einzeln hinzugefuegt), die Anwesenheit antwortet aber nur
+    // mit den Zeilen der angefragten Klasse — wer in einer anderen Klasse des Kurses steht, fehlte
+    // sonst in der Liste, obwohl er als abwesend eingetragen war.
+    const kurs = kurse.find((k) => (k.classes || []).some((c) => c.id === selectedClass.id));
+    const ids = kurs ? kurs.classes.map((c) => c.id) : [selectedClass.id];
+    Promise.all(ids.map((cid) =>
+      fetch(`${API}/anwesenheit/${cid}?date=${encodeURIComponent(heute.toISOString())}`)
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null)))
+      .then((antworten) => {
+        if (!gilt || antworten.every((d) => d === null)) return;   // keine Antwort: den letzten Stand behalten statt alle anwesend zu setzen
         const namen = new Map();
         classes.forEach((c) => (c.students || []).forEach((st) => namen.set(String(st.id), (st.name || "").trim())));
         const weg = new Set();
-        Object.entries(d || {}).forEach(([sid, eintrag]) => {
+        antworten.forEach((d) => Object.entries(d || {}).forEach(([sid, eintrag]) => {
           if (!eintrag || !["fehlt", "entsch"].includes(eintrag.status)) return;
           const name = namen.get(String(sid));
           if (name) weg.add(name);
-        });
+        }));
         setAbwesend(weg);
       });
-    return () => { gilt = false; };
-  }, [selectedClass, classes]);
+    };
+    holen();
+    const takt = setInterval(holen, 45000);
+    const zurueck = () => { if (document.visibilityState === "visible") holen(); };
+    document.addEventListener("visibilitychange", zurueck);
+    return () => { gilt = false; clearInterval(takt); document.removeEventListener("visibilitychange", zurueck); };
+  }, [selectedClass, classes, kurse]);
 
   const shuffleArray = (arr) => {
     const a = [...arr];
@@ -141,6 +193,11 @@ export default function Session() {
         mode: gameMode ? "game" : "test",
       }));
     const s = await res.json();
+    // Nicht benotet: schon beim Start festhalten, damit auch die Kinder an ihrem Zugang
+    // sehen, dass es dafuer keine Note gibt (steht in der Auswertung wieder aenderbar).
+    if (nichtBenotet && !selectedSet.unbenotet) {
+      fetch(`${API}/sessions/${s.id}/eval-config`, alsJson("PUT", { unbenotet: true })).catch(() => {});
+    }
     setSessionId(s.id);
     setSessionCode(s.code || String(s.id).padStart(4, "0"));
     let qs = selectedSet.questions;
@@ -151,6 +208,10 @@ export default function Session() {
       const qmap = {};
       qs.forEach((q) => { qmap[String(q.id)] = q.correct_answer || ""; });
       fetch(`${API}/sessions/${s.id}/question-map`, alsJson("PUT", qmap));
+      // Die gezeigte Reihenfolge merken: wer die Seite neu laedt (Netzausfall) und die
+      // Sitzung fortsetzt, soll dieselben Fragen in derselben Reihenfolge sehen.
+      fetch(`${API}/sessions/${s.id}/question-layout`, alsJson("PUT",
+        qs.map((q) => ({ id: q.id, choices: q.choices || {}, choice_images: q.choice_images || null, correct_answer: q.correct_answer || null }))));
     }
     if (gameMode && timerSeconds === 0) setTimerSeconds(0);
   };
@@ -167,7 +228,9 @@ export default function Session() {
       if (res.ok) {
         const qs = await res.json();
         setSelectedSet(qs);
-        setQuestions(qs.questions || []);
+        const geordnet = ordnungAnwenden(qs.questions || [], s.question_layout);
+        qs.questions = geordnet;
+        setQuestions(geordnet);
         if (s.current_question_id && qs.questions) {
           const idx = qs.questions.findIndex((q) => q.id === s.current_question_id);
           if (idx >= 0) {
@@ -203,15 +266,45 @@ export default function Session() {
 
   useEffect(() => {
     if (!sessionId) return;
+    // Faellt die Leitung weg (Netzausfall, WLAN), verbindet sich der Host mit wachsendem
+    // Abstand neu — die Sitzung laeuft im Browser weiter, nur die Handys waeren sonst
+    // stumm geblieben. Nach dem Wiederverbinden werden die Scans der aktuellen Frage
+    // nachgeladen, die in der Zwischenzeit eingegangen sind.
+    let ws = null, zu = false, versuch = 0, timer = null;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${proto}//${window.location.host}/ws/session/${sessionId}`);
-    wsRef.current = ws;
-    ws.addEventListener("open", () => {
-      ws.send(JSON.stringify({ type: "auth", token: localStorage.getItem("token") || "" }));
-    });
-    ws.onmessage = (e) => {
+    const verbinden = () => {
+      ws = new WebSocket(`${proto}//${window.location.host}/ws/session/${sessionId}`);
+      wsRef.current = ws;
+      ws.addEventListener("open", () => {
+        const erneut = versuch > 0;
+        versuch = 0;
+        ws.send(JSON.stringify({ type: "auth", token: localStorage.getItem("token") || "" }));
+        if (erneut) nachladenRef.current?.();
+      });
+      ws.addEventListener("close", () => {
+        if (zu) return;
+        timer = setTimeout(verbinden, Math.min(10000, 1000 * 2 ** Math.min(versuch++, 4)));
+      });
+      ws.onmessage = onNachricht;
+    };
+    const onNachricht = (e) => {
       const data = JSON.parse(e.data);
       if (data.type === "scan") {
+        const erneut = scannedRef.current.has(data.student_id);
+        const name = namenRef.current[data.student_id];
+        // Eine Karte, die im Bild bleibt, wird alle paar Bilder erneut gemeldet — das soll
+        // kein Dauerfeuer von Fenstern werden: nach dem ersten Mal poppt sie nur auf, wenn
+        // sich die Antwort geaendert hat oder die Karte mehrere Sekunden weg war.
+        const frueher = letzterScanRef.current.get(data.student_id);
+        const jetzt = Date.now();
+        const zeigen = !erneut || !frueher || frueher.answer !== data.answer || jetzt - frueher.zeit > 6000;
+        const geaendert = !!(erneut && frueher && frueher.answer !== data.answer);
+        letzterScanRef.current.set(data.student_id, { answer: data.answer, zeit: jetzt });
+        if (name && zeigen) {
+          const key = `${data.student_id}-${Date.now()}`;
+          setPopups((p) => [...p.slice(-4), { key, name, erneut, geaendert }]);
+          setTimeout(() => setPopups((p) => p.filter((x) => x.key !== key)), 2600);
+        }
         setScannedStudents((prev) => {
           const filtered = prev.filter((s) => s.student_id !== data.student_id);
           return [...filtered, { student_id: data.student_id, answer: data.answer, time: Date.now() }];
@@ -225,7 +318,8 @@ export default function Session() {
         else if (data.action === "finish") finishRef.current?.();
       }
     };
-    return () => ws.close();
+    verbinden();
+    return () => { zu = true; clearTimeout(timer); if (ws) ws.close(); };
   }, [sessionId]);
 
   const saveQuestionTime = () => {
@@ -267,7 +361,7 @@ export default function Session() {
     setQuestion(q);
     setQuestionIndex(idx);
     setCounts({ A: 0, B: 0, C: 0, D: 0 });
-    setScannedStudents([]);
+    setScannedStudents([]); letzterScanRef.current = new Map();
     setRevealed(false);
     setShowLeaderboard(false);
     broadcastState(false, idx + 1 >= questions.length);
@@ -347,7 +441,8 @@ export default function Session() {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       const isLast = isLastOverride !== undefined ? isLastOverride : questionIndex + 1 >= questions.length;
-      ws.send(JSON.stringify({ type: "host_state", revealed: revealedState, is_last: isLast }));
+      // `skip`: im Test darf man auch ohne Aufdecken weiter (am Handy gleich).
+      ws.send(JSON.stringify({ type: "host_state", revealed: revealedState, is_last: isLast, skip: !gameMode }));
     }
   };
 
@@ -359,9 +454,13 @@ export default function Session() {
   const hideRef = useRef();
   const finishRef = useRef();
   revealRef.current = () => { if (!revealed) revealResults(); };
-  nextRef.current = () => { if (revealed && questionIndex + 1 < questions.length) nextQuestion(); };
+  // Im Test geht es auch ohne Aufdecken weiter — nicht jede Frage soll vor der
+  // Klasse aufgelöst werden. Im Spielmodus entstehen die Punkte beim Aufdecken,
+  // dort bleibt es Pflicht.
+  const darfWeiter = revealed || !gameMode;
+  nextRef.current = () => { if (darfWeiter && questionIndex + 1 < questions.length) nextQuestion(); };
   hideRef.current = () => { if (revealed) hideResults(); };
-  finishRef.current = () => { if (revealed && questionIndex + 1 >= questions.length) finishSession(); };
+  finishRef.current = () => { if (darfWeiter && questionIndex + 1 >= questions.length) finishSession(); };
 
   const finishSession = () => {
     saveQuestionTime();
@@ -403,6 +502,8 @@ export default function Session() {
   const fehltHeute = (st) => abwesend.has((st.name || "").trim());
   const erwartet = studentList.filter((st) => !fehltHeute(st));
   const studentMap = Object.fromEntries(studentList.map((s) => [s.card_id, s.name]));
+  scannedRef.current = scannedIds;
+  namenRef.current = studentMap;
 
   const niveauMap = Object.fromEntries(studentList.map((s) => [s.card_id, s.niveau || ""]));
   const leaderboard = Object.entries(scores)
@@ -504,6 +605,13 @@ export default function Session() {
               <input type="checkbox" checked={showAnswers} onChange={(e) => setShowAnswers(e.target.checked)}
                 style={{ width: 18, height: 18, accentColor: "var(--accent)" }} />
               <span style={{ fontSize: 14, color: "var(--text)" }}>{t("session.showAnswers")}</span>
+            </label>
+
+            <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: selectedSet.unbenotet ? "default" : "pointer", marginBottom: 16 }}>
+              <input type="checkbox" checked={nichtBenotet || !!selectedSet.unbenotet} disabled={!!selectedSet.unbenotet}
+                onChange={(e) => setNichtBenotet(e.target.checked)}
+                style={{ width: 18, height: 18, accentColor: "var(--accent)" }} />
+              <span style={{ fontSize: 14, color: "var(--text)" }}>{t("session.nichtBenotet")}</span>
             </label>
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
@@ -777,12 +885,15 @@ export default function Session() {
                 {revealed ? t("scanner.hide") : t("scanner.reveal")}
               </button>
             )}
-            {question && revealed && !isLastQuestion && (
-              <button onClick={nextQuestion} style={{ ...toolbarBtn, fontWeight: 700, background: "var(--text)", color: "var(--bg)", borderColor: "var(--text)" }}>
+            {question && darfWeiter && !isLastQuestion && (
+              <button onClick={nextQuestion}
+                style={revealed
+                  ? { ...toolbarBtn, fontWeight: 700, background: "var(--text)", color: "var(--bg)", borderColor: "var(--text)" }
+                  : { ...toolbarBtn, fontWeight: 700 }}>
                 {t("scanner.next")}
               </button>
             )}
-            {question && revealed && isLastQuestion && (
+            {question && darfWeiter && isLastQuestion && (
               <button onClick={finishSession} style={{ ...toolbarBtn, fontWeight: 700, background: C.danger, color: C.aufAkzent, borderColor: C.danger, display: "inline-flex", alignItems: "center", gap: 6 }}>
                 {gameMode ? <><Icon d={ICONS.trophy} size={15} color={C.aufAkzent} /> {t("session.endGame")}</> : t("scanner.finishTest")}
               </button>
@@ -846,6 +957,18 @@ export default function Session() {
         </div>
       )}
 
+      {popups.length > 0 && (
+        <div style={{ position: "fixed", top: 70, right: 16, zIndex: 80, display: "grid", gap: 8, pointerEvents: "none" }}>
+          {popups.map((p) => (
+            <div key={p.key} style={{ animation: "slideUp 0.25s ease", background: "var(--text)", color: "var(--bg)",
+              padding: "10px 18px", borderRadius: CONTROL_R, fontSize: "clamp(16px, 2.4vh, 24px)", fontWeight: 700,
+              boxShadow: "0 6px 24px rgba(0,0,0,0.25)" }}>
+              {p.name}{p.erneut && <span style={{ marginLeft: 10, fontSize: "0.7em", fontWeight: 600, opacity: 0.85 }}>↻ {t(p.geaendert ? "cv.geaendert" : "cv.nochmal")}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
       {question && (
         <>
           {/* Namen UEBER der Frage (Wunsch 02.10.2026): beim Scannen schaut die
@@ -864,7 +987,17 @@ export default function Session() {
                 )}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {[...studentList].sort((a, b) => {
+                {/* Die Liste beantwortet „auf wen warte ich noch?": wer gescannt hat oder
+                    fehlt, steht NICHT mehr darin (statt nur die Farbe zu wechseln). Nach dem
+                    Aufdecken mit „Antworten zeigen" stehen alle gescannten Kinder in der
+                    Farbe ihrer Antwort da. */}
+                {studentList.length > 0 && erwartet.every((st) => scannedIds.has(st.card_id)) && !(revealed && showAnswers) && (
+                  <span style={{ fontSize: "clamp(14px, 2vh, 19px)", color: "var(--text3)" }}>{t("cv.alleErfasst")}</span>
+                )}
+                {[...studentList].filter((st) => {
+                  if (revealed && showAnswers) return scannedIds.has(st.card_id);
+                  return !scannedIds.has(st.card_id) && !fehltHeute(st);
+                }).sort((a, b) => {
                   // Wer fehlt, steht ganz hinten: die Liste beantwortet „auf
                   // wen warte ich noch?", und dort gehoert niemand hin, der
                   // gar nicht im Raum ist.

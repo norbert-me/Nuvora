@@ -33,8 +33,8 @@ from ..database import get_db
 from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
 from ..importe import geprueft
 from ..models import (
-    GradeCategory, GradeEntry, GradeSection, GradeOverride, QuartalDivider,
-    Session as TestSession, Student, User, CodeSession, WorkAnalysis,
+    GradeCategory, GradeEntry, GradeSection, GradeOverride, QuartalDatum,
+    Session as TestSession, SchoolClass, Student, User, CodeSession, WorkAnalysis, QuestionSet,
 )
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
@@ -161,6 +161,7 @@ class CategoryOut(BaseModel):
     topic_id: Optional[int] = None
     # Tag der Leistung — Eigenschaft, kein Namensbestandteil (siehe models.py).
     date: Optional[str] = None
+    optional: bool = False
     created_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
@@ -254,44 +255,64 @@ async def reorder_sections(class_id: int, body: ReorderIn, user: User = Depends(
     await db.commit()
 
 
-@router.get("/classes/{class_id}/dividers")
-async def list_dividers(class_id: int, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    """Quartalsstriche: nach welchen Spalten sie stehen (rein optisch)."""
+def _strich_filter(class_id: int, term: str, kurs_id: Optional[int], user: User):
+    bed = [QuartalDatum.class_id == class_id, QuartalDatum.owner_id == user.id, QuartalDatum.term == term]
+    if kurs_id is not None:
+        bed.append(or_(QuartalDatum.kurs_id == kurs_id, QuartalDatum.kurs_id.is_(None)))
+    return bed
+
+
+async def _strich_liste(db, class_id: int, term: str, kurs_id: Optional[int], user: User) -> list:
+    rows = (await db.execute(select(QuartalDatum).where(*_strich_filter(class_id, term, kurs_id, user)))).scalars().all()
+    return sorted({r.datum.isoformat() for r in rows})
+
+
+@router.get("/classes/{class_id}/quartalsstriche")
+async def list_quartalsstriche(class_id: int, term: str = "1", kurs_id: Optional[int] = None,
+                               user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Quartalsstriche im Verlauf der Gesamtnoten: Daten („JJJJ-MM-TT"), aufsteigend. Rein optisch."""
     await _owned_class(db, user, class_id)
-    rows = (await db.execute(select(QuartalDivider).where(
-        QuartalDivider.class_id == class_id, QuartalDivider.owner_id == user.id, QuartalDivider.term == term,
-    ))).scalars().all()
-    return [r.after_category_id for r in rows]
+    return await _strich_liste(db, class_id, term, kurs_id, user)
 
 
-class DividerIn(BaseModel):
-    after_category_id: int
+class StrichIn(BaseModel):
+    datum: str
 
 
-@router.post("/classes/{class_id}/dividers/toggle")
-async def toggle_divider(class_id: int, body: DividerIn, term: str = "1", kurs_id: Optional[int] = None,
-                         user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    """Strich nach einer Spalte an/aus. Gibt die neue Liste zurueck."""
+def _tag(wert: str):
+    from datetime import date as _d
+    try:
+        return _d.fromisoformat((wert or "")[:10])
+    except ValueError:
+        raise HTTPException(400, "Kein gültiges Datum (JJJJ-MM-TT)")
+
+
+@router.post("/classes/{class_id}/quartalsstriche")
+async def set_quartalsstrich(class_id: int, body: StrichIn, term: str = "1", kurs_id: Optional[int] = None,
+                             user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Einen Strich an einem Datum setzen (gleicher Tag zweimal = einmal). Gibt die neue Liste zurück."""
     await _owned_class(db, user, class_id)
-    # Die Spalte ist eine fremde ID wie jede andere; und `kurs_id` war hier
-    # ueberhaupt nicht definiert — das ANLEGEN eines Teilers endete in einem
-    # NameError, also HTTP 500. Jetzt kommt er wie ueberall sonst als Parameter.
-    await _owned_category(db, user, body.after_category_id)
-    existing = (await db.execute(select(QuartalDivider).where(
-        QuartalDivider.class_id == class_id, QuartalDivider.owner_id == user.id,
-        QuartalDivider.term == term, QuartalDivider.after_category_id == body.after_category_id,
-    ))).scalar_one_or_none()
-    if existing:
-        await db.delete(existing)
-    else:
-        db.add(QuartalDivider(class_id=class_id, owner_id=user.id, term=term,
-                              kurs_id=kurs_id if kurs_id is not None else await kurs_der_klasse(db, class_id),
-                              after_category_id=body.after_category_id))
+    tag = _tag(body.datum)
+    schon = (await db.execute(select(QuartalDatum).where(
+        *_strich_filter(class_id, term, kurs_id, user), QuartalDatum.datum == tag))).first()
+    if not schon:
+        db.add(QuartalDatum(class_id=class_id, owner_id=user.id, term=term, datum=tag,
+                              kurs_id=kurs_id if kurs_id is not None else await kurs_der_klasse(db, class_id)))
+        await db.commit()
+    return await _strich_liste(db, class_id, term, kurs_id, user)
+
+
+@router.delete("/classes/{class_id}/quartalsstriche")
+async def delete_quartalsstrich(class_id: int, datum: str, term: str = "1", kurs_id: Optional[int] = None,
+                                user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Den Strich an diesem Datum entfernen. Gibt die neue Liste zurück."""
+    await _owned_class(db, user, class_id)
+    tag = _tag(datum)
+    for r in (await db.execute(select(QuartalDatum).where(
+            *_strich_filter(class_id, term, kurs_id, user), QuartalDatum.datum == tag))).scalars().all():
+        await db.delete(r)
     await db.commit()
-    rows = (await db.execute(select(QuartalDivider).where(
-        QuartalDivider.class_id == class_id, QuartalDivider.owner_id == user.id, QuartalDivider.term == term,
-    ))).scalars().all()
-    return [r.after_category_id for r in rows]
+    return await _strich_liste(db, class_id, term, kurs_id, user)
 
 
 @router.put("/sections/{section_id}/categories/reorder", status_code=204)
@@ -335,6 +356,9 @@ class CategoryIn(BaseModel):
     position: int = 0
     topic_id: Optional[int] = None   # Thema der Spalte (z.B. was die Klassenarbeit abdeckt)
     date: Optional[str] = None       # "YYYY-MM-DD" — Tag der Leistung, optional
+    # Freiwillige Spalte (Raketenaufgabe): fehlende Noten werden nicht hervorgehoben.
+    # None = nicht angefasst (aeltere Clients schicken das Feld nicht mit).
+    optional: Optional[bool] = None
 
     name_ok = field_validator("name")(_pflichtname)
 
@@ -383,6 +407,8 @@ async def update_category(category_id: int, body: CategoryIn, user: User = Depen
     cat.class_id = sec.class_id
     cat.topic_id = await _check_topic(db, user.id, body.topic_id)
     cat.date = _parse_date(body.date)
+    if body.optional is not None:
+        cat.optional = bool(body.optional)
     await db.commit()
     await db.refresh(cat)
     return cat
@@ -744,7 +770,11 @@ class StudentSummary(BaseModel):
     total_override: Optional[float]
     # true = ungewichteter Rueckfall (keine Gewichte gesetzt).
     unweighted_fallback: bool
+    # Foerderschwerpunkt Lernen („LE"): keine Gesamtnote, zaehlt nicht in Klassenwerten.
+    le: bool = False
     observations: int
+    # Klasse des Kindes (in gemischten Kursen sitzen mehrere Klassen in einer Tabelle).
+    klasse: str = ""
 
 
 def _agg(werte, mode):
@@ -782,6 +812,9 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
     cat_ids = {c.id for c in cats}
 
     students = await _kurs_roster(db, user, class_id, kurs_id)
+    klassen_namen = {c.id: c.name for c in (await db.execute(
+        select(SchoolClass).where(SchoolClass.id.in_({st.class_id for st in students}))
+    )).scalars().all()} if students else {}
 
     entries = (await db.execute(
         select(GradeEntry)
@@ -802,6 +835,18 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
     # Endnote-Override (section_id NULL) am Kurs: nur die des gewaehlten Kurses.
     total_over = {o.student_id: o.value for o in overrides
                   if o.section_id is None and o.term == term and (o.kurs_id == kurs_id if kurs_id is not None else o.kurs_id is None)}
+
+    # LE (Foerderschwerpunkt Lernen): keine Gesamtnote. Die Angabe steht an der
+    # Person, aelterer Bestand noch an der Zeile.
+    from ..models import Person
+    pids = [x.person_id for x in students if getattr(x, "person_id", None)]
+    personen = {p.id: p for p in (await db.execute(select(Person).where(Person.id.in_(pids)))).scalars().all()} if pids else {}
+
+    def _ist_le(x):
+        p = personen.get(getattr(x, "person_id", None))
+        # Person ODER Zeile: eine nichtleere Angabe an der Person (z. B. nur „LRS") darf ein „Lernen"
+        # an der Zeile nicht verdecken — das Kind bekam dann trotzdem eine Note angezeigt.
+        return "Lernen" in set((p.foerder or []) if p else []) | set(x.foerder or [])
 
     out = []
     for st in students:
@@ -846,11 +891,12 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
             fallback = True
 
         out.append(StudentSummary(
-            student_id=st.id, name=st.name,
+            student_id=st.id, name=st.name, klasse=klassen_namen.get(st.class_id, ""),
             per_category=per_cat, per_section=per_sec,
             section_overrides=sec_ovr, section_effective=sec_eff,
-            weighted=weighted, total_override=total_over.get(st.id),
-            unweighted_fallback=fallback,
+            weighted=None if _ist_le(st) else weighted,
+            total_override=None if _ist_le(st) else total_over.get(st.id),
+            unweighted_fallback=fallback, le=_ist_le(st),
             observations=(len([e for e in eigene if e.kind == "observation" and e.category_id in cat_ids])
                           + len([e for e in obs_frei if e.student_id == st.id])),
         ))
@@ -963,6 +1009,11 @@ async def import_session(body: ImportBody, user: User = Depends(require_module),
     if not sess.class_id:
         raise HTTPException(400, "Diese Session hat keine Klasse — keine Zuordnung möglich")
 
+    if sess.question_set_id:
+        quiz = await db.get(QuestionSet, sess.question_set_id)
+        if quiz and quiz.unbenotet:
+            raise HTTPException(409, "Dieses Quiz ist als nicht benotet markiert — es lässt sich nicht ins Notenbuch übernehmen.")
+
     sec = await _owned_section(db, user, body.section_id)
     if sec.class_id != sess.class_id:
         raise HTTPException(400, "Abschnitt und Session gehören zu verschiedenen Klassen")
@@ -1063,7 +1114,8 @@ async def import_grades(body: ImportGradesBody, user: User = Depends(require_mod
     for g in body.grades:
         if g.student_id not in roster:
             continue
-        db.add(GradeEntry(category_id=cat.id, student_id=g.student_id, kind="grade", value=g.value, note=body.note or ""))
+        db.add(GradeEntry(category_id=cat.id, student_id=g.student_id, kind="grade", value=g.value,
+                         note="" if body.source_kind == "klassenarbeit" else (body.note or "")))
         angelegt += 1
     if angelegt == 0 and work_id is None:
         # Keine einzige Zuordnung -> leere Spalte waere nur Ballast. Eine
@@ -1107,6 +1159,9 @@ class VerknuepftSyncBody(BaseModel):
     student_ids: List[int]
     grades: List[GradeCell]
     note: str = ""
+    # Kinder, die in dieser Arbeit nicht bewertet werden (NB): die Zelle bekommt
+    # keinen Wert, aber den Vermerk „NB" — sonst gilt sie im Notenbuch als fehlend.
+    nb_ids: List[int] = []
 
 
 @router.put("/verknuepft/{work_id}")
@@ -1116,7 +1171,8 @@ async def verknuepft_sync(work_id: int, body: VerknuepftSyncBody, user: User = D
     if not spalten:
         return {"spalten": 0}
     werte = {g.student_id: g.value for g in body.grades}
-    bereich = set(body.student_ids) | set(werte)
+    nb = {s for s in body.nb_ids if s not in werte}
+    bereich = set(body.student_ids) | set(werte) | nb
     for cat in spalten:
         # Nur Kinder dieser Klassenfamilie — eine fremde student_id faellt still heraus.
         geschwister = await sibling_class_ids(db, cat.class_id)
@@ -1130,8 +1186,18 @@ async def verknuepft_sync(work_id: int, body: VerknuepftSyncBody, user: User = D
             if sid in werte:
                 if e is None:
                     db.add(GradeEntry(category_id=cat.id, student_id=sid, kind="grade", value=werte[sid], note=body.note or ""))
-                elif e.value != werte[sid]:
-                    e.value = werte[sid]
+                else:
+                    if e.value != werte[sid]:
+                        e.value = werte[sid]
+                    # NB-Vermerk und der frühere Herkunftstext „Klassenarbeit" fallen weg.
+                    if (e.note or "") in ("NB", "UB", "Klassenarbeit"):
+                        e.note = body.note or ""
+            elif sid in nb:
+                if e is None:
+                    db.add(GradeEntry(category_id=cat.id, student_id=sid, kind="grade", value=None, note="NB"))
+                else:
+                    e.value = None
+                    e.note = "NB"
             elif e is not None:
                 # Keine Note mehr (abwesend, Punkte geleert): die Zelle folgt.
                 await db.delete(e)
@@ -1300,12 +1366,10 @@ async def export_noten(class_id: int, term: str = "1", kurs_id: Optional[int] = 
         if o.section_id is None and o.term != term:
             continue
         overrides.append({"card_id": sid2card[o.student_id], "s": sec_idx.get(o.section_id), "value": o.value})
-    div_rows = (await db.execute(select(QuartalDivider).where(
-        QuartalDivider.class_id == class_id, QuartalDivider.owner_id == user.id, QuartalDivider.term == term))).scalars().all()
-    dividers = [cat_index[d.after_category_id] for d in div_rows if d.after_category_id in cat_index]
+    strich_daten = await _strich_liste(db, class_id, term, kurs_id, user)
     return {"type": "nuvora_noten", "version": 1, "term": term, "sections": out_secs,
             "entries": entries, "overrides": overrides,
-            "dividers": [{"s": s, "c": c} for (s, c) in dividers]}
+            "quartalsstriche": strich_daten}
 
 
 class ImportSection(BaseModel):
@@ -1422,9 +1486,10 @@ class NotenImport(BaseModel):
     sections: List[ImportSection] = []
     entries: List[ImportEntry] = []
     overrides: List[ImportOverride] = []
-    dividers: List[ImportDivider] = []
+    dividers: List[ImportDivider] = []        # alte Ausgabe: Strich nach einer Spalte
+    quartalsstriche: List[str] = []           # neue Ausgabe: Daten
 
-    _leer = field_validator("sections", "entries", "overrides", "dividers", mode="before")(ohne_none([]))
+    _leer = field_validator("sections", "entries", "overrides", "dividers", "quartalsstriche", mode="before")(ohne_none([]))
 
 
 @router.post("/classes/{class_id}/import")
@@ -1490,11 +1555,22 @@ async def import_noten(class_id: int, body: dict, term: str = "1", kurs_id: Opti
             continue
         db.add(GradeOverride(owner_id=user.id, class_id=class_id, kurs_id=(None if section_id is not None else kurs_id),
                              student_id=sid, section_id=section_id, term=term, value=o.value))
-    for d in daten.dividers:
+    from datetime import date as _date
+    kid = await kurs_der_klasse(db, class_id)
+    tage = set()
+    for t in daten.quartalsstriche:
+        try:
+            tage.add(_date.fromisoformat(str(t)[:10]))
+        except ValueError:
+            continue
+    for d in daten.dividers:                   # alte Datei: das Datum der Spalte
         cid = cat_map.get((d.s, d.c))
-        if cid:
-            db.add(QuartalDivider(class_id=class_id, owner_id=user.id, term=term,
-                                  kurs_id=await kurs_der_klasse(db, class_id), after_category_id=cid))
+        cat = await db.get(GradeCategory, cid) if cid else None
+        tag = (cat.date or (cat.created_at.date() if cat.created_at else None)) if cat else None
+        if tag:
+            tage.add(tag)
+    for tag in sorted(tage):
+        db.add(QuartalDatum(class_id=class_id, owner_id=user.id, term=term, kurs_id=kid, datum=tag))
     await db.commit()
     return {"imported": len(daten.sections)}
 

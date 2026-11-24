@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 # Unterstrich im Namen) und in noten.py ein drittes Mal mit Text-Schluesseln.
 # Es gibt eine: die in scoring.py, wo auch gerechnet wird.
 from ..uploads import eigene_bilder, eigenes_bild
-from ..scoring import DEFAULT_SCALE, bewerte, e_modus_von, gefehlt_von, status_of
+from ..scoring import DEFAULT_SCALE, bewerte, bonus_regel_von, e_modus_von, gefehlt_von, status_of, konfig_mit_vorgaben
 from ..uploads import anhang_kopf
 from ..schueler import sortiert
 from ..pdfdruck import als_anhang, neue_seite
@@ -568,11 +568,12 @@ class ImportQuestionSetBody(BaseModel):
     # Fassung anders bewertet als das Original.
     niveau_aktiv: bool = False
     minuspunkte: bool = False
+    unbenotet: bool = False
     questions: List[ImportQuestion] = []
 
     _leer_text = field_validator("name", mode="before")(ohne_none(""))
     _leer_flag = field_validator("shuffle_questions", "shuffle_answers", "niveau_aktiv",
-                                 "minuspunkte", mode="before")(ohne_none(False))
+                                 "minuspunkte", "unbenotet", mode="before")(ohne_none(False))
     _leer_liste = field_validator("questions", mode="before")(ohne_none([]))
 
 
@@ -617,6 +618,7 @@ async def import_question_set(body: dict, user: User = Depends(get_current_user)
         shuffle_answers=daten.shuffle_answers,
         niveau_aktiv=daten.niveau_aktiv,
         minuspunkte=daten.minuspunkte,
+        unbenotet=daten.unbenotet,
     )
     db.add(qs)
     await db.flush()
@@ -683,11 +685,12 @@ class ImportFolderSet(BaseModel):
     shuffle_answers: bool = False
     niveau_aktiv: bool = False
     minuspunkte: bool = False
+    unbenotet: bool = False
     questions: List[ImportQuestion] = []
 
     _leer_text = field_validator("name", mode="before")(ohne_none(""))
     _leer_flag = field_validator("shuffle_questions", "shuffle_answers", "niveau_aktiv",
-                                 "minuspunkte", mode="before")(ohne_none(False))
+                                 "minuspunkte", "unbenotet", mode="before")(ohne_none(False))
     _leer_liste = field_validator("questions", mode="before")(ohne_none([]))
 
 
@@ -737,6 +740,7 @@ async def _import_folder_recursive(data: ImportFolderBody, parent_id, owner_id, 
             shuffle_answers=qs_data.shuffle_answers,
             niveau_aktiv=qs_data.niveau_aktiv,
             minuspunkte=qs_data.minuspunkte,
+            unbenotet=qs_data.unbenotet,
         )
         db.add(qs)
         await db.flush()
@@ -863,7 +867,7 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
     for i, q in enumerate(questions):
         ws.cell(row=2, column=i + 2, value=q._shuffled_correct or "–")
 
-    config = session.eval_config or {}
+    config = konfig_mit_vorgaben(session.eval_config, user)
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     qdicts = [{"id": q.id, "correct_answer": q._shuffled_correct, "niveau": getattr(q, "_niveau", ""),
                "topic_id": getattr(q, "topic_id", None)} for q in questions]
@@ -885,7 +889,7 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
                     cell.fill = red_fill
             cell.alignment = Alignment(horizontal="center")
         eigene = {q.id: scan_map.get((student.card_id, q.id)) for q in questions}
-        w = bewerte(qdicts, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
+        w = bewerte(qdicts, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config),
                     minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
                     gefehlt_topics=gefehlt_von(student.card_id, config))
         ws.cell(row=row, column=len(questions) + 2, value=f"{w['score']:g}/{w['max_score']:g}")
@@ -917,7 +921,7 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
     all_scans = result.scalars().all()
     scan_map = {(s.student_id, s.question_id): s.answer for s in all_scans}
 
-    config = session.eval_config or {}
+    config = konfig_mit_vorgaben(session.eval_config, user)
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     weights = config.get("weights", {})
     scale = _skala(config)
@@ -953,7 +957,7 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
         if status_of(student.card_id, has_any, config) == "krank":
             continue
         eigene = {qn["id"]: scan_map.get((student.card_id, qn["id"])) for qn in qdicts}
-        pct = round(bewerte(qdicts, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
+        pct = round(bewerte(qdicts, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config),
                             minuspunkte=minuspunkte, weights=weights, scale=scale,
                             gefehlt_topics=gefehlt_von(student.card_id, config))["pct"])
         grade = _decimal_grade(pct, scale)
@@ -1034,7 +1038,7 @@ def _build_student_pdf_single(student, questions, scan_map, session, config, niv
     # Punkte, Prozent und damit die Note kommen aus der gemeinsamen Wertung
     # (E/G-Bonus, Minuspunkte) — sonst stuende im PDF etwas anderes als am Schirm.
     wertung = bewerte(questions, eigene, niveau=student.get("niveau", ""),
-                      niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), minuspunkte=minuspunkte,
+                      niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config), minuspunkte=minuspunkte,
                       weights=weights, scale=scale,
                       gefehlt_topics=gefehlt_von(student["card_id"], config))
     score, max_score, pct = wertung["score"], wertung["max_score"], round(wertung["pct"])
@@ -1113,7 +1117,7 @@ async def student_evaluation_pdf(session_id: int, card_id: int, user: User = Dep
     result = await db.execute(select(Scan).where(Scan.session_id == session_id))
     scan_map = {(s.student_id, s.question_id): s.answer for s in result.scalars().all()}
 
-    config = session.eval_config or {}
+    config = konfig_mit_vorgaben(session.eval_config, user)
     questions = [q for q in questions if (student["card_id"], q["id"]) in scan_map]
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     buf = _build_student_pdf_single(student, questions, scan_map, session, config, niveau_aktiv, minuspunkte)
@@ -1141,7 +1145,7 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
     from reportlab.lib.units import mm
     # HexColor faellt hier weg: die Farbwahl steckt jetzt in _antwort_farbe().
 
-    config = session.eval_config or {}
+    config = konfig_mit_vorgaben(session.eval_config, user)
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     weights = config.get("weights", {})
     scale = _skala(config)
@@ -1170,7 +1174,7 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
         results, eigene = _antwort_zeilen(student_questions, student["card_id"], scan_map, get_w)
 
         wertung = bewerte(student_questions, eigene, niveau=student.get("niveau", ""),
-                          niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), minuspunkte=minuspunkte,
+                          niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config), minuspunkte=minuspunkte,
                           weights=weights, scale=scale,
                           gefehlt_topics=gefehlt_von(student["card_id"], config))
         score, student_max, pct = wertung["score"], wertung["max_score"], round(wertung["pct"])
@@ -1275,7 +1279,7 @@ async def class_student_pdf(class_id: int, card_id: int, user: User = Depends(ge
         if not scans:
             continue
 
-        config = session.eval_config or {}
+        config = konfig_mit_vorgaben(session.eval_config, user)
         weights = config.get("weights", {})
         scale = _skala(config)
         get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))

@@ -860,6 +860,19 @@ def teste_kern(api, b, u):
 
     def papierkorb():
         api.call("GET", "/api/trash", erwartet=(200,))
+
+    def wiederherstellung():
+        """Aus Sicherung zurueckholen: Liste und Module antworten, und der Vergleich laeuft, wenn es eine
+        Sicherung gibt. Zurueckgespielt wird hier NIE — der Selbsttest fasst keine echten Daten an."""
+        module = api.call("GET", "/api/wiederherstellung/module", erwartet=(200,)) or []
+        if not any(m.get("key") == "kern" for m in module):
+            raise AssertionError("Das Kern-Modul fehlt in der Auswahl der Wiederherstellung")
+        sicherungen = api.call("GET", "/api/wiederherstellung/sicherungen", erwartet=(200,)) or []
+        if sicherungen:
+            erg = api.call("POST", "/api/wiederherstellung/vergleich",
+                           body={"sicherung": sicherungen[0]["name"], "modul": "kern"}, erwartet=(200,))
+            if "tabellen" not in (erg or {}):
+                raise AssertionError("Der Vergleich liefert keine Tabellen")
         return "erreichbar"
 
     def fruehwarnung():
@@ -1113,6 +1126,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Namensliste in den Kurs", kurs_namensliste)
     b.pruefe("Kern", "Themen", themen)
     b.pruefe("Kern", "Papierkorb", papierkorb)
+    b.pruefe("Kern", "Wiederherstellung aus Sicherung", wiederherstellung)
     b.pruefe("Kern", "Archiv", archiv)
     b.pruefe("Kern", "Dateiablage", material)
     b.pruefe("Kern", "Fruehwarnung", fruehwarnung)
@@ -1346,6 +1360,23 @@ def probe_waage(api, u):
     return f"Blatt anlegen (falsche Gleichung abgelehnt), {len(liste)} Kinder in der Liste, aendern, loeschen"
 
 
+def probe_reihen(api, u):
+    # Reihe anlegen, zwei Stunden, Reihenfolge, Kopie, loeschen. Der Weg zum
+    # Kalender (aus-kalender / ausspielen) laeuft im Systemtest (Modul-Bruecke).
+    r = api.call("POST", "/api/reihen", {"name": f"{PRAEFIX} Reihe", "fach": "Mathematik"}, erwartet=(201,))
+    a = api.call("POST", f"/api/reihen/{r['id']}/stunden", {"titel": "Einstieg", "dauer": 1}, erwartet=(201,))
+    b = api.call("POST", f"/api/reihen/{r['id']}/stunden", {"titel": "Vertiefung", "dauer": 2,
+                 "naechstes_mal": "Mehr Zeit fuer Beispiele"}, erwartet=(201,))
+    api.call("PUT", f"/api/reihen/{r['id']}/reihenfolge", {"ids": [b["id"], a["id"]]}, erwartet=(204,))
+    d = api.call("GET", f"/api/reihen/{r['id']}", erwartet=(200,))
+    if [s["titel"] for s in d["stunden"]] != ["Vertiefung", "Einstieg"]:
+        raise AssertionError(f"Reihenfolge nicht gespeichert: {[s['titel'] for s in d['stunden']]}")
+    k = api.call("POST", f"/api/reihen/{r['id']}/kopie", erwartet=(201,))
+    api.call("DELETE", f"/api/reihen/{k['id']}", erwartet=(204,))
+    api.call("DELETE", f"/api/reihen/{r['id']}", erwartet=(204,))
+    return "Reihe mit zwei Stunden, Reihenfolge gemerkt, Kopie, Papierkorb"
+
+
 def probe_unterrichtsplanung(api, u):
     # Das Modul ist die Einstiegs-/Methodensammlung. Die frueher hier gepruefte
     # Wochenplanung (/api/planung) gibt es nicht mehr: die Jahresplanung liegt
@@ -1414,7 +1445,9 @@ PROBEN = {
     "tafel": probe_tafel,
     "mathespiele": None,
     "koerper": None,
+    "zahlenstrahl": None,
     "waage": probe_waage,
+    "reihen": probe_reihen,
     "rennen": None,
 }
 

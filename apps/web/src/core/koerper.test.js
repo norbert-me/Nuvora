@@ -50,4 +50,27 @@ describe("Körper: Maße", () => {
     const p = projiziere(gefaltet(k, 1), { gier: 0.6, nick: 0.5, breite: 800, hoehe: 500 });
     p.forEach((f) => f.bild.forEach(([x, y]) => { expect(x).toBeGreaterThanOrEqual(39); expect(x).toBeLessThanOrEqual(761); expect(y).toBeGreaterThanOrEqual(39); expect(y).toBeLessThanOrEqual(461); }));
   });
+  it("Zeichenreihenfolge: erst die abgewandten, dann die zugewandten Flächen", () => {
+    // Hoher Zylinder, Blick von schräg oben: der Deckel darf nicht von den
+    // Mantelstreifen überdeckt werden (Sortierung nur nach mittlerer Tiefe tat das).
+    ["zylinder", "quader", "kegel"].forEach((art) => {
+      const k = baue(art, art === "quader" ? { a: 3, b: 3, c: 8 } : { r: 2, h: 8 });
+      const p = projiziere(gefaltet(k, 1), { gier: -0.65, nick: 0.5, breite: 900, hoehe: 560 });
+      const erste = p.findIndex((f) => f.zugewandt);
+      expect(erste).toBeGreaterThan(-1);
+      p.slice(erste).forEach((f) => expect(f.zugewandt).toBe(true));
+    });
+  });
+  it("Perspektive: die hintere Kante des Deckels ist kürzer als die vordere", () => {
+    // Parallelprojektion zeigt beide gleich lang — das Auge liest das als
+    // „nach hinten breiter". Mit Blick von schräg oben auf einen Quader muss die
+    // weiter entfernte Kante kürzer erscheinen.
+    const k = baue("quader", { a: 6, b: 4, c: 3 });
+    const p = projiziere(gefaltet(k, 1), { gier: 0, nick: 0.6, breite: 900, hoehe: 560 });
+    const deckel = p.find((f) => f.gruppe === "deckel");
+    const kante = (i, j) => Math.hypot(deckel.bild[i][0] - deckel.bild[j][0], deckel.bild[i][1] - deckel.bild[j][1]);
+    const laengen = deckel.bild.map((_, i) => kante(i, (i + 1) % deckel.bild.length));
+    // Gegenueberliegende Kanten (0/2 bzw. 1/3) duerfen nicht gleich lang sein.
+    expect(Math.abs(laengen[0] - laengen[2]) + Math.abs(laengen[1] - laengen[3])).toBeGreaterThan(1);
+  });
 });

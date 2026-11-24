@@ -53,6 +53,7 @@ def quiz_inhalt(qs, items) -> dict:
         "shuffle_answers": qs.shuffle_answers,
         "niveau_aktiv": bool(qs.niveau_aktiv),
         "minuspunkte": bool(qs.minuspunkte),
+        "unbenotet": bool(qs.unbenotet),
         "questions": [frage_schnappschuss(it) for it in items],
     }
 

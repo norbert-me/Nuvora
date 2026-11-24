@@ -11,11 +11,11 @@ from sqlalchemy.orm import selectinload
 from ..besitz import oder_403
 from ..database import get_db
 from ..nebenlauf import mit_wiederholung
-from ..kursmitglieder import sibling_class_ids
+from ..kursmitglieder import class_kurs_ids, sibling_class_ids
 from ..schueler import roster_klasse
 from ..models import Scan, Session, SchoolClass, Student, QuestionSet, QuestionSetItem, Question, User, Topic
 from .auth import get_current_user
-from ..scoring import bewerte, e_modus_von, gefehlt_von, note_aus_pct, status_of
+from ..scoring import bewerte, bonus_regel_von, e_modus_von, gefehlt_von, note_aus_pct, status_of, konfig_mit_vorgaben
 # Punktelogik der Klassenarbeit (Teilaufgaben, Altformat, Abwesende) — die
 # Fruehwarnung rechnet sie NICHT nach, sie ruft sie auf. Kein Importring:
 # klassenarbeit.py holt nur database/models/auth/modules.
@@ -76,7 +76,13 @@ async def _mit_wiederholung(db: AsyncSession, arbeit, versuche: int = 6):
                                   "Gerade zu viel los. Bitte gleich noch einmal scannen.")
 
 
-async def _set_items(db: AsyncSession, question_set_id: int, sortiert: bool = False):
+def ausgeschlossene(session) -> set:
+    """Fragen, die diese Auswertung nachtraeglich ausgenommen hat (`eval_config.ausgeschlossen`)."""
+    roh = (getattr(session, "eval_config", None) or {}).get("ausgeschlossen") or []
+    return {int(x) for x in roh if isinstance(x, (int, str)) and str(x).lstrip("-").isdigit()}
+
+
+async def _set_items(db: AsyncSession, question_set_id: int, sortiert: bool = False, ohne=None):
     """Die Fragen eines Quiz-Sets laden (Frage gleich mitgeladen).
 
     Vorher stand dieselbe Abfrage wortgleich an fuenf Stellen. `sortiert` bleibt
@@ -86,6 +92,8 @@ async def _set_items(db: AsyncSession, question_set_id: int, sortiert: bool = Fa
     """
     q = (select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
          .where(QuestionSetItem.question_set_id == question_set_id))
+    if ohne:
+        q = q.where(QuestionSetItem.question_id.notin_(list(ohne)))
     if sortiert:
         q = q.order_by(QuestionSetItem.position)
     return (await db.execute(q)).scalars().all()
@@ -101,7 +109,7 @@ async def _fragen_und_flags(db: AsyncSession, session):
     questions = []
     if session.question_set_id:
         qmap = session.question_map or {}
-        for item in await _set_items(db, session.question_set_id):
+        for item in await _set_items(db, session.question_set_id, ohne=ausgeschlossene(session)):
             q = item.question
             questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer),
                               "niveau": item.niveau or "",
@@ -262,29 +270,60 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
 
     students = []
     kurs_id = None
+    kurse_der_klasse = []
     if session.class_id:
+        from ..models import Kurs
+        ids = await class_kurs_ids(db, session.class_id)
+        if ids:
+            kurse_der_klasse = [{"id": k.id, "name": k.name, "fach": k.fach or ""} for k in (await db.execute(
+                select(Kurs).where(Kurs.id.in_(ids), Kurs.owner_id == user.id).order_by(Kurs.name))).scalars().all()]
         # Roster kursweit (gleichnamige Fach-Klassen-SuS = eine Person). Die
         # Kartennummern (card_id) sind bei gleicher Lerngruppe deckungsgleich.
-        students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""}
-                    for s in await _kurs_roster(db, session.class_id)]
+        from ..schueler import le_ids
+        roster_zeilen = await _kurs_roster(db, session.class_id)
+        le = await le_ids(db, roster_zeilen)
+        students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or "", "le": s.id in le}
+                    for s in roster_zeilen]
         sc = await db.get(SchoolClass, session.class_id)
-        kurs_id = sc.kurs_id if sc else None
+        # Der Kurs, dem die Session zugewiesen ist. Ohne Zuweisung wird NICHT geraten, wenn die Klasse in
+        # mehreren Kursen liegt: der Standard-Kurs der Klasse (`school_classes.kurs_id`) ist dann einer von
+        # mehreren, und die Note landete im Notenbuch des falschen Fachs. Gibt es genau einen Kurs, ist er es;
+        # ohne Kurse bleibt der alte Weg ueber die Klasse.
+        if session.kurs_id:
+            kurs_id = session.kurs_id
+        elif len(kurse_der_klasse) == 1:
+            kurs_id = kurse_der_klasse[0]["id"]
+        elif not kurse_der_klasse:
+            kurs_id = sc.kurs_id if sc else None
+        else:
+            kurs_id = None
 
     # E/G-Differenzierung und Minuspunkte haengen am Quiz, nicht an der Session.
     niveau_aktiv = False
     minuspunkte = False
+    unbenotet = False
     if session.question_set_id:
         qs = await db.get(QuestionSet, session.question_set_id)
         if qs:
             niveau_aktiv = bool(qs.niveau_aktiv)
             minuspunkte = bool(qs.minuspunkte)
+            unbenotet = bool(qs.unbenotet)
+    quiz_unbenotet = unbenotet
+    # Auch die einzelne Auswertung kann „nicht benotet" sein (Schalter dort).
+    unbenotet = unbenotet or bool((session.eval_config or {}).get("unbenotet"))
 
     questions = []
+    ausgenommen = []
+    ohne = ausgeschlossene(session)
     if session.question_set_id:
         # Sortiert: die Auswertung zeigt die Fragen in der Reihenfolge des Sets.
         qmap = session.question_map or {}
         for item in await _set_items(db, session.question_set_id, sortiert=True):
             q = item.question
+            if q.id in ohne:
+                # Nicht gewertet, aber sichtbar — sonst liesse sich die Entscheidung nicht zuruecknehmen.
+                ausgenommen.append({"id": q.id, "text": q.text})
+                continue
             correct = qmap.get(str(q.id), q.correct_answer)
             questions.append({
                 "id": q.id,
@@ -303,7 +342,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
     for scan in all_scans:
         scan_map[(scan.student_id, scan.question_id)] = scan.answer
 
-    config = session.eval_config or {}
+    config = konfig_mit_vorgaben(session.eval_config, user)
     rows = []
     for student in students:
         answers = []
@@ -323,7 +362,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
                 "is_correct": is_correct,
             })
         wertung = bewerte(
-            questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
+            questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config),
             minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
             gefehlt_topics=gefehlt_von(student["card_id"], config),
         )
@@ -331,6 +370,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
             "card_id": student["card_id"],
             "name": student["name"],
             "niveau": student["niveau"],
+            "le": bool(student.get("le")),     # LE: keine Note (Anzeige „LE“ statt Note)
             "answers": answers,
             "score": wertung["score"],
             "total": wertung["max_score"],
@@ -347,14 +387,21 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
     return {
         "session_id": session_id,
         "session_name": session.name,
+        # Fuer den Link zur Fragensammlung in der Auswertung (Deep-Link ?set=).
+        "question_set_id": session.question_set_id,
         "class_id": session.class_id,
         # Der Kurs (Fach) der Klasse. Ohne ihn schlaegt die Uebernahme ins
         # Notenbuch die Abschnitte ALLER Faecher dieser Klasse vor — und die
         # Spalte landete im Notenbuch eines anderen Fachs, wo sie niemand sucht.
         "kurs_id": kurs_id,
+        # Die Kurse dieser Klasse: wohin sich die Session umhaengen laesst.
+        "kurse": kurse_der_klasse,
         "niveau_aktiv": niveau_aktiv,
         "minuspunkte": minuspunkte,
+        "unbenotet": unbenotet,
+        "unbenotet_quiz": quiz_unbenotet,
         "questions": questions,
+        "ausgeschlossen": ausgenommen,
         "students": rows,
     }
 
@@ -368,7 +415,7 @@ async def get_topic_stats(session_id: int, user: User = Depends(get_current_user
     if not session.question_set_id:
         return {"class_id": session.class_id, "topics": []}
 
-    items = await _set_items(db, session.question_set_id)   # ungeordnet: hier wird nur gezaehlt
+    items = await _set_items(db, session.question_set_id, ohne=ausgeschlossene(session))   # ungeordnet: hier wird nur gezaehlt
     qmap = session.question_map or {}
     q_topic = {}   # question_id -> topic_id
     q_correct = {}  # question_id -> correct_answer
@@ -466,7 +513,7 @@ async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int]
     for sess in sessions:
         if not sess.question_set_id:
             continue
-        items = await _set_items(db, sess.question_set_id)   # ungeordnet: hier wird nur gezaehlt
+        items = await _set_items(db, sess.question_set_id, ohne=ausgeschlossene(sess))   # ungeordnet: hier wird nur gezaehlt
         qmap = sess.question_map or {}
         q_topic = {it.question.id: it.question.topic_id for it in items if it.question.topic_id}
         q_correct = {it.question.id: qmap.get(str(it.question.id), it.question.correct_answer) for it in items}
@@ -678,7 +725,7 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
         if session.question_set_id:
             # Sortiert wie in der Einzelauswertung — dieselbe Reihenfolge.
             qmap = session.question_map or {}
-            for item in await _set_items(db, session.question_set_id, sortiert=True):
+            for item in await _set_items(db, session.question_set_id, sortiert=True, ohne=ausgeschlossene(session)):
                 q = item.question
                 questions.append({
                     "id": q.id,
@@ -704,7 +751,7 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
                 niveau_aktiv = bool(qs.niveau_aktiv)
                 minuspunkte = bool(qs.minuspunkte)
 
-        config = session.eval_config or {}
+        config = konfig_mit_vorgaben(session.eval_config, user)
         student_scores = {}
         for student in students:
             has_any = any((student["card_id"], q["id"]) in scan_map for q in questions)
@@ -714,7 +761,7 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
                 student_scores[student["card_id"]] = {"score": None, "total": max_score, "present": False, "status": status}
                 continue
             eigene = {q["id"]: scan_map.get((student["card_id"], q["id"])) for q in questions}
-            wertung = bewerte(questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
+            wertung = bewerte(questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config),
                               minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
                               gefehlt_topics=gefehlt_von(student["card_id"], config))
             student_scores[student["card_id"]] = {
@@ -841,13 +888,13 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
             if max_score == 0:
                 continue
 
-            config = session.eval_config or {}
+            config = konfig_mit_vorgaben(session.eval_config, user)
             for student in cls.students:
                 has_any = any((student.card_id, q["id"]) in scan_map for q in questions)
                 if status_of(student.card_id, has_any, config) == "krank":
                     continue   # krank bleibt aus dem Schnitt, eine gewertete 0 nicht
                 eigene = {q["id"]: scan_map.get((student.card_id, q["id"])) for q in questions}
-                w = bewerte(questions, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
+                w = bewerte(questions, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config),
                             minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
                             gefehlt_topics=gefehlt_von(student.card_id, config))
                 all_pcts.append(round(w["pct"]))
@@ -902,7 +949,7 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
             select(Session).where(Session.class_id == cls.id, Session.archived == False)
         )
         for session in sess_result.scalars().all():
-            config = session.eval_config or {}
+            config = konfig_mit_vorgaben(session.eval_config, user)
             scale_raw = config.get("grade_scale", {1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0})
             scale = {int(k): v for k, v in scale_raw.items()}
             weights = config.get("weights", {})
@@ -925,7 +972,7 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
                 if status_of(student.card_id, has_any, config) == "krank":
                     continue
                 eigene = {q["id"]: scan_map.get((student.card_id, q["id"])) for q in questions}
-                pct = round(bewerte(questions, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
+                pct = round(bewerte(questions, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config),
                                     minuspunkte=minuspunkte, weights=weights, scale=scale,
                                     gefehlt_topics=gefehlt_von(student.card_id, config))["pct"])
                 for g in range(1, 6):
@@ -1011,7 +1058,7 @@ async def _arbeiten_als_tests(db, user, class_id: int, id_zu_karte: dict):
     return tests
 
 
-async def _fruehwarn_daten(db, user, class_id: int):
+async def _fruehwarn_daten(db, user, class_id: int, nur_quiz: bool = False):
     """Erhebungen einer Klasse in der Form, die app/fruehwarnung.py erwartet."""
 
     roster = await _kurs_roster(db, class_id)
@@ -1024,7 +1071,9 @@ async def _fruehwarn_daten(db, user, class_id: int):
     id_zu_karte = {s.id: s.card_id for s in roster}
 
     tests = []
-    if await is_active(db, user.id, "auswertung"):
+    # `nur_quiz`: die CardVote-Auswertung zeigt nur ihre eigenen Tests; die Klassenarbeiten
+    # kommen in der Kursansicht („Lernstand") dazu.
+    if not nur_quiz and await is_active(db, user.id, "auswertung"):
         tests += await _arbeiten_als_tests(db, user, class_id, id_zu_karte)
     if not await is_active(db, user.id, "cardvote"):
         return tests, kinder
@@ -1037,14 +1086,14 @@ async def _fruehwarn_daten(db, user, class_id: int):
     for sess in sessions:
         if not sess.question_set_id or not sess.created_at:
             continue
-        items = await _set_items(db, sess.question_set_id)   # ungeordnet: hier wird nur gezaehlt
+        items = await _set_items(db, sess.question_set_id, ohne=ausgeschlossene(sess))   # ungeordnet: hier wird nur gezaehlt
         qmap = sess.question_map or {}
         # Die richtige Antwort kann je Sitzung abweichen (question_map) — dieselbe
         # Quelle wie in der Auswertung, sonst rechnen zwei Ansichten verschieden.
         fragen = {it.question.id: (qmap.get(str(it.question.id), it.question.correct_answer),
                                    it.question.topic_id) for it in items}
         scans = (await db.execute(select(Scan).where(Scan.session_id == sess.id))).scalars().all()
-        config = sess.eval_config or {}
+        config = konfig_mit_vorgaben(sess.eval_config, user)
 
         t = fw.Test(session_id=sess.id, name=sess.name or "", datum=sess.created_at, art="quiz")
         hat_abgegeben = {s.student_id for s in scans}
@@ -1129,7 +1178,7 @@ async def _fehlzeiten(db, user, class_id: int) -> dict:
 
 
 @kern_router.get("/classes/{class_id}/fruehwarnung")
-async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
+async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False, nur: str = "",
                               user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Vollbild für eine Klasse: je Kind Kurve, Etiketten, Themen, Begründung."""
 
@@ -1139,7 +1188,7 @@ async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
     if school_class.owner_id and school_class.owner_id != user.id:
         raise HTTPException(403, "Kein Zugriff auf diese Klasse")
 
-    tests, kinder = await _fruehwarn_daten(db, user, class_id)
+    tests, kinder = await _fruehwarn_daten(db, user, class_id, nur_quiz=(nur == "quiz"))
     quellen = await _fruehwarn_quellen(db, user, class_id)
     if not tests:
         # Kein blosses "nichts da": WARUM nichts da ist, ist der eigentliche
@@ -1190,7 +1239,7 @@ async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
 # haengen deshalb am Kern und pruefen je Quelle `is_active` (Regel 3).
 
 @kern_router.get("/classes/{class_id}/themenprofil")
-async def themenprofil(class_id: int, student_id: Optional[int] = None,
+async def themenprofil(class_id: int, student_id: Optional[int] = None, kurs_id: Optional[int] = None,
                        user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Je Kind je Thema: Gesamtstand in Prozent, Verlauf und Trend.
 
@@ -1273,7 +1322,7 @@ async def themenprofil(class_id: int, student_id: Optional[int] = None,
     karten_je_kind: dict[int, dict] = {}
     if await is_active(db, user.id, "karten"):
         quellen.append("karten")
-        karten_je_kind = await themen_lernstand(db, user, class_id, roster)
+        karten_je_kind = await themen_lernstand(db, user, class_id, roster, kurs_id=kurs_id)
 
     skala = user.grade_scale or None
     aus = []

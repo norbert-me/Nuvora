@@ -388,6 +388,24 @@ REGISTRY: List[ModuleDef] = [
         stage="beta",
     ),
     ModuleDef(
+        key="zahlenstrahl",
+        group="unterricht",
+        name="Zahlenstrahl",
+        description=(
+            "Rechnen mit Pfeilen auf dem Zahlenstrahl: ganze Zahlen und "
+            "Dezimalzahlen addieren und subtrahieren. Bei einer Aufgabe liegen "
+            "die Pfeile fest und erscheinen Schritt für Schritt; im freien "
+            "Modus ohne Aufgabe lassen sich Start und Pfeile ziehen, und der "
+            "Term entsteht daraus. Zeigt, warum „minus eine negative Zahl“ plus "
+            "ist: der Pfeil der Zahl wird umgedreht. Dazu die Plättchenmethode "
+            "(Guthaben und Schulden): 5 − 3 heißt fünf Guthaben, drei abziehen; "
+            "minus eine Schuld heißt Schulden wegnehmen, wo keine liegen, über "
+            "Nullpaare. Reines Werkzeug, ohne Daten."
+        ),
+        path="/zahlenstrahl",
+        stage="beta",
+    ),
+    ModuleDef(
         key="waage",
         group="unterricht",
         name="Waage",
@@ -403,6 +421,23 @@ REGISTRY: List[ModuleDef] = [
             "wie viele Gleichungen gelöst sind, und jeden Lösungsweg."
         ),
         path="/waage",
+        stage="beta",
+    ),
+    ModuleDef(
+        key="reihen",
+        group="unterricht",
+        name="Reihen",
+        description=(
+            "Unterrichtsreihen als Vorlage, die man Jahr für Jahr wieder einsetzt: "
+            "je Reihe eine Folge von Stunden mit Thema, Ablauf, Notizen, "
+            "Verweisen auf Quiz, Karteikarten und Lernleiter und angehängten "
+            "Dateien (PDFs, Arbeitsblätter). Zu jeder Stunde und zur ganzen "
+            "Reihe gibt es Notizen fürs nächste Mal. Mit dem Kalender: gehaltene "
+            "Stunden eines Kurses als Reihe speichern — oder eine Reihe in einen "
+            "Kurs spielen, die Stunden landen der Reihe nach auf den "
+            "tatsächlichen Unterrichtsstunden (Ferien und Ausfälle übersprungen)."
+        ),
+        path="/reihen",
         stage="beta",
     ),
     ModuleDef(

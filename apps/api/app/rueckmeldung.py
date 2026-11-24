@@ -33,7 +33,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import QuestionSet, QuestionSetItem, Scan, Session, Topic
-from .scoring import bewerte, e_modus_von, gefehlt_von, note_aus_pct, status_of
+from .scoring import bewerte, bonus_regel_von, e_modus_von, gefehlt_von, konfig_mit_vorgaben, note_aus_pct, note_mit_tendenz, status_of
 
 # Ab hier gilt ein Thema als gesessen bzw. als offen. Dazwischen steht bewusst
 # nichts: „62 % — weder noch" ist keine Rückmeldung, sondern eine Zahl.
@@ -77,7 +77,7 @@ async def quiz(db: AsyncSession, session: Session, nur_card_id: Optional[int] = 
     aber der Server schickt auch nur dessen Zeile heraus. Ohne das Argument
     kommt die ganze Lerngruppe (Blatt zum Ausdrucken).
     """
-    from .schueler import roster_klasse
+    from .schueler import le_ids, roster_klasse
 
     if not session.question_set_id or not session.class_id:
         return []
@@ -85,12 +85,19 @@ async def quiz(db: AsyncSession, session: Session, nur_card_id: Optional[int] = 
     qs = await db.get(QuestionSet, session.question_set_id)
     niveau_aktiv = bool(qs and qs.niveau_aktiv)
     minuspunkte = bool(qs and qs.minuspunkte)
-    config = session.eval_config or {}
+    from .models import User as _User
+    besitzer = await db.get(_User, session.owner_id) if session.owner_id else None
+    config = konfig_mit_vorgaben(session.eval_config, besitzer)
+    # Am Quiz ODER an dieser einen Auswertung als „nicht benotet“ markiert.
+    unbenotet = bool(qs and qs.unbenotet) or bool(config.get("unbenotet"))
     qmap = session.question_map or {}
 
     items = (await db.execute(
         select(QuestionSetItem).where(QuestionSetItem.question_set_id == session.question_set_id)
     )).scalars().all()
+    # Nachtraeglich ausgenommene Fragen (eval_config.ausgeschlossen) zaehlen nicht.
+    _ohne = {int(x) for x in ((session.eval_config or {}).get("ausgeschlossen") or []) if str(x).lstrip("-").isdigit()}
+    items = [it for it in items if it.question_id not in _ohne]
     # Fragen laden (die Beziehung ist hier nicht vorgeladen — eine Abfrage).
     from .models import Question
     q_ids = [it.question_id for it in items]
@@ -120,6 +127,7 @@ async def quiz(db: AsyncSession, session: Session, nur_card_id: Optional[int] = 
 
     labels = await _themen_labels(db, {q["topic_id"] for q in questions})
     roster = await roster_klasse(db, session.class_id)
+    le = await le_ids(db, roster)    # LE: keine Note, nur Rueckmeldung
     out = []
     for st in roster:
         if nur_card_id is not None and st.card_id != nur_card_id:
@@ -128,7 +136,7 @@ async def quiz(db: AsyncSession, session: Session, nur_card_id: Optional[int] = 
         hat_etwas = any(v is not None for v in eigene.values())
         if status_of(st.card_id, hat_etwas, config) == "krank":
             continue          # nichts abgegeben: keine Aussage, keine Rückmeldung
-        w = bewerte(questions, eigene, niveau=st.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config),
+        w = bewerte(questions, eigene, niveau=st.niveau or "", niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config),
                     minuspunkte=minuspunkte, weights=config.get("weights"),
                     scale=config.get("grade_scale"),
                     gefehlt_topics=gefehlt_von(st.card_id, config))
@@ -155,7 +163,14 @@ async def quiz(db: AsyncSession, session: Session, nur_card_id: Optional[int] = 
         out.append({
             "student_id": st.id, "card_id": st.card_id, "name": st.name,
             "punkte": w["score"], "max": w["max_score"], "pct": round(w["pct"]),
-            "note": note_aus_pct(w["pct"], config.get("grade_scale")),
+            # Nicht benotet: Prozent und Themen bleiben, die Note entfaellt.
+            "note": None if (unbenotet or st.id in le) else note_aus_pct(w["pct"], config.get("grade_scale")),
+            "note_tendenz": None if (unbenotet or st.id in le) else note_mit_tendenz(w["pct"], config.get("grade_scale")),
+            "unbenotet": unbenotet,
+            "le": st.id in le,
+            # ALLE Themen mit Prozent (auch die dazwischen): daraus bildet die Schuelerseite
+            # den Lernstand ueber mehrere Tests.
+            "themen": themen,
             "sass": [x for x in themen if x["pct"] >= SASS],
             "offen": [x for x in themen if x["pct"] < OFFEN],
         })

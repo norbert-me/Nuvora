@@ -44,6 +44,8 @@ function KernHilfe({ t }) {
       <Section title={t("help.core.searchT")}>{t("help.core.search")}</Section>
       <Section title={t("help.core.navT")}>{t("help.core.nav")}</Section>
       <Faq q={t("help.core.faqQ")}>{withLink(t("help.core.faqA"), "/legal", t("help.privacyWord"))}</Faq>
+      <Faq q={t("help.core.sicherungQ")}>{withLink(t("help.core.sicherungA"), "/wiederherstellung", t("help.wh.link"))}</Faq>
+      <Faq q={t("help.core.verschluesseltQ")}>{t("help.core.verschluesseltA")}</Faq>
     </>
   );
 }
@@ -89,6 +91,10 @@ function AuswertungHilfe({ t }) {
       <Section title={t("help.nt.trendT")}>{t("help.nt.trend")}</Section>
       <Section title={t("help.nt.obsT")}>{t("help.nt.obs")}</Section>
       <Section title={t("help.nt.impT")}>{t("help.nt.imp")} {t("help.nt.imp2")}</Section>
+      <Faq q={t("help.nt.mitteilenQ")}>{t("help.nt.mitteilenA")}</Faq>
+      <Faq q={t("help.nt.beamerQ")}>{t("help.nt.beamerA")}</Faq>
+      <Faq q={t("help.nt.wegQ")}>{withLink(t("help.nt.wegA"), "/wiederherstellung", t("help.wh.link"))}</Faq>
+      <Faq q={t("help.nt.stricheQ")}>{t("help.nt.stricheA")}</Faq>
       <Section title={t("help.kla.whatT")}>{t("help.kla.what")}</Section>
       <Section title={t("help.kla.evalT")}>{t("help.kla.eval")}</Section>
     </>
@@ -119,6 +125,8 @@ function KalenderHilfe({ t }) {
       <Section title={t("help.kal.serieT")}>{t("help.kal.serie")}</Section>
       <Section title={t("help.kal.caldavT")}>{t("help.kal.caldav")}</Section>
       <Section title={t("help.kal.korrT")}>{t("help.kal.korr")}</Section>
+      <Faq q={t("help.kal.fremdQ")}>{t("help.kal.fremdA")}</Faq>
+      <Faq q={t("help.kal.ausfallQ")}>{t("help.kal.ausfallA")}</Faq>
     </>
   );
 }

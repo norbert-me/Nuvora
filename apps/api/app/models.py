@@ -5,12 +5,13 @@ from datetime import datetime, date, timezone
 PyDate = date
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String, Text, DateTime, Date, Integer, JSON, Boolean, LargeBinary, UniqueConstraint, func
+from sqlalchemy import event, ForeignKey, String, Text, DateTime, Date, Integer, JSON, Boolean, LargeBinary, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 # Optimistisches Sperren fuer die Tabellen, die offline bearbeitet werden
 # (siehe app/versionierung.py). Ein Blatt — es importiert nichts von hier.
 from .versionierung import Versioniert
+from .krypto import EncStr, EncJSON, EncFloat, EncInt, EncBytes, suchwert
 
 
 class Base(DeclarativeBase):
@@ -29,9 +30,13 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    email: Mapped[str] = mapped_column(EncStr("users.email"))
+    # Suchwert der E-Mail (HMAC, nicht umkehrbar): die Adresse selbst steht
+    # verschluesselt da, gefunden wird ueber diesen Wert. Gepflegt wird er in den
+    # Ereignissen unter der Klasse — kein Schreibweg kann ihn vergessen.
+    email_idx: Mapped[Optional[str]] = mapped_column(String(64), unique=True, index=True, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    name: Mapped[str] = mapped_column(String(200), default="")
+    name: Mapped[str] = mapped_column(EncStr("users.name"), default="")
     salutation: Mapped[str] = mapped_column(String(10), default="Hr.")
     marketplace_name: Mapped[str] = mapped_column(String(100), default="", server_default="")
     grade_scale: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
@@ -57,7 +62,7 @@ class User(Base):
     anwesenheit_default: Mapped[str] = mapped_column(String(10), default="da", server_default="da")
     token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    pending_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    pending_email: Mapped[Optional[str]] = mapped_column(EncStr("users.pending_email"), nullable=True)
     # Wurde das Konto schon einmal ans Modulregister angeschlossen? Verhindert,
     # dass der Backfill beim Start ein abgeschaltetes Modul wieder aktiviert.
     modules_initialized: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
@@ -76,7 +81,7 @@ class User(Base):
     calendar_fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     # Externer Kalender (ICS-URL, z.B. Google/Apple), den Nuvora read-only
     # einblendet — die „andere Richtung". Leer = aus. Isoliert/leicht entfernbar.
-    external_ics_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    external_ics_url: Mapped[Optional[str]] = mapped_column(EncStr("users.external_ics_url"), nullable=True)
     # Eigene Anzeigefarbe für abonnierte (externe) Termine (Hex, "" = Standard).
     external_ics_color: Mapped[str] = mapped_column(String(9), default="", server_default="")
     # Mehrere externe Kalender: Liste [{url, color, name}]. Löst external_ics_url/
@@ -116,12 +121,20 @@ class User(Base):
     # Tipparbeit, die beim Wiederholen nervt.
     untis_server: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     untis_schule: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
-    untis_benutzer: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    untis_benutzer: Mapped[Optional[str]] = mapped_column(EncStr("users.untis_benutzer"), nullable=True)
     # Der Ausweichweg: der persoenliche ICS-Abo-Link aus WebUntis. Er darf
     # gespeichert werden — er ist read-only, traegt sein eigenes Geheimnis und
     # laesst sich in WebUntis jederzeit neu erzeugen; dieselbe Art Adresse wie
     # in external_calendars.
-    untis_ics_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    untis_ics_url: Mapped[Optional[str]] = mapped_column(EncStr("users.untis_ics_url"), nullable=True)
+    # Der zuletzt per Anmeldung geholte Stand der Abweichungen (Vertretung, Entfall,
+    # Zusatz) mit echten Titeln: {"stand","von","bis","stunden":[…]}. Das Passwort
+    # bleibt ungespeichert — der Stand ist ein Abbild, kein laufender Abgleich.
+    untis_stand: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Untis-Mobile-Zugang (Host, Schule, Benutzer, Schluessel) VERSCHLUESSELT
+    # (app/geheimnis.py) — kein Passwort. Der Schluessel gilt nur fuer Apps und
+    # laesst sich in WebUntis widerrufen. Wird nie zurueckgegeben.
+    untis_mobil: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Was ein Kalender-Client am Kalender einstellt: Farbe, Reihenfolge, Name.
     #
     # Apple schreibt das nach dem Einrichten mit PROPPATCH — und bricht den
@@ -226,6 +239,10 @@ class QuestionSet(Base):
     # Minuspunkte: falsche Antwort = -1 (Gesamtpunktzahl nie unter 0). Wer die
     # Karte unten laesst, antwortet nicht: 0 Punkte, kein Abzug.
     minuspunkte: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Nicht benotet: das Quiz gibt Rueckmeldung (Prozent, Themen), aber keine
+    # Note. Die Zahlen bleiben, nur das Wort „Note" entfaellt — fuer Tests,
+    # die zum Ueben da sind und nicht ins Notenbuch gehoeren.
+    unbenotet: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Reihenfolge innerhalb des Ordners — von Hand gezogen. Vorher kamen die
     # Quizze in der Reihenfolge, in der die Datenbank sie gerade herausgab, und
     # das ist keine: wer zwanzig Quizze in einem Ordner hat, sucht das von
@@ -269,6 +286,11 @@ class Session(Base):
     mode: Mapped[str] = mapped_column(String(20), default="test", server_default="test")
     archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     question_map: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Die Reihenfolge und die gemischten Antworten, WIE SIE GEZEIGT WURDEN. Das
+    # Mischen passiert beim Start im Browser; wer die Seite neu laedt (Netzausfall,
+    # Absturz) und die Sitzung fortsetzt, bekam sonst die Fragen in der Reihenfolge
+    # des Sets zurueck — eine andere als die, nach der gerade abgestimmt wurde.
+    question_layout: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     eval_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     scans: Mapped[list["Scan"]] = relationship(back_populates="session", cascade="all, delete-orphan")
@@ -319,6 +341,9 @@ class Kurs(Versioniert, Base):
     # bei Kursen ohne Niveau-Differenzierung nervt sie sonst. E/G wird im Kurs
     # gepflegt (nicht je Fach-Klasse), weil es die Person betrifft.
     niveau_aktiv: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Karteikarten fuer diesen Kurs an/aus: aus heisst, die Kinder bekommen ueber
+    # diesen Kurs keine Stapel (Anzeige-Schalter der Lehrkraft, Daten bleiben).
+    karten_aktiv: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     # Fach des Kurses — das Gegenstueck zu `topics.fach`. Erst dadurch ist
     # „die Themen dieses Kurses" eine Abfrage und kein Namensraten (der Name
     # ist frei, „Mathe 7.5" genauso wie „M7b" oder „Mathe Gruppe rot").
@@ -432,18 +457,18 @@ class Person(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    name: Mapped[str] = mapped_column(String(200))
+    name: Mapped[str] = mapped_column(EncStr("persons.name"))
     niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")  # "E" | "G" | ""
-    foerder: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
-    massnahmen: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
-    notizen: Mapped[str] = mapped_column(Text, default="", server_default="")
-    klassenlehrer: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    foerder: Mapped[Optional[list]] = mapped_column(EncJSON("persons.foerder"), nullable=True)
+    massnahmen: Mapped[Optional[list]] = mapped_column(EncJSON("persons.massnahmen"), nullable=True)
+    notizen: Mapped[str] = mapped_column(EncStr("persons.notizen"), default="", server_default="")
+    klassenlehrer: Mapped[str] = mapped_column(EncStr("persons.klassenlehrer"), default="", server_default="")
     # Der ausgeteilte Zugang gehoert dem KIND, nicht einer seiner Listen: ein
     # Kind hat einen QR-Zettel, nicht drei.
     karten_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
-    photo: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    photo: Mapped[Optional[bytes]] = mapped_column(EncBytes("persons.photo"), nullable=True, deferred=True)
     photo_mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
-    photo_thumb: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    photo_thumb: Mapped[Optional[bytes]] = mapped_column(EncBytes("persons.photo_thumb"), nullable=True, deferred=True)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -470,7 +495,7 @@ class Student(Base):
     # alte Scans dem falschen Kind zu. Sortiert wird nach position, dann
     # card_id: Bestandsdaten (alle position 0) bleiben damit unveraendert.
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    name: Mapped[str] = mapped_column(String(200))
+    name: Mapped[str] = mapped_column(EncStr("students.name"))
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"))
     # Welche PERSON sitzt hier? Neu (siehe Person): die Zeile ist damit die
     # Zugehoerigkeit, nicht mehr das Kind selbst. Nullable, solange der Bestand
@@ -492,29 +517,29 @@ class Student(Base):
     # gelangen, die zum Teilen gedacht sind. Wer hier ein Feld ergaenzt,
     # prueft zuerst jeden Export- und Veroeffentlichungspfad.
     niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")  # "E" | "G" | ""
-    foerder: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    foerder: Mapped[Optional[list]] = mapped_column(EncJSON("students.foerder"), nullable=True)
     # Foerdermassnahmen zu den Schwerpunkten: was fuer dieses Kind konkret gilt
     # (abweichende Lernziele, laengere Bearbeitungszeit, Vorlesen, …).
     # [{"art": "Zeitzuschlag", "detail": "+25 %", "arbeit": true}, …]
     # arbeit=true heisst: gilt in Klassenarbeiten — genau diese zeigt der
     # Kalender am Klassenarbeitstermin. Ebenfalls DSGVO Art. 9, siehe oben.
-    massnahmen: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
-    notizen: Mapped[str] = mapped_column(Text, default="", server_default="")
+    massnahmen: Mapped[Optional[list]] = mapped_column(EncJSON("students.massnahmen"), nullable=True)
+    notizen: Mapped[str] = mapped_column(EncStr("students.notizen"), default="", server_default="")
     # Einzigartiger Token fuer den kontenlosen Karten-Zugang (Bearer-Secret).
     karten_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
     # Klassenleitung des Kindes — am Schueler, nicht an der Klasse: ein Kurs
     # wie "Mathe 7.5" mischt Kinder aus mehreren Klassen mit je eigener
     # Klassenleitung. Freitext, weil Lehrkraefte keine Nuvora-Konten sind.
-    klassenlehrer: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    klassenlehrer: Mapped[str] = mapped_column(EncStr("students.klassenlehrer"), default="", server_default="")
     # Optionales Foto der Person — personenbezogen, NIE in Export/Marktplatz. Blob
     # deferred (Listen laden es nicht); die mime-Spalte signalisiert, OB eins da ist.
-    photo: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    photo: Mapped[Optional[bytes]] = mapped_column(EncBytes("students.photo"), nullable=True, deferred=True)
     photo_mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
     # Kleines Vorschaubild (256 px, JPEG) fuer Listen und den Sitzplan. Ein
     # Klassensatz waeren sonst 30 Handyfotos zu je mehreren MB — im Schulnetz
     # laedt das sichtbar lange. Wird beim Hochladen einmalig gebaut; das
     # Original bleibt unangetastet.
-    photo_thumb: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    photo_thumb: Mapped[Optional[bytes]] = mapped_column(EncBytes("students.photo_thumb"), nullable=True, deferred=True)
 
     school_class: Mapped[SchoolClass] = relationship(back_populates="students")
 
@@ -557,6 +582,15 @@ class MarketplaceRating(Base):
 # Module sind zuschaltbar. Der Kern besitzt Konten, Klassen und Schueler;
 # Module arbeiten darauf, besitzen sie aber nicht. Welche Module eine Lehrkraft
 # aktiviert hat, steht hier — eine Zeile pro aktiviertem Modul.
+def _email_idx_pflegen(_mapper, _conn, ziel: "User") -> None:
+    if ziel.email:
+        ziel.email_idx = suchwert(ziel.email)
+
+
+event.listen(User, "before_insert", _email_idx_pflegen)
+event.listen(User, "before_update", _email_idx_pflegen)
+
+
 class UserModule(Base):
     __tablename__ = "user_modules"
     __table_args__ = (UniqueConstraint("user_id", "module_key", name="uq_user_module"),)
@@ -835,6 +869,9 @@ class GradeCategory(Base):
     # war „Klassenarbeit 02.03.2026" eine Zeichenkette, die niemand sortieren
     # oder auswerten kann. Optional — nicht jede Spalte hat einen Termin.
     date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # Freiwillige Abgabe (z. B. Raketenaufgaben): fehlt die Note, wird das Kind
+    # in dieser Spalte nicht als „fehlt noch" hervorgehoben. Zaehlt sonst wie jede Note.
+    optional: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     section: Mapped[Optional["GradeSection"]] = relationship(back_populates="categories")
@@ -873,10 +910,10 @@ class GradeEntry(Base):
     # "grade" = zaehlt in den Schnitt, "observation" = zaehlt nie.
     kind: Mapped[str] = mapped_column(String(20), default="grade", server_default="grade")
     # Note als Zahl (1.0–6.0, Tendenzen als .3/.7). Bei Beobachtungen leer.
-    value: Mapped[Optional[float]] = mapped_column(nullable=True)
+    value: Mapped[Optional[float]] = mapped_column(EncFloat("grade_entries.value"), nullable=True)
     # Beobachtung: +1 positiv, -1 negativ, 0 neutral. Bei Noten leer.
-    tendency: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    note: Mapped[str] = mapped_column(Text, default="", server_default="")
+    tendency: Mapped[Optional[int]] = mapped_column(EncInt("grade_entries.tendency"), nullable=True)
+    note: Mapped[str] = mapped_column(EncStr("grade_entries.note"), default="", server_default="")
     # Datum der Stunde, nicht der Eingabe: nachtragen muss moeglich sein.
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -963,11 +1000,16 @@ class CalendarEntry(Versioniert, Base):
     exdate: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Verlaufsplan: einfache Phasenliste [{phase, dauer, text}] für die Stunde.
     verlaufsplan: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Weitere Themen der Stunde (neben `topic_id`, dem ersten): ohne FK wie bei
+    # exam_dates.topic_ids — der Kalender besitzt keine Taxonomie, er zeigt hin.
+    topic_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Verknuepfte Modul-Objekte (Regel 3: alle optional, ON DELETE SET NULL —
     # der Eintrag bleibt ohne das jeweilige Modul voll nutzbar). CardVote-Quiz,
     # Karten-Deck (wird am Kalendertag freigeschaltet), Lernpfad-Lernleiter.
     cardvote_set_id: Mapped[Optional[int]] = mapped_column(ForeignKey("question_sets.id", ondelete="SET NULL"), nullable=True, index=True)
     karten_deck_id: Mapped[Optional[int]] = mapped_column(ForeignKey("card_decks.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Weitere Stapel der Stunde neben `karten_deck_id` — ohne FK (Verweise, wie bei topic_ids).
+    karten_deck_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     lernpfad_ladder_id: Mapped[Optional[int]] = mapped_column(ForeignKey("learning_ladders.id", ondelete="SET NULL"), nullable=True, index=True)
     # Code-Detektiv-Rätsel per stabiler client_id (kein FK, App-eigener ID-Raum).
     codedetektiv_puzzle: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
@@ -990,7 +1032,7 @@ class Attendance(Base):
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     status: Mapped[str] = mapped_column(String(10), default="da", server_default="da")
-    note: Mapped[str] = mapped_column(Text, default="", server_default="")
+    note: Mapped[str] = mapped_column(EncStr("attendance.note"), default="", server_default="")
     # Optional: auf welche Stunde (Stundenplan-Period) sich der Fehltag bezieht.
     # 0/NULL = ganzer Tag. Ein Datensatz je (Schueler, Datum).
     period: Mapped[Optional[int]] = mapped_column(nullable=True)
@@ -1315,8 +1357,8 @@ class ExternalEventArchive(Base):
 
 
 class QuartalDivider(Base):
-    """Optischer Quartalsstrich in der Notentabelle — nach welcher Spalte er
-    steht. Mehrere je Klasse+Halbjahr moeglich, rein visuell."""
+    """ALTBESTAND: Quartalsstrich NACH einer Spalte der Notentabelle. Wird beim Start einmalig in ein
+    `QuartalDatum` umgewandelt und gelöscht (`app/quartal.py`); neue Zeilen entstehen hier nicht mehr."""
     __tablename__ = "quartal_dividers"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -1326,6 +1368,19 @@ class QuartalDivider(Base):
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     term: Mapped[str] = mapped_column(String(8), default="1", server_default="1")
     after_category_id: Mapped[int] = mapped_column(ForeignKey("grade_categories.id", ondelete="CASCADE"), index=True)
+
+
+class QuartalDatum(Base):
+    """Quartalsstrich im Verlauf der Gesamtnoten — an einem DATUM. Mehrere je Klasse/Kurs+Halbjahr moeglich,
+    rein visuell. (Der Verlauf ordnet nach Zeit; ein Strich „nach Spalte X" sagte dort nichts.)"""
+    __tablename__ = "quartal_daten"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
+    term: Mapped[str] = mapped_column(String(8), default="1", server_default="1")
+    datum: Mapped[date] = mapped_column(Date)
 
 
 # ─── Nuvora-Kern: Wochenplanung ───
@@ -1541,7 +1596,7 @@ class WorkAnalysis(Base):
     # wird mit E | G. SET NULL: loescht jemand nur ein Blatt, bleibt das andere.
     partner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_analyses.id", ondelete="SET NULL"), nullable=True)
     tasks: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
-    results: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    results: Mapped[Optional[dict]] = mapped_column(EncJSON("work_analyses.results"), nullable=True)
     # Fehlerart je Wertungseinheit und Kind: {"<student_id>": {"t2": "ansatz"}}.
     #
     # Warum getrennt von results: die Punkte sagen WIE VIEL fehlt, die Fehlerart
@@ -1554,15 +1609,20 @@ class WorkAnalysis(Base):
     # da, bleibt die alte Angabe zwar stehen, wird aber nicht mitgezaehlt
     # (siehe _fehler_gezaehlt) — sonst muesste jede Punkteaenderung in eine
     # zweite Tabelle greifen, und genau da entstehen die Geisterwerte.
-    fehler: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    fehler: Mapped[Optional[dict]] = mapped_column(EncJSON("work_analyses.fehler"), nullable=True)
     # Wahlaufgaben einer E/G-Arbeit: bei welchen Aufgaben ein Kind die Fassung
     # des ANDEREN Blatts geschrieben hat ({"<student_id>": ["t3", …]}, gleiche
     # Position im Partnerblatt). Gewertet wird in app/arbeitswertung.py.
-    wechsel: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    wechsel: Mapped[Optional[dict]] = mapped_column(EncJSON("work_analyses.wechsel"), nullable=True)
     # Abwesende SuS (Liste von student_id als String). Orthogonal zu results:
     # abwesend heisst „aus der Klassenstatistik rausrechnen", loescht aber die
     # erreichten Punkte NICHT — kommt der SuS zurueck, sind sie noch da.
-    absent: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    absent: Mapped[Optional[list]] = mapped_column(EncJSON("work_analyses.absent"), nullable=True)
+    # Einzelne Kinder, die in DIESER Arbeit keine Note bekommen („UB", unbewertet): Punkte,
+    # Themenstand und Rueckmeldebogen bleiben, nur die Note faellt weg — nicht in Verteilung und
+    # Schnitt, nicht ins Notenbuch. (Foerderschwerpunkt Lernen gilt ohnehin ueberall; das hier ist
+    # die Ausnahme fuer ein einzelnes Kind und eine einzelne Arbeit.)
+    unbewertet: Mapped[Optional[list]] = mapped_column(EncJSON("work_analyses.unbewertet"), nullable=True)
     # Niveau dieser Arbeit: "" (alle), "E" oder "G". Kurse mit E/G schreiben
     # ZWEI Arbeiten — verschiedene Blaetter, verschiedene Punkte. Mit dem Niveau
     # zeigt die Auswertung nur die Kinder, die dieses Blatt geschrieben haben;
@@ -1589,6 +1649,53 @@ class SegelStatus(Base):
     stage: Mapped[str] = mapped_column(String(10), default="", server_default="")  # hafen|kueste|meer|welt
 
 
+class Reihe(Base):
+    """Modul Reihen: eine Unterrichtsreihe als Vorlage — Folge von Stunden mit
+    Thema, Ablauf, Material und Notizen fuers naechste Mal. Gehoert der Lehrkraft,
+    nicht einem Kurs oder einem Jahr: gespielt wird sie in einen Kurs ueber den
+    Kalender (optional, Regel 3). Weich geloescht (Papierkorb)."""
+    __tablename__ = "reihen"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    fach: Mapped[str] = mapped_column(String(60), default="", server_default="")
+    jahrgang: Mapped[str] = mapped_column(String(20), default="", server_default="")
+    beschreibung: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Was beim naechsten Mal anders werden soll — die Rueckmeldung an sich selbst.
+    naechstes_mal: Mapped[str] = mapped_column(Text, default="", server_default="")
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Herkunft: aus welchem Kurs wurde sie gespeichert (reine Anzeige, kein FK).
+    quelle: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ReiheStunde(Base):
+    """Eine Stunde (oder Doppelstunde) einer Reihe. Verweise auf Quiz, Stapel,
+    Lernleiter und Einstieg ohne Fremdschluessel — Module haengen nicht
+    voneinander ab (Regel 3), die Vorlage zeigt nur hin."""
+    __tablename__ = "reihen_stunden"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reihe_id: Mapped[int] = mapped_column(ForeignKey("reihen.id", ondelete="CASCADE"), index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    titel: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    # Wie viele Unterrichtsstunden die Stunde belegt (Doppelstunde = 2).
+    dauer: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    topic_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    notizen: Mapped[str] = mapped_column(Text, default="", server_default="")
+    naechstes_mal: Mapped[str] = mapped_column(Text, default="", server_default="")
+    verlaufsplan: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    cardvote_set_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    karten_deck_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    lernpfad_ladder_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    method_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+
 class Material(Base):
     """Datei-/Materialablage der Lehrkraft, an ein Thema und/oder eine Stunde
     (Kalender-Eintrag) gehaengt. Beides optional und ON DELETE SET NULL (Regel 3:
@@ -1607,6 +1714,8 @@ class Material(Base):
     # Erwartungshorizont. Wie die anderen Bindungen optional und SET NULL — die
     # Datei ueberlebt das Loeschen der Auswertung und bleibt in der Ablage.
     work_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
+    # ... und an eine Stunde einer Reihe (Modul Reihen) — dieselbe Regel.
+    reihe_stunde_id: Mapped[Optional[int]] = mapped_column(ForeignKey("reihen_stunden.id", ondelete="SET NULL"), nullable=True, index=True)
     # Wozu die Datei gehoert: "arbeit" | "erwartung" | "" (sonstiger Anhang).
     # Zwei benannte Plaetze statt einer namenlosen Liste — beim Nachkorrigieren
     # sucht niemand, welche der vier PDFs der Erwartungshorizont war. Mehrere je
@@ -1644,12 +1753,12 @@ class Todo(Versioniert, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    text: Mapped[str] = mapped_column(String(500), default="", server_default="")
+    text: Mapped[str] = mapped_column(EncStr("todos.text"), default="", server_default="")
     # Laengerer Text zur Aufgabe. Der `text` ist die Zeile in der Liste und
     # bleibt kurz — was man sich zur Sache merkt („Frau X anrufen, Nummer …",
     # drei Stichpunkte zur Konferenz), passt dort nicht hinein und landete
     # sonst gar nicht erst in Nuvora.
-    notiz: Mapped[str] = mapped_column(Text, default="", server_default="")
+    notiz: Mapped[str] = mapped_column(EncStr("todos.notiz"), default="", server_default="")
     done: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Optional: Faelligkeitsdatum + Uhrzeit ("HH:MM", "" = ganztaegig/ohne Zeit).
     due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
@@ -1668,8 +1777,8 @@ class Observation(Base):
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
     date: Mapped[Optional[PyDate]] = mapped_column(Date, nullable=True)
-    category: Mapped[str] = mapped_column(String(60), default="", server_default="")
-    text: Mapped[str] = mapped_column(Text, default="", server_default="")
+    category: Mapped[str] = mapped_column(EncStr("observations.category"), default="", server_default="")
+    text: Mapped[str] = mapped_column(EncStr("observations.text"), default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -1683,7 +1792,7 @@ class ParentContact(Base):
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
     date: Mapped[Optional[PyDate]] = mapped_column(Date, nullable=True)
     channel: Mapped[str] = mapped_column(String(30), default="", server_default="")  # telefon|mail|gespraech|brief
-    text: Mapped[str] = mapped_column(Text, default="", server_default="")
+    text: Mapped[str] = mapped_column(EncStr("parent_contacts.text"), default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -1695,8 +1804,8 @@ class NotepadNote(Versioniert, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    title: Mapped[str] = mapped_column(String(200), default="", server_default="")
-    content: Mapped[str] = mapped_column(Text, default="", server_default="")
+    title: Mapped[str] = mapped_column(EncStr("notepad_notes.title"), default="", server_default="")
+    content: Mapped[str] = mapped_column(EncStr("notepad_notes.content"), default="", server_default="")
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Groesse des Zettels in Pixeln, vom Ziehen an der Ecke. 0 = wie bisher
     # (Breite aus dem Raster, Hoehe aus dem Inhalt) — ein Zettel, den niemand
@@ -1745,7 +1854,7 @@ class PapAbgabe(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     aufgabe_id: Mapped[int] = mapped_column(ForeignKey("pap_aufgaben.id", ondelete="CASCADE"), index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
-    daten: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    daten: Mapped[Optional[dict]] = mapped_column(EncJSON("pap_abgaben.daten"), nullable=True)
     abgegeben: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -1784,7 +1893,7 @@ class WaageAbgabe(Base):
     aufgabe_id: Mapped[int] = mapped_column(ForeignKey("waage_aufgaben.id", ondelete="CASCADE"), index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
     # {"<index>": {"schritte": [...]}}
-    daten: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    daten: Mapped[Optional[dict]] = mapped_column(EncJSON("waage_abgaben.daten"), nullable=True)
     geloest: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     abgegeben: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -1838,8 +1947,8 @@ class BugReport(Base):
     # das sie geschrieben hat — sonst verschwindet mit einem geloeschten
     # Konto auch der Fehlerbericht, an dem noch gearbeitet wird.
     user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    email: Mapped[str] = mapped_column(String(200), default="", server_default="")
-    message: Mapped[str] = mapped_column(Text, default="", server_default="")
+    email: Mapped[str] = mapped_column(EncStr("bug_reports.email"), default="", server_default="")
+    message: Mapped[str] = mapped_column(EncStr("bug_reports.message"), default="", server_default="")
     seite: Mapped[str] = mapped_column(String(200), default="", server_default="")
     fassung: Mapped[str] = mapped_column(String(20), default="", server_default="")
     browser: Mapped[str] = mapped_column(String(200), default="", server_default="")

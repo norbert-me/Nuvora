@@ -202,3 +202,72 @@ def test_e_modus_von_liest_die_konfiguration():
     assert e_modus_von({"e_modus": "unsinn"}) == "bonus"
     assert e_modus_von({}) == "bonus"
     assert e_modus_von(None) == "bonus"
+
+
+def test_note_mit_tendenz_spiegelt_das_frontend():
+    from app.scoring import note_mit_tendenz as n
+    assert [n(p) for p in (95, 87, 80, 73, 60, 50, 10, 0)] == ["1", "1", "2", "2-", "3-", "4", "6", "6"]
+    assert n(85) == "2+" and n(70) == "3+"
+
+
+def test_noten_trend_spiegelt_das_frontend():
+    from app.scoring import noten_trend as n
+    assert n([3]) is None and n([3, 2]) == 1 and n([2, 3]) == -1 and n([2, 2.1, 2]) == 0
+    assert n([4, 3, 2]) == 1 and n([None, 3, 2]) == 1
+    # Schwelle: eine halbe Note — eine Tendenzstufe (0,3) ist noch kein Auf- oder Abstieg.
+    assert n([2, 2.4]) == 0 and n([2.3, 2.0]) == 0 and n([2, 2.5]) == -1 and n([3, 2.5]) == 1
+
+
+def _qs():
+    # Zwei G-Fragen (eine bleibt offen, Basis < 100 %: sonst gibt es keine
+    # naechste Stufe, auf die ein Bonus gehen koennte) und eine E-Frage.
+    return [{"id": 1, "correct_answer": "A", "niveau": "", "topic_id": None},
+            {"id": 3, "correct_answer": "A", "niveau": "", "topic_id": None},
+            {"id": 2, "correct_answer": "A", "niveau": "E", "topic_id": None}]
+
+
+def test_bonus_regel_vorgabe_und_einstellbar():
+    from app.scoring import bewerte, bonus_regel_von
+    antw = {1: "A", 3: "B", 2: "A"}
+    kw = dict(niveau="G", niveau_aktiv=True)
+    standard = bewerte(_qs(), antw, **kw, regel=bonus_regel_von({}))
+    ganz = bewerte(_qs(), antw, **kw, regel=bonus_regel_von({"bonus_regel": {"max_stufen": 2, "mindest_nenner": 1}}))
+    nichts = bewerte(_qs(), antw, **kw, regel=bonus_regel_von({"bonus_regel": {"max_stufen": 0}}))
+    assert nichts["bonus_pct"] == 0
+    assert ganz["bonus_pct"] > standard["bonus_pct"] > 0
+    # falsche E-Antwort: zehrt den Bonus nur, wenn eingestellt
+    falsch = {1: "A", 3: "B", 2: "B"}
+    assert bewerte(_qs(), falsch, **kw, regel={"falsch_zehrt": True})["bonus_pct"] == 0
+    assert bewerte(_qs(), falsch, **kw, regel={"falsch_zehrt": False})["bonus_pct"] == 0  # keine richtige E: nichts zu holen
+
+
+# ─── E-Modus „ausgleich": richtige E-Fragen gleichen verpasste G-Fragen aus ───
+
+def _sechs_g_zwei_e():
+    qs = [{"id": i, "correct_answer": "A", "niveau": "", "topic_id": None} for i in range(1, 7)]
+    qs += [{"id": 7, "correct_answer": "A", "niveau": "E", "topic_id": None},
+           {"id": 8, "correct_answer": "A", "niveau": "E", "topic_id": None}]
+    return qs
+
+
+def test_ausgleich_5_von_6_plus_beide_e_ist_100_prozent():
+    from app.scoring import bewerte
+    antw = {1: "A", 2: "A", 3: "A", 4: "A", 5: "A", 6: "B", 7: "A", 8: "A"}
+    w = bewerte(_sechs_g_zwei_e(), antw, niveau="G", niveau_aktiv=True, e_modus="ausgleich")
+    assert w["score"] == 5 and w["max_score"] == 6
+    assert w["pct"] == 100.0, "die Luecke von einer Frage ist ausgeglichen"
+    b = bewerte(_sechs_g_zwei_e(), antw, niveau="G", niveau_aktiv=True, e_modus="bonus")
+    assert b["pct"] < 100, "der Bonus hebt nur um eine Notenstufe, der Ausgleich fuellt die Luecke"
+
+
+def test_ausgleich_gibt_nie_mehr_als_100_und_falsche_zehren_auf():
+    from app.scoring import bewerte
+    voll = {i: "A" for i in range(1, 9)}
+    assert bewerte(_sechs_g_zwei_e(), voll, niveau="G", niveau_aktiv=True, e_modus="ausgleich")["pct"] == 100.0
+    # Eine E richtig, eine falsch: der Ausgleich ist aufgezehrt.
+    antw = {1: "A", 2: "A", 3: "A", 4: "A", 5: "A", 6: "B", 7: "A", 8: "B"}
+    w = bewerte(_sechs_g_zwei_e(), antw, niveau="G", niveau_aktiv=True, e_modus="ausgleich")
+    assert w["bonus_pct"] == 0 and round(w["pct"], 1) == 83.3
+    # Ein E-Kind rechnet ohnehin alles regulaer.
+    e = bewerte(_sechs_g_zwei_e(), voll, niveau="E", niveau_aktiv=True, e_modus="ausgleich")
+    assert e["pct"] == 100.0 and e["bonus_pct"] == 0

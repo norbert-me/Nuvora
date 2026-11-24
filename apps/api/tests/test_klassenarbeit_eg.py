@@ -64,3 +64,31 @@ async def test_bestehende_arbeit_teilen(s):
     assert g.tasks == e.tasks and g.name == "Brueche"
     with pytest.raises(HTTPException):
         await KA.split_work(w.id, user=u, db=s)
+
+
+def test_klassenstufe_aus_dem_namen():
+    from app.routers.klassenarbeit import klassenstufe
+    assert [klassenstufe(n) for n in ("7.5", "10a", "WP-INF 8", "6.1", "Blanko", "", None)] == [7, 10, 8, 6, None, None, None]
+
+
+@pytest.mark.asyncio
+async def test_vergleich_nimmt_nur_klassen_derselben_stufe(s):
+    """Gemeldet: der Vergleich stellte 6.1 neben 7.5 — dieselbe Namensgleichheit, aber nicht dieselbe Arbeit."""
+    from app import models as m
+    from app.routers.klassenarbeit import vergleich
+    u = m.User(email="v@s.de", password_hash="x", name="L", email_verified=True)
+    s.add(u)
+    await s.flush()
+    ids = {}
+    for n in ("6.1", "7.5", "7.4", "Blanko"):
+        c = m.SchoolClass(owner_id=u.id, name=n)
+        s.add(c)
+        await s.flush()
+        w = m.WorkAnalysis(owner_id=u.id, class_id=c.id, name="Rechnen mit Brüchen", results={})
+        s.add(w)
+        await s.flush()
+        ids[n] = w.id
+    await s.commit()
+    erg = await vergleich(ids["7.5"], user=u, db=s)
+    klassen = sorted(a["class_name"] for a in erg["arbeiten"])
+    assert klassen == ["7.4", "7.5", "Blanko"], klassen        # 6.1 fehlt; „Blanko" hat keine lesbare Stufe und bleibt

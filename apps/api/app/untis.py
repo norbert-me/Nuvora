@@ -236,6 +236,19 @@ def _zeit(zahl):
     return f"{s[:2]}:{s[2:]}"
 
 
+# Untis' `lstype` (Art des Eintrags), wenn weder Fach noch Klasse noch Text da sind.
+_LSTYPE = {"oh": "Sprechstunde", "sb": "Bereitschaft", "bs": "Aufsicht", "ex": "Prüfung"}
+
+
+def _art(z: dict) -> str:
+    """Wenn eine Stunde keinen Namen hat (eine „Veranstaltung" ohne Fach), sagt
+    wenigstens ihre Art, was es ist — statt gar nichts."""
+    akt = (z.get("activityType") or "").strip()
+    if akt and akt.lower() != "unterricht":
+        return akt[:60]
+    return _LSTYPE.get((z.get("lstype") or "").strip(), "")
+
+
 def _stunde_aus_api(z: dict, stamm: dict) -> dict:
     """Eine Untis-Stunde in Nuvoras Form.
 
@@ -251,12 +264,19 @@ def _stunde_aus_api(z: dict, stamm: dict) -> dict:
     faecher = namen("su", "faecher")
     raeume = namen("ro", "raeume")
     d = _datum(z.get("date"))
-    titel = " ".join(x for x in [", ".join(faecher), ", ".join(klassen)] if x) or (z.get("lstext") or "").strip()
+    # Stundeninfo und Vertretungstext stehen oft als einziges, wo ein Name steht;
+    # `orgid` nennt das urspruengliche Fach, wenn Untis es ersetzt hat.
+    info = " · ".join(x for x in ((z.get(k) or "").strip() for k in ("lstext", "substText", "info")) if x)
+    orig = [t for t in ((stamm.get("faecher") or {}).get(x.get("orgid"), "")
+                        for x in (z.get("su") or []) if isinstance(x, dict) and x.get("orgid")) if t]
+    titel = (" ".join(x for x in [", ".join(faecher), ", ".join(klassen)] if x)
+             or (z.get("lstext") or "").strip() or _art(z))
     return {
         "datum": d.isoformat() if d else "",
         "start": _zeit(z.get("startTime")), "ende": _zeit(z.get("endTime")),
         "titel": titel[:200], "klassen": klassen, "faecher": faecher,
         "raum": ", ".join(raeume)[:60],
+        "info": info[:300], "orig": ", ".join(orig)[:60],
         "faellt_aus": (z.get("code") or "") == "cancelled",
         "vertretung": (z.get("code") or "") == "irregular",
     }
@@ -318,10 +338,14 @@ def stunden_aus_ics(url: str, von: date, bis: date) -> list:
     return stunden_aus_ics_text(text, von, bis)
 
 
-def stunden_aus_ics_text(text: str, von: date, bis: date) -> list:
+def stunden_aus_ics_text(text: str, von: date, bis: date, mit_ausfall: bool = False) -> list:
     """Der Parser zu `stunden_aus_ics`, ohne den Abruf — den Text holt auch
     der Kalender (Vertretungen, siehe `abweichungen`), und zwei Parser fuer
-    dieselbe Datei wuerden die UTC-Umrechnung nur einmal richtig machen."""
+    dieselbe Datei wuerden die UTC-Umrechnung nur einmal richtig machen.
+
+    `mit_ausfall`: Ereignisse mit STATUS:CANCELLED kommen mit `faellt_aus`
+    zurueck (der Kalender zeigt den Entfall). Ohne den Schalter bleiben sie
+    draussen wie bisher — die Stundenplan-Uebernahme will sie nicht."""
     text = re.sub(r"\r?\n[ \t]", "", text)
     out, cur = [], None
     for zeile in text.split("\n"):
@@ -331,12 +355,13 @@ def stunden_aus_ics_text(text: str, von: date, bis: date) -> list:
         elif zeile == "END:VEVENT":
             if cur and cur.get("datum"):
                 d = _datum(cur["datum"])
-                if d and von <= d <= bis and cur.get("status") != "CANCELLED":
+                abgesagt = cur.get("status") == "CANCELLED"
+                if d and von <= d <= bis and (mit_ausfall or not abgesagt):
                     out.append({
                         "datum": d.isoformat(), "start": cur.get("start", ""), "ende": cur.get("ende", ""),
                         "titel": (cur.get("titel") or "")[:200], "klassen": [], "faecher": [],
                         "raum": (cur.get("raum") or "")[:60],
-                        "faellt_aus": False, "vertretung": False,
+                        "faellt_aus": abgesagt, "vertretung": False,
                     })
             cur = None
         elif cur is not None and ":" in zeile:
@@ -392,13 +417,15 @@ def abweichungen(stunden: list, regulaer=None) -> list:
         muster.setdefault((wt, s.get("start", "")), Counter())[norm(s.get("titel"))] += 1
 
     out = []
+    ohne = {}
     for s in stunden:
         titel = norm(s.get("titel"))
-        if not titel:
-            continue
         try:
             d = date.fromisoformat(s["datum"])
         except (KeyError, ValueError):
+            continue
+        if not titel:
+            ohne.setdefault((d, s.get("start", "")), []).append(s)
             continue
         haeufig = (muster.get((d.weekday(), s.get("start", ""))) or Counter()).most_common(2)
         erster = haeufig[0] if haeufig else ("", 0)
@@ -410,6 +437,16 @@ def abweichungen(stunden: list, regulaer=None) -> list:
         if regulaer and titel in {norm(t) for t in (regulaer(d, s.get("start", "")) or ())}:
             continue
         out.append(s)
+    # Ein Export ohne Betreff (manche Schulen schalten Fach/Klasse/Raum ab) kennt
+    # nur Zeiten. Was dort ZUSAETZLICH zu Nuvoras eigenem Plan steht — mehr
+    # Termine zur selben Zeit, als der Plan Stunden hat —, ist keine regulaere
+    # Stunde: eine Fremdvertretung, Veranstaltung oder Zusatzstunde. Ohne
+    # eigenen Plan (`regulaer` fehlt) laesst sich das nicht beurteilen.
+    if regulaer:
+        for (d, start), liste in ohne.items():
+            eigene = len(regulaer(d, start) or ())
+            for s in liste[eigene:]:
+                out.append({**s, "titel": "Zusätzlicher Termin"})
     return out
 
 

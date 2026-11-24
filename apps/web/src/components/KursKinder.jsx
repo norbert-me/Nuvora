@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AddButton, Icon, ICONS, COLORS as C, CONTROL_R, badge, btnPrimary, btnSecondary, btnSmall,
   dateiWaehlen, iconBtn, inputStyle, sectionLabel, toolbarIconBtn, toolbarInput,
@@ -24,6 +25,7 @@ export default function KursKinder({ kursId, t: tProp }) {
   const [liste, setListe] = useState([]);
   const [neu, setNeu] = useState("");
   const [offen, setOffen] = useState(null);
+  const navigate = useNavigate();
   const [zieht, setZieht] = useState(null);
   const [ueber, setUeber] = useState(null);
   const [zuschnitt, setZuschnitt] = useState(null);   // { personId, datei }
@@ -153,7 +155,7 @@ export default function KursKinder({ kursId, t: tProp }) {
                 Nachteilsausgleich FUER DIESEN KURS beieinander. Umbenannt wird
                 mit dem Stift daneben: das ist der seltenere Handgriff, und als
                 Klick auf den Namen verdeckte er den haeufigen. */}
-            <button onClick={() => setOffen(offen === k.student_id ? null : k.student_id)}
+            <button onClick={() => (k.person_id ? navigate(`/personen?person=${k.person_id}`) : setOffen(offen === k.student_id ? null : k.student_id))}
               title={text("kurse.kindAngaben")}
               style={{ flex: 1, minWidth: 0, fontSize: 14, textAlign: "left", border: "none", background: "none", cursor: "pointer", color: "var(--text)",
                 // Wie linkBtn: Polster fuer die Trefferflaeche, negativer Rand
@@ -161,10 +163,18 @@ export default function KursKinder({ kursId, t: tProp }) {
                 padding: "7px 0", margin: "-7px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {k.name}
             </button>
-            {k.niveau && <span style={badge(k.niveau === "E" ? C.info : C.success)}>{k.niveau}</span>}
-            {/* Nur DASS etwas vereinbart ist. Was genau, steht im Dialog des
-                Kindes — eine Kursliste ist kein Ort fuer Art-9-Angaben. */}
-            {k.nta && <span style={badge(C.warning)} title={text("kurse.ntaHint")}>{text("kurse.nta")}</span>}
+            {/* LRS und LE verändern die Benotung (LE: keine Noten) — deshalb als
+                Kürzel in der Liste, sonst nur im Dialog des Kindes. Links vom
+                Niveau; das Niveau steht in fester Breite rechtsbündig, damit
+                E/G untereinander eine Spalte bilden. */}
+            {(k.sonder || []).map((x) => <span key={x} style={badge(C.warning)} title={x === "LE" ? text("kurse.leHint") : text("kurse.lrsHint")}>{x}</span>)}
+            {/* Nur DASS etwas vereinbart ist; was genau, steht im Dialog des
+                Kindes. Bei LRS entfällt es: der Nachteilsausgleich steckt darin,
+                zwei Kürzel für dasselbe wären doppelt. */}
+            {k.nta && !(k.sonder || []).includes("LRS") && <span style={badge(C.warning)} title={text("kurse.ntaHint")}>{text("kurse.nta")}</span>}
+            <span style={{ width: 28, display: "inline-flex", justifyContent: "flex-end", flexShrink: 0 }}>
+              {k.niveau && <span style={badge(k.niveau === "E" ? C.info : C.success)}>{k.niveau}</span>}
+            </span>
             {/* Umbenennen stand hier und ist entfernt: der Name gehoert der
                 PERSON und wandert beim Aendern auf alle Kurse mit — im Kurs
                 sah er wie eine Angabe DIESES Kurses aus. Gepflegt wird er

@@ -740,6 +740,42 @@ const bedienung = (td) => [
     },
   },
   {
+    modul: "zahlenstrahl",
+    name: "Pfeil legen und Ergebnis sehen (/zahlenstrahl)",
+    pfad: "/zahlenstrahl",
+    // Reines Werkzeug ohne Daten. Die Voreinstellung ist „minus eine negative
+    // Zahl“: ein Klick legt den Pfeil, der Pfeil der Zahl steht gestrichelt
+    // darunter, und aus dem Fragezeichen wird das Ergebnis.
+    beweis: "Pfeil der Zahl gelegt, umgedreht, Ergebnis statt „?“",
+    async eigen(seite) {
+      await seite.getByRole("button", { name: "Nächster Pfeil" }).first().click({ timeout: 8000 });
+      await seite.getByText(/Pfeil für/).first().waitFor({ timeout: 8000 });
+      // Bei „minus“ ist das erst der Pfeil der Zahl selbst; das Ergebnis steht noch aus.
+      await seite.getByRole("button", { name: "Pfeil umdrehen" }).first().click({ timeout: 8000 });
+      const text = await seite.locator("body").innerText();
+      return text.includes("= ?") ? "nach dem Pfeil steht noch ein Fragezeichen statt des Ergebnisses" : "";
+    },
+  },
+  {
+    modul: "zahlenstrahl",
+    name: "Plättchen legen bis zum Ergebnis (/zahlenstrahl)",
+    pfad: "/zahlenstrahl",
+    // Dieselbe Seite, zweite Ansicht: „Plättchen“ legt Guthaben und Schulden. Bei der Voreinstellung
+    // „minus eine Schuld“ muss nach dem zweiten Schritt von Nullpaaren die Rede sein.
+    beweis: "Plättchen Schritt für Schritt gelegt, Ergebnis genannt",
+    async eigen(seite) {
+      await seite.getByRole("button", { name: "Plättchen", exact: true }).first().click({ timeout: 8000 });
+      // Alle Schritte durchgehen (je nach Aufgabe 2 bis 4); danach steht das Ergebnis da.
+      for (let i = 0; i < 6; i++) {
+        const knopf = seite.getByRole("button", { name: "Nächster Schritt" }).first();
+        if (await knopf.isDisabled()) break;
+        await knopf.click({ timeout: 8000 });
+      }
+      const text = await seite.locator("body").innerText();
+      return /das Ergebnis ist/.test(text) ? "" : "nach allen Schritten steht kein Ergebnis da";
+    },
+  },
+  {
     modul: "mathespiele",
     name: "Mathefußball spielen (/mathespiele)",
     pfad: "/mathespiele",

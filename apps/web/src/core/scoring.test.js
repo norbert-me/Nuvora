@@ -337,3 +337,23 @@ describe("e_modus", () => {
     expect(a.pct).toBe(b.pct);
   });
 });
+
+
+describe("e_modus ausgleich", () => {
+  const qs = [...Array(6)].map((_, i) => ({ id: i + 1, correct_answer: "A", niveau: "" }))
+    .concat([{ id: 7, correct_answer: "A", niveau: "E" }, { id: 8, correct_answer: "A", niveau: "E" }]);
+  const antw = { 1: "A", 2: "A", 3: "A", 4: "A", 5: "A", 6: "B", 7: "A", 8: "A" };
+
+  it("5 von 6 plus beide E richtig ergibt 100 %, der Bonus nicht", () => {
+    const a = bewerte(qs, antw, { niveau: "G", niveauAktiv: true, eModus: "ausgleich" });
+    expect(a.score).toBe(5);
+    expect(a.pct).toBe(100);
+    const b = bewerte(qs, antw, { niveau: "G", niveauAktiv: true, eModus: "bonus" });
+    expect(b.pct).toBeLessThan(100);
+  });
+
+  it("falsche E-Antworten zehren den Ausgleich auf", () => {
+    const a = bewerte(qs, { ...antw, 8: "B" }, { niveau: "G", niveauAktiv: true, eModus: "ausgleich" });
+    expect(a.bonusPct).toBe(0);
+  });
+});

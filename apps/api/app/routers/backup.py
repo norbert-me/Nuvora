@@ -71,15 +71,16 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import bindparam, select
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.responses import FileResponse
 
+from .. import krypto
 from ..admin import APP_VERSION, _require_admin
 from ..rollen import ist_betreiber
 from ..database import DATABASE_URL, async_session, get_db
 from ..models import AppSetting, Base
-from ..spalten import fuellwert
+from ..sicherungsformat import dekodiere as _dekodiere, kodiere as _kodiere, passend_machen as _passend_machen
 from .auth import _verify_pw, get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/admin/backup", tags=["backup"])
@@ -253,27 +254,6 @@ async def aktuelles_ziel(db) -> str:
 
 
 # ── JSON-Kodierung für Werte, die JSON nicht kennt ───────────────────────────
-def _kodiere(v):
-    if isinstance(v, bytes):
-        return {"__b64__": base64.b64encode(v).decode("ascii")}
-    if isinstance(v, datetime):
-        return {"__dt__": v.isoformat()}
-    if isinstance(v, date):
-        return {"__d__": v.isoformat()}
-    return v
-
-
-def _dekodiere(v):
-    if isinstance(v, dict) and len(v) == 1:
-        if "__b64__" in v:
-            return base64.b64decode(v["__b64__"])
-        if "__dt__" in v:
-            return datetime.fromisoformat(v["__dt__"])
-        if "__d__" in v:
-            return date.fromisoformat(v["__d__"])
-    return v
-
-
 # ── Die Sicherung selbst ─────────────────────────────────────────────────────
 class _Zaehler(io.RawIOBase):
     """Schreibt durch und rechnet nebenbei sha256 und Bytes mit — damit die
@@ -319,7 +299,9 @@ async def _datenbank_schreiben(zf: zipfile.ZipFile, conn) -> tuple[dict, dict]:
         # Ohne ORDER BY ist die Reihenfolge die des Heaps, also nach Updates und
         # VACUUM beliebig. Aufsteigende id heisst: das Elternteil war zuerst da
         # und steht zuerst in der Datei.
-        stmt = select(tabelle).order_by(*tabelle.primary_key.columns)
+        # Verschluesselte Spalten (krypto.py) bleiben im Dump Chiffretext: die Sicherung
+        # darf nichts entschluesseln, sonst laege der Klartext wieder in der Datei.
+        stmt = select(*krypto.roh_ausdruecke(tabelle)).order_by(*tabelle.primary_key.columns)
         try:
             ergebnis = await conn.stream(stmt)
             async for row in ergebnis:
@@ -699,46 +681,6 @@ def _grund(fehler: Exception) -> str:
     return roh.strip().splitlines()[0][:200]
 
 
-def _passend_machen(tabelle, zeilen: list[dict]) -> tuple[list[dict], list[str]]:
-    """Zeilen aus der Datei an das heutige Schema anpassen — und sagen, was.
-
-    Eine Sicherung ist ein Stand von damals, das Zielschema ist von heute.
-    Zwei Abweichungen sind harmlos und wurden trotzdem zum Abbruch:
-
-      * **NULL in einer NOT-NULL-Spalte.** Entstanden in der Produktionsdatenbank
-        durch ein `ADD COLUMN` ohne DEFAULT (siehe `_ensure_columns` in
-        main.py). Die laufende Datenbank ist inzwischen repariert — in den
-        Dateien von davor steckt die NULL weiter drin. Gefüllt wird mit dem
-        Default des Modells, also mit dem, was die ORM beim Schreiben gesetzt
-        hätte.
-      * **Eine Spalte, die es nicht mehr gibt.** Sonst scheitert das Einspielen
-        einer älteren Sicherung an einem Feld, das niemand mehr liest.
-
-    Beides wird **gezählt und gemeldet**, nicht stillschweigend gemacht: wer
-    zurückspielt, muss erfahren, dass die Daten dabei angefasst wurden.
-    """
-    spalten = {c.name: c for c in tabelle.c}
-    hinweise: dict[str, int] = {}
-    fertig = []
-    for zeile in zeilen:
-        neu = {}
-        for k, v in zeile.items():
-            col = spalten.get(k)
-            if col is None:
-                hinweise[f"{tabelle.name}.{k} verworfen (Spalte gibt es nicht mehr)"] = \
-                    hinweise.get(f"{tabelle.name}.{k} verworfen (Spalte gibt es nicht mehr)", 0) + 1
-                continue
-            if v is None and not col.nullable and not col.primary_key:
-                ersatz = fuellwert(col)
-                if ersatz is not None:
-                    schluessel = f"{tabelle.name}.{k} war NULL, gefüllt"
-                    hinweise[schluessel] = hinweise.get(schluessel, 0) + 1
-                    v = ersatz
-            neu[k] = v
-        fertig.append(neu)
-    return fertig, [f"{text} ({n})" for text, n in sorted(hinweise.items())]
-
-
 async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None = None) -> dict:
     """Spielt eine Sicherung in die Datenbank unter `ziel_url` zurück.
 
@@ -787,15 +729,57 @@ async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None 
                         continue
                     zeilen, hinweise = _passend_machen(tabelle, zeilen)
                     angepasst.extend(hinweise)
+                    # Verwaiste Bezuege: die Produktionsdatenbank ist gewachsen, nicht jede Spalte hatte von
+                    # Anfang an ihren Fremdschluessel — so stehen dort Verweise auf Zeilen, die es nicht mehr
+                    # gibt (gesehen: grade_categories.source_session_id, calendar_entries.karten_deck_id).
+                    # Eine frische Datenbank lehnt sie ab und das ganze Zurueckspielen scheitert. Nullbare
+                    # Bezuege ohne Ziel werden deshalb geleert — und gemeldet, nicht still.
+                    for fk in tabelle.foreign_keys:
+                        ziel = fk.column.table.name
+                        if not fk.parent.nullable or ziel not in tabellen or fk.column.name != "id" or ziel == name:
+                            continue
+                        da = {z.get("id") for z in eimer.get(ziel, [])}
+                        n = 0
+                        for z in zeilen:
+                            if z.get(fk.parent.name) is not None and z[fk.parent.name] not in da:
+                                z[fk.parent.name] = None
+                                n += 1
+                        if n:
+                            angepasst.append(f"{name}.{fk.parent.name}: {n} verwaister Bezug auf {ziel} entfernt")
+                    # Roh einspielen: Chiffretext bleibt Chiffretext (sonst wuerde er ein
+                    # zweites Mal verschluesselt); Klartext aus aelteren Sicherungen
+                    # steht danach als Klartext da und wird beim naechsten Start umgeschrieben.
+                    ziel_tab, zeilen = krypto.fuer_einspielen(tabelle, zeilen)
+                    # Selbstbezuege (kurse.vorgaenger_id, folders.parent_id, …): „aufsteigende id
+                    # heisst, das Elternteil war zuerst da" stimmt nicht immer — ein Kurs kann auf
+                    # einen Vorgaenger mit HOEHERER id zeigen (so in der Produktion gesehen), und
+                    # Postgres lehnt die Zeile ab. Deshalb zwei Phasen: erst ohne den Bezug einfuegen,
+                    # danach nachtragen, wenn alle Zeilen da sind.
+                    selbst = [fk.parent.name for fk in tabelle.foreign_keys if fk.column.table is tabelle and fk.parent.nullable]
+                    nachtrag = []
+                    if selbst and "id" in tabelle.c:
+                        for z in zeilen:
+                            teil = {c: z[c] for c in selbst if z.get(c) is not None}
+                            if teil:
+                                nachtrag.append({"b_id": z["id"], **{f"b_{c}": v for c, v in teil.items()}})
+                                for c in teil:
+                                    z[c] = None
                     for i in range(0, len(zeilen), 500):
                         try:
-                            await conn.execute(tabelle.insert(), zeilen[i:i + 500])
+                            await conn.execute(ziel_tab.insert(), zeilen[i:i + 500])
                         except SQLAlchemyError as e:
                             # Ohne Tabelle und Bedingung waere die Meldung
                             # „IntegrityError" — und die Ursache nur im
                             # Container-Protokoll. Genau das hat hier einmal
                             # zwei Tage gekostet.
                             raise Einspielfehler(name, e) from e
+                    if nachtrag:
+                        # Je Spalte ein Lauf: nicht jede Zeile hat jede Bezugsspalte.
+                        for c in selbst:
+                            teil = [{"b_id": n["b_id"], f"b_{c}": n[f"b_{c}"]} for n in nachtrag if f"b_{c}" in n]
+                            if teil:
+                                await conn.execute(
+                                    ziel_tab.update().where(ziel_tab.c.id == bindparam("b_id")).values({c: bindparam(f"b_{c}")}), teil)
                     zaehlung[name] = len(zeilen)
                 unbekannt = set(eimer) - set(tabellen)
                 if unbekannt:

@@ -150,7 +150,7 @@ def endpunkte(u):
             ("GET", f"/api/noten/classes/{c}/entries"),
             ("GET", f"/api/noten/classes/{c}/summary"),
             ("GET", f"/api/noten/classes/{c}/year"),
-            ("GET", f"/api/noten/classes/{c}/dividers"),
+            ("GET", f"/api/noten/classes/{c}/quartalsstriche"),
             ("GET", f"/api/noten/classes/{c}/export"),
             ("GET", "/api/noten/code-sessions"),
             ("GET", f"/api/klassenarbeit/classes/{c}/students"),
@@ -212,8 +212,12 @@ def endpunkte(u):
         ],
         "mathespiele": [],
         "koerper": [],
+        "zahlenstrahl": [],
         "waage": [
             ("GET", "/api/waage/aufgaben"),
+        ],
+        "reihen": [
+            ("GET", "/api/reihen"),
         ],
         "rennen": [],
     }
@@ -247,7 +251,9 @@ def tore(u):
         "tafel": [("GET", "/api/tafel")],
         "mathespiele": [],
         "koerper": [],
+        "zahlenstrahl": [],
         "waage": [("GET", "/api/waage/aufgaben")],
+        "reihen": [("GET", "/api/reihen")],
         "rennen": [],
     }
 
@@ -1011,19 +1017,23 @@ def inhalt_kalender(api, u, spuren):
         "PUT", "/api/kalender/external",
         {"calendars": vorher_ext.get("calendars") or [],
          "mitschicken": bool(vorher_ext.get("mitschicken"))}, erwartet=(200, 404))))
-    an = api.call("PUT", "/api/kalender/external",
-                  {"calendars": vorher_ext.get("calendars") or [], "mitschicken": True},
-                  erwartet=(200,))
-    if an.get("mitschicken") is not True:
-        raise AssertionError(f"Schalter nicht gespeichert: {an}")
+    # „Exportieren" gilt JE KALENDER; der Gesamtschalter `mitschicken` heisst nur noch „mindestens
+    # einer exportiert" — ohne einen Kalender kann er nie an sein. Der Testkalender liegt auf einer
+    # reservierten Adresse (.invalid): der Namensabruf scheitert sofort, kein Testlauf haengt am Netz.
+    kal = {"url": "https://kalender.selbsttest.invalid/nuvora.ics", "color": "", "name": "ZZ-Selbsttest"}
+    an = api.call("PUT", "/api/kalender/external", {"calendars": [{**kal, "export": True}]}, erwartet=(200,))
+    if an.get("mitschicken") is not True or not an["calendars"] or an["calendars"][0].get("export") is not True:
+        raise AssertionError(f"Export je Kalender nicht gespeichert: {an}")
     if api.call("GET", "/api/kalender/external", erwartet=(200,)).get("mitschicken") is not True:
         raise AssertionError("Schalter kommt beim Lesen nicht zurueck")
-    # Ein alter Client schickt das Feld gar nicht mit — dann darf der Schalter
-    # nicht stillschweigend ausgehen.
-    ohne = api.call("PUT", "/api/kalender/external",
-                    {"calendars": vorher_ext.get("calendars") or []}, erwartet=(200,))
+    # Ein alter Client schickt `export` gar nicht mit — dann darf der Kalender nicht stillschweigend
+    # ausgehen (die Angabe von vorher bleibt).
+    ohne = api.call("PUT", "/api/kalender/external", {"calendars": [kal]}, erwartet=(200,))
     if ohne.get("mitschicken") is not True:
-        raise AssertionError(f"Schalter faellt ohne Feld um: {ohne}")
+        raise AssertionError(f"Export faellt ohne Feld um: {ohne}")
+    aus = api.call("PUT", "/api/kalender/external", {"calendars": [{**kal, "export": False}]}, erwartet=(200,))
+    if aus.get("mitschicken") is not False:
+        raise AssertionError(f"Gesamtschalter bleibt an, obwohl kein Kalender exportiert: {aus}")
     if not isinstance(api.call("GET", "/api/kalender/external-hidden", erwartet=(200,)), list):
         raise AssertionError("Ausgeblendet-Liste antwortet nicht als Liste")
     api.call("PUT", "/api/kalender/external",
@@ -1325,6 +1335,37 @@ def inhalt_pap(api, u, spuren):
 
 
 
+def inhalt_reihen(api, u, spuren):
+    """Reihen: Stunden mit Notizen fuers naechste Mal schreiben, NEU LESEN und
+    vergleichen; Reihenfolge und Kopie halten die Werte."""
+    r = api.call("POST", "/api/reihen", {
+        "name": f"{PRAEFIX} Reihe", "fach": "Mathematik", "jahrgang": "7",
+        "naechstes_mal": "Statt der Hausaufgabe ein Quiz"}, erwartet=(201,))
+    spuren.append(("Reihe", lambda: api.call("DELETE", f"/api/reihen/{r['id']}", erwartet=(204, 404))))
+    a = api.call("POST", f"/api/reihen/{r['id']}/stunden", {
+        "titel": "Brueche kuerzen", "dauer": 1, "notizen": "AB 3 verteilen",
+        "verlaufsplan": [{"phase": "Einstieg", "dauer": "5", "text": "Blitzlicht"}]}, erwartet=(201,))
+    b = api.call("POST", f"/api/reihen/{r['id']}/stunden", {
+        "titel": "Brueche erweitern", "dauer": 2, "naechstes_mal": "Kuerzer halten"}, erwartet=(201,))
+    api.call("PUT", f"/api/reihen/{r['id']}/reihenfolge", {"ids": [b["id"], a["id"]]}, erwartet=(204,))
+    d = api.call("GET", f"/api/reihen/{r['id']}", erwartet=(200,))
+    if d["naechstes_mal"] != "Statt der Hausaufgabe ein Quiz":
+        raise AssertionError("Notiz zur Reihe nicht gespeichert")
+    if [s["titel"] for s in d["stunden"]] != ["Brueche erweitern", "Brueche kuerzen"]:
+        raise AssertionError("Reihenfolge nicht gespeichert")
+    erste, zweite = d["stunden"]
+    if erste["dauer"] != 2 or erste["naechstes_mal"] != "Kuerzer halten":
+        raise AssertionError(f"Stunde 1 falsch gelesen: {erste}")
+    if zweite["notizen"] != "AB 3 verteilen" or zweite["verlaufsplan"][0]["text"] != "Blitzlicht":
+        raise AssertionError(f"Stunde 2 falsch gelesen: {zweite}")
+    if d["unterrichtsstunden"] != 3:
+        raise AssertionError(f"Summe der Unterrichtsstunden {d['unterrichtsstunden']} statt 3")
+    k = api.call("POST", f"/api/reihen/{r['id']}/kopie", erwartet=(201,))
+    spuren.append(("Reihen-Kopie", lambda: api.call("DELETE", f"/api/reihen/{k['id']}", erwartet=(204, 404))))
+    if len(k["stunden"]) != 2 or k["naechstes_mal"] != d["naechstes_mal"]:
+        raise AssertionError("Kopie weicht ab")
+
+
 def inhalt_waage(api, u, spuren):
     """Waage: Blatt anlegen, das Kind loest ueber seinen Zugang, die Lehrkraft
     findet den Weg wieder — und „geloest" rechnet der SERVER nach: ein Weg,
@@ -1389,7 +1430,9 @@ INHALT = {
     "tafel": inhalt_tafel,
     "mathespiele": None,
     "koerper": None,
+    "zahlenstrahl": None,
     "waage": inhalt_waage,
+    "reihen": inhalt_reihen,
     "rennen": None,
 }
 

@@ -20,10 +20,12 @@ def _montag(woche):
     return heute - timedelta(days=heute.weekday()) + timedelta(weeks=woche)
 
 
-def _ev(tag, titel, zeit="060000"):
+def _ev(tag, titel, zeit="080000"):
+    # Ortszeit ohne „Z": mit UTC-Zeit hing der Test an Sommer-/Winterzeit
+    # (06:00Z ist im November 07:00, nicht 08:00).
     d = tag.strftime("%Y%m%d")
-    return (f"BEGIN:VEVENT\r\nUID:{d}{titel}\r\nDTSTART:{d}T{zeit}Z\r\n"
-            f"DTEND:{d}T064500Z\r\nSUMMARY:{titel}\r\nEND:VEVENT\r\n")
+    return (f"BEGIN:VEVENT\r\nUID:{d}{titel}\r\nDTSTART:{d}T{zeit}\r\n"
+            f"DTEND:{d}T084500\r\nSUMMARY:{titel}\r\nEND:VEVENT\r\n")
 
 
 def _feed(*events):
@@ -75,3 +77,36 @@ async def test_ohne_abo_link_nichts(s):
     await s.commit()
     assert await K.externe_ereignisse(u, db=s) == []
     assert (await K.get_external(u))["untis"] is False
+
+
+def test_ics_ausfall_nur_auf_wunsch_und_mit_flag():
+    from datetime import date
+    from app import untis as U
+    ics = ("BEGIN:VEVENT\nDTSTART:20260105T080000\nSUMMARY:Mathe\nSTATUS:CANCELLED\nEND:VEVENT\n"
+           "BEGIN:VEVENT\nDTSTART:20260106T080000\nSUMMARY:Mathe\nEND:VEVENT")
+    von, bis = date(2026, 1, 1), date(2026, 2, 1)
+    assert [s["datum"] for s in U.stunden_aus_ics_text(ics, von, bis)] == ["2026-01-06"]
+    mit = U.stunden_aus_ics_text(ics, von, bis, mit_ausfall=True)
+    assert [(s["datum"], s["faellt_aus"]) for s in mit] == [("2026-01-05", True), ("2026-01-06", False)]
+
+
+def test_export_ohne_betreff_zeigt_ueberzaehlige_termine():
+    """Ohne SUMMARY (Schule schaltet Betreff ab): zwei Termine zur selben Zeit,
+    der Plan hat eine Stunde -> der zweite ist Fremdvertretung/Zusatz."""
+    from datetime import date
+    from app import untis as U
+    ics = "\n".join([
+        "BEGIN:VCALENDAR",
+        "BEGIN:VEVENT", "UID:a", "STATUS:CONFIRMED",
+        "DTSTART;TZID=Europe/Vienna:20261111T114500", "DTEND;TZID=Europe/Vienna:20261111T124500", "END:VEVENT",
+        "BEGIN:VEVENT", "UID:b", "STATUS:CONFIRMED",
+        "DTSTART;TZID=Europe/Vienna:20261111T114500", "DTEND;TZID=Europe/Vienna:20261111T124500", "END:VEVENT",
+        "BEGIN:VEVENT", "UID:c", "STATUS:CONFIRMED",
+        "DTSTART;TZID=Europe/Vienna:20261111T104000", "DTEND;TZID=Europe/Vienna:20261111T114000", "END:VEVENT",
+        "END:VCALENDAR"])
+    st = U.stunden_aus_ics_text(ics, date(2026, 11, 1), date(2026, 11, 30))
+    plan = {"11:45": ["Mathe"], "10:40": ["Deutsch"]}
+    out = U.abweichungen(st, lambda d, start: plan.get(start, []))
+    assert [(x["datum"], x["start"]) for x in out] == [("2026-11-11", "11:45")]
+    # ohne eigenen Plan: nichts raten
+    assert U.abweichungen(st, None) == []

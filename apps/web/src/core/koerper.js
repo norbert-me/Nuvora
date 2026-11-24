@@ -178,7 +178,7 @@ function kegel(r, h) {
 function kugel(r) {
   // Eine Kugel hat kein Netz — sie laesst sich nicht verzerrungsfrei in die
   // Ebene abwickeln (`faltbar: false`).
-  const B = 24, L = 12, fl = [];
+  const B = 36, L = 18, fl = [];
   const P = (i, j) => { const t = (Math.PI * j) / L, p = (2 * Math.PI * i) / B; return [r * Math.sin(t) * Math.cos(p), r * Math.sin(t) * Math.sin(p), r * Math.cos(t)]; };
   for (let j = 0; j < L; j++) for (let i = 0; i < B; i++) {
     const pts = [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1)].filter((p, k, a) => k === 0 || !gleich(p, a[k - 1]));
@@ -271,18 +271,33 @@ export function projiziere(flaechen, { gier, nick, breite, hoehe, rand = 70, zoo
   // Wuerfel uebers Eck ist breiter als von vorn), und Drehen fuehlte sich an
   // wie Ringen. So bleibt der Koerper beim Drehen gleich gross.
   const R = Math.max(1e-6, ...alle.map((p) => V.laenge(V.minus(p, c))));
-  const k = ((Math.min(breite, hoehe) / 2 - rand) / R) * zoom;
-  const abbild = (p) => { const [x, y] = sicht(p); return [breite / 2 + x * k, hoehe / 2 + y * k]; };
+  // Perspektive: je weiter weg, desto kleiner. Eine Parallelprojektion (alle
+  // Kanten bleiben parallel) sieht fuer das Auge nach „hinten breiter" aus —
+  // genau das Gegenteil dessen, was ein Blick auf einen Quader zeigt. Die
+  // Kamera steht ABSTAND Kugelradien vor dem Koerper; der Massstab kommt weiter
+  // aus der Kugel (nicht aus dem gedrehten Umriss), damit die Groesse beim
+  // Drehen nicht pumpt.
+  const ABSTAND = 4.5, d = ABSTAND * R;
+  const k = ((Math.min(breite, hoehe) / 2 - rand) / R) * 0.9 * zoom;
+  const abbild = (p) => {
+    const [x, y, z] = sicht(p);
+    const f = d / Math.max(1e-6, d + z);
+    return [breite / 2 + x * k * f, hoehe / 2 + y * k * f];
+  };
   const licht = V.einheit([0.4, -0.7, 0.6]);
   const out = flaechen.map((f) => {
     const s2 = f.pts.map(sicht);
-    const bild = s2.map(([x, y]) => [breite / 2 + x * k, hoehe / 2 + y * k]);
+    const bild = s2.map(([x, y, z]) => { const g = d / Math.max(1e-6, d + z); return [breite / 2 + x * k * g, hoehe / 2 + y * k * g]; });
     const tiefe = s2.reduce((t, p) => t + p[2], 0) / s2.length;
     const nb = sicht(V.plus(c, f.n)), n0 = sicht(c);
     const nSicht = V.einheit(V.minus(nb, n0));
     const hell = 0.55 + 0.45 * Math.abs(V.dot(f.n, licht));
-    return { ...f, bild, tiefe, hell, zugewandt: nSicht[2] < 0 };
-  }).sort((a, b) => b.tiefe - a.tiefe);
+    // Zugewandt heisst: der Blick von der Kamera auf die Flaeche trifft ihre
+    // Vorderseite — mit Perspektive entscheidet die Lage der Flaeche mit.
+    const m = s2.reduce((t, p) => [t[0] + p[0], t[1] + p[1], t[2] + p[2]], [0, 0, 0]).map((v) => v / s2.length);
+    const blick = [m[0], m[1], m[2] + d];
+    return { ...f, bild, tiefe, hell, zugewandt: V.dot(nSicht, blick) < 0 };
+  }).sort((a, b) => (a.zugewandt === b.zugewandt ? b.tiefe - a.tiefe : (a.zugewandt ? 1 : -1)));
   // Dieselbe Abbildung fuer alles, was mit dem Koerper dreht (Bodenraster).
   out.abbild = abbild;
   out.mitte = c;

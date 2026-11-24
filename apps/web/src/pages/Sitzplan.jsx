@@ -4,6 +4,7 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import { cardStyle, chipStyle, panelStyle, sectionLabel, Segment, segmentBtn, toolbarBtn, Icon, ICONS, toolbarIconBtn, CONTROL_R, SHADOW, dateiWaehlen, COLORS as C, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import { useKurzName } from "../core/namen.js";
 import { useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
@@ -82,7 +83,9 @@ export default function Sitzplan() {
   // Knoepfe auf 108 px Breite, davon zwei mit sehr verschiedenen Folgen.
   // Bewusst ein FELD und kein „nach aussen ziehen" — die Flaeche waechst nach
   // unten und rechts, „draussen" ist dort also ein gueltiger Platz.
+  const kurz = useKurzName();
   const [ziehtPlatz, setZiehtPlatz] = useState(false);
+  const [namenVoll, setNamenVoll] = useState(false);   // Namen ganz zeigen (Schrift schrumpft) statt mit „…" kuerzen
   const [ueberMuell, setUeberMuell] = useState(false);
   const muellRef = useRef(null);
   // Anwesenheit lebt im Modul „Orga" (Aufruf-Ansicht nutzt sie).
@@ -155,6 +158,16 @@ export default function Sitzplan() {
 
   // Farbe eines Platzes — eine Stelle fuer alle drei Arten, damit Legende und
   // Platz nie auseinanderlaufen.
+  // Alle Farben eines Platzes: bei Foerderschwerpunkten einer je Schwerpunkt
+  // (ein Kind kann mehrere haben), sonst die eine von farbeFuer.
+  const farbenFuer = (st) => {
+    if (st && hervor === "foerder") {
+      const eigene = (st.foerder || []).filter((f) => !foerderArt || f === foerderArt);
+      return [...new Set(eigene.map((f) => HERVOR_FARBEN[vorhandeneFoerder.indexOf(f) % HERVOR_FARBEN.length]))];
+    }
+    const f = farbeFuer(st);
+    return f ? [f] : [];
+  };
   const farbeFuer = (st) => {
     if (!st) return null;
     if (hervor === "mark") {
@@ -212,12 +225,14 @@ export default function Sitzplan() {
   const ladenr = useRef(0);
   // Frische Serverdaten (anderer Kurs) beenden den Entwurf.
   const frisch = useRef(false);
+  const fitOffen = useRef(false);
   const load = useCallback((id) => {
     if (!id) return;
     const meine = ++ladenr.current;
     hol(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`, null).then((d) => {
       if (meine !== ladenr.current) return;
       frisch.current = true;
+      fitOffen.current = true;   // frisch geladen: beim Oeffnen immer einpassen
       if (!d) { setGSeats([]); return; }
       setGTafel(d.tafel && typeof d.tafel.x === "number" ? d.tafel : { x: 200, y: 8 });
       // Altes Raster (cells) einmalig in freie Positionen umrechnen.
@@ -293,7 +308,7 @@ export default function Sitzplan() {
     try {
       const v = JSON.parse(localStorage.getItem(`sitzplan_view_${viewKey}`) || "{}");
       setSegelOn(!!v.segel);
-      setHervor(v.hervor || ""); setFoerderArt(v.foerderArt || "");
+      setHervor(v.hervor || ""); setFoerderArt(v.foerderArt || ""); setNamenVoll(!!v.namenVoll);
     } catch { setSegelOn(false); setHervor(""); setFoerderArt(""); }
     // Markierungen haengen am selben Kurs wie die Ansicht.
     try { setMarken(JSON.parse(localStorage.getItem(`sitzplan_mark_${viewKey}`) || "{}")); }
@@ -666,6 +681,7 @@ export default function Sitzplan() {
   // (oder ein anderes Fach) übertragen.
   // Auto-Zoom: alle Elemente einpassen, mit ~30 % Rand ringsum.
   const fitView = () => {
+    if (!scrollRef.current) return;
     if (!seats.length) { setZoom(1); return; }
     const items = [...seats.map((s) => ({ x: s.x, y: s.y, w: SEAT_W, h: SEAT_H })), { x: tafel.x, y: tafel.y, w: TAFEL_W, h: TAFEL_H }];
     const minX = Math.min(...items.map((i) => i.x)), minY = Math.min(...items.map((i) => i.y));
@@ -727,6 +743,12 @@ export default function Sitzplan() {
     window.removeEventListener("pointercancel", onPanUp);
     panRef.current = null;
   };
+
+  // Beim Oeffnen (und Kurswechsel) einpassen, sobald der geladene Stand in der
+  // Arbeitskopie steht — nicht beim Bearbeiten, sonst huepft die Ansicht.
+  useEffect(() => {
+    if (fitOffen.current && !frisch.current) { fitOffen.current = false; fitView(); }
+  }, [seats, tafel]);
 
   // Zwei Finger zoomen — und das Trackpad zieht mit.
   //
@@ -797,6 +819,8 @@ export default function Sitzplan() {
         links={<KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />}
         ansicht={(
           <ViewMenu title={t("sitzplan.view")} items={[
+            { key: "kurzname", label: t("namen.kuerzen"), hint: t("namen.kuerzenHint"), value: kurz.an, onChange: kurz.umschalten },
+            { key: "namenVoll", label: t("sitzplan.namenVoll"), hint: t("sitzplan.namenVollHint"), value: namenVoll, onChange: (v) => { setNamenVoll(v); saveView({ namenVoll: v }); } },
             { key: "fotos", label: t("sitzplan.photoToggle"), hint: t("sitzplan.photoHint"), value: fotosOn, onChange: (v) => { setFotosOn(v); saveView({ fotos: v }); } },
             ...(segelTeil ? [{ key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } }] : []),
             { key: "hervor", art: "wahl", label: t("sitzplan.hervorLabel"), hint: t(hervor === "foerder" ? "sitzplan.hervorHintFoerder" : "sitzplan.hervorHint"),
@@ -903,7 +927,8 @@ export default function Sitzplan() {
             {seats.map((seat) => {
               const s = byId(seat.sid);
               if (!seat.empty && !s) return null;   // verwaister Platz (Schüler gelöscht) bleibt versteckt
-              const hf = seat.empty ? null : farbeFuer(s);
+              const hfs = seat.empty ? [] : farbenFuer(s);
+              const hf = hfs[0] || null;
               const anw = seat.empty ? null : anwFuer(s);
               const anwKey = anw ? anwesenheit[String(s.id)]?.status : "";
               const mitFoto = !seat.empty && fotosOn && !!s?.has_photo;
@@ -931,8 +956,11 @@ export default function Sitzplan() {
                     {hf && (
                       // Der Balken traegt die Farbe da, wo sie auch bei
                       // uebereinanderliegenden Tischen sichtbar bleibt: an der
-                      // Kante.
-                      <span aria-hidden style={{ width: 5, flexShrink: 0, background: hf }} />
+                      // Kante. Mehrere Schwerpunkte: ein Streifen je Farbe,
+                      // uebereinander.
+                      <span aria-hidden style={{ width: 5, flexShrink: 0, display: "flex", flexDirection: "column" }}>
+                        {hfs.map((c) => <span key={c} style={{ flex: 1, background: c }} />)}
+                      </span>
                     )}
                     {mitFoto && (
                       // `pointerEvents: none`: sonst faengt das Bild den Zug ab
@@ -1004,9 +1032,12 @@ export default function Sitzplan() {
                       <Icon d={ICONS.rotate} size={11} />
                     </span>
                   </span>
-                  <span title={seat.empty ? t("sitzplan.emptySeat") : s.name}
+                  <span title={seat.empty ? t("sitzplan.emptySeat") : kurz.name(s.name)}
                     style={{ height: NAME_H, display: "flex", alignItems: "center", justifyContent: "center",
-                      padding: "0 6px", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      padding: "0 6px", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: namenVoll ? "clip" : "ellipsis",
+                      // Ganzer Name: die Schrift schrumpft mit der Laenge, statt dass
+                      // der Nachname hinten abgeschnitten wird.
+                      ...(namenVoll && !seat.empty ? { fontSize: Math.max(8, Math.min(13, Math.floor(96 / (String(s.name || "").length * 0.58 || 1)))) } : null),
                       color: seat.empty ? "var(--text3)" : undefined }}>
                     {seat.empty ? t("sitzplan.emptySeat") : s.name}
                   </span>
@@ -1027,7 +1058,7 @@ export default function Sitzplan() {
                 <div key={s.id} draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", String(s.id))}
                   style={{ ...chipStyle, padding: "8px 12px", border: "1px solid var(--border2)", background: "var(--card)", color: "var(--text)", fontSize: 13, cursor: "grab", display: "inline-flex", alignItems: "center", gap: 8 }}>
                   {fotosOn && <Portrait student={s} size={22} />}
-                  {s.name}
+                  {kurz.name(s.name)}
                 </div>
               ))}
             </div>

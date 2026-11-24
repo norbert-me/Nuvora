@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..admin import APP_VERSION
 from ..rollen import ist_admin
 from ..database import get_db
+from ..krypto import suchwert
 from ..models import Base, User, UserModule
 from .auth import _hash_pw, _purge_user_content, client_ip, get_current_user, rate_limit
 from .backup import BACKUP_DIR, BACKUP_DIR_EXTERN
@@ -88,10 +89,12 @@ MODUL_PREFIX = {
     "code-detektiv": "/api/codedetektiv",
     "pap": "/api/pap",
     "waage": "/api/waage",
+    "reihen": "/api/reihen",
     "rennen": None,
     "tafel": "/api/tafel",
     "mathespiele": None,
     "koerper": None,
+    "zahlenstrahl": None,
 }
 
 # Betreiberdaten: ohne diese Felder ist das Impressum unvollstaendig.
@@ -693,8 +696,10 @@ def _zu_alt(erstellt, jetzt: datetime) -> bool:
 
 async def _verwaiste_tilgen(db: AsyncSession) -> int:
     jetzt = datetime.now(timezone.utc)
-    kandidaten = (await db.execute(select(User).where(
-        User.email.like(f"selftest-%@{WEGWERF_DOMAIN}")))).scalars().all()
+    # Die Adresse steht verschluesselt in der Datenbank: LIKE geht nicht mehr. Die
+    # Konten sind wenige, gefiltert wird in Python (und unten ohnehin noch einmal).
+    kandidaten = [u for u in (await db.execute(select(User))).scalars().all()
+                  if (u.email or "").startswith("selftest-") and (u.email or "").endswith(f"@{WEGWERF_DOMAIN}")]
     n = 0
     for u in kandidaten:
         # Das Muster wird hier ein zweites Mal geprueft: LIKE kennt `_` und `%`
@@ -763,7 +768,7 @@ async def wegwerf_konto_loeschen(email: str, request: Request, db: AsyncSession 
     email = (email or "").strip().lower()
     if not ist_wegwerf_adresse(email):
         raise HTTPException(400, "Nur Wegwerf-Konten des Selbsttests lassen sich hier löschen")
-    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    user = (await db.execute(select(User).where(User.email_idx == suchwert(email)))).scalar_one_or_none()
     if not user:
         raise HTTPException(404, "Kein solches Konto")
     if user.id == 1 or ist_admin(user):

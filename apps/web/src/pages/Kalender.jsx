@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, Segment, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, pageApp, Popover } from "../components/Icons.jsx";
 import { themenFuerKurs, themenIndex } from "../core/topics.js";
 import ThemenWahl from "../components/ThemenWahl.jsx";
+import QrKnopf from "../components/QrKnopf.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
 import Zeitleiste from "../components/Zeitleiste.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -28,7 +29,9 @@ import { feiertage } from "../data/feiertage.js";
 // dieselben Zeilen lagen in Zufall, Sitzplan, Anwesenheit und feiertage.js.
 import { addDays, hmToMin, minToHm, isoDay, isoWeek, mondayOf, parseYmd, startOfDay, wochentagMo0, ymd } from "../core/datum.js";
 import { stundenZeit, stundenListe, slotGiltAm, PAUSE_BASIS, stundenRang, stundeLabel } from "../core/stunden";
-import { useZielFilter } from "../core/modules.js";
+import { useAktiv, useZielFilter } from "../core/modules.js";
+import ReiheEinfuegen from "../components/ReiheEinfuegen.jsx";
+import ZuReihe from "../components/ZuReihe.jsx";
 import { TextMitTabellen, TextMitTabellenFeld } from "../components/TextMitTabellen.jsx";
 import AutoTextarea from "../components/AutoTextarea.jsx";
 
@@ -179,7 +182,7 @@ export default function Kalender() {
   const extColor = EXT_FARBE;
   const openAbo = async () => {
     const r = await fetch(`${API}/subscribe`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-    if (r) { const ex = await fetch(`${API}/external`).then((x) => (x.ok ? x.json() : {})).catch(() => ({})); setAbo({ ...r, cals: (ex.calendars || []), mit: !!ex.mitschicken }); }
+    if (r) { const ex = await fetch(`${API}/external`).then((x) => (x.ok ? x.json() : {})).catch(() => ({})); setAbo({ ...r, cals: (ex.calendars || []) }); }
   };
   // Force-Resync: neues Abo-Token holen. Die alte URL wird sofort ungueltig —
   // damit behandelt Apple/Google das Abo als neu und laedt alles einmal frisch.
@@ -204,10 +207,15 @@ export default function Kalender() {
     const qs = q.toString();
     return hol(`${API}/external-events${qs ? `?${qs}` : ""}`).then((d) => setExtEvents(Array.isArray(d) ? d : [])).finally(() => force && setExtBusy(false)); };
   // Kalenderliste speichern (URL/Farbe je Kalender) und Events neu ziehen.
-  const saveCals = async (cals, mitschicken) => {
-    const clean = cals.filter((c) => (c.url || "").trim());
-    await fetch(`${API}/external`, alsJson("PUT", { calendars: clean, mitschicken })).catch(() => {});
-    setExtCals(clean); loadExt(true);
+  // Der Server ergaenzt fehlende Namen (aus dem Kalender selbst) — die Antwort
+  // gilt, nicht das Gesendete.
+  const saveCals = async (cals) => {
+    const clean = cals.filter((c) => (c.url || "").trim()).map(({ neu, ...c }) => c); // eslint-disable-line no-unused-vars
+    const res = await fetch(`${API}/external`, alsJson("PUT", { calendars: clean })).catch(() => null);
+    const d = res && res.ok ? await res.json().catch(() => null) : null;
+    const out = d && Array.isArray(d.calendars) ? d.calendars : clean;
+    setExtCals(out); loadExt(true);
+    return out;
   };
   // Ein externes Ereignis aus-/wieder einblenden (Schlüssel uid|Datum). Ein
   // Termin ueber mehrere Tage hat je Tag einen eigenen Schluessel — er wird
@@ -269,6 +277,9 @@ export default function Kalender() {
   // hier ein zweites Mal einzutragen ist die Arbeit, die dieses Modul
   // abnehmen soll. Der Dialog schreibt nichts, bevor jemand bestaetigt.
   const [untisOffen, setUntisOffen] = useState(false);
+  const aktivM = useAktiv();
+  const reihenAn = aktivM("reihen");
+  const [reiheOffen, setReiheOffen] = useState(false);
   const [breaks, setBreaks] = useState([]); // unterrichtsfreie Zeitraeume (Ferien/Feiertage)
   const [examOverview, setExamOverview] = useState([]); // Klassenarbeiten-Übersicht (kommend + Reststunden)
   const loadExams = () => hol(`${API}/klassenarbeiten/uebersicht`).then((d) => setExamOverview(Array.isArray(d) ? d : []));
@@ -572,13 +583,16 @@ export default function Kalender() {
       if (!kopie || !kopie.id) return;
       e = { ...e, id: kopie.id, rrule: "", exdate: [], occ: "" };
     }
-    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", location: e.location || "", rrule: e.rrule || "", exdate: Array.isArray(e.exdate) ? e.exdate : [], verlaufsplan: Array.isArray(e.verlaufsplan) ? e.verlaufsplan : [], class_id: e.class_id || null, kurs_id: e.kurs_id ?? null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, start_time: e.start_time || "", end_time: e.end_time || "", cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
+    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", location: e.location || "", rrule: e.rrule || "", exdate: Array.isArray(e.exdate) ? e.exdate : [], verlaufsplan: Array.isArray(e.verlaufsplan) ? e.verlaufsplan : [], class_id: e.class_id || null, kurs_id: e.kurs_id ?? null, topic_id: e.topic_id || null, topic_ids: Array.isArray(e.topic_ids) ? e.topic_ids : [], method_id: e.method_id || null, period: e.period ?? null, start_time: e.start_time || "", end_time: e.end_time || "", cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, karten_deck_ids: Array.isArray(e.karten_deck_ids) ? e.karten_deck_ids : [], lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, alsJson(e.id ? "PUT" : "POST", body)).catch(() => null);
     // Lehnte der Server ab, passierte bisher NICHTS: das Modal blieb offen, der
     // getippte Verlaufsplan stand noch da, und nur ein späterer Blick auf den
     // Tag verriet, dass die Stunde nie gespeichert wurde.
     if (!(await pruefeAntwort(res, t("common.save")))) return;
     if (res && res.ok) {
+      // Ein aus einem fremden Termin übernommener Eintrag ersetzt das Original: es wird erst JETZT
+      // ausgeblendet (nach dem Speichern), nicht schon beim Klick — wer abbricht, behält den Termin.
+      if (e._ersetzt) { await hideExtEvent(e._ersetzt); }
       // Nach dem Speichern den Eintrag ANZEIGEN (nicht schließen). _justSaved lässt
       // das Modal in die Ansicht wechseln; date wieder als Date, id vom Server.
       let saved = null; try { saved = await res.json(); } catch { /* egal */ }
@@ -644,7 +658,9 @@ export default function Kalender() {
       gesehen.add(id);
       return true;
     });
-    const stunden = (slotCancels || []).map((c) => {
+    // Von Untis ausgefallene Stunden (`untis: true`) stehen nicht in der Liste: sie sind keine Entscheidung
+    // dieser Lehrkraft und lassen sich hier nicht „wieder einblenden" — Untis sagt, dass sie ausfallen.
+    const stunden = (slotCancels || []).filter((c) => !c.untis).map((c) => {
       const d = new Date(c.date);
       const s = tt.slots.find((x) => x.weekday === wochentagMo0(d) && x.period === c.period && slotActiveOn(x, d));
       return { ...c, d, name: (s && (slotName(s) || s.title)) || "" };
@@ -876,6 +892,8 @@ export default function Kalender() {
             // und Ferien — und die gehoeren an den Kalender, nicht an die
             // Vorlage. Am Stundenplan sah es aus, als ginge es nur um ihn.
             { key: "untis", label: t("untis.menu"), icon: ICONS.import, onClick: () => setUntisOffen(true) },
+            // Eine Reihe in den Kalender uebernehmen (nur mit dem Modul Reihen, Regel 3).
+            ...(reihenAn ? [{ key: "reihe", label: t("reihen.inKurs"), icon: ICONS.calendar, onClick: () => setReiheOffen(true) }] : []),
           ]}
         >
           <AddButton data-tour="kal-new" onClick={() => setEditing({ date: neuesDatum() })} title={t("kalender.newEntry")} />
@@ -1019,9 +1037,10 @@ export default function Kalender() {
       )}
       {view === "week" && <WeekView beginnMin={beginnMin} extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
       {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={(td) => nav(td?.id ? `/notizbrett?tab=aufgaben&todo=${td.id}` : "/notizbrett?tab=aufgaben")} slotsFor={slotsFor} onCancelSlot={cancelSlot} frei={frei} className={className} slotName={slotName} eintragName={eintragName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {reiheOffen && <ReiheEinfuegen onClose={() => { setReiheOffen(false); load(); }} />}
       {untisOffen && (
         <UntisImport onClose={() => setUntisOffen(false)} kurse={kurse} klassen={classes} periods={tt.periods}
-          onFertig={() => { loadTt(); loadBreaks(); loadCancels(); }} />
+          onFertig={() => { loadTt(); loadBreaks(); loadCancels(); loadExt(true); }} />
       )}
       {view === "timetable" && <TimetableView tt={tt} bearbeiten={bearbeiten} entwurfRef={ttEntwurf} onOffen={setTtOffen} stichtag={stichtag} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
@@ -1031,6 +1050,7 @@ export default function Kalender() {
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>{t("kalender.subscribeTitle")}</h3>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <a href={abo.webcal} style={{ ...btnPrimary, display: "inline-block", textDecoration: "none" }}>{t("kalender.subscribeNow")}</a>
+              <QrKnopf url={abo.webcal} titel={t("kalender.subscribeTitle")} />
               {/* Der Hinweis steht im title: er wird einmal gebraucht, kostet
                   daneben aber dauerhaft eine Zeile. */}
               <button onClick={resyncAbo} disabled={resyncing} title={t("kalender.resyncHint")}
@@ -1048,10 +1068,9 @@ export default function Kalender() {
             {/* Andere Richtung: MEHRERE externe Kalender (ICS-URL) read-only einblenden. */}
             <div style={{ borderTop: "1px solid var(--border)", marginTop: 24, paddingTop: 16 }}>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("kalender.extTitle")}</div>
-              <ExtCalEditor cals={abo.cals || []} mit={!!abo.mit}
+              <ExtCalEditor cals={abo.cals || []}
                 onChange={(cals) => setAbo((a) => ({ ...a, cals }))}
-                onMit={(v) => setAbo((a) => ({ ...a, mit: v }))}
-                onSave={(cals, mit) => { saveCals(cals, mit); setAbo((a) => ({ ...a, cals, mit })); }} t={t} />
+                onSave={async (cals) => { const out = await saveCals(cals); setAbo((a) => ({ ...a, cals: out })); }} t={t} />
             </div>
             <ExtArchiv onGeaendert={() => loadExt()} t={t} />
 
@@ -1061,7 +1080,7 @@ export default function Kalender() {
         </Modal>
       )}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} kurse={kurse} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setSlotColor} onRaum={setKursRaum} onClose={() => setSlotEdit(null)} t={t} />}
-      {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} onHide={() => { hideExtEvent(extInfo); setExtInfo(null); }} t={t} />}
+      {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} onEigen={(ev) => { setExtInfo(null); setEditing(eigenerTerminAus(ev)); }} onHide={() => { hideExtEvent(extInfo); setExtInfo(null); }} t={t} />}
     </div>
   );
 }
@@ -1115,7 +1134,7 @@ function AusgeblendetModal({ ext, cancels, onExtBack, onSlotBack, onClose, t }) 
 
 // Read-only-Info zu einem angeklickten externen (abonnierten) Termin. Nicht
 // editierbar — fremder Kalender; nur Anzeige der ICS-Felder.
-function ExtInfoModal({ ev, onClose, onHide, t }) {
+function ExtInfoModal({ ev, onClose, onHide, onEigen, t }) {
   const fmt = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(); } catch { return iso; } };
   const zeitraum = ev.end && ev.end !== ev.start ? `${fmt(ev.start)} – ${fmt(ev.end)}` : fmt(ev.start || ev.date);
   const Zeile = ({ label, children }) => (
@@ -1141,12 +1160,27 @@ function ExtInfoModal({ ev, onClose, onHide, t }) {
               <Icon d={ICONS.eye} size={15} /> {t("kalender.extHide")}
             </button>
           )}
+          {onEigen && (
+            <button onClick={() => onEigen(ev)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("kalender.extEigenHint")}>
+              <Icon d={ICONS.edit || ICONS.plus} size={15} /> {t("kalender.extEigen")}
+            </button>
+          )}
           <span style={{ flex: 1 }} />
           <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
         </div>
     </Modal>
   );
 }
+
+// Aus einem fremden Termin den Entwurf eines EIGENEN machen (Titel, Tag, Uhrzeit, Ort, Beschreibung).
+// Fremde Termine sind schreibgeschützt: eine Änderung drüben lässt sich hier nicht machen. Wer sie braucht
+// (verschoben, anders benannt), übernimmt den Termin — das Original wird beim Speichern ausgeblendet.
+const eigenerTerminAus = (ev) => ({
+  date: parseYmd(ev.start || ev.date) || new Date(),
+  title: ev.title || "", notes: ev.description || "", location: ev.location || "",
+  start_time: ev.time || "", end_time: ev.endtime || "",
+  _ersetzt: ev,
+});
 
 // Editor für mehrere externe Kalender: je Zeile URL + Farbe + Löschen. „Speichern"
 // schreibt die ganze Liste (leere URLs fallen weg).
@@ -1186,12 +1220,16 @@ function ExtArchiv({ onGeaendert, t }) {
   );
 }
 
-function ExtCalEditor({ cals, mit, onChange, onMit, onSave, t }) {
-  const rows = cals.length ? cals : [{ url: "", color: "", name: "" }];
+function ExtCalEditor({ cals, onChange, onSave, t }) {
+  // Eine neue Zeile fragt die Adresse; danach steht dort nur noch Name, Farbe und
+  // Export — die Adresse ist ein Geheimnis (bei iCloud und Outlook zugleich der
+  // Zugang zum Kalender) und soll nicht in der Liste stehen.
+  const leer = () => ({ url: "", color: "", name: "", export: false, neu: true });
+  const rows = cals.length ? cals : [leer()];
   const [hilfe, setHilfe] = useState(false);
   const setRow = (i, patch) => { const next = rows.map((r, j) => (j === i ? { ...r, ...patch } : r)); onChange(next); };
-  const addRow = () => onChange([...rows, { url: "", color: "", name: "" }]);
-  const delRow = (i) => { const next = rows.filter((_, j) => j !== i); onChange(next.length ? next : [{ url: "", color: "", name: "" }]); };
+  const addRow = () => onChange([...rows, leer()]);
+  const delRow = (i) => { const next = rows.filter((_, j) => j !== i); onChange(next.length ? next : [leer()]); };
   return (
     <div>
       {/* „Wo finde ich die Adresse?" ist die Frage, an der das Abonnieren
@@ -1205,30 +1243,32 @@ function ExtCalEditor({ cals, mit, onChange, onMit, onSave, t }) {
           <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <input type="color" value={c.color || EXT_PALETTE[i % EXT_PALETTE.length]} onChange={(e) => setRow(i, { color: e.target.value })}
               title={t("kalender.extColor")} style={{ width: 26, height: 26, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }} />
-            <input value={c.url || ""} onChange={(e) => setRow(i, { url: e.target.value })} placeholder="https://…/basic.ics"
-              style={{ ...inputStyle, flex: 1, fontSize: 12, minWidth: 0 }} />
+            {c.neu ? (
+              <input value={c.url || ""} onChange={(e) => setRow(i, { url: e.target.value })} placeholder={t("kalender.extNeuAdresse")}
+                autoComplete="off" style={{ ...inputStyle, flex: 1, fontSize: 12, minWidth: 0 }} />
+            ) : (
+              <input value={c.name || ""} onChange={(e) => setRow(i, { name: e.target.value })} placeholder={t("kalender.extName")}
+                style={{ ...inputStyle, flex: 1, fontSize: 13, minWidth: 0 }} />
+            )}
+            {/* Ob dieser Kalender in Abo und CalDAV mitgeschickt wird — je
+                Kalender: der iCloud-Kalender ist im Handy ohnehin da, der
+                Outlook-Kalender vielleicht nicht. */}
+            <label title={t("kalender.extShareHint")} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text2)", flexShrink: 0, cursor: "pointer" }}>
+              <input type="checkbox" checked={!!c.export} onChange={(e) => setRow(i, { export: e.target.checked })} />
+              {t("kalender.extExport")}
+            </label>
             <button onClick={() => delRow(i)} className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }} title={t("common.delete")} aria-label={t("common.delete")}>
               <Icon d={ICONS.trash} size={15} color={C.danger} />
             </button>
           </div>
         ))}
       </div>
-      {/* Die fremden Termine im eigenen Export mitschicken. Aus als Vorgabe,
-          und der Hinweis bleibt trotz der Regel gegen Erklärtexte stehen: dass
-          derselbe Termin dann auf einem Gerät doppelt steht, das die Kalender
-          selbst abonniert hat, sieht man dem Schalter nicht an — man sieht es
-          erst im Handy. */}
-      <label style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500, marginTop: 12, paddingLeft: 0 }}>
-        <input type="checkbox" checked={!!mit} onChange={(e) => onMit(e.target.checked)} />
-        {t("kalender.extShare")}
-      </label>
-      <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2, marginBottom: 4, lineHeight: 1.4 }}>{t("kalender.extShareHint")}</div>
       <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
         <button onClick={addRow} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Icon d={ICONS.plus} size={14} /> {t("kalender.extAdd")}
         </button>
         <span style={{ flex: 1 }} />
-        <button onClick={() => onSave(rows, !!mit)} style={btnPrimary}>{t("common.save")}</button>
+        <button onClick={() => onSave(rows)} style={btnPrimary}>{t("common.save")}</button>
       </div>
     </div>
   );
@@ -2439,6 +2479,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onRau
 }
 
 function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, topicName = () => "", kursName = () => "", onSave, onDelete, onClose, t }) {
+  const [zuReihe, setZuReihe] = useState(false);
   const [title, setTitle] = useState(entry.title || "");
   const [notes, setNotes] = useState(entry.notes || "");
   const [verlauf, setVerlauf] = useState(Array.isArray(entry.verlaufsplan) ? entry.verlaufsplan : []);
@@ -2449,11 +2490,13 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], 
   const [classId, setClassId] = useState(entry.class_id || "");
   const [kursId, setKursId] = useState(entry.kurs_id ?? null); // gewaehlter Kurs — richtige Auflösung beim Bearbeiten
   const [topicId, setTopicId] = useState(entry.topic_id || "");
+  const [weitereThemen, setWeitereThemen] = useState(Array.isArray(entry.topic_ids) ? entry.topic_ids : []);
   const [methodId, setMethodId] = useState(entry.method_id || "");
   const [quizId, setQuizId] = useState(entry.cardvote_set_id || "");
   const [ladderId, setLadderId] = useState(entry.lernpfad_ladder_id || "");
   const [puzzleId, setPuzzleId] = useState(entry.codedetektiv_puzzle || "");
   const [deckId, setDeckId] = useState(entry.karten_deck_id || "");
+  const [weitereDecks, setWeitereDecks] = useState(Array.isArray(entry.karten_deck_ids) ? entry.karten_deck_ids : []);
   // Bei einer Stunde stehen die Uhrzeiten der Stunde in den Feldern, wenn der
   // Eintrag keine eigenen hat. Vorher waren sie leer („--:--") — die Zeit stand
   // nur als Text im Kopf des Dialogs, und wer sie im Feld suchte, hielt sie fuer
@@ -2603,7 +2646,14 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], 
   // steht die Phase trotzdem da, nur ohne Minutenangabe.
   const autoEinstieg = useRef(null);
   useEffect(() => {
-    if (!methodId) return;
+    if (!methodId) {
+      // Einstieg abgewaehlt: die davon angelegte Phase geht mit.
+      const alt = autoEinstieg.current;
+      autoEinstieg.current = null;
+      const am = alt != null ? methods.find((x) => x.id === alt) : null;
+      if (am) setVerlauf((v) => v.filter((p) => !((p.phase || "").trim().toLowerCase() === "einstieg" && (p.text || "").trim() === (am.title || "").trim())));
+      return;
+    }
     const m = methods.find((x) => x.id === Number(methodId));
     if (!m) return;
     if (autoEinstieg.current === m.id) return;
@@ -2818,8 +2868,10 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], 
             <div style={{ display: "flex", gap: 8, marginTop: 24, alignItems: "center" }}>
               <button onClick={() => setEdit(true)} style={btnPrimary}>{t("common.edit")}</button>
               <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
-              {entry.id && <button onClick={() => onDelete(entry.id, entry)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
+              {entry.id && aktiv.reihen && <button onClick={() => setZuReihe(true)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("reihen.inReihe")} aria-label={t("reihen.inReihe")}><Icon d={ICONS.plus} size={18} /></button>}
+              {entry.id && <button onClick={() => onDelete(entry.id, entry)} className="icon-btn" style={{ ...iconBtn, marginLeft: entry.id && aktiv.reihen ? 0 : "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
             </div>
+            {zuReihe && <ZuReihe eintragId={entry.id} onClose={() => setZuReihe(false)} />}
           </div>
         )}
         {edit && (<>
@@ -2909,6 +2961,12 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], 
         <SuchSelect value={topicId} onChange={setTopicId} style={{ width: "100%" }}
           leerLabel={`– ${t("kalender.noTopic")} –`}
           optionen={themenFuerKurs(themen, kurse.find((k) => k.id === kursId), topicId ? [topicId] : []).map((tp) => ({ wert: tp.id, label: themen.auswahlLabel(tp) }))} />
+        {topicId && (
+          <>
+            <div style={lbl}>{t("kalender.moreTopics")}</div>
+            <ThemenWahl topics={topics} value={weitereThemen} onChange={setWeitereThemen} kurs={kurse.find((k) => k.id === kursId) || null} />
+          </>
+        )}
         {aktiv.unterrichtsplanung && (
           <>
             <div style={lbl}>{t("kalender.method")}</div>
@@ -2939,6 +2997,25 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], 
               disabled={!classId} title={!classId ? t("kalender.pickClassFirst") : undefined}
               leerLabel={`– ${t("kalender.none")} –`}
               optionen={[...decks].sort(byLabel((d) => d.name)).map((d) => ({ wert: d.id, label: d.name }))} />
+            {deckId && (
+              <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                {weitereDecks.map((id) => {
+                  const d = decks.find((x) => x.id === id);
+                  return d ? (
+                    <span key={id} style={chipStyle}>
+                      {d.name}
+                      <button type="button" onClick={() => setWeitereDecks((l) => l.filter((x) => x !== id))} aria-label={t("common.delete")}
+                        style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text3)", padding: "0 0 0 6px" }}>×</button>
+                    </span>
+                  ) : null;
+                })}
+                <div style={{ minWidth: 200, flex: "1 1 200px" }}>
+                  <SuchSelect value="" onChange={(v) => { const n = Number(v); if (n && n !== Number(deckId)) setWeitereDecks((l) => (l.includes(n) ? l : [...l, n])); }} style={{ width: "100%" }}
+                    leerLabel={`+ ${t("kalender.weitererStapel")}`}
+                    optionen={[...decks].filter((d) => d.id !== Number(deckId) && !weitereDecks.includes(d.id)).sort(byLabel((d) => d.name)).map((d) => ({ wert: d.id, label: d.name }))} />
+                </div>
+              </div>
+            )}
             {deckId && <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("kalender.deckReleaseHint")}</div>}
           </>
         )}
@@ -3026,9 +3103,11 @@ function EntryModal({ entry, zeiten = [], zeroZeit = null, classes, kurse = [], 
         {entry.id && <div style={{ marginTop: 16 }}><MaterialPanel entryId={entry.id} /></div>}
 
         </>)}
-        <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, end_date: mehrtaegig ? (() => { const [y, m, d] = endVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : null, title, notes, start_time: mehrtaegig ? "" : (startTime || ""), end_time: mehrtaegig ? "" : (endTime || ""), location: ort, rrule: rruleBauen(), exdate: Array.isArray(entry.exdate) ? entry.exdate : [], verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>
-          {entry.id && <button onClick={() => onDelete(entry.id, entry)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
+        <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, end_date: mehrtaegig ? (() => { const [y, m, d] = endVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : null, title, notes, start_time: mehrtaegig ? "" : (startTime || ""), end_time: mehrtaegig ? "" : (endTime || ""), location: ort, rrule: rruleBauen(), exdate: Array.isArray(entry.exdate) ? entry.exdate : [], verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, topic_ids: topicId ? weitereThemen.filter((x) => x !== Number(topicId)) : [], method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, karten_deck_ids: deckId ? weitereDecks.filter((x) => x !== Number(deckId)) : [], lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>
+          {entry.id && aktiv.reihen && <button onClick={() => setZuReihe(true)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("reihen.inReihe")} aria-label={t("reihen.inReihe")}><Icon d={ICONS.plus} size={18} /></button>}
+          {entry.id && <button onClick={() => onDelete(entry.id, entry)} className="icon-btn" style={{ ...iconBtn, marginLeft: entry.id && aktiv.reihen ? 0 : "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         </DialogFuss>
+        {zuReihe && <ZuReihe eintragId={entry.id} onClose={() => setZuReihe(false)} />}
         </>)}
         </div>
     </Modal>

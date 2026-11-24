@@ -39,7 +39,7 @@ from ..uploads import anhang_kopf, bildtyp
 from ..versionierung import VersionOut, pruefe, stand
 from sqlalchemy.orm import selectinload
 from ..models import (Card, CardDeck, CardDeckKurs, CardFolder, CardReview, Kurs,
-                      SchoolClass, Student, User, Session)
+                      SchoolClass, Student, User, Session, ExamDate, GradeCategory)
 from .auth import get_current_user, rate_limit
 from .modules import is_active, modul_pflicht
 
@@ -213,10 +213,25 @@ async def _class_all_decks_where(db, class_id):
     return CardDeck.class_id == class_id
 
 
+def _stapel_des_kurses(kurs_id):
+    """Stapel EINES Kurses: ihm zugewiesen — oder (noch ohne Zuweisung) von ihm herkommend."""
+    return or_(_zugewiesen([kurs_id]), and_(_ohne_zuweisung(), CardDeck.kurs_id == kurs_id))
+
+
+async def _student_kurs_alle(db, st) -> set:
+    """Alle Kurse des Kindes, auch die mit abgeschalteten Karteikarten."""
+    return set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id)
+
+
 async def _student_kurs_ids(db, st) -> list:
     """Die Kurse dieses Kindes: die seiner Klasse UND die Teilkurse, in denen es
-    einzeln Mitglied ist (Kurse aus Teilen von Klassen)."""
-    return list(set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id))
+    einzeln Mitglied ist (Kurse aus Teilen von Klassen). Kurse, in denen die
+    Lehrkraft die Karteikarten abgeschaltet hat, zaehlen nicht mit."""
+    ids = await _student_kurs_alle(db, st)
+    if not ids:
+        return []
+    aus = set((await db.execute(select(Kurs.id).where(Kurs.id.in_(ids), Kurs.karten_aktiv.is_(False)))).scalars().all())
+    return list(ids - aus)
 
 
 async def _student_deck_where(db, st):
@@ -227,11 +242,61 @@ async def _student_deck_where(db, st):
     Fremde Kurse bleiben aussen vor: gefragt wird nur nach den Kursen dieses
     Kindes, und der Herkunfts-Zweig haengt weiterhin an seiner eigenen class_id."""
     kurse = await _student_kurs_ids(db, st)
+    # Gehoert das Kind nur Kursen mit abgeschalteten Karteikarten an, bekommt es
+    # gar nichts — auch nicht die Bestandsstapel seiner Klasse ohne Zuweisung.
+    if not kurse and await _student_kurs_alle(db, st):
+        return sa_false()
     alt = and_(CardDeck.class_id == st.class_id, CardDeck.kurs_id.is_(None))
+    # Bestandsstapel der Klasse ohne Kurs: sie gehoeren keinem Kurs ausdruecklich,
+    # sind aber meist EIN Fach. Ist der Karteikarten-Schalter eines Kurses aus,
+    # fallen sie heraus, wenn ihr Thema zu dessen Fach gehoert — oder, ohne
+    # Fach am Thema, sobald irgendein Kurs des Kindes aus ist (sonst bliebe der
+    # Schalter wirkungslos: der Stapel haengt an der Klasse, nicht am Kurs).
+    aus_kurse = (await _student_kurs_alle(db, st)) - set(kurse)
+    if aus_kurse:
+        verstecken = await _bestandsstapel_aus(db, st, aus_kurse, kurse)
+        if verstecken:
+            alt = and_(alt, ~CardDeck.id.in_(verstecken))
     if kurse:
         alt = or_(CardDeck.kurs_id.in_(kurse), alt)
         return or_(_zugewiesen(kurse), and_(_ohne_zuweisung(), alt))
     return and_(_ohne_zuweisung(), alt)
+
+
+async def _bestandsstapel_aus(db, st, aus_kurse, aktive_kurse) -> list:
+    """IDs der Klassen-Stapel (ohne Kurs), die wegen abgeschalteter Kurse
+    nicht an dieses Kind gehen."""
+    from ..models import Topic
+    def norm(x):
+        return (x or "").strip().casefold()
+    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
+        Kurs.id.in_(set(aus_kurse) | set(aktive_kurse))))).scalars().all()}
+    aus_faecher = {norm(kurse[k].fach) for k in aus_kurse if k in kurse and norm(kurse[k].fach)}
+    aktive_faecher = {norm(kurse[k].fach) for k in aktive_kurse if k in kurse and norm(kurse[k].fach)}
+    decks = (await db.execute(select(CardDeck.id, CardDeck.topic_id).where(
+        CardDeck.class_id == st.class_id, CardDeck.kurs_id.is_(None), CardDeck.deleted_at.is_(None)))).all()
+    if not decks:
+        return []
+    topics = {}
+    tids = {tid for _, tid in decks if tid}
+    if tids:
+        tp = {t.id: t for t in (await db.execute(select(Topic).where(Topic.id.in_(tids)))).scalars().all()}
+        eltern = {t.parent_id for t in tp.values() if t.parent_id}
+        if eltern:
+            tp.update({t.id: t for t in (await db.execute(select(Topic).where(Topic.id.in_(eltern)))).scalars().all()})
+        topics = tp
+    out = []
+    for did, tid in decks:
+        t = topics.get(tid)
+        fach = norm(t.fach) if t and norm(t.fach) else (norm(topics[t.parent_id].fach) if t and t.parent_id in topics else "")
+        if fach:
+            # Fach bekannt: nur verstecken, wenn ein Kurs dieses Fachs aus ist und
+            # kein anderer Kurs desselben Fachs noch an.
+            if fach in aus_faecher and fach not in aktive_faecher:
+                out.append(did)
+        else:
+            out.append(did)
+    return out
 
 
 def _niveau_where(st):
@@ -1297,7 +1362,7 @@ async def progress(class_id: int, kurs_id: Optional[int] = None, user: User = De
 
 
 async def themen_lernstand(db: AsyncSession, user: User, class_id: int, students,
-                           jetzt: Optional[datetime] = None) -> dict:
+                           jetzt: Optional[datetime] = None, kurs_id: Optional[int] = None) -> dict:
     """Kartenstand je Kind und Thema — die Kartenquelle des Themenstands.
 
     Kein Endpunkt, sondern eine Auskunft für `themenprofil` (Kern). Die
@@ -1308,6 +1373,9 @@ async def themen_lernstand(db: AsyncSession, user: User, class_id: int, students
 
     - nur ausgerollte, nicht gelöschte Stapel MIT Thema (ein Entwurf ist für
       niemanden fällig, ein Stapel ohne Thema gehört in keine Themenzeile),
+    - mit `kurs_id` nur die Stapel DIESES Kurses: dieselbe Klasse liegt oft in
+      mehreren Kursen (7.5 Mathe und 7.5 LZ), und Karteikarten, die nur in Mathe
+      geübt werden, gehören nicht in den Themenstand der LZ,
     - E/G auf beiden Ebenen (`_sichtbar_karte`) — ein G-Kind darf sich keinen
       Rückstand an E-Karten anrechnen lassen, die es nie zu sehen bekommt,
     - `Treffer = reps`, `Versuche = reps + lapses`. NICHT nach `reps > 0`
@@ -1327,7 +1395,7 @@ async def themen_lernstand(db: AsyncSession, user: User, class_id: int, students
         select(Card.id, Card.niveau, CardDeck.niveau, CardDeck.niveau_aktiv, CardDeck.topic_id)
         .join(CardDeck, Card.deck_id == CardDeck.id)
         .where(CardDeck.owner_id == user.id,
-               await _class_all_decks_where(db, class_id),
+               (_stapel_des_kurses(kurs_id) if kurs_id else await _class_all_decks_where(db, class_id)),
                CardDeck.topic_id.is_not(None),
                CardDeck.deleted_at.is_(None),
                CardDeck.released_at.is_not(None), CardDeck.released_at <= now,
@@ -1685,11 +1753,24 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
     # Testergebnisse gehoeren CardVote — sie bleiben also erreichbar, wenn nur
     # das Kartenmodul abgeschaltet ist, und verschwinden mit CardVote.
     st = await _student_by_token(db, token, modul="cardvote")
+    # Stichtag: die zuletzt geschriebene Klassenarbeit. Quizze davor sind
+    # erledigter Stoff und stehen dem Kind nicht mehr im Weg. Der Termin kommt
+    # aus dem Kalender (Regel 3: ohne das Modul gibt es keinen Stichtag).
+    owner_id = (await db.execute(select(SchoolClass.owner_id).where(SchoolClass.id == st.class_id))).scalar()
+    stichtag = None
+    if owner_id and await is_active(db, owner_id, "kalender"):
+        kurs_ids = await class_kurs_ids(db, st.class_id)
+        stichtag = (await db.execute(select(sa_func.max(ExamDate.date)).where(
+            ExamDate.owner_id == owner_id, ExamDate.date <= _now(),
+            or_(ExamDate.class_id == st.class_id, ExamDate.kurs_id.in_(kurs_ids)),
+        ))).scalar()
     sessions = (await db.execute(
         select(Session).where(Session.class_id == st.class_id).order_by(Session.created_at.desc())
     )).scalars().all()
     out = []
     for sess in sessions:
+        if stichtag and sess.created_at and als_utc(sess.created_at) < als_utc(stichtag):
+            continue
         zeilen = await rueckmeldung.quiz(db, sess, nur_card_id=st.card_id)
         if not zeilen:
             continue                      # nicht teilgenommen oder nichts erfasst
@@ -1698,10 +1779,78 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
             "name": sess.name or "Test",
             "date": sess.created_at.isoformat() if sess.created_at else None,
             "score": r["punkte"], "total": r["max"], "pct": r["pct"],
+            "note": r["note_tendenz"],
+            "unbenotet": bool(r.get("unbenotet")),
+            "le": bool(r.get("le")),
             # Was das Kind aus der Zahl machen soll — ohne das ist eine Prozent-
             # angabe nur eine Zahl. Kein Vergleich mit der Klasse.
-            "sass": r["sass"], "offen": r["offen"],
+            "sass": r["sass"], "offen": r["offen"], "themen": r.get("themen", []),
         })
+    return out
+
+
+def _kurs_ohne_klasse(kurs, klassenname: str = "") -> str:
+    """„7.5 Mathematik" -> „Mathematik": die Klasse kennen die Kinder selbst.
+
+    Das Fach des Kurses gilt zuerst; ohne Fach wird eine fuehrende Klassenbezeichnung
+    („7.5", „7a", „10b") vom Namen abgeschnitten — gleich, ob sie der Klassenname ist
+    oder nur so aussieht. Bleibt nichts uebrig, gilt der ganze Name."""
+    import re
+    fach = (kurs.fach or "").strip()
+    if fach:
+        return fach
+    name = (kurs.name or "").strip()
+    kn = (klassenname or "").strip()
+    if kn and name.lower().startswith(kn.lower()):
+        rest = name[len(kn):].strip(" -–—:·")
+        if rest:
+            return rest
+    rest = re.sub(r"^\d{1,2}(?:[.,]\d+)?[a-zA-Z]?\s*[-–—:·]?\s*", "", name).strip()
+    return rest or name
+
+
+@router.get("/lernen/{token}/aktuelle-note")
+async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
+    """Oeffentlich (Token): die aktuelle Note des Kindes aus dem NOTENBUCH —
+    Endnote des laufenden Halbjahrs (manuell gesetzte schlaegt den gewichteten
+    Schnitt). Ohne Modul Auswertung oder ohne Noten: null. Nicht aus den
+    CardVote-Tests: die sind eine Erhebung, keine Zeugnisgrundlage."""
+    from ..scoring import note_label, noten_trend
+    st = await _student_by_token(db, token, modul="cardvote")
+    owner_id = (await db.execute(select(SchoolClass.owner_id).where(SchoolClass.id == st.class_id))).scalar()
+    if not owner_id or not await is_active(db, owner_id, "auswertung"):
+        return []
+    from .noten import _summarize          # erst hier: noten.py importiert karten.py
+    owner = await db.get(User, owner_id)
+    heute = jetzt().date()
+    termine = ["2", "1"] if owner.hj2_start and owner.hj2_start <= heute else ["1", "2"]
+    # Eine Note je Kurs des Kindes (Mathe, Deutsch …); Bestand ohne Kurs zaehlt als ein Eintrag.
+    kurs_ids = sorted(set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id))
+    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(Kurs.id.in_(kurs_ids), Kurs.deleted_at.is_(None)))).scalars().all()} if kurs_ids else {}
+    klasse = await db.get(SchoolClass, st.class_id)
+    ziele = [(kid, _kurs_ohne_klasse(kurse[kid], klasse.name if klasse else "")) for kid in kurs_ids if kid in kurse] or [(None, "")]
+    out = []
+    for kid, name in ziele:
+        for term in termine:
+            secs, rows = await _summarize(db, owner, st.class_id, term, agg="mean", kurs_id=kid)
+            r = next((x for x in rows if x.student_id == st.id), None)
+            if r is not None and getattr(r, "le", False):
+                continue          # LE: keine Note — das Kind sieht nur den Hinweis
+            wert = (r.total_override if r.total_override is not None else r.weighted) if r else None
+            if wert is not None:
+                # Verlauf: die Spaltennoten in Zeitreihenfolge (Datum der Leistung, sonst Anlage).
+                cats = (await db.execute(select(GradeCategory).where(
+                    GradeCategory.section_id.in_([x.id for x in secs])))).scalars().all() if secs else []
+                cats.sort(key=lambda c: (str(c.date)[:10] if c.date else (c.created_at.date().isoformat() if c.created_at else ""), c.id))
+                reihe = [r.per_category.get(str(c.id)) for c in cats]
+                # Die Teilnoten sind die BEREICHSNOTEN („Mündlich", „Klassenarbeiten") — nicht
+                # die einzelnen Spaltennoten: das waere fuer ein Kind eine Wand aus Zahlen.
+                teil = [{"name": sec.name, "note": note_label(v), "wert": round(v, 1), "gewicht": round(sec.weight or 0)}
+                        for sec in secs
+                        if (v := (r.section_effective or {}).get(str(sec.id))) is not None]
+                out.append({"kurs": name, "note": note_label(wert), "wert": round(wert, 1), "halbjahr": term,
+                            "trend": noten_trend(reihe), "teilnoten": teil})
+                break
     return out
 
 

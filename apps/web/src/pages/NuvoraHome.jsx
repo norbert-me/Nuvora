@@ -9,7 +9,8 @@ import { lokal, sichern } from "../core/ansichten.js";
 import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLORS as C, pageApp, cardStyle, chipStyle, badge, btnSmall, CONTROL_H, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson, hol } from "../core/melden.js";
-import { WIDGETS } from "../components/Widgets.jsx";
+import { WIDGETS, WidgetPlatz } from "../components/Widgets.jsx";
+import { BEAMER_MODULE, useBeamer } from "../core/beamer.js";
 import { ZIELE } from "../core/ziele.js";
 import { hmToMin, ymd } from "../core/datum.js";
 import { stundenZeit, slotGiltAm, stundenRang, stundeKurz, tagesStand, eintragFenster } from "../core/stunden";
@@ -189,7 +190,10 @@ function HeutePanel({ t }) {
       // stand der Tag der Deutschen Einheit hier am 2. Oktober.
       const freiHeute = (Array.isArray(breaks) ? breaks : []).find((b) => ymd(heute) >= ymd(new Date(b.start_date)) && ymd(heute) <= ymd(new Date(b.end_date)));
       if (!ab) setData({ slots: (tt?.slots || []), times: (tt?.times || []), zero: (tt?.zero || null), entries: Array.isArray(entries) ? entries : [], fremd,
-                        classes, kurse: Array.isArray(kurse) ? kurse : [], frei: freiHeute,
+                        classes, kurse: Array.isArray(kurse) ? kurse : [],
+                        // Am Wochenende ist ohnehin frei: „Unterrichtsfrei: Allerheiligen“ am
+                        // Sonntag sagt nichts (und liess das Widget fuer nichts stehen).
+                        frei: (heute.getDay() === 0 || heute.getDay() === 6) ? null : freiHeute,
                         entfallen: (Array.isArray(cancels) ? cancels : [])
                           .filter((c) => c.date && ymd(new Date(c.date)) === ymd(heute)).map((c) => c.period) });
     })();
@@ -392,6 +396,7 @@ export default function NuvoraHome({ user }) {
   // den Titel darueber) und der Marktplatz (der gehoert dem Kern, das Modul
   // verlinkt ihn nur).
   const zielDa = useZielFilter();
+  const beamer = useBeamer();
   const teile = (m) => ZIELE
     .filter((z) => z.modul === m.key && z.pfad !== m.path && !z.pfad.startsWith("/marktplatz"))
     // Abgeschaltete Teile stehen nicht auf der Kachel: sonst zaehlt sie
@@ -552,13 +557,13 @@ export default function NuvoraHome({ user }) {
           {/* Nicht nur „laeuft das Modul?", sondern auch „ist dieser TEIL an?"
               — dieselbe Frage wie in Navigation, Suche und Modul-Kachel, und
               deshalb dieselbe Funktion (useZielFilter). */}
-          {!edit && WIDGETS.filter((w) => kacheln.wert.widgets.includes(w.key) && zielDa({ modul: w.modul, option: w.option })).map((w) => {
-            if (w.key === "heute") return <HeutePanel key={w.key} t={t} />;
+          {!edit && WIDGETS.filter((w) => kacheln.wert.widgets.includes(w.key) && zielDa({ modul: w.modul, option: w.option }) && !(beamer.aktiv && (BEAMER_MODULE.includes(w.modul) || w.sensibel))).map((w) => {
+            if (w.key === "heute") return <WidgetPlatz key={w.key} id={w.key} abstand={24}><HeutePanel t={t} /></WidgetPlatz>;
             if (w.key === "schwach") {
-              return <SchwacheWoche key={w.key} t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} />;
+              return <WidgetPlatz key={w.key} id={w.key} abstand={24}><SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} /></WidgetPlatz>;
             }
             const K = w.komponente;
-            return <div key={w.key} style={{ marginBottom: 16 }}><K /></div>;
+            return <WidgetPlatz key={w.key} id={w.key}><div style={{ marginBottom: 16 }}><K /></div></WidgetPlatz>;
           })}
 
           {/* Bearbeiten: was soll die Startseite zeigen? Widgets zum An- und

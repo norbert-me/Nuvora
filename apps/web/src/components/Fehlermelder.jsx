@@ -105,6 +105,38 @@ export default function Fehlermelder() {
   };
 
 
+  // Eine Datei anhaengen — vom Auswahldialog, per Ziehen oder aus der Zwischenablage (Screenshot einfuegen).
+  const nimmAuf = async (f) => {
+                  if (!f) return;
+                  if (f.size > ANHANG_MAX) { setFehler(t("melder.anhangZuGross", { n: Math.round(ANHANG_MAX / 1024 / 1024) })); return; }
+                  const daten = await new Promise((res) => {
+                    const r = new FileReader();
+                    r.onload = () => res(String(r.result || "").split(",")[1] || "");
+                    r.onerror = () => res("");
+                    r.readAsDataURL(f);
+                  });
+                  if (!daten) { setFehler(t("melder.anhangFehler")); return; }
+                  // Funktional gesetzt: bei mehreren gewaehlten Dateien kommen
+                  // die Rueckrufe nacheinander, und jede braucht den Stand der
+                  // vorigen, um die Grenzen zu pruefen.
+                  setDateien((alt) => {
+                    if (alt.length >= ANHANG_ANZAHL) { setFehler(t("melder.anhangAnzahl", { n: ANHANG_ANZAHL })); return alt; }
+                    if (alt.reduce((n, d) => n + d.groesse, 0) + f.size > ANHANG_ZUSAMMEN) {
+                      setFehler(t("melder.anhangZusammen", { n: Math.round(ANHANG_ZUSAMMEN / 1024 / 1024) })); return alt;
+                    }
+                    setFehler("");
+                    return [...alt, { id: `${Date.now()}-${Math.random()}`, name: f.name, typ: f.type || "application/octet-stream", groesse: f.size, daten }];
+                  });
+                  };
+
+  const [ziehtDatei, setZiehtDatei] = useState(false);
+  const dateiDrop = (ev) => {
+    ev.preventDefault();
+    setZiehtDatei(false);
+    [...(ev.dataTransfer?.files || [])].forEach((f) => nimmAuf(f));
+  };
+  const nurDateien = (ev) => [...(ev.dataTransfer?.types || [])].includes("Files");
+
   if (!erlaubt || versteckt) return null;
 
   return (
@@ -141,7 +173,13 @@ export default function Fehlermelder() {
               <button onClick={schliessen} style={{ ...btnSecondary, marginTop: 12 }}>{t("common.close")}</button>
             </div>
           ) : (
-            <>
+            <div onDragOver={(ev) => { if (nurDateien(ev)) { ev.preventDefault(); setZiehtDatei(true); } }}
+              onDragLeave={(ev) => { if (!ev.currentTarget.contains(ev.relatedTarget)) setZiehtDatei(false); }}
+              onDrop={dateiDrop}
+              style={{ borderRadius: CONTROL_R, outline: ziehtDatei ? "2px dashed var(--accent)" : "2px dashed transparent", outlineOffset: 4 }}>
+              {ziehtDatei && (
+                <div style={{ textAlign: "center", fontSize: 13, color: "var(--accent)", padding: "4px 0 8px", fontWeight: 600 }}>{t("melder.dateiHierher")}</div>
+              )}
               {/* Kein Einleitungssatz: der Platzhalter im Feld sagt dasselbe,
                   und auf dem Handy schob der Satz das Textfeld aus dem Bild. */}
               {/* Auf dem Handy ist das Feld der ganze Dialog: Fehlerbeschreibungen
@@ -149,6 +187,7 @@ export default function Fehlermelder() {
                   blind. Mindesthoehe statt fester Zeilenzahl, damit es auf dem
                   kleinen Bildschirm den vorhandenen Platz nimmt. */}
               <textarea value={text} onChange={(e) => setText(e.target.value.slice(0, 3000))} rows={8}
+                onPaste={(e) => { const dateien2 = [...(e.clipboardData?.files || [])]; if (dateien2.length) { e.preventDefault(); dateien2.forEach((f) => nimmAuf(f)); } }}
                 placeholder={t("melder.platzhalter")} autoFocus
                 style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical",
                   minHeight: "38vh", fontSize: 16 }} />
@@ -174,28 +213,7 @@ export default function Fehlermelder() {
               </button>
               {/* Anhang: bewusst KEIN automatisches Einsammeln — die Datei
                   waehlt die Lehrkraft. */}
-                <button onClick={() => dateiWaehlen(async (f) => {
-                  if (!f) return;
-                  if (f.size > ANHANG_MAX) { setFehler(t("melder.anhangZuGross", { n: Math.round(ANHANG_MAX / 1024 / 1024) })); return; }
-                  const daten = await new Promise((res) => {
-                    const r = new FileReader();
-                    r.onload = () => res(String(r.result || "").split(",")[1] || "");
-                    r.onerror = () => res("");
-                    r.readAsDataURL(f);
-                  });
-                  if (!daten) { setFehler(t("melder.anhangFehler")); return; }
-                  // Funktional gesetzt: bei mehreren gewaehlten Dateien kommen
-                  // die Rueckrufe nacheinander, und jede braucht den Stand der
-                  // vorigen, um die Grenzen zu pruefen.
-                  setDateien((alt) => {
-                    if (alt.length >= ANHANG_ANZAHL) { setFehler(t("melder.anhangAnzahl", { n: ANHANG_ANZAHL })); return alt; }
-                    if (alt.reduce((n, d) => n + d.groesse, 0) + f.size > ANHANG_ZUSAMMEN) {
-                      setFehler(t("melder.anhangZusammen", { n: Math.round(ANHANG_ZUSAMMEN / 1024 / 1024) })); return alt;
-                    }
-                    setFehler("");
-                    return [...alt, { id: `${Date.now()}-${Math.random()}`, name: f.name, typ: f.type || "application/octet-stream", groesse: f.size, daten }];
-                  });
-                }, "*/*", { mehrere: true })} disabled={dateien.length >= ANHANG_ANZAHL}
+                <button onClick={() => dateiWaehlen(nimmAuf, "*/*", { mehrere: true })} disabled={dateien.length >= ANHANG_ANZAHL}
                   style={{ ...btnSecondary, ...btnSmall, ...(dateien.length >= ANHANG_ANZAHL ? { opacity: 0.5 } : {}) }}>
                   {t("melder.anhang")}
                 </button>
@@ -243,7 +261,7 @@ export default function Fehlermelder() {
                   {busy ? t("melder.sendet") : t("melder.senden")}
                 </button>
               </div>
-            </>
+            </div>
           )}
         </Modal>
       )}

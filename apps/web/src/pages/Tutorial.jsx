@@ -40,6 +40,7 @@ const BEREICHE = [
   { key: "einstiege", ziel: "/unterrichtsplanung", modul: "unterrichtsplanung" },
   { key: "mathespiele", ziel: "/mathespiele", modul: "mathespiele" },
   { key: "koerper", ziel: "/koerper", modul: "koerper" },
+  { key: "zahlenstrahl", ziel: "/zahlenstrahl", modul: "zahlenstrahl" },
   { key: "waage", ziel: "/waage", modul: "waage" },
   { key: "rennen", ziel: "/rennen", modul: "rennen" },
   { key: "codedetektiv", ziel: "/code-detektiv", modul: "code-detektiv" },

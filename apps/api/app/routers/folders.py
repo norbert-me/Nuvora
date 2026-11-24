@@ -58,6 +58,7 @@ class QuestionSetOut(BaseModel):
     # E/G-Differenzierung und Minuspunkte gelten je Quiz (siehe QuestionSet).
     niveau_aktiv: bool = False
     minuspunkte: bool = False
+    unbenotet: bool = False
     # Niveau je Frage IN DIESEM Quiz: {"<question_id>": "E"}. Fehlt ein Eintrag,
     # gilt G — das ist die Anforderung, die alle erfuellen sollen.
     niveaus: dict = {}
@@ -75,6 +76,7 @@ class QuestionSetCreate(BaseModel):
     shuffle_answers: bool = False
     niveau_aktiv: bool = False
     minuspunkte: bool = False
+    unbenotet: bool = False
     niveaus: dict = {}
 
     @field_validator("niveaus")
@@ -229,7 +231,7 @@ async def create_question_set(body: QuestionSetCreate, user: User = Depends(get_
     qs = QuestionSet(
         name=body.name, folder_id=body.folder_id, owner_id=user.id,
         shuffle_questions=body.shuffle_questions, shuffle_answers=body.shuffle_answers,
-        niveau_aktiv=body.niveau_aktiv, minuspunkte=body.minuspunkte,
+        niveau_aktiv=body.niveau_aktiv, minuspunkte=body.minuspunkte, unbenotet=body.unbenotet,
     )
     await _eigene_fragen(db, user, body.question_ids)
     db.add(qs)
@@ -353,6 +355,7 @@ async def update_question_set(set_id: int, body: QuestionSetCreate, user: User =
     qs.shuffle_answers = body.shuffle_answers
     qs.niveau_aktiv = body.niveau_aktiv
     qs.minuspunkte = body.minuspunkte
+    qs.unbenotet = body.unbenotet
 
     # Die alten Niveaus merken: schickt ein alter Client (oder ein Aufruf, der
     # nur den Namen aendert) keine niveaus mit, duerfen sie nicht verschwinden.
@@ -500,6 +503,7 @@ def _set_to_dict(qs: QuestionSet) -> dict:
         "shuffle_answers": qs.shuffle_answers,
         "niveau_aktiv": bool(qs.niveau_aktiv),
         "minuspunkte": bool(qs.minuspunkte),
+        "unbenotet": bool(qs.unbenotet),
         "position": qs.position or 0,
         "niveaus": {str(item.question_id): (item.niveau or "G") for item in qs.items
                     if item.question and item.question.deleted_at is None},

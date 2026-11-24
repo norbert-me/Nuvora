@@ -4,6 +4,8 @@ Geprueft wird das, was ohne Netz pruefbar ist und wo es wehtut, wenn es kippt:
 die Umrechnung Untis -> Nuvora und die Uebersetzung der Fehlschlaege. Der
 Netzabruf selbst wird nicht nachgebaut — er gehoert in den Systemtest.
 """
+import json
+
 import pytest
 
 from app import untis as U
@@ -270,3 +272,256 @@ def test_ics_text_rechnet_utc_um():
             "SUMMARY:M 7.5\nEND:VEVENT\nEND:VCALENDAR\n")
     s = U.stunden_aus_ics_text(text, date(2026, 9, 1), date(2026, 9, 30))
     assert s[0]["start"] == "08:00" and s[0]["datum"] == "2026-09-21"
+
+
+@pytest.mark.asyncio
+async def test_import_ohne_zuordnung_ueberschreibt_keinen_kurs(s):
+    """Reiner Text aus Untis darf eine Stunde mit Kurs nicht entkoppeln."""
+    from sqlalchemy import select
+
+    from app.models import Kurs, User, UserModule
+    from app.routers import kalender as K
+
+    u = User(email="untis3@b.de", password_hash="x", name="L")
+    s.add(u)
+    await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    k = Kurs(owner_id=u.id, name="6.4 Informatik")
+    s.add(k)
+    await s.commit()
+    await K.upsert_slot(K.SlotIn(weekday=0, period=1, title="", kurs_id=k.id), user=u, db=s)
+
+    d = await K.untis_uebernehmen(K.UntisUebernahmeIn(slots=[
+        K.UntisSlotIn(weekday=0, period=1, title="INF 6.4"),   # ohne Kurs
+        K.UntisSlotIn(weekday=1, period=1, title="M 8.3"),     # leerer Platz: wird gesetzt
+    ]), user=u, db=s)
+    assert d["bewahrt"] == 1 and d["slots"] == 1
+    slots = (await s.execute(select(K.TimetableSlot).where(
+        K.TimetableSlot.owner_id == u.id, K.TimetableSlot.weekday == 0))).scalars().all()
+    assert [x.kurs_id for x in slots] == [k.id]
+
+
+# ─── Vertretungen per Anmeldung holen: Titel, Stand, Entdoppeln ───
+
+class _FakeSitzung:
+    def __init__(self, *a, **k):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def stundenplan(self, von, bis):
+        from datetime import date, timedelta
+        d = (date.today() + timedelta(days=1)).isoformat()
+        return [
+            {"datum": d, "start": "08:00", "ende": "08:50", "titel": "M 8.3", "raum": "A1",
+             "info": "Aufgaben im Buch", "orig": "D", "faellt_aus": False, "vertretung": True},
+            {"datum": d, "start": "09:00", "ende": "09:50", "titel": "E 7a", "raum": "",
+             "info": "", "orig": "", "faellt_aus": True, "vertretung": False},
+            {"datum": d, "start": "10:00", "ende": "10:50", "titel": "Frei", "raum": "",
+             "info": "", "orig": "", "faellt_aus": False, "vertretung": False},
+        ]
+
+
+@pytest.mark.asyncio
+async def test_vertretungen_holen_speichert_titel_und_zeigt_sie(s, monkeypatch):
+    from datetime import date, timedelta
+
+    from app import untis as U
+    from app.models import User, UserModule
+    from app.routers import kalender as K
+
+    monkeypatch.setattr(U, "UntisSitzung", _FakeSitzung)
+    u = User(email="untis4@b.de", password_hash="x", name="L",
+             timetable_times=[{"start": "08:00", "end": "08:50"}, {"start": "09:00", "end": "09:50"},
+                              {"start": "10:00", "end": "10:50"}])
+    s.add(u)
+    await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    await s.commit()
+
+    d = await K.untis_vertretungen_holen(K.UntisAbrufIn(passwort="geheim"), user=u, db=s)
+    assert d["ok"] and d["anzahl"] == 3          # Vertretung, Entfall und die Stunde ohne eigenen Plan (Zusatz)
+    assert "geheim" not in str(u.untis_stand), "das Passwort wird nie gespeichert"
+
+    cal = K._untis_kalender(u)
+    assert cal, "ein Stand allein macht den Untis-Kalender (auch ohne Abo-Link)"
+    heute = date.today()
+    zeilen, ausfaelle = await K._untis_vertretungen(u, s, "", cal, heute, heute + timedelta(days=30))
+    titel = sorted(z["title"] for z in zeilen)
+    # Der Ausfall ist KEIN Eintrag mehr: die Stunde verschwindet aus dem Stundenplan.
+    assert titel == ["Vertretung: M 8.3 (statt D)", "Zusatz: Frei"]
+    assert [a["titel"] for a in ausfaelle] == ["E 7a"]
+    assert [z for z in zeilen if z["title"].startswith("Vertretung")][0]["description"] == "Aufgaben im Buch"
+
+
+def test_stunde_ohne_namen_nennt_ihre_art():
+    stamm = {"faecher": {}, "klassen": {}, "raeume": {}}
+    assert _stunde_aus_api({"date": 20261111, "startTime": 1145, "activityType": "Veranstaltung"},
+                           stamm)["titel"] == "Veranstaltung"
+    assert _stunde_aus_api({"date": 20261111, "startTime": 1145, "lstype": "oh"},
+                           stamm)["titel"] == "Sprechstunde"
+
+
+# ─── Untis Mobile: Schluessel statt Passwort ───
+
+def test_geheimnis_rundlauf_und_manipulation(monkeypatch):
+    from app import geheimnis as G
+    monkeypatch.setenv("TOKEN_SECRET", "abc" * 20)
+    t = G.verschluesseln('{"key": "JBSWY3DPEHPK3PXP"}')
+    assert "JBSWY" not in t, "der Klartext steht nicht im Ablageformat"
+    assert G.entschluesseln(t) == '{"key": "JBSWY3DPEHPK3PXP"}'
+    assert G.verschluesseln("x") != G.verschluesseln("x"), "jedes Mal ein anderer Nonce"
+    assert G.entschluesseln(t[:-3] + "AAA") is None, "verändert -> kein Klartext"
+    monkeypatch.setenv("TOKEN_SECRET", "andere" * 10)
+    assert G.entschluesseln(t) is None, "anderer Server-Schlüssel -> getrennt statt Müll"
+    assert G.entschluesseln("") is None and G.entschluesseln("v1.kaputt") is None
+
+
+def test_totp_rfc_wert():
+    from app.untis_mobile import totp
+    assert totp("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", 59) == "287082"
+
+
+def test_link_lesen():
+    from app.untis_mobile import link_lesen
+    z = link_lesen("untis://setschool?url=ges-hurth.webuntis.com&school=ges-hurth&user=VANO"
+                   "&key=JBSWY3DPEHPK3PXP&schoolNumber=1")
+    assert z["host"] == "ges-hurth.webuntis.com" and z["benutzer"] == "VANO"
+    for kaputt in ("", "untis://setschool?url=x", "https://example.com/?key=1",
+                   "untis://setschool?url=a.b.c&school=s&user=u&key=!!!!!!!!"):
+        with pytest.raises(ValueError):
+            link_lesen(kaputt)
+
+
+def test_perioden_werden_zu_stunden():
+    from app.untis_mobile import stunden_aus_perioden
+    md = {"klassen": [{"id": 1, "name": "8.3"}], "subjects": [{"id": 2, "name": "M"}, {"id": 3, "name": "D"}],
+          "rooms": [{"id": 4, "name": "A1"}], "teachers": [{"id": 5, "lastName": "Ich"}, {"id": 6, "lastName": "Muster"}],
+          "timeGrid": {"days": [{"day": "MON", "units": [{"startTime": "08:10"}, {"startTime": "11:45"}]}]}}
+
+    def p(start, ende, kennz, text=None, tid=5, torg=5, sorg=2):
+        return {"startDateTime": start, "endDateTime": ende, "is": kennz, "text": text or {},
+                "elements": [{"type": "CLASS", "id": 1, "orgId": 1}, {"type": "SUBJECT", "id": 2, "orgId": sorg},
+                             {"type": "ROOM", "id": 4, "orgId": 4}, {"type": "TEACHER", "id": tid, "orgId": torg}]}
+
+    st = stunden_aus_perioden([
+        p("2026-11-11T10:45Z", "2026-11-11T11:35Z", ["IRREGULAR"], {"substitution": "Aufgaben", "info": ""}, torg=6, sorg=3),
+        p("2026-11-12T08:10", "2026-11-12T09:00", ["CANCELLED"]),
+        p("2026-11-13T08:10", "2026-11-13T09:00", ["REGULAR"]),
+    ], md)
+    v, c, r = st
+    assert v["datum"] == "2026-11-11" and v["start"] == "11:45", "UTC wird in Schulzeit umgerechnet, wo das Raster es bestätigt"
+    assert v["titel"] == "M 8.3" and v["raum"] == "A1" and v["vertretung"] is True
+    assert "D" in v["orig"] and "Muster" in v["orig"] and v["info"] == "Aufgaben"
+    assert c["faellt_aus"] is True and c["start"] == "08:10", "Ortszeit mit Z wird nicht doppelt umgerechnet"
+    assert r["vertretung"] is False and r["faellt_aus"] is False
+
+
+def test_ersetzte_klasse_ist_eine_vertretung_auch_wenn_untis_regular_sagt():
+    """Gesehen am 26.11. im echten Stundenplan: eine Klasse wurde ersetzt (`orgId` != `id`), Untis fuehrte die
+    Stunde aber als REGULAR — und die Vertretung fiel durch. Ein Vertretungstext allein genuegt ebenfalls."""
+    from app.untis_mobile import stunden_aus_perioden
+    md = {"klassen": [{"id": 1, "name": "7.5"}, {"id": 9, "name": "7.4"}], "subjects": [{"id": 2, "name": "M"}],
+          "rooms": [], "teachers": [{"id": 5, "lastName": "Ich"}], "timeGrid": {"days": []}}
+    ersetzt = {"startDateTime": "2026-11-26T11:45", "endDateTime": "2026-11-26T12:30", "is": ["REGULAR"], "text": {},
+               "elements": [{"type": "CLASS", "id": 1, "orgId": 9}, {"type": "SUBJECT", "id": 2, "orgId": 2}, {"type": "TEACHER", "id": 5, "orgId": 5}]}
+    mit_text = {"startDateTime": "2026-11-27T11:45", "endDateTime": "2026-11-27T12:30", "is": ["REGULAR"], "text": {"substitution": "Raumtausch"},
+                "elements": [{"type": "CLASS", "id": 1, "orgId": 1}, {"type": "SUBJECT", "id": 2, "orgId": 2}]}
+    normal = {"startDateTime": "2026-11-28T11:45", "endDateTime": "2026-11-28T12:30", "is": ["REGULAR"], "text": {},
+              "elements": [{"type": "CLASS", "id": 1, "orgId": 1}, {"type": "SUBJECT", "id": 2, "orgId": 2}]}
+    a, b, c = stunden_aus_perioden([ersetzt, mit_text, normal], md)
+    assert a["vertretung"] is True and "7.4" in a["orig"]
+    assert b["vertretung"] is True
+    assert c["vertretung"] is False
+    # Ausgefallen ist keine Vertretung
+    ausfall = {**normal, "is": ["CANCELLED"], "elements": [{"type": "CLASS", "id": 1, "orgId": 9}]}
+    assert stunden_aus_perioden([ausfall], md)[0]["vertretung"] is False
+
+
+@pytest.mark.asyncio
+async def test_untis_ausfall_nimmt_die_stunde_aus_dem_plan_statt_einen_eintrag_zu_zeigen(s, monkeypatch):
+    from datetime import date, timedelta
+    from app.models import User, UserModule
+    from app.routers import kalender as K
+
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 40)
+    tag = (date.today() + timedelta(days=2)).isoformat()
+    u = User(email="untis6@b.de", password_hash="x", name="L", email_verified=True,
+             timetable_times=[{"start": "08:00", "end": "08:45"}, {"start": "08:50", "end": "09:35"}],
+             untis_stand={"stand": "2026-11-23T10:00:00+00:00", "von": tag, "bis": tag,
+                          "stunden": [{"datum": tag, "start": "08:50", "ende": "09:35", "titel": "E 7a", "faellt_aus": True}]})
+    s.add(u)
+    await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    await s.commit()
+    K._AUSFALL_CACHE.pop(u.id, None)
+    K._EXT_CACHE.pop(u.id, None)
+
+    # 1. kein Eintrag im Kalender
+    zeilen = await K.externe_ereignisse(u, db=s)
+    assert not [z for z in zeilen if z["title"].startswith("Entfall")], zeilen
+    # 2. die Stunde (2.) faellt aus dem Plan, nicht wieder einblendbar
+    erg = await K.list_slot_cancellations(user=u, db=s)
+    assert {"date": f"{tag}T00:00:00", "period": 2, "untis": True} in erg
+@pytest.mark.asyncio
+async def test_mobil_verbinden_holen_und_trennen(s, monkeypatch):
+    from datetime import date, timedelta
+
+    from app import untis as U, untis_mobile as M
+    from app.models import User, UserModule
+    from app.routers import kalender as K
+
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 40)
+    tag = (date.today() + timedelta(days=1)).isoformat()
+
+    class Fake:
+        def __init__(self, z):
+            self.z = z
+
+        def pruefen(self):
+            return {}
+
+        def stundenplan(self, von, bis):
+            return [{"datum": tag, "start": "08:00", "ende": "08:50", "titel": "M 8.3", "raum": "",
+                     "info": "", "orig": "Muster", "faellt_aus": False, "vertretung": True}]
+
+    monkeypatch.setattr(M, "MobileSitzung", Fake)
+    u = User(email="untis5@b.de", password_hash="x", name="L")
+    s.add(u)
+    await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    await s.commit()
+
+    link = "untis://setschool?url=ges.webuntis.com&school=ges&user=VANO&key=JBSWY3DPEHPK3PXP"
+    assert (await K.untis_mobil_setzen(K.UntisMobilIn(link=link), user=u, db=s))["ok"]
+    assert "JBSWY3DPEHPK3PXP" not in (u.untis_mobil or ""), "der Schlüssel liegt nur verschlüsselt in der Datenbank"
+    assert (await K.untis_konto(user=u))["mobil"] is True
+    assert "JBSWY" not in json.dumps(await K.untis_konto(user=u)), "und kommt nie wieder heraus"
+
+    d = await K.untis_vertretungen_holen(K.UntisAbrufIn(), user=u, db=s)    # ohne Passwort
+    assert d["ok"] and d["anzahl"] == 1
+    assert u.untis_stand["stunden"][0]["orig"] == "Muster"
+
+    await K.untis_mobil_trennen(user=u, db=s)
+    assert u.untis_mobil is None and u.untis_stand is None
+    assert (await K.untis_vertretungen_holen(K.UntisAbrufIn(), user=u, db=s))["ok"] is False
+
+
+def test_stand_wird_hoechstens_alle_30_minuten_geholt(monkeypatch):
+    import time as _t
+
+    from app.models import User
+    from app.routers import kalender as K
+
+    u = User(email="u@b.de", password_hash="x", name="L")
+    u.id = 4711
+    assert K._stand_faellig(u, _t.time()) is False, "ohne Zugang nie"
+    u.untis_mobil = "v1.x"
+    K._STAND_VERSUCH.pop(4711, None)
+    assert K._stand_faellig(u, _t.time()) is True, "Zugang, noch nie geholt"
+    K._STAND_VERSUCH[4711] = _t.time()
+    assert K._stand_faellig(u, _t.time()) is False, "gerade erst versucht (auch nach Fehlschlag)"

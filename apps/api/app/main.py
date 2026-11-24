@@ -8,13 +8,14 @@ from fastapi.staticfiles import StaticFiles
 from .netz import client_ip
 from .uploads import anhang_kopf
 from .kursmitglieder import schuljahr_aus_name
-from .database import engine, async_session
+from .database import IST_SQLITE, async_session, engine, sql_jetzt, sql_vor
+from .krypto import suchwert
 from .models import AppSetting, Base, Kurs, Session as SessionModel, User
 # Admin-Pruefung und Programmfassung kommen aus app/admin.py — dem Blatt, das
 # den frueheren Ring main -> routers.backup -> main aufloest. Hier nur noch
 # hereingeholt, damit die Routen weiter unten `_require_admin` benutzen koennen.
 from .admin import _require_admin, APP_VERSION  # noqa: F401 — Routen unten
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, caldav, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, pap, waage, personen, tafel, trash, selftest, backup
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, caldav, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, pap, waage, reihen, qr, personen, tafel, trash, selftest, backup, wiederherstellung
 from . import websocket as ws
 from .routers.auth import _hash_pw, _token_teile, get_current_user, rate_limit, token_gueltig_bis
 from .routers.karten import uebernahme_deck_kurse
@@ -36,6 +37,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 # --- Missbrauchsschutz: Body-Grösse + globaler Flood-Schutz pro IP ---
+def _sw(*a, **k):
+    """Warnung der Bestands-Migrationen. Sie sind Postgres-SQL fuer alte Server-
+    Datenbanken; eine frische SQLite-Datenbank (eingebaute App) hat nichts zu
+    migrieren, und die Meldung waere nur Laerm."""
+    if not IST_SQLITE:
+        print(*a, **k)
+
+
 MAX_BODY_BYTES = int(os.environ.get("MAX_BODY_BYTES", 24 * 1024 * 1024))
 # Grosszügig, da ganze Klassen/Schulen oft hinter EINER öffentlichen IP (NAT) hängen
 GLOBAL_RATE_MAX = int(os.environ.get("GLOBAL_RATE_MAX", 3000))
@@ -212,12 +221,15 @@ app.include_router(pap.router)
 app.include_router(pap.lern_router)
 app.include_router(waage.router)
 app.include_router(waage.lern_router)
+app.include_router(reihen.router)
+app.include_router(qr.router)
 app.include_router(personen.router)
 app.include_router(trash.router)
 app.include_router(selftest.router)
 # Sicherungen: Serververwaltung, kein Modul (steht deshalb nicht in REGISTRY).
 # Haengt komplett an _require_admin — die Dateien enthalten Art.-9-Daten.
 app.include_router(backup.router)
+app.include_router(wiederherstellung.router)
 app.include_router(marketplace.router)
 
 # Im Container /app/uploads (Volume). Ueberschreibbar, damit Tests und die
@@ -240,6 +252,7 @@ def _ensure_columns(sync_conn):
         ("grade_entries", "kurs_id", "INTEGER"),
         ("grade_entries", "term", "VARCHAR(10) DEFAULT '' NOT NULL"),
         ("users", "tours_done", "JSON"),
+        ("users", "email_idx", "VARCHAR(64)"),    # Suchwert der verschluesselten E-Mail
         ("exercises", "quelle_id", "INTEGER"),
         ("exam_dates", "ersetzt_stunde", "BOOLEAN DEFAULT true NOT NULL"),
         ("work_analyses", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
@@ -273,6 +286,8 @@ def _ensure_columns(sync_conn):
         ("users", "untis_schule", "VARCHAR(120)"),
         ("users", "untis_benutzer", "VARCHAR(120)"),
         ("users", "untis_ics_url", "TEXT"),
+        ("users", "untis_stand", "JSON"),
+        ("users", "untis_mobil", "TEXT"),
         ("users", "caldav_props", "JSON"),          # Farbe/Reihenfolge aus der Kalender-App
         ("calendar_entries", "caldav_uid", "VARCHAR(200)"),  # UID des Clients (Apple/Outlook)
         ("users", "external_ics_color", "VARCHAR(9) DEFAULT '' NOT NULL"),
@@ -280,6 +295,7 @@ def _ensure_columns(sync_conn):
         ("methods", "topic_id", "INTEGER"),
         ("methods", "folder_id", "INTEGER"),
         ("kurse", "niveau_aktiv", "BOOLEAN DEFAULT false NOT NULL"),
+        ("kurse", "karten_aktiv", "BOOLEAN DEFAULT true NOT NULL"),
         ("kurse", "color", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("seating_plans", "kurs_id", "INTEGER"),
         ("orga_items", "kurs_id", "INTEGER"),
@@ -310,6 +326,7 @@ def _ensure_columns(sync_conn):
         ("students", "massnahmen", "JSON"),
         ("question_sets", "niveau_aktiv", "BOOLEAN DEFAULT FALSE NOT NULL"),
         ("question_sets", "minuspunkte", "BOOLEAN DEFAULT FALSE NOT NULL"),
+        ("question_sets", "unbenotet", "BOOLEAN DEFAULT FALSE NOT NULL"),
         ("question_sets", "position", "INTEGER DEFAULT 0 NOT NULL"),
         ("exercises", "deleted_at", "TIMESTAMPTZ"),
         ("question_set_items", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
@@ -353,6 +370,7 @@ def _ensure_columns(sync_conn):
         ("grade_categories", "topic_id", "INTEGER"),
         # Tag der Leistung — Eigenschaft der Spalte, nicht Teil ihres Namens.
         ("grade_categories", "date", "DATE"),
+        ("grade_categories", "optional", "BOOLEAN DEFAULT FALSE NOT NULL"),
         # Kurs-Kette ueber Schuljahre (siehe Kurs in models.py).
         ("kurse", "schuljahr", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("kurse", "vorgaenger_id", "INTEGER"),
@@ -362,6 +380,7 @@ def _ensure_columns(sync_conn):
         ("calendar_entries", "method_id", "INTEGER"),
         ("calendar_entries", "kurs_id", "INTEGER"),
         ("calendar_entries", "verlaufsplan", "JSON"),
+        ("calendar_entries", "topic_ids", "JSON"),     # weitere Themen der Stunde
         ("exam_dates", "entry_id", "INTEGER"),
         ("exam_dates", "work_id", "INTEGER"),
         ("exam_dates", "period", "INTEGER"),
@@ -390,6 +409,8 @@ def _ensure_columns(sync_conn):
         ("calendar_entries", "period", "INTEGER"),
         ("calendar_entries", "cardvote_set_id", "INTEGER"),
         ("calendar_entries", "karten_deck_id", "INTEGER"),
+        ("calendar_entries", "karten_deck_ids", "JSON"),   # weitere Stapel der Stunde
+        ("materials", "reihe_stunde_id", "INTEGER"),       # Datei an einer Stunde einer Reihe
         ("calendar_entries", "lernpfad_ladder_id", "INTEGER"),
         ("calendar_entries", "codedetektiv_puzzle", "VARCHAR(64)"),
         ("calendar_entries", "start_time", "VARCHAR(5) DEFAULT '' NOT NULL"),
@@ -414,6 +435,8 @@ def _ensure_columns(sync_conn):
         # Wahrheit.
         ("attendance", "kurs_id", "INTEGER"),
         ("sessions", "kurs_id", "INTEGER"),
+        ("sessions", "question_layout", "JSON"),
+        ("work_analyses", "unbewertet", "JSON"),
         ("zufall_draws", "kurs_id", "INTEGER"),
         ("quartal_dividers", "kurs_id", "INTEGER"),
         ("plan_weeks", "kurs_id", "INTEGER"),
@@ -478,7 +501,7 @@ def _ensure_columns(sync_conn):
             # markieren. Laeuft nur beim erstmaligen Anlegen der Spalte, also
             # nicht wieder ueber spaeter angelegte Entwuerfe (released_at NULL).
             if (table, column) == ("card_decks", "released_at"):
-                sync_conn.execute(text("UPDATE card_decks SET released_at = now() WHERE released_at IS NULL"))
+                sync_conn.execute(text(f"UPDATE card_decks SET released_at = {sql_jetzt()} WHERE released_at IS NULL"))
 
     # Spalten, die von NOT NULL auf nullable wandern.
     #
@@ -702,13 +725,34 @@ async def startup():
         await conn.run_sync(_ensure_columns)
         await conn.run_sync(_check_module_tables)
 
+    # Personenbezogene Spalten liegen verschluesselt in der Datenbank
+    # (app/krypto.py). Zuerst pruefen, ob der Schluessel zu DIESER Datenbank passt —
+    # ein falscher Schluessel bricht den Start ab, statt unter einem zweiten
+    # Schluessel Daten zu schreiben. Dann Spaltentypen, Suchwert, Bestand.
+    from . import verschluesselung as _vk
+    async with async_session() as db:
+        zustand = await _vk.pruefwert_pruefen(db)
+    async with engine.begin() as conn:
+        for z in await conn.run_sync(_vk.spaltentypen_umstellen):
+            print(f"[STARTUP] Verschluesselung, Spalte umgestellt: {z}", flush=True)
+    async with async_session() as db:
+        n = await _vk.email_suchwerte(db)
+        if n:
+            print(f"[STARTUP] Verschluesselung: {n} E-Mail-Suchwert(e) nachgetragen.", flush=True)
+    zaehl = await _vk.bestand_verschluesseln(engine)
+    if zaehl:
+        print("[STARTUP] Verschluesselung, Bestand umgeschrieben: "
+              + ", ".join(f"{k} {v}" for k, v in zaehl.items()), flush=True)
+    elif zustand == "neu":
+        print("[STARTUP] Verschluesselung: Schluessel-Pruefwert angelegt.", flush=True)
+
     from sqlalchemy import func, select, text
 
     # Bestandskonten (vor Cutoff) als bestätigt markieren — Neue müssen bestätigen
     async with async_session() as db:
         await db.execute(text(
             "UPDATE users SET email_verified = true "
-            f"WHERE email_verified = false AND created_at < TIMESTAMPTZ '{VERIFY_CUTOFF}'"
+            f"WHERE email_verified = false AND created_at < {('' if IST_SQLITE else 'TIMESTAMPTZ ')}'{VERIFY_CUTOFF}'"
         ))
         await db.commit()
 
@@ -726,7 +770,7 @@ async def startup():
                     UNION ALL SELECT 1 FROM school_classes c WHERE c.owner_id = u.id
                     UNION ALL SELECT 1 FROM sessions s WHERE s.owner_id = u.id
               )
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+            ON CONFLICT DO NOTHING
         """))
         await db.execute(text("UPDATE users SET modules_initialized = true WHERE modules_initialized = false"))
         # Wer schon Einstiege hat, gilt als geseedet — sonst wuerde die
@@ -772,14 +816,14 @@ async def startup():
         await db.execute(text("""
             INSERT INTO user_modules (user_id, module_key)
             SELECT DISTINCT user_id, 'unterrichtsplanung' FROM user_modules WHERE module_key IN ('stoffplan', 'methoden')
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+            ON CONFLICT DO NOTHING
         """))
         await db.execute(text("DELETE FROM user_modules WHERE module_key IN ('stoffplan', 'methoden')"))
         # Mathefußball in das Sammelmodul „Mathespiele" umbenannt. Idempotent.
         await db.execute(text("""
             INSERT INTO user_modules (user_id, module_key)
             SELECT DISTINCT user_id, 'mathespiele' FROM user_modules WHERE module_key = 'mathefussball'
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+            ON CONFLICT DO NOTHING
         """))
         await db.execute(text("DELETE FROM user_modules WHERE module_key = 'mathefussball'"))
         # Noten + Klassenarbeit sind ins Modul „Auswertung" (Reiter) aufgegangen.
@@ -787,7 +831,7 @@ async def startup():
         await db.execute(text("""
             INSERT INTO user_modules (user_id, module_key)
             SELECT DISTINCT user_id, 'auswertung' FROM user_modules WHERE module_key IN ('noten', 'klassenarbeit')
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+            ON CONFLICT DO NOTHING
         """))
         await db.execute(text("DELETE FROM user_modules WHERE module_key IN ('noten', 'klassenarbeit')"))
         await db.commit()
@@ -805,7 +849,7 @@ async def startup():
             # Start darf daran nicht abbrechen — aber still bleiben auch nicht,
             # sonst sieht niemand, wenn es auf Postgres wirklich schiefgeht.
             await db.rollback()
-            print(f"[STARTUP-WARN] uq_attendance_student_date nicht entfernt: {type(e).__name__}: {e}", flush=True)
+            _sw(f"[STARTUP-WARN] uq_attendance_student_date nicht entfernt: {type(e).__name__}: {e}", flush=True)
 
     # Sitzplan hängt jetzt am Kurs (kurs_id); der alte Unique-Constraint auf
     # (owner, class_id) würde mehrere Fach-Kurse derselben Klasse blockieren.
@@ -816,7 +860,7 @@ async def startup():
         except Exception as e:
             # Wie oben: auf SQLite erwartbar, auf Postgres ein Befund.
             await db.rollback()
-            print(f"[STARTUP-WARN] uq_seating_owner_class nicht entfernt: {type(e).__name__}: {e}", flush=True)
+            _sw(f"[STARTUP-WARN] uq_seating_owner_class nicht entfernt: {type(e).__name__}: {e}", flush=True)
 
     # Bestandsnoten an den Kurs anschliessen: wo eine Klasse in GENAU EINEM Kurs
     # liegt, bekommen ihre Abschnitte/Endnoten-Overrides dessen kurs_id — sonst
@@ -843,7 +887,7 @@ async def startup():
                         "work_analyses", "exam_dates", "calendar_entries",
                         "segel_status", "timetable_slots", "pap_aufgaben", "waage_aufgaben",
                         "attendance", "sessions", "zufall_draws",
-                        "quartal_dividers", "plan_weeks", "learning_ladders"):
+                        "quartal_dividers", "quartal_daten", "plan_weeks", "learning_ladders"):
                 await db.execute(text(f"""
                     WITH single AS (
                       SELECT class_id, MIN(kurs_id) AS kurs_id FROM (
@@ -861,7 +905,7 @@ async def startup():
             # Abbruch — aber sichtbar, sonst sucht niemand die Ursache dafuer,
             # dass Sitzplan/Orga/Decks „verschwunden" wirken.
             await db.rollback()
-            print(f"[STARTUP-WARN] Kurs-Backfill uebersprungen: {type(e).__name__}: {e}", flush=True)
+            _sw(f"[STARTUP-WARN] Kurs-Backfill uebersprungen: {type(e).__name__}: {e}", flush=True)
 
     # Kurs-Konzept, Phase 1: jede Klasse ohne Kurs bekommt ihren eigenen Kurs
     # (1:1, gleicher Name/Owner). Ändert nichts am Verhalten, legt nur die
@@ -895,7 +939,7 @@ async def startup():
             await db.execute(text(
                 "INSERT INTO kurs_tags (kurs_id, class_id) "
                 "SELECT kurs_id, id FROM school_classes WHERE kurs_id IS NOT NULL "
-                "ON CONFLICT ON CONSTRAINT uq_kurs_tag DO NOTHING"
+                "ON CONFLICT DO NOTHING"
             ))
             # Karten-Decks an den Kurs ihrer Klasse hängen (Decks gelten kursweit).
             await db.execute(text(
@@ -935,7 +979,7 @@ async def startup():
             await db.commit()
         except Exception as e:
             await db.rollback()
-            print(f"[STARTUP-WARN] E/G-Blaetter nicht verbunden: {e}", flush=True)
+            _sw(f"[STARTUP-WARN] E/G-Blaetter nicht verbunden: {e}", flush=True)
 
     # Besitzer nachtragen, wo er sich herleiten laesst.
     #
@@ -1000,7 +1044,7 @@ async def startup():
                     print(f"[STARTUP] Besitzer nachgetragen: {res.rowcount} {name}(e).", flush=True)
             except Exception as e:
                 await db.rollback()
-                print(f"[STARTUP-WARN] Besitzer-Nachtrag ({name}) uebersprungen: {type(e).__name__}: {e}", flush=True)
+                _sw(f"[STARTUP-WARN] Besitzer-Nachtrag ({name}) uebersprungen: {type(e).__name__}: {e}", flush=True)
 
     # Karteikarten: Bestandsstapel in die neue Kurs-Zuweisung heben (einmalig je
     # Konto, siehe karten.uebernahme_deck_kurse). Ohne das stuenden nach dem
@@ -1028,7 +1072,18 @@ async def startup():
             await db.commit()
         except Exception as e:
             await db.rollback()
-            print(f"[STARTUP-WARN] Defaults nicht gesetzt: {type(e).__name__}: {e}", flush=True)
+            _sw(f"[STARTUP-WARN] Defaults nicht gesetzt: {type(e).__name__}: {e}", flush=True)
+
+    # Quartalsstriche: vom Spaltenbezug zum Datum (siehe app/quartal.py). Idempotent.
+    async with async_session() as db:
+        try:
+            from .quartal import striche_zu_daten
+            n = await striche_zu_daten(db)
+            if n:
+                print(f"[STARTUP] Quartalsstriche: {n} auf ein Datum umgestellt.", flush=True)
+        except Exception as e:
+            await db.rollback()
+            print(f"[STARTUP-WARN] Quartalsstriche nicht umgestellt: {type(e).__name__}: {e}", flush=True)
 
     # Personen-Ebene: jede Listenzeile bekommt ihr Kind (siehe app/personen.py).
     # Idempotent und ohne Datenverlust — die alten Felder an `students` bleiben
@@ -1079,7 +1134,7 @@ async def startup():
             total = 0
             for tbl in ("school_classes", "folders", "questions", "sessions", "topics",
                         "exercises", "learning_paths", "grade_sections", "grade_categories",
-                        "grade_overrides", "card_decks", "quartal_dividers", "plan_weeks"):
+                        "grade_overrides", "card_decks", "quartal_dividers", "quartal_daten", "plan_weeks"):
                 try:
                     r = await db.execute(text(f"UPDATE {tbl} SET owner_id = :a WHERE owner_id IS NULL"), {"a": admin})
                     total += r.rowcount or 0
@@ -1119,7 +1174,7 @@ async def startup():
                 # Bestandsinstallationen haben schon Konten — dann nur markieren,
                 # nicht erneut anlegen (die Mail koennte laengst geaendert sein).
                 any_user = (await db.execute(select(User).limit(1))).scalar_one_or_none()
-                exists = (await db.execute(select(User).where(User.email == admin_email))).scalar_one_or_none()
+                exists = (await db.execute(select(User).where(User.email_idx == suchwert(admin_email)))).scalar_one_or_none()
                 if not any_user and not exists:
                     db.add(User(email=admin_email, password_hash=_hash_pw(admin_pw), name="Admin", email_verified=True))
                 db.add(AppSetting(key="admin_bootstrapped", value="1"))
@@ -1168,7 +1223,7 @@ async def _fehlermeldungen_aufraeumen():
     try:
         async with async_session() as db:
             await db.execute(text(
-                f"DELETE FROM bug_reports WHERE created_at < now() - interval '{BUGREPORT_TAGE} days'"
+                f"DELETE FROM bug_reports WHERE created_at < {sql_vor(f'{BUGREPORT_TAGE} days')}"
             ))
             await db.commit()
     except Exception as e:
@@ -1190,6 +1245,7 @@ PAPIERKORB_TABELLEN = (
     ("questions", "Frage(n)"), ("topics", "Thema/Themen"),
     ("pap_aufgaben", "PAP-Aufgabe(n)"),
     ("waage_aufgaben", "Waage-Aufgabe(n)"),
+    ("reihen", "Reihe(n)"),
     ("persons", "Person(en)"),
 )
 
@@ -1202,7 +1258,7 @@ async def _papierkorb_leeren(laut: bool = False):
             try:
                 res = await db.execute(text(
                     f"DELETE FROM {tbl} WHERE deleted_at IS NOT NULL "
-                    "AND deleted_at < now() - interval '30 days'"
+                    f"AND deleted_at < {sql_vor('30 days')}"
                 ))
                 await db.commit()
                 if res.rowcount and laut:
@@ -1252,8 +1308,8 @@ async def _codesessions_aufraeumen():
                 # Regel weiter ab.
                 await db.execute(text(
                     "DELETE FROM code_sessions WHERE "
-                    "(ended_at IS NOT NULL AND ended_at < now() - interval '1 day') "
-                    "OR created_at < now() - interval '7 days'"
+                    f"(ended_at IS NOT NULL AND ended_at < {sql_vor('1 day')}) "
+                    f"OR created_at < {sql_vor('7 days')}"
                 ))
                 await db.commit()
         except Exception as e:
@@ -1271,7 +1327,7 @@ async def _cleanup_unverified_loop():
             async with async_session() as db:
                 await db.execute(text(
                     "DELETE FROM users "
-                    "WHERE email_verified = false AND created_at < NOW() - INTERVAL '14 days'"
+                    f"WHERE email_verified = false AND created_at < {sql_vor('14 days')}"
                 ))
                 await db.commit()
         except Exception as e:
@@ -1345,6 +1401,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
             if not ws.freigeben(websocket, session_id):
                 await _schliessen(1013)  # Obergrenze je Sitzung erreicht
                 return
+            alt = ws.letzter_zustand.get(session_id)
+            if alt:
+                try:
+                    await websocket.send_text(_json.dumps(alt))   # Zustand nachreichen (Wiederverbinden)
+                except Exception:
+                    pass
             break
         while True:
             raw = await websocket.receive_text()
@@ -1356,6 +1418,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                 continue
             # remote: Scanner -> Host (Aufdecken/Weiter/...); host_state/session_finished: Host -> Scanner
             if msg.get("type") in ("remote", "host_state", "session_finished"):
+                if msg["type"] == "host_state":
+                    if len(ws.letzter_zustand) >= ws._ZUSTAND_MAX and session_id not in ws.letzter_zustand:
+                        ws.letzter_zustand.pop(next(iter(ws.letzter_zustand)), None)   # aeltester raus
+                    ws.letzter_zustand[session_id] = msg
+                elif msg["type"] == "session_finished":
+                    ws.letzter_zustand.pop(session_id, None)
                 await ws.broadcast(session_id, msg)
     except WebSocketDisconnect:
         pass    # Gegenstelle weg: kein Fehler, aufgeraeumt wird im finally
@@ -1538,7 +1606,6 @@ APP_PLATTFORMEN = [
     ("windows", "Windows", lambda n: n.endswith((".exe", ".msi"))),
     ("linux", "Linux", lambda n: n.endswith((".AppImage", ".deb"))),
     ("android", "Android", lambda n: n.endswith(".apk")),
-    ("ios", "iPhone / iPad", lambda n: n.endswith(".ipa")),
 ]
 
 
@@ -1598,11 +1665,19 @@ async def apps(user=Depends(get_current_user)):
 # Fassungen ist fuer ein neues Konto keine Neuigkeit, sondern eine Wand aus Text.
 # Deshalb setzt schon die Registrierung den Stand auf die laufende Fassung.
 @app.get("/api/changelog")
-async def changelog_neu(user=Depends(get_current_user)):
-    """Die Fassungen, die seit dem letzten Blick dieser Lehrkraft dazukamen."""
+async def changelog_neu(letzte: int = 0, user=Depends(get_current_user)):
+    """Die Fassungen, die seit dem letzten Blick dieser Lehrkraft dazukamen.
+
+    Mit `letzte=N`: die letzten N Fassungen bis zur laufenden, unabhaengig vom
+    gemerkten Stand — zum Nachlesen (Profil), ohne den Stand anzufassen."""
     from . import changelog as _cl
     pfad = _cl.datei()
     text = pfad.read_text(encoding="utf-8") if pfad else ""
+    if letzte > 0:
+        o = _cl.version_tupel(APP_VERSION)
+        alle = [a for a in _cl.abschnitte(text) if _cl.version_tupel(a["version"]) <= o]
+        return {"version": APP_VERSION, "gesehen": (getattr(user, "changelog_seen", "") or "").strip(),
+                "abschnitte": alle[:min(letzte, 10)]}
     gesehen = (getattr(user, "changelog_seen", "") or "").strip()
     return {
         "version": APP_VERSION,
@@ -1969,3 +2044,9 @@ async def contact(body: ContactBody, request: Request):
     if not ok:
         raise HTTPException(503, "Nachricht konnte nicht gesendet werden")
     return {"ok": True}
+
+
+# Lokale Installation (eingebaute App): die Oberflaeche aus demselben Prozess
+# ausliefern. Als LETZTES, damit alle /api- und /ws-Routen davor greifen.
+from . import lokal as _lokal  # noqa: E402
+_lokal.einhaengen(app)

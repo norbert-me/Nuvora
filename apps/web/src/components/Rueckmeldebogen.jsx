@@ -26,6 +26,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 
 import { COLORS as C, CONTROL_R, Icon, ICONS, Modal, Segment, Toggle, btnPrimary, btnSecondary, segmentBtn } from "./Icons.jsx";
+import { wertLabel } from "../core/grades.js";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "./Latex.jsx";
 import { lokal, sichern } from "../core/ansichten.js";
@@ -39,13 +40,13 @@ const PAPIER = { background: "#fff", color: "#111" };
 // Rückmeldung mit Note und Unterschrift, für die Wiederholung nur die
 // Aufgaben. Bausteine statt fester Fassungen — die Vorlagen setzen nur
 // Häkchen, jedes lässt sich danach einzeln umlegen.
-export const BOGEN_TEILE = ["note", "themen", "rat", "wdh", "notiz", "unterschrift"];
+export const BOGEN_TEILE = ["note", "stand", "themen", "rat", "wdh", "notiz", "unterschrift"];
 export const BOGEN_VORLAGEN = {
   wdh: ["wdh"],
-  rueckmeldung: ["note", "themen", "rat", "notiz", "unterschrift"],
+  rueckmeldung: ["note", "stand", "themen", "rat", "notiz", "unterschrift"],
   alles: BOGEN_TEILE,
 };
-const ALTE_TEILE = BOGEN_VORLAGEN.rueckmeldung;
+const ALTE_TEILE = ["note", "themen", "rat", "notiz", "unterschrift"];
 const SPEICHER = "nuvora_bogen_teile";
 
 // Die zuletzt gewählten Bausteine — am KONTO (core/ansichten.js), damit die
@@ -61,6 +62,29 @@ export function gemerkteTeile() {
   return BOGEN_VORLAGEN.alles;
 }
 
+// Gesamtpunkte auf halbe Punkte: alles darunter ist Rechenrauschen
+// (100,0999999 statt 100). Mit Komma, wie sonst im Haus.
+const halbe = (x) => {
+  const r = Math.round(Number(x) * 2) / 2;
+  return Number.isFinite(r) ? String(r).replace(".", ",") : x;
+};
+
+// Ohne Tendenz-/Wert-Angabe (Quiz) bleibt es bei der Note, wie sie ist.
+const noteText = (b, form) => {
+  if (form === "wert" && b.noteWert != null) return String(b.noteWert).replace(".", ",");
+  if (form === "ganz") return b.note || null;
+  return b.noteTendenz || b.note || null;
+};
+
+// Eine berechnete Note (Zwischenstand): „2−", „2,5" oder ganz — nach der
+// gewaehlten Notenform. 
+const stufenText = (wert, form) => {
+  const zahl = String(Math.round(wert * 100) / 100).replace(".", ",");
+  if (form === "ganz") return String(Math.round(wert));
+  if (form === "wert") return zahl;
+  return wertLabel(wert);   // Tendenz gewaehlt: keine Kommazahl daneben
+};
+
 export function BogenWahl({ onDrucken, onClose, mitWdh = true, wdhFehlt = [] }) {
   const { t } = useLanguage();
   const verfuegbar = BOGEN_TEILE.filter((k) => mitWdh || k !== "wdh");
@@ -71,9 +95,11 @@ export function BogenWahl({ onDrucken, onClose, mitWdh = true, wdhFehlt = [] }) 
     const a = BOGEN_VORLAGEN[v].filter((k) => verfuegbar.includes(k));
     return a.length === teile.length && a.every((k) => teile.includes(k));
   });
+  // Wie die Note aufs Blatt kommt: „4+", „3,7" oder ganz („4") — am Konto.
+  const [notenform, setNotenform] = useState(() => { const x = lokal("rueckmeldebogen"); return ["tendenz", "wert", "ganz"].includes(x?.notenform) ? x.notenform : "tendenz"; });
   const drucken = () => {
-    sichern("rueckmeldebogen", { teile, max });
-    onDrucken(teile, max);
+    sichern("rueckmeldebogen", { teile, max, notenform });
+    onDrucken(teile, max, notenform);
   };
   return (
     <Modal onClose={onClose} title={t("bogen.wahlTitel")} width={420}>
@@ -92,6 +118,17 @@ export function BogenWahl({ onDrucken, onClose, mitWdh = true, wdhFehlt = [] }) 
           <div key={k}>
             <Toggle checked={teile.includes(k)} label={t(`bogen.teil.${k}`)}
               onChange={(an) => setTeile((l) => (an ? BOGEN_TEILE.filter((x) => x === k || l.includes(x)) : l.filter((x) => x !== k)))} />
+            {k === "note" && teile.includes("note") && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0 0 46px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, color: "var(--text2)" }}>{t("bogen.notenform")}</span>
+                <Segment>
+                  {[["tendenz", "4+"], ["wert", "3,7"], ["ganz", "4"]].map(([v, l]) => (
+                    <button key={v} onClick={() => setNotenform(v)} aria-pressed={notenform === v}
+                      style={{ ...segmentBtn, minWidth: 40, fontWeight: notenform === v ? 700 : 500, color: notenform === v ? "var(--accent)" : "var(--text2)" }}>{l}</button>
+                  ))}
+                </Segment>
+              </div>
+            )}
             {/* Wie viele je Thema: anteilig nach dem, was fehlt, hoechstens so viele. */}
             {k === "wdh" && teile.includes("wdh") && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0 0 46px", flexWrap: "wrap" }}>
@@ -134,7 +171,7 @@ export function BogenWahl({ onDrucken, onClose, mitWdh = true, wdhFehlt = [] }) 
 // oft zu zweit auf ein A4 gedruckt (verkleinert auf etwa 70 %). Und jedes
 // Blatt steht MITTIG auf seiner Seite (margin: auto): linksbuendig lag es auf
 // dem verkleinerten Doppelblatt einmal am Rand und einmal an der Mitte.
-export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv, lernpfadAktiv, teile = ALTE_TEILE }) {
+export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv, lernpfadAktiv, teile = ALTE_TEILE, notenform = "tendenz" }) {
   const an = (k) => teile.includes(k);
   const { t } = useLanguage();
   if (!bogen || !bogen.length) return null;
@@ -154,9 +191,35 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
               zuerst sucht — und das Unwichtigste auf diesem Blatt. */}
           {an("note") && (
           <div style={{ fontSize: 16, marginBottom: 20 }}>
-            {t("bogen.punkte", { p: b.punkte, max: b.max })}
-            {b.note ? <> · <strong>{t("bogen.note", { n: b.note })}</strong></> : null}
+            {t("bogen.punkte", { p: halbe(b.punkte), max: halbe(b.max) })}
+            {noteText(b, notenform) ? <> · <strong>{t("bogen.note", { n: noteText(b, notenform) })}</strong></> : null}
           </div>
+          )}
+
+          {/* Zwischenstand der Gesamtnote aus dem Notenbuch: je Bereich die
+              Note und das Gewicht, darunter der Stand insgesamt. Nur das eigene
+              Kind — kein Vergleich mit der Klasse. */}
+          {an("stand") && b.stand && b.stand.bereiche.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, margin: "0 0 6px" }}>{t("bogen.standTitel")}</div>
+              <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 14 }}>
+                <tbody>
+                  {b.stand.bereiche.map((x) => (
+                    <tr key={x.name} style={{ borderBottom: "1px solid #ddd" }}>
+                      <td style={{ padding: "4px 0" }}>{x.name}</td>
+                      <td style={{ padding: "4px 8px", color: "#555", textAlign: "right", width: 56 }}>{x.gewicht} %</td>
+                      <td style={{ padding: "4px 0", textAlign: "right", width: 90, fontWeight: 600 }}>{x.wert != null ? stufenText(x.wert, notenform) : "·"}</td>
+                    </tr>
+                  ))}
+                  {b.stand.gesamt != null && (
+                    <tr>
+                      <td style={{ padding: "6px 0", fontWeight: 700 }} colSpan={2}>{t("bogen.standGesamt")}</td>
+                      <td style={{ padding: "6px 0", textAlign: "right", fontWeight: 700 }}>{stufenText(b.stand.gesamt, notenform)}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {an("themen") && (<>
@@ -171,7 +234,7 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
           {b.offen.length > 0 ? (
             <Abschnitt titel={t("bogen.offen")} farbe={C.danger} icon={ICONS.bulb}>
               {b.offen.map((x) => (
-                <li key={x.label} style={zeile}>{x.label} <span style={klein}>({x.erreicht} / {x.max})</span></li>
+                <li key={x.label} style={zeile}>{x.label}</li>
               ))}
             </Abschnitt>
           ) : (
@@ -240,12 +303,18 @@ export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv
               Linie schreibt die Unterschrift jemand quer ueber die Notiz — und
               die Lehrkraft sieht spaeter nicht, ob es je jemand gelesen hat.
               Datum daneben, weil „unterschrieben" ohne Tag nichts belegt. */}
-          {an("unterschrift") && <div style={{ marginTop: 28, display: "flex", gap: 24, alignItems: "flex-end" }}>
-            <div style={{ width: 120 }}>
-              <div style={{ borderBottom: "1px solid #999", height: 22 }} />
-              <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>{t("bogen.datum")}</div>
+          {an("unterschrift") && <div style={{ marginTop: 28 }}>
+            <div style={{ display: "flex", gap: 24, alignItems: "flex-end" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ borderBottom: "1px solid #999", height: 22 }} />
+                <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>{t("bogen.lehrkraft")}</div>
+              </div>
+              <div style={{ width: 120 }}>
+                <div style={{ borderBottom: "1px solid #999", height: 22 }} />
+                <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>{t("bogen.datum")}</div>
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ marginTop: 24 }}>
               <div style={{ borderBottom: "1px solid #999", height: 22 }} />
               <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>{t("bogen.unterschrift")}</div>
             </div>

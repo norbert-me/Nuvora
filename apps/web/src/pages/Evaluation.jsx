@@ -4,12 +4,15 @@ import { useAktiv } from "../core/modules.js";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, linkBtn, pageApp, panelStyle, quoteFarbe, quoteFlaeche, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
+import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, linkBtn, pageApp, panelStyle, quoteFarbe, quoteFlaeche, selectStyle, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
+import Verteilung from "../components/Verteilung.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
+import { bogenName, druckenMitTitel } from "../core/drucken.js";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
-import { bewerte, statusOf } from "../core/scoring.js";
+import { bewerte, bonusRegelVon, statusOf } from "../core/scoring.js";
+import BonusRegel, { profilBonus } from "../components/BonusRegel.jsx";
 import { mmss } from "../core/datum.js";
 import { median, streuung as stddev } from "../core/statistik.js";
 import { alsJson, hol } from "../core/melden.js";
@@ -46,7 +49,6 @@ function tendencyGrade(pct, scale) {
   return result;
 }
 
-const TENDENCY_GRADES = [1, 2, 3, 4, 5].flatMap((g) => [g, Math.round((g + 0.3) * 10) / 10, Math.round((g + 0.7) * 10) / 10]).concat([6]);
 
 // Boxplot liegt jetzt zentral in Icons.jsx (eine Quelle für CardVote,
 // Klassen-Auswertung und Klassenarbeit). Hier nur noch importiert.
@@ -58,7 +60,7 @@ export default function Evaluation() {
   const [selectedQ, setSelectedQ] = useState(null);
   const [showWeights, setShowWeights] = useState(false);
   const [showScale, setShowScale] = useState(false);
-  const [showFragen, setShowFragen] = useState(false);
+  const [eOffen, setEOffen] = useState(false);   // „E-Aufgaben fuer G-Kinder": standardmaessig zu
   // SuS-Ansicht: alles Persönliche aus (Namen, Punkte, Noten je Kind). Dieselbe
   // Bauform wie in der Klassenarbeit — die Auswertung wird im Unterricht
   // besprochen, und dabei gehört die Leistung eines Kindes nicht an die Wand.
@@ -71,7 +73,6 @@ export default function Evaluation() {
   // Erklaerung erschien sonst ganz unten unter der Fragetabelle statt bei der
   // Kachel.
   const [showCiTop, setShowCiTop] = useState(false);
-  const [gradeView, setGradeView] = useState("bar");
   // Voreinstellung aus dem Profil (grade_tendency): mit Tendenz (2+) oder ganz.
   const [gradeMode, setGradeMode] = useState(() => { try { const u = JSON.parse(localStorage.getItem("user")); return u && u.grade_tendency === false ? "whole" : "tendency"; } catch { return "whole"; } }); // "whole" | "tendency"
   const aktiv = useAktiv();
@@ -85,9 +86,9 @@ export default function Evaluation() {
   useEffect(() => {
     if (sp.get("import") === "1" && notenAktiv && data?.class_id) setNotenDialog(true);
   }, [sp, notenAktiv, data]);
-  const [avgMode, setAvgMode] = useState("pts");
-  const [medMode, setMedMode] = useState("pts");
-  const [sdMode, setSdMode] = useState("pts");
+  // Nur Prozent: erreichte Punkte sind nicht vergleichbar (E/G, Gewichte, Bonus, Minuspunkte —
+  // jedes Kind hat eine andere erreichbare Punktzahl). Es gibt deshalb keinen Umschalter auf Punkte.
+  const avgMode = "pct", medMode = "pct", sdMode = "pct";
   // Lehrer-Übersicht nach Kursniveau filtern ("" = alle).
   const [niveauFilter, setNiveauFilter] = useState("");
   const [loadError, setLoadError] = useState(false);
@@ -101,7 +102,7 @@ export default function Evaluation() {
   // Vorher lief jede dieser Aenderungen nach 800 ms von selbst zum Server —
   // man sah nur ein kurzes „gespeichert" und hatte nichts in der Hand.
   const [gespeicherteConfig, setGespeicherteConfig] = useState({
-    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [], gefehlt: {}, eModus: "bonus",
+    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [], gefehlt: {}, eModus: "bonus", unbenotet: false, ausgeschlossen: [], bonus: profilBonus(),
   });
   // Was sonst noch in der Konfiguration steht (Zeiten aus der Live-Sitzung).
   // Die PUT ersetzt sie als Ganzes — ohne diese Kopie waeren sie nach dem
@@ -112,12 +113,18 @@ export default function Evaluation() {
         ...restConfig.current,
         weights: wert.weights, grade_scale: wert.gradeScale,
         krank: wert.krank, anwesend: wert.anwesend, gefehlt: wert.gefehlt,
-        e_modus: wert.eModus,
+        e_modus: wert.eModus, unbenotet: !!wert.unbenotet, ausgeschlossen: wert.ausgeschlossen || [],
+        bonus_regel: { max_stufen: wert.bonus.maxStufen, mindest_nenner: wert.bonus.mindestNenner, falsch_zehrt: wert.bonus.falschZehrt },
       })).catch(() => null);
     if (!r || !r.ok) return false;
+    // Welche Fragen zaehlen, rechnet der Server — danach also neu laden.
+    const vorher = (gespeicherteConfig.ausgeschlossen || []).join(",");
     setGespeicherteConfig(wert);
+    if ((wert.ausgeschlossen || []).join(",") !== vorher) setNeuLaden((n) => n + 1);
   });
-  const { weights, gradeScale, krank: krankListe, anwesend: anwesendListe, gefehlt: gefehltMap, eModus } = eConf.wert;
+  const { weights, gradeScale, krank: krankListe, anwesend: anwesendListe, gefehlt: gefehltMap, eModus, bonus } = eConf.wert;
+  // Nicht benotet: am Quiz (vom Server) ODER an dieser Auswertung (live aus dem Entwurf).
+  const unbenotet = !!(data && data.unbenotet_quiz) || !!eConf.wert.unbenotet;
 
   // Nach dem Laden die Arbeitskopie auf den geladenen Stand setzen. `useEntwurf`
   // uebernimmt einen neuen Stand nur, wenn NICHTS offen ist — und beim ersten
@@ -125,6 +132,7 @@ export default function Evaluation() {
   // offene Aenderung aus. Ohne diese Zeile stuende die Seite direkt nach dem
   // Aufruf auf „nicht gespeichert" und zeigte den Notenschluessel von vorher.
   const [ladeStand, setLadeStand] = useState(0);
+  const [neuLaden, setNeuLaden] = useState(0);
   // Rueckmeldung je Kind (was sass, was fehlt). Eigener Aufruf statt aus der
   // Auswertung gerechnet: die Regeln (Schwellen, Mindestzahl an Fragen, wer als
   // krank gilt) stehen im Server (app/rueckmeldung.py) und werden vom Kind auf
@@ -150,7 +158,7 @@ export default function Evaluation() {
       clearTimeout(timer);
       if (weg.current) { navigate("/", { replace: true }); return; }
       if (evalData && evalData.questions && evalData.students) setData({ ...evalData, _evalConfig: config || {} });
-      const { weights: _w, grade_scale: _g, krank: _k, anwesend: _a, gefehlt: _f, ...rest } = config || {};
+      const { weights: _w, grade_scale: _g, krank: _k, anwesend: _a, gefehlt: _f, unbenotet: _u, ausgeschlossen: _x, ...rest } = config || {};
       restConfig.current = rest;
       let skala = (config && config.grade_scale) || null;
       if (!skala) {
@@ -168,11 +176,17 @@ export default function Evaluation() {
         gefehlt: (config && config.gefehlt && typeof config.gefehlt === "object") ? config.gefehlt : {},
         // Fehlt der Schluessel (jede Auswertung vor dieser Fassung), gilt
         // „bonus" — sonst aenderte sich ueber Nacht jede alte Note.
-        eModus: ["bonus", "keine", "alle"].includes(config && config.e_modus) ? config.e_modus : "bonus",
+        eModus: ["bonus", "ausgleich", "keine", "alle"].includes(config && config.e_modus) ? config.e_modus : "bonus",
+        unbenotet: !!(config && config.unbenotet),
+        ausgeschlossen: (config && Array.isArray(config.ausgeschlossen)) ? config.ausgeschlossen.map(Number) : [],
+        // Ohne eigene Regel an dieser Auswertung gilt die Vorgabe aus dem Profil,
+        // sonst die eingebaute. Bestandsauswertungen behalten damit ihre Zahlen,
+        // solange im Profil nichts steht.
+        bonus: config && config.bonus_regel ? bonusRegelVon(config) : profilBonus(),
       });
       setLadeStand((n) => n + 1);
     });
-  }, [id]);
+  }, [id, neuLaden]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Datei holen und speichern — dreimal dieselbe Zeile inline war einmal zu oft.
   const holen = async (url, dateiname) => {
@@ -271,7 +285,7 @@ export default function Evaluation() {
   const werte = (s) => bewerte(
     questions.map((q) => ({ id: q.id, correct_answer: q.correct_answer, niveau: q.niveau || "", topic_id: q.topic_id ?? null })),
     Object.fromEntries(s.answers.map((a) => [a.question_id, a.answer])),
-    { niveau: s.niveau || "", niveauAktiv, eModus, minuspunkte, weights, scale: gradeScale,
+    { niveau: s.niveau || "", niveauAktiv, eModus, regel: bonus, minuspunkte, weights, scale: gradeScale,
       gefehltTopics: (gefehltMap || {})[String(s.card_id)] || [] },
   );
 
@@ -305,6 +319,8 @@ export default function Evaluation() {
 
   const scores = presentStudents.map((s) => s.weightedScore);
   const pcts = presentStudents.map((s) => s.pct);
+  // LE-Kinder bekommen keine Note: sie zaehlen nicht in Notenverteilung und Notenschnitt.
+  const notenPcts = presentStudents.filter((s) => !s.le).map((s) => s.pct);
   const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
   // Prozentwerte kommen aus der Wertung je Kind (bei E/G hat nicht jedes
   // dieselbe erreichbare Punktzahl) — nicht mehr aus einem gemeinsamen Maximum.
@@ -313,18 +329,6 @@ export default function Evaluation() {
   const medianPct = pcts.length > 0 ? Math.round(median(pcts)) : 0;
   const sd = stddev(scores);
   const sdPct = pcts.length > 0 ? stddev(pcts) : 0;
-
-const gradeDistribution = (() => {
-    if (gradeMode === "tendency") {
-      const dist = {};
-      TENDENCY_GRADES.forEach((g) => { dist[g] = 0; });
-      pcts.forEach((p) => { dist[tendencyGrade(p, gradeScale)]++; });
-      return dist;
-    }
-    const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-    pcts.forEach((p) => { dist[Math.round(gradeFromPct(p, gradeScale))]++; });
-    return dist;
-  })();
 
   const questionStats = questions.map((q, qi) => {
     let correct = 0;
@@ -395,19 +399,26 @@ const gradeDistribution = (() => {
 
   const suggestions = (() => {
     const tips = [];
-    const tooEasy = questionStats.filter((s, i) => s.pct >= 90 && questions[i].correct_answer);
-    const tooHard = questionStats.filter((s, i) => s.pct <= 20 && s.answered > 0 && questions[i].correct_answer);
-    const lowDisc = questionStats.filter((s) => s.discrimination !== null && s.discrimination < 0.1 && s.answered > 0);
-    const negDisc = questionStats.filter((s) => s.discrimination !== null && s.discrimination < 0);
+    // Je Vorschlag die betroffenen Fragen (Index): sie werden verlinkt und oeffnen die Frage.
+    const idx = (f) => questionStats.map((s, i) => (f(s, i) ? i : -1)).filter((i) => i >= 0);
+    const tooEasy = idx((s, i) => s.pct >= 90 && questions[i].correct_answer);
+    const tooHard = idx((s, i) => s.pct <= 20 && s.answered > 0 && questions[i].correct_answer);
+    const lowDisc = idx((s) => s.discrimination !== null && s.discrimination < 0.1 && s.answered > 0);
+    const negDisc = idx((s) => s.discrimination !== null && s.discrimination < 0);
 
     if (tooEasy.length > 0)
-      tips.push(t("cv.tipTooEasy", { n: tooEasy.length }));
+      tips.push({ text: t("cv.tipTooEasy", { n: tooEasy.length }), fragen: tooEasy });
     if (tooHard.length > 0)
-      tips.push(t("cv.tipTooHard", { n: tooHard.length }));
+      tips.push({ text: t("cv.tipTooHard", { n: tooHard.length }), fragen: tooHard });
     if (negDisc.length > 0)
-      tips.push(t("cv.tipNegDisc", { n: negDisc.length }));
+      tips.push({ text: t("cv.tipNegDisc", { n: negDisc.length }), fragen: negDisc });
     if (lowDisc.length > 1)
-      tips.push(t("cv.tipLowDisc", { n: lowDisc.length }));
+      tips.push({ text: t("cv.tipLowDisc", { n: lowDisc.length }), fragen: lowDisc });
+    // Gewichtung: wer etwas aendern kann, soll es hier erfahren — und mit einem Klick dort sein.
+    if (tooEasy.length > 0)
+      tips.push({ text: t("cv.tipWeightEasy"), fragen: tooEasy, gewicht: true });
+    if (negDisc.length > 0 || tooHard.length > 0)
+      tips.push({ text: t("cv.tipWeightOut"), fragen: [...new Set([...negDisc, ...tooHard])], gewicht: true });
 
     if (avgPct > 85) tips.push(t("cv.tipEasyOverall"));
     if (avgPct < 40) tips.push(t("cv.tipHardOverall"));
@@ -457,7 +468,7 @@ const gradeDistribution = (() => {
     const avgGrade = presentStudents.length > 0
       ? pcts.reduce((sum, p) => sum + gradeFromPct(p, gradeScale), 0) / presentStudents.length
       : 0;
-    if (avgGrade >= 4.5 && avgPct >= 40)
+    if (!unbenotet && avgGrade >= 4.5 && avgPct >= 40)
       tips.push(t("cv.tipGradeAvg", { avg: avgGrade.toFixed(1) }));
 
     return tips;
@@ -541,16 +552,23 @@ const gradeDistribution = (() => {
               <span style={{ width: 28, fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{k}</span>
               {/* Balken: der Radius rundet die Kappe der Grafik, kein
                   Bedienelement — deshalb Zahl statt Token. */}
-              <div style={{ flex: 1, height: 28, background: "var(--bg2)", borderRadius: 6, overflow: "hidden" }}>
+              <div style={{ flex: 1, height: 28, background: "var(--bg2)", borderRadius: 6, overflow: "hidden", position: "relative" }}>
+                {/* Ein schmaler Balken (1 von 23) hat keinen Platz fuer seine Beschriftung: sie stand halb
+                    darin und sah kaputt aus. Unter 18 % steht sie NEBEN dem Balken, in Textfarbe. */}
                 <div style={{
                   height: "100%", width: `${pct}%`,
                   background: isCorrect ? C.success : ANTWORT_COLORS[k],
                   borderRadius: 6, display: "flex", alignItems: "center", paddingLeft: 8,
                   color: C.aufAkzent, fontSize: 13, fontWeight: 600, transition: "width 0.3s",
-                  minWidth: count > 0 ? 28 : 0, opacity: isCorrect ? 1 : 0.6,
+                  minWidth: count > 0 ? 6 : 0, opacity: isCorrect ? 1 : 0.6,
                 }}>
-                  {count > 0 && `${count} (${Math.round(pct)}%)`}
+                  {count > 0 && pct >= 18 && `${count} (${Math.round(pct)}%)`}
                 </div>
+                {count > 0 && pct < 18 && (
+                  <span style={{ position: "absolute", top: 0, bottom: 0, left: `calc(${pct}% + 8px)`, display: "flex", alignItems: "center", fontSize: 13, fontWeight: 600, color: "var(--text2)" }}>
+                    {count} ({Math.round(pct)}%)
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -559,8 +577,6 @@ const gradeDistribution = (() => {
     );
   }
 
-  const maxGrade = Math.max(...Object.values(gradeDistribution), 1);
-
   return (
     <div>
       <Link to="/cardvote/tests" style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 5 }}>
@@ -568,7 +584,7 @@ const gradeDistribution = (() => {
       </Link>
       {notenDialog && (
         <NotenImport
-          sessionId={Number(id)} classId={data.class_id} kursId={data.kurs_id ?? null} sessionName={data.session_name}
+          sessionId={Number(id)} classId={data.class_id} kursId={data.kurs_id ?? null} mehrereKurse={(data.kurse || []).length > 1} sessionName={data.session_name}
           grades={alleAnwesend.map((st) => ({
             card_id: st.card_id, name: st.name,
             value: gradeMode === "tendency"
@@ -578,7 +594,37 @@ const gradeDistribution = (() => {
           onClose={() => setNotenDialog(false)}
         />
       )}
-      <h2 style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{session_name || t("cv.sessionFallback", { id })}</h2>
+      <h2 style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{session_name || t("cv.sessionFallback", { id })}
+        {unbenotet && <span style={{ ...chipStyle, marginLeft: 10, fontSize: 12, verticalAlign: "middle" }}>{t("dash.unbenotetToggle")}</span>}</h2>
+      {data.question_set_id && (
+        <Link to={`/cardvote/questions?set=${data.question_set_id}`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--accent)", textDecoration: "none", fontWeight: 500, marginTop: 2 }}>
+          <Icon d={ICONS.chevronRight} size={13} color="var(--accent)" /> {t("cv.zurFragensammlung")}
+        </Link>
+      )}
+      {/* Nicht benotet: diese Auswertung zaehlt nicht als Note. Die Kinder sehen es an ihrem Zugang
+          („Übung"), die Notenverteilung fällt weg. Ist schon das Quiz so markiert, steht es oben als Marke. */}
+      {!data.unbenotet_quiz && (
+        <div style={{ margin: "4px 0 8px" }}>
+          <Toggle checked={!!eConf.wert.unbenotet} onChange={(v) => eConf.setz({ unbenotet: v })} label={t("dash.unbenotetToggle")} />
+        </div>
+      )}
+      {/* Derselbe Test in einem anderen Kurs der Klasse? Umhängen ist eine
+          Handlung (wie Archivieren), keine Einstellung — sie gilt sofort. */}
+      {(data.kurse || []).length > 1 && (
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)", margin: "4px 0 8px" }}>
+          {t("cv.kursZuweisen")}
+          <select value={data.kurs_id ?? ""} style={{ ...selectStyle, minWidth: 160 }}
+            onChange={async (ev) => {
+              const neu = ev.target.value ? Number(ev.target.value) : null;
+              const r = await fetch(`/api/sessions/${id}/kurs`, alsJson("PUT", { kurs_id: neu })).catch(() => null);
+              if (r && r.ok) setData((d) => ({ ...d, kurs_id: neu }));
+            }}>
+            {data.kurs_id == null && <option value="">{t("cv.kursWaehlen")}</option>}
+            {data.kurse.map((k) => <option key={k.id} value={k.id}>{k.fach ? `${k.fach} · ` : ""}{k.name}</option>)}
+          </select>
+        </label>
+      )}
 
       {/* Eine Werkzeugleiste wie ueberall: der eine Alltagsgriff (Note
           uebernehmen) sichtbar, die drei Exporte im Menue. Vorher standen hier
@@ -593,7 +639,7 @@ const gradeDistribution = (() => {
       >
         {/* Nur sichtbar, wenn das Notenmodul aktiv ist — sonst fuehrt der
             Knopf ins Leere (Regel 3: CardVote haengt nicht von Noten ab). */}
-        {notenAktiv && data.class_id && (
+        {notenAktiv && data.class_id && !unbenotet && (
           <button onClick={() => setNotenDialog(true)} style={toolbarBtn}>
             {t("notenimp.button")}
           </button>
@@ -603,7 +649,7 @@ const gradeDistribution = (() => {
           <Icon d={ICONS.eye} size={15} color={susAnsicht ? C.aufAkzent : "var(--text2)"} /> {t("klassenarbeit.presentMode")}
         </button>
         {bogen.length > 0 && (
-          <button onClick={() => window.print()} style={toolbarBtn} title={t("bogen.printHint")}>
+          <button onClick={() => druckenMitTitel(bogenName(session_name))} style={toolbarBtn} title={t("bogen.printHint")}>
             <Icon d={ICONS.print} size={15} /> {t("bogen.print")}
           </button>
         )}
@@ -642,16 +688,35 @@ const gradeDistribution = (() => {
           und Notenschluessel. */}
       {niveauAktiv && (
         <div style={{ ...panelStyle, padding: 16, marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-            <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{t("cv.eModusTitle")}</h4>
-            <Tabs value={eModus} onChange={(v) => eConf.setz({ eModus: v })} style={{ marginLeft: "auto" }}
-              options={[["bonus", t("cv.eModusBonus")], ["keine", t("cv.eModusKeine")], ["alle", t("cv.eModusAlle")]]} />
+          {/* Eingeklappt steht nur die Ueberschrift mit der gewaehlten Regel: die Erklaerung
+              braucht man beim Einstellen, nicht bei jedem Blick auf die Auswertung. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: eOffen ? 8 : 0 }}>
+            <button onClick={() => setEOffen((v) => !v)} aria-expanded={eOffen}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--text)" }}>
+              <Icon d={eOffen ? ICONS.chevronDown : ICONS.chevronRight} size={14} color="var(--text3)" />
+              <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: 0 }}>{t("cv.eModusTitle")}</h4>
+            </button>
+            {eOffen ? (
+              <Tabs value={eModus} onChange={(v) => eConf.setz({ eModus: v })} style={{ marginLeft: "auto" }}
+                options={[["bonus", t("cv.eModusBonus")], ["ausgleich", t("cv.eModusAusgleich")], ["keine", t("cv.eModusKeine")], ["alle", t("cv.eModusAlle")]]} />
+            ) : (
+              <span style={{ ...chipStyle, fontSize: 12 }}>
+                {eModus === "bonus" ? t("cv.eModusBonus") : eModus === "ausgleich" ? t("cv.eModusAusgleich")
+                  : eModus === "keine" ? t("cv.eModusKeine") : t("cv.eModusAlle")}
+              </span>
+            )}
           </div>
-          <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6 }}>
-            {eModus === "bonus" ? t("cv.eModusBonusText")
-              : eModus === "keine" ? t("cv.eModusKeineText")
-              : t("cv.eModusAlleText")}
-          </p>
+          {eOffen && (
+            <>
+              <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6 }}>
+                {eModus === "bonus" ? t("cv.eModusBonusText")
+                  : eModus === "ausgleich" ? t("cv.eModusAusgleichText")
+                  : eModus === "keine" ? t("cv.eModusKeineText")
+                  : t("cv.eModusAlleText")}
+              </p>
+              {(eModus === "bonus" || eModus === "ausgleich") && <BonusRegel wert={bonus} onChange={(b) => eConf.setz({ bonus: b })} t={t} />}
+            </>
+          )}
         </div>
       )}
 
@@ -661,20 +726,14 @@ const gradeDistribution = (() => {
         <Stat
           label={avgMode === "pts" ? t("cv.statAvgPoints") : t("cv.statAvgPct")}
           value={avgMode === "pts" ? fmt(avgScore) : `${avgPct}%`}
-          onClick={() => setAvgMode(avgMode === "pts" ? "pct" : "pts")}
-          clickable
         />
         <Stat
           label={medMode === "pts" ? t("cv.statMedian") : t("cv.statMedianPct")}
           value={medMode === "pts" ? fmt(medianScore) : `${medianPct}%`}
-          onClick={() => setMedMode(medMode === "pts" ? "pct" : "pts")}
-          clickable
         />
         <Stat
           label={sdMode === "pts" ? t("cv.statSd") : t("cv.statSdPct")}
           value={sdMode === "pts" ? fmt(sd) : `${sdPct.toFixed(1)}%`}
-          onClick={() => setSdMode(sdMode === "pts" ? "pct" : "pts")}
-          clickable
           info={() => setShowSdInfo(!showSdInfo)}
         />
         {quizCi && (
@@ -708,50 +767,12 @@ const gradeDistribution = (() => {
       {/* KI-Erklaerung der oberen Kachel — direkt hier, nicht am Seitenende. */}
       {showCiTop && <CiInfoBox onClose={() => setShowCiTop(false)} />}
 
-      {/* Notenverteilung / Boxplot toggle */}
+      {/* Notenverteilung / Boxplot: das gemeinsame Feld. */}
       <div style={{ ...panelStyle, padding: 16, marginBottom: 12 }}>
-        {/* Reiter aus dem Kern (Tabs) statt vier nachgebauter Pillen. */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-          <Tabs value={gradeView} onChange={setGradeView}
-            options={[["bar", t("cv.gradeDistribution")], ["box", t("cv.boxplot")]]} />
-          {gradeView === "bar" && (
-            <Tabs value={gradeMode} onChange={setGradeMode} style={{ marginLeft: "auto" }}
-              options={[["whole", t("cv.wholeGrades")], ["tendency", t("cv.tendencyGrades")]]} />
-          )}
-        </div>
-        {gradeView === "bar" ? (
-          <div style={{ display: "flex", alignItems: "flex-end", gap: gradeMode === "tendency" ? 3 : 8 }}>
-            {(gradeMode === "tendency" ? TENDENCY_GRADES : [1, 2, 3, 4, 5, 6]).map((g) => {
-              const count = gradeDistribution[g];
-              const barH = maxGrade > 0 ? Math.round((count / maxGrade) * 80) : 0;
-              const colorGrade = gradeMode === "tendency" ? Math.min(6, Math.round(g)) : g;
-              return (
-                <div key={g} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <span style={{ fontSize: gradeMode === "tendency" ? 11 : 12, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{count || ""}</span>
-                  <div style={{
-                    width: "100%", maxWidth: gradeMode === "tendency" ? 26 : 48, height: barH, minHeight: count > 0 ? 8 : 2,
-                    background: count > 0 ? GRADE_COLORS[colorGrade] : "var(--border3)", borderRadius: "6px 6px 0 0", transition: "height 0.3s", opacity: count > 0 ? 0.85 : 0.3,
-                  }} />
-                  <span style={{ fontSize: gradeMode === "tendency" ? 11 : 13, fontWeight: 600, color: "var(--text3)", marginTop: 4, whiteSpace: "nowrap" }}>{gradeMode === "tendency" ? g.toFixed(1) : g}</span>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          scores.length >= 3
-            // Bei E/G ist die erreichbare Punktzahl je Kind verschieden — dann
-            // ist Prozent die einzige gemeinsame Achse.
-            ? (<>
-                {/* Was die Achse zeigt, muss dranstehen: neben einer
-                    Notenverteilung im Reiter daneben liest man die Zahlen
-                    sonst als Noten — und 85 waere dort eine sehr schlechte. */}
-                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}>
-                  {niveauAktiv ? t("cv.boxplotAxisPct") : t("cv.boxplotAxisPts", { max: fmt(maxScore) })}
-                </div>
-                {niveauAktiv ? <Boxplot values={pcts} max={100} /> : <Boxplot values={scores} max={maxScore} />}
-              </>)
-            : <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("cv.needThree")}</p>
-        )}
+        <Verteilung
+          noten={unbenotet ? null : notenPcts.map((p) => tendencyGrade(p, gradeScale))}
+          pct={pcts}
+          fein={gradeMode === "tendency"} onFein={(v) => setGradeMode(v ? "tendency" : "whole")} />
       </div>
 
       {/* Notenschlüssel + Gewichtung */}
@@ -761,13 +782,12 @@ const gradeDistribution = (() => {
       <Werkzeugleiste style={{ marginBottom: 12 }}
         links={
           <Tabs
-            value={showScale ? "scale" : showWeights ? "weights" : showFragen ? "fragen" : ""}
+            value={showScale ? "scale" : showWeights ? "weights" : ""}
             onChange={(v) => {
               setShowScale(v === "scale" && !showScale);
               setShowWeights(v === "weights" && !showWeights);
-              setShowFragen(v === "fragen" && !showFragen);
             }}
-            options={[["scale", t("cv.gradeScale")], ["weights", t("cv.weights")], ["fragen", t("cv.allQuestions")]]}
+            options={[...(unbenotet ? [] : [["scale", t("cv.gradeScale")]]), ["weights", t("cv.weights")]]}
           />
         }
       />
@@ -796,7 +816,7 @@ const gradeDistribution = (() => {
       )}
 
       {showWeights && (
-        <div style={{ ...cardStyle, marginBottom: 12 }}>
+        <div id="gewichte" style={{ ...cardStyle, marginBottom: 12 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>{t("cv.weights")}</h3>
           <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>{t("cv.weightsHint")}</p>
           <style>{NUM_CSS}</style>
@@ -812,62 +832,9 @@ const gradeDistribution = (() => {
         </div>
       )}
 
-      {/* Alle Fragen des Tests zum Nachlesen.
-          Bisher kam man an eine Frage nur ueber die senkrecht gestellten
-          Spaltenkoepfe der Tabelle („F3") — das findet niemand, der nicht
-          weiss, dass sie anklickbar sind, und beim Besprechen im Unterricht
-          ist „was stand in Frage 3?" die haeufigste Frage. Hier steht der
-          Wortlaut, die richtige Antwort und wie viele sie hatten; ein Klick
-          fuehrt in die bestehende Einzelansicht. */}
-      {showFragen && (
-        <div style={{ ...cardStyle, marginBottom: 12, display: "grid", gap: 8 }}>
-          {questions.map((q, i) => {
-            const stat = questionStats[i];
-            const loesung = (q.correct_answer || "").split("").filter(Boolean);
-            return (
-              <button key={q.id} onClick={() => setSelectedQ(i)}
-                style={{
-                  display: "flex", alignItems: "flex-start", gap: 12, textAlign: "left", width: "100%",
-                  padding: "10px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border3)",
-                  background: "var(--bg3)", cursor: "pointer", color: "var(--text)",
-                }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", flexShrink: 0, paddingTop: 2 }}>
-                  F{i + 1}{niveauAktiv && (q.niveau || "") === "E" ? " · E" : ""}
-                </span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5 }}>
-                  <Latex>{q.text}</Latex>
-                  <span style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-                    {loesung.map((k) => (
-                      <span key={k} style={{ ...chipStyle, fontSize: 12, fontWeight: 700, padding: "2px 8px", background: ANTWORT_COLORS[k], color: C.aufAkzent }}>
-                        {k} <Latex>{q.choices?.[k] || ""}</Latex>
-                      </span>
-                    ))}
-                    {!loesung.length && <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("cv.noSolution")}</span>}
-                  </span>
-                </span>
-                <span style={{ fontSize: 12, color: "var(--text3)", flexShrink: 0, paddingTop: 2 }}>
-                  {stat ? `${stat.correct}/${stat.answered}` : ""}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Vorschläge */}
-      {suggestions.length > 0 && (
-        <div style={{ ...panelStyle, padding: 16, background: "var(--warn-bg)", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <Icon d={ICONS.bulb} size={18} color="var(--text2)" />
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{t("cv.suggestions")}</h3>
-          </div>
-          {suggestions.map((tip, i) => (
-            <div key={i} style={{ fontSize: 13, color: "var(--text)", marginBottom: 8, lineHeight: 1.5, paddingLeft: 12, borderLeft: `2px solid ${C.warning}` }}>
-              {tip}
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Die Fragen erreicht man ueber die Spaltenkoepfe der Tabelle (F1, F2 …) und ueber
+          den Link zur Fragensammlung oben — ein eigener „Fragen"-Reiter war die dritte
+          Kopie derselben Navigation. */}
 
       <TopicAnalysis questions={questions} presentStudents={presentStudents} />
 
@@ -908,7 +875,11 @@ const gradeDistribution = (() => {
             {presentStudents
               .map((student) => {
               const pct = Math.round(student.pct);
-              const grade = gradeFromPct(pct, gradeScale);
+              // Die Note aus dem GENAUEN Prozentwert, nicht aus dem gerundeten
+              // Anzeigewert: Verteilung und Notenübernahme rechnen auch genau, und
+              // aus „89 %“ ein 1,8 zu machen, während die Verteilung 2,0 zählt,
+              // ließ dieselbe Leistung zwei Noten haben.
+              const grade = gradeFromPct(student.pct, gradeScale);
               return (
                 <tr key={student.card_id}>
                   <td style={{ ...td, ...klebtLinks, fontWeight: "bold" }}>
@@ -994,7 +965,7 @@ const gradeDistribution = (() => {
                     )}
                   </td>
                   <td style={{ ...td, textAlign: "center", fontWeight: 700, color: GRADE_COLORS[Math.round(grade)] }}>
-                    {student.ownMax > 0 ? grade.toFixed(1) : "–"}
+                    {student.le ? <span title={t("kurse.leHint")}>LE</span> : student.ownMax > 0 && !unbenotet ? grade.toFixed(1) : "–"}
                   </td>
                 </tr>
               );
@@ -1027,7 +998,30 @@ const gradeDistribution = (() => {
             ))}
           </tbody>
           <tfoot>
+            {/* Fragen, die nie gestellt wurden (Versuch abgebrochen), lassen sich hier aus der Wertung nehmen:
+                fehlende Antworten waeren sonst fuer alle falsch. Ausgenommene stehen rechts und lassen sich zurueckholen. */}
             <tr style={{ borderTop: "2px solid var(--border3)" }}>
+              <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }} title={t("cv.nichtWertenHint")}>{t("cv.werten")}</td>
+              {questions.map((q) => (
+                <td key={q.id} style={{ ...td, textAlign: "center" }}>
+                  <input type="checkbox" checked aria-label={`${t("cv.werten")} ${q.text}`}
+                    onChange={() => eConf.setz({ ausgeschlossen: [...new Set([...(eConf.wert.ausgeschlossen || []), q.id])] })} />
+                </td>
+              ))}
+              <td style={{ ...td, whiteSpace: "normal", fontSize: 12 }} colSpan={3}>
+                {(data.ausgeschlossen || []).map((q) => {
+                  const aus = (eConf.wert.ausgeschlossen || []).includes(q.id);
+                  return (
+                    <label key={q.id} style={{ display: "flex", alignItems: "center", gap: 6, color: aus ? "var(--text3)" : "var(--text)", textDecoration: aus ? "line-through" : "none", maxWidth: 260 }}>
+                      <input type="checkbox" checked={!aus}
+                        onChange={() => eConf.setz({ ausgeschlossen: aus ? (eConf.wert.ausgeschlossen || []).filter((x) => x !== q.id) : [...(eConf.wert.ausgeschlossen || []), q.id] })} />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.text}</span>
+                    </label>
+                  );
+                })}
+              </td>
+            </tr>
+            <tr>
               <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }}>{t("cv.statCorrect")}</td>
               {questionStats.map((stat, i) => (
                 <td key={i} style={{ ...td, textAlign: "center", fontSize: 12, fontWeight: "bold", color: quoteFarbe(stat.pct) }}>
@@ -1232,7 +1226,7 @@ function SchliessenBtn({ onClick, t }) {
 
 
 // Dialog: CardVote-Testnoten in eine Kategorie des Notenmoduls uebernehmen.
-function NotenImport({ sessionId, classId, kursId = null, sessionName, grades, onClose }) {
+function NotenImport({ sessionId, classId, kursId = null, mehrereKurse = false, sessionName, grades, onClose }) {
   const { t } = useLanguage();
   const heute = () => { const d = new Date(); return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`; };
   const [sectionId, setSectionId] = useState(null);
@@ -1274,7 +1268,11 @@ function NotenImport({ sessionId, classId, kursId = null, sessionName, grades, o
                 {/* Mit kursId: ohne ihn standen hier die Abschnitte ALLER
                     Faecher dieser Klasse, und die Spalte landete im Notenbuch
                     eines anderen Fachs — dort, wo sie niemand sucht. */}
-                <AbschnittWahl classId={classId} kursId={kursId} value={sectionId} onChange={setSectionId} />
+                {/* Liegt die Klasse in mehreren Kursen und dieser Test ist keinem zugewiesen, wird nicht geraten:
+                    erst den Kurs waehlen (oben auf der Seite), dann die Abschnitte. */}
+                {kursId == null && mehrereKurse
+                  ? <p style={{ fontSize: 13, color: C.warning, margin: 0 }}>{t("cv.kursErstWaehlen")}</p>
+                  : <AbschnittWahl classId={classId} kursId={kursId} value={sectionId} onChange={setSectionId} />}
 
                 <div style={lbl}>{t("notenimp.colName")}</div>
                 <div style={{ display: "flex", gap: 6 }}>

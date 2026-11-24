@@ -14,7 +14,204 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
-## Unveröffentlicht
+## 4.6.1 — 23.11.2026
+
+- **Notenbuch:** Quartalsstriche stehen nicht mehr in der Tabelle, sondern im Verlauf der Gesamtnoten — per Datum setzen („Strich setzen“) und mit dem Kreuz wieder entfernen. Bestehende Striche werden einmalig in das Datum ihrer Spalte umgewandelt.
+- **Hilfe:** neue FAQ — Noten den Kindern mitteilen, Notenbuch am Beamer, Daten aus einer Sicherung zurückholen, Quartal im Verlauf markieren, fremden Kalendertermin ändern, fehlende Stunde bei Untis, Datenschutz.
+
+## 4.6.0 — 23.11.2026
+
+- **Sicherheit:** Namen, Noten, Förder- und Maßnahmenangaben, Fotos, Notizen und die Konto-E-Mail liegen jetzt **verschlüsselt** in der Datenbank (AES-256-GCM). Der Schlüssel steht nur in der `.env` des Servers (Kopie: `.deploy.env`), nie in der Sicherung. **Beim ersten Deploy zeigt `deploy.sh` ihn einmal an — in den Passwortmanager legen.**
+- **Sicherheit:** Pillow 13.0.0 und aktualisierte Abhängigkeiten (schließen die offenen GitHub-Warnungen); Pfadprüfung in der lokalen App gehärtet.
+- **Wiederherstellung:** neu unter `/wiederherstellung` (Link im Papierkorb): je Modul mit einer Sicherung vergleichen und zurückholen — was fehlt, was anders ist, was neu ist. Nur eigene Daten, nichts wird gelöscht.
+- **Sicherung:** das Zurückspielen läuft jetzt auch mit den echten Daten (Kurs-Vorgänger und verwaiste Bezüge brachten es zum Scheitern); Chiffretext bleibt in der Sicherung verschlüsselt.
+- **Notenbuch:** deutlich flotter bei vielen Noten (Klick, Eintragen, Scrollen); Kinder sortierbar nach Nachname, Vorname oder Klasse; Quartalsstriche im Verlauf der Gesamtnoten; schlägt das Laden fehl, steht ein Hinweis mit „Erneut laden“ statt einer leeren Tabelle.
+- **Startseite:** die Widgets halten beim Laden ihren Platz und springen nicht mehr.
+- **Untis:** ausgefallene Stunden verschwinden aus dem Stundenplan (kein „Entfall“-Eintrag mehr); ersetzte Klasse, Fach oder Lehrkraft wird als Vertretung erkannt, auch wenn Untis die Stunde als normal führt.
+- **Kurse:** Klick auf den Namen zeigt Kinder, nächste Arbeit, Notenschnitt und Wiederholungsbedarf.
+- **CardVote:** Bilder als SVG lassen sich wieder einfügen (werden zu PNG), Upload-Fehler werden angezeigt; die Note einer Auswertung landet nicht mehr im Standard-Kurs der Klasse, wenn die Klasse in mehreren Kursen liegt.
+- **Klassenarbeit:** der Vergleich nimmt nur Klassen derselben Stufe; ein Klick auf eine Klasse öffnet deren Arbeit.
+- **Kalender:** ein fremder Termin lässt sich als eigener übernehmen und ändern — das Original wird dabei ausgeblendet.
+- **Menüs und Seite:** Aufklappmenüs werden nicht mehr von abgerundeten Karten abgeschnitten; die Fußzeile steht auch bei kurzen Seiten unten.
+- **Fehler melden:** Dateien per Drag & Drop oder als eingefügter Screenshot anhängen.
+
+## 4.5.8 — 13.11.2026
+
+- **Klassenarbeit:** die Auswahl der Arbeiten bleibt nach Datum sortiert, die älteste oben (in 4.5.7 sortierte sie danach noch einmal nach Namen).
+- **Notenbuch:** NB steht nicht mehr als Kommentar da — der Kommentar-Dialog öffnet sich bei einer NB-Zelle leer.
+- **Reihen:** in der Auswahl stehen alle Stunden des Kurses (auch ohne Inhalt), abhaken was in die Reihe soll; beim „In einen Kurs spielen“ lassen sich einzelne Stunden der Reihe abhaken.
+
+## 4.5.7 — 13.11.2026
+
+- **Klassenarbeit:** ein Klick auf die Note wechselt zwischen NB (nicht bewertet) und der Note; der UB-Knopf am Namen entfällt, überall heißt es jetzt NB. Die Auswahl der Arbeiten ist nach Datum sortiert, die älteste oben.
+- **Notenbuch:** ein Kind, das in der Arbeit auf NB steht, zeigt dort NB statt einer fehlenden Note; Klassenarbeits-Noten tragen keinen Kommentar „Klassenarbeit“ mehr.
+- **Verteilung:** Notenbuch, Klassenarbeit und CardVote zeigen dasselbe Feld — Balken oder Boxplot, Noten oder Teilnoten, % oder Note, immer gleich hoch; beim Boxplot steht die gute Seite links.
+- **Reihen:** vorhandene Stunden eines Kurses lassen sich mit Häkchen auswählen und als neue Reihe speichern oder an eine bestehende Reihe anhängen; im Kalender steht „In einen Kurs spielen“ im ⋯-Menü. Die Liste ist nach Fach, Stufe und Reihe gegliedert.
+- **Startseite:** „Schwache Lernende“ erscheint nur, wenn die Frühwarnung jemanden meldet.
+- **Kurs:** der Knopf „Lernstand“ ist wieder entfernt.
+
+## 4.5.6 — 13.11.2026
+
+- **Notenbuch:** die Kommentar-Ecke oben rechts ist dunkel und auch auf gelb oder rot markierten Zellen zu sehen; die Zellen von LE-Kindern in Klassenarbeits-Spalten sind schraffiert markiert.
+- **Boxplot:** klassisch gezeichnet — die Antennen reichen bis zum kleinsten und größten Wert, keine roten Ausreißer-Punkte mehr.
+- **Kurs → Lernstand:** zeigt jedes Kind mit seinem Stand (Auffällige zuerst), nicht nur die gemeldeten.
+- **CardVote-Auswertung:** „Werten“ steht jetzt als Häkchen-Zeile unten in der Ergebnistabelle (statt Knöpfe in „Fragen“); ausgenommene Fragen stehen rechts daneben und lassen sich wieder anhaken.
+- **CardVote-Sitzung:** abwesende Kinder verschwinden auch dann aus der Liste der noch zu scannenden, wenn sie in einer anderen Klasse des Kurses stehen (die Anwesenheit wird für alle Klassen des Kurses geholt).
+
+## 4.5.5 — 12.11.2026
+
+- **Kurs:** unter „Im Kurs öffnen“ gibt es „Lernstand“ — die Frühwarn-Darstellung über Quizze **und** Klassenarbeiten. In der CardVote-Auswertung zählen wieder nur die Tests.
+- **CardVote-Auswertung:** eine Frage lässt sich nachträglich „nicht werten“ (Ansicht „Alle Fragen“) — sie zählt dann in Note, Themen, Rückmeldung und Zugang der Kinder nicht mehr, z. B. wenn der Versuch abbrach und sie nie gestellt wurde. Zurücknehmen mit „Wieder werten“.
+- **Klassenarbeit:** unter dem Punkte-Raster stehen die Zeilen „Gewicht“ (Anteil jeder Aufgabe an der Arbeit) und „Ø Klasse“ (Schnitt in Prozent je Aufgabe und Teilaufgabe); die Gewichtung nach Themen ist eingeklappt.
+- **Notenbuch:** beim Öffnen sind immer alle Spalten ausgeklappt; die Notenverteilung lässt sich direkt am Diagramm auf Teilnoten umschalten (wie in der Klassenarbeit).
+- **Startseite:** neues Widget „Schwache Lernende“ (aus; im Bearbeiten-Bereich einzuschalten) — die Kinder, die die Frühwarnung über mehrere Tests und Arbeiten hinweg meldet, mit Abstand zur Klasse und Sprung in die Ansicht des Kindes. Am Beamer bleibt es verborgen.
+- **CardVote-Auswertung:** die Vorschläge verlinken auf die betroffenen Fragen (F3 öffnet Frage 3) und nennen Gewichtungsempfehlungen mit Sprung zur Gewichtung; kleine Balken in der Antwortverteilung (z. B. 1 von 23) tragen ihre Beschriftung daneben statt halb darin.
+- **Klassenarbeit:** einzelne Kinder lassen sich als „UB“ (unbewertet) markieren — Punkte und Rückmeldung bleiben, das Kind zählt aber nicht in Notenverteilung und Schnitt und geht nicht ins Notenbuch.
+- **Rückmeldebogen:** der Dateiname beim „Als PDF sichern“ ist „Rückmeldebogen_<Name der Arbeit>“ (Klassenarbeit und CardVote-Test).
+- **LE:** ein Kind mit „Lernen“ an der Zeile, aber nur „LRS“ an der Person, bekam am Zugang trotzdem eine Note — jetzt gilt LE, sobald Person oder Zeile es sagt.
+- **Zugang der Kinder:** der Hinweis „Dein Übungsstand wird unter deinem Namen gespeichert …“ steht nicht mehr da.
+- **Seiten öffnen sich auch bei kurzer Unterbrechung des Internets:** der Service-Worker antwortet nach 3 Sekunden aus dem Zwischenspeicher (die genaue Seite, sonst die Hülle), statt zu warten, bis der Abruf scheitert; ohne Verbindung sofort. Gilt auch für die Lernpfad-Seite.
+- **CardVote-Auswertung:** nur noch Prozent — Kacheln, Boxplot und die Ansicht je Kind ohne erreichte Punkte; auch am Zugang der Kinder steht nur Prozent. Im Rückmeldebogen entfällt „1 / 3“ unter „Daran müssen wir arbeiten“.
+- **QR-Zettel drucken (Karteikarten):** keine leeren Blätter mehr — 12 Zettel je Seite mit festem Seitenrand (10 mm), die Seite passt auf jedem Gerät.
+- **Handy:** Zahlenstrahl und KI-Rennen ragen nicht mehr aus dem Bild (Aufgabenart bzw. Betriebsart als Auswahl).
+- **Zahlenstrahl: Plättchenmethode (Guthaben und Schulden).** Eine zweite Ansicht im Modul: 5 − 3 heißt fünf Guthaben, drei abziehen; „minus eine Schuld“ heißt Schulden wegnehmen — wo keine liegen, erst Nullpaare dazulegen. Als Aufgabe Schritt für Schritt oder frei zum Selberlegen.
+
+## 4.5.4 — 11.11.2026
+
+- **Zugang der Kinder (Ergebnisse), neu gestaltet:** Handy untereinander, am PC Note und Lernstand nebeneinander und die Tests darunter in voller Breite. Teilnoten als Tabelle (Name, Note, Gewicht in festen Spalten); der Lernstand gruppiert nach Oberthema („Rationale Zahlen“ einmal als Kopf) und nennt den Status nur noch, wo etwas zu tun ist; jeder Test zeigt ein Ergebnis groß und das Übrige klein darunter.
+- **Zugang der Kinder:** die Teilnoten zeigen ihr Gewicht in Prozent („Klassenarbeiten 3 · 40 %“). Eine leere Seite hat keinen Scrollbalken mehr (die volle Fensterhöhe wurde durch den Seitenzoom um 6 % zu groß; gilt auch für die Code-Detektiv-Seiten der Kinder).
+- **Zugang der Kinder:** unter der aktuellen Note stehen die Teilnoten als Bereiche („Mündlich 2−  Klassenarbeiten 3+“); der Pfeil erscheint erst ab einer halben Note Unterschied (vorher schon bei 0,3) und gar nicht bei „gleich“; die Aussage im Lernstand passt zu den Balken („Alle Themen sitzen“ nur, wenn es stimmt; die Zeile „Hier fehlt noch etwas Sicherheit“ ist weg); das Fach steht ohne Klasse („Mathematik“ statt „7.5 Mathematik“).
+- **Notenbuch:** „UB“ in eine Zelle tippen setzt dieses Kind in dieser Spalte auf „nicht benotet“ (zählt nicht, gilt nicht als fehlend); LE-Kinder mit UB in der Klassenarbeit werden nicht mehr als „Note fehlt“ markiert; Tab/Enter überspringt Kinder, die an dem Tag gefehlt haben (und LE-Kinder in Klassenarbeits-Spalten).
+- **Zugang der Kinder:** die aktuelle Note nennt nur das Fach („Mathematik“), nicht „7.5 Mathematik“.
+- **Zugang der Kinder:** „Impressum & Datenschutz“ klebt am unteren Rand und ist ohne Scrollen sichtbar (auch bei Code-Detektiv); der Testname wird umgebrochen statt abgeschnitten und beginnt nicht mehr mit der Klasse.
+- **Ergebnisse (Zugang der Kinder):** der Lernstand steht nur noch oben, nicht mehr zusätzlich unter jedem einzelnen Test.
+- **CardVote-Sitzung am Beamer:** die Liste zeigt nur noch, auf wen noch gewartet wird — gescannte und abwesende Kinder verschwinden daraus (statt die Farbe zu wechseln). Beim Scannen poppt kurz der Name auf, bei einer Karte, die nochmal gescannt wurde, mit „nochmal gescannt“ bzw. „Antwort geändert“. Die Anwesenheit wird alle 45 Sekunden und beim Zurückkehren auf die Seite neu geholt.
+- **CardVote-Note stimmt überall überein:** Auswertung, Zugang der Kinder, PDF und Excel rechnen jetzt mit demselben Notenschlüssel und derselben Bonusregel — ohne eigene Angabe an der Auswertung gilt das Profil (der Zugang der Kinder nahm bisher die eingebaute Vorgabe).
+- **LE-Kinder:** am Zugang steht keine Note, sondern „Keine Note“; in der CardVote-Auswertung „LE“ statt Note, ohne Einfluss auf Notenverteilung.
+- **CardVote starten:** „Nicht benotet“ lässt sich schon beim Start der Sitzung anhaken.
+- **CardVote bei Netzausfall:** die gezeigte Reihenfolge der Fragen (und die gemischten Antworten) wird gemerkt — wer die Seite neu lädt und die Sitzung fortsetzt, sieht dieselbe Reihenfolge statt der des Sets. Scanner und Host verbinden sich nach einem Ausfall von selbst neu, der Scanner bekommt den Zustand des Hosts nachgereicht, der Host holt die verpassten Scans der aktuellen Frage.
+- **Ergebnisse (Zugang der Kinder):** neuer Block „Dein Lernstand“ — je Thema Prozent über alle Tests, mit „Als Erstes nochmal ansehen“. Themen entstehen nur aus Fragen mit zugeordnetem Thema.
+- **Themenstand je Kurs:** Karteikarten zählen nur noch im Kurs, dem der Stapel zugewiesen ist (7.5 LZ zeigte Karten aus 7.5 Mathe, weil beide dieselbe Klasse teilen).
+- **Karteikarten, QR-Zettel drucken:** feste Seiten mit je 12 Zetteln — kein QR-Code wird mehr in der Mitte durchgeschnitten.
+- **CardVote-Auswertung:** „Nicht benotet“ lässt sich auch an der einzelnen Auswertung setzen; die Kinder sehen an ihrem Zugang „Übung“.
+
+## 4.5.3 — 10.11.2026
+
+- **Neues Modul Zahlenstrahl (Beta):** Rechnen mit Pfeilen, auch mit negativen und Dezimalzahlen. Die Achse ist fest (−10 bis +10, mit Zehnteln −2 bis +2). Bei einer Aufgabe entstehen die Pfeile Schritt für Schritt; bei „minus“ zuerst der Pfeil der Zahl, im nächsten Schritt wird er umgedreht. Im freien Modus ohne Aufgabe lassen sich Start und Pfeile ziehen. Zeigt, warum „minus eine negative Zahl“ plus ist.
+- **Profil:** unter „Hilfe und App“ lassen sich die letzten Änderungen jederzeit nachlesen.
+- **Profil:** Optionen neu geordnet — Konto, Unterricht, Teile der Module, „Dieses Gerät“ (Sprache, Beamer, Datensparen, Melde-Knopf), „Hilfe und App“; mit Sprungleiste oben. Der Bonus für E-Aufgaben erscheint nur noch mit CardVote.
+- **iPhone/iPad-App entfernt:** die Capacitor-Hülle, ihr Profil-Eintrag und der Release-Job sind weg; für iPhone und iPad bleibt der Weg über Safari („Zum Home-Bildschirm“).
+- **Klassenarbeit:** Auswahl nach Datum sortiert, die gemeinsame Auswertung nennt die Zahl der E- und G-Kinder.
+
+## 4.5.2 — 10.11.2026
+
+- **Eingebaute App (Vorarbeit):** die API läuft jetzt auch auf SQLite und liefert die Oberfläche selbst aus (`NUVORA_LOKAL=1`) — Grundlage für Nuvora ohne Server auf Mac und Windows. Plan: `docs/eingebaute-app.md`.
+- **Körper:** perspektivische Darstellung (die hintere Kante erscheint kürzer, statt nach hinten breiter zu wirken), richtige Zeichenreihenfolge, feinere Kugel.
+- **CardVote:** Ordner und geöffnetes Quiz stehen in der Adresse — der Zurück-Knopf (Safari, Maus, Wischgeste) geht eine Ebene hoch.
+- **Notenbuch:** die Notenform (2,5 / 2+) wird im Dialog des Kindes umgeschaltet statt in der Werkzeugleiste.
+- **Klassenarbeit:** die Auswahl nennt das Datum der Arbeit (Termin aus dem Kalender, sonst Anlegedatum).
+- **Einstiege:** Beim Löschen (oder Abwählen im Kalender-Eintrag) verschwindet auch die Phase „Einstieg“ aus dem Verlaufsplan.
+- **Notenbuch:** fehlende Noten leuchten jetzt in der Zelle selbst (nicht nur am Namen); Spalten lassen sich als „Optional (freiwillig)“ markieren (Raketenaufgaben) und werden dann nie hervorgehoben.
+- **Willkommen-Dialog:** wird am Konto gemerkt, nicht mehr in jedem Browser neu gezeigt.
+- **CardVote: Quiz „Nicht benotet“.** Schalter am Quiz: Rückmeldung mit Prozent und Themen, aber ohne Note;
+  die Schülerseite sagt „Übung“ und „Schau dir das nochmal an“. Keine Notenübernahme, keine Notenverteilung.
+- **Klassenarbeit:** LE-Kinder bekommen keine Note mehr (der Kursliste fehlte die Angabe); im Notenbuch steht „UB“.
+- **Rückmeldebogen:** Unterschrift der Lehrkraft mit Datum, darunter die Erziehungsberechtigten; „Tendenz“ ohne Kommazahl.
+- **Notenbuch:** Tendenz ohne Zahl in Klammern; „Details“ einer verknüpften Spalte öffnet die Klassenarbeit.
+- **Klassenarbeit-Auswertung:** Anzahl der E- und G-Kinder.
+- **Kurse:** E/G rechtsbündig, kein doppeltes NTA-Kürzel neben dem Förder-Kürzel; ein Klick auf ein Kind öffnet genau diese Person.
+- **Beamer-Modus:** Strg/Cmd + Umschalt + B als Schnellschalter (Apples Übertragung ist im Browser nicht erkennbar).
+- **CardVote: E-Aufgaben als Ausgleich.** Neue Wertungsart „Als Ausgleich“ (Auswertung → Anforderungsaufgaben):
+  richtige E-Aufgaben gleichen verpasste G-Punkte aus — 5 von 6 plus beide E richtig ergibt 6 von 6 (100 %),
+  nie darüber. „Als Bonus“ bleibt die Vorgabe (hebt höchstens um eine Notenstufe).
+- **CardVote: Weiter ohne Aufdecken.** Im Testmodus geht „Weiter“ / „Test beenden“ auch, ohne die Frage
+  vorher aufzudecken (am Rechner und am Handy). Im Spielmodus bleibt das Aufdecken Pflicht, dort entstehen die Punkte.
+- **Abonnierte Kalender:** „Exportieren“ jetzt je Kalender statt für alle, mit Name und Farbe;
+  die Adresse steht nur noch beim Hinzufügen. Fehlende Namen holt Nuvora aus dem Kalender selbst.
+- **CardVote-Auswertung:** die Dezimalnote in der Tabelle wird aus dem genauen Prozentwert
+  gerechnet, nicht aus dem gerundeten (89 % → „1,8“, während die Verteilung 2,0 zählte).
+- **Untis automatisch, ohne Passwort.** Im Untis-Dialog verbindest du den Untis-Mobile-Schlüssel
+  (QR-Code aus WebUntis, gilt nur für Apps und ist dort widerrufbar). Nuvora holt dann
+  Vertretungen, Entfälle und Zusatzstunden mit Fach, Klasse, Raum, Info-Text und dem
+  ursprünglichen Lehrer beim Öffnen des Kalenders selbst (höchstens alle 30 Minuten).
+  Der Schlüssel liegt verschlüsselt auf dem Server und lässt sich mit „Trennen“ löschen.
+- **Untis: „Vertretungen holen“.** Im Untis-Dialog holt ein Knopf mit deiner Anmeldung
+  die nächsten Wochen und zeigt Vertretung, Entfall und Zusatz im Kalender mit Fach,
+  Klasse, Raum und Info-Text (das Passwort wird nicht gespeichert; der Stand gilt
+  bis zum nächsten Abruf). Nötig, weil der Abo-Link bei manchen Schulen keine Titel liefert.
+- **Untis-Import überschreibt keinen Kurs mehr:** eine Stunde, die schon einem
+  Kurs oder einer Klasse gehört, bleibt unberührt, wenn der Import keine
+  Zuordnung mitbringt (vorher wurden Kurs und Farbe durch reinen Text ersetzt).
+- **Untis ohne Betreff:** liefert der Abo-Link nur Zeiten (Schule hat Fach, Klasse
+  und Raum im Export abgeschaltet), zeigt der Kalender Termine, die zu einer
+  Uhrzeit zusätzlich zu den Stunden des eigenen Plans stehen, als „Zusätzlicher
+  Termin“ — etwa eine Fremdvertretung.
+- **Rückmeldebogen:** Baustein „Zwischenstand Gesamtnote“ (Bereiche mit Gewicht
+  und Note, darunter der Stand insgesamt).
+- **Notenbuch:** schneller Schalter in der Leiste — berechnete Noten als Zahl
+  oder als Tendenz mit Zahl in Klammern („2− (2,46)“).
+- **QR-Code zu Links:** Waage, PAP und Kalender-Abo zeigen den Link auf
+  Wunsch als QR-Code (Knopf „QR“).
+- **LE-Kinder:** „NB“ (nicht bewertet) statt Note — in Notenbuch und
+  Klassenarbeit.
+- **Namen kürzen („Anna M.“)** als Anzeigeoption im Notenbuch und im Sitzplan
+  (je Gerät, gespeichert bleibt der volle Name).
+- **CardVote:** ein Test lässt sich nachträglich einem anderen Kurs derselben
+  Klasse zuweisen (Auswertung, Auswahl „Kurs“).
+
+## 4.5.1 — 09.11.2026
+
+- **Neues Modul Reihen (Beta):** Unterrichtsreihen als Vorlage — Stunden mit
+  Thema, Ablauf, Notizen, Verweisen auf Quiz/Karten/Lernleiter/Einstieg,
+  Dateien (PDFs, Arbeitsblätter) und **Notizen fürs nächste Mal**. Mit dem
+  Kalender: gehaltene Stunden als Reihe speichern oder eine Reihe in einen Kurs
+  spielen (Ferien und Ausfälle übersprungen, Vorschau vorher).
+- **Kalender:** mehrere Themen und mehrere Karteikarten-Stapel je Stunde;
+  Ausblenden ist nur Ansicht und sperrt den Export an geteilte Kalender nicht;
+  Untis-Entfall wird angezeigt (bei Vertretung ausgeblendet); kein
+  „Unterrichtsfrei“ am Wochenende auf der Startseite.
+- **CalDAV:** eine gültige Anmeldung wird nie mehr wegen einer Bremse
+  abgelehnt — Apple fragt das Passwort nicht mehr neu ab.
+- **Notenbuch:** fehlende Noten markieren den Namen (nicht bei Abwesenheit oder
+  Kommentar); LE-Kinder haben keine Gesamtnote und zählen nicht in den
+  Klassenwerten (auch in der Klassenarbeit); Suche filtert auch die
+  Jahresansicht; neue Spalten sind nach dem Umsortieren gleich sichtbar;
+  markierte Spaltenüberschrift deckend; Details-Dialog vor unscharfem
+  Hintergrund.
+- **Kurse:** Kürzel für die zwei Sonderfälle der Benotung in der Kinderliste;
+  Karteikarten abgeschaltet gilt auch für Stapel, die nur an der Klasse hängen.
+- **Waage:** die Zehner-Stange greift zehn; Doppelklick zerlegt sie in zehn
+  Einer und bündelt zurück; beide Seiten durch eine Zahl teilen; Gleichung auf
+  Wunsch unter der Waage.
+- **Kartenliste (CardVote)** nennt den Kurs in der Zeile.
+- **Schutz vor „Slopsquatting“:** neue Paketnamen brauchen eine Freigabe,
+  Lock-Dateien müssen lückenlos sein, die CI prüft Alter und Existenz.
+
+## 4.5.0 — 09.11.2026
+
+- **Notenbuch: Trend-Pfeil** (↗ besser, ↘ schlechter, → gleich) je Teilnote
+  und bei der Endnote, auch in der Übersicht eines Kindes (ab zwei Noten).
+- **Notenbuch:** Kinder suchen; **SuS-Modus** blendet alle Noten aus;
+  Nachkommastellen der Schnitte wählbar (1 oder 2); die Spalten-Auswertung
+  steht vor unscharfem Hintergrund.
+- **Beamer-Modus** (Profil): blendet Kalender und Noten aus — automatisch bei
+  zweitem Bildschirm, sonst von Hand.
+- **Kinder-Seite:** Noten mit Tendenz (3+, 4−), dazu die **aktuelle Note aus
+  dem Notenbuch** je Kurs mit Trend-Pfeil; Quizze vor der letzten
+  Klassenarbeit entfallen.
+- **Rückmeldebogen:** Notenform wählbar (4+, 3,7 oder 4), Gesamtpunkte auf
+  halbe Punkte gerundet.
+- **CardVote:** Bonus der E-Aufgaben einstellbar (je Auswertung, Vorgabe im
+  Profil); Fragenzahl je Sammlung in der Liste.
+- **Karteikarten je Kurs** an/aus (Kurs bearbeiten); auch Stapel, die nur an
+  der Klasse hängen, folgen dem Schalter. Kartenliste nennt den Kurs.
+- **Kalender:** mehrere Themen je Stunde; Untis-Entfall wird angezeigt und bei
+  einer Vertretung ausgeblendet.
+- **Sitzplan:** alle Förderschwerpunkte eines Kindes markiert, beim Öffnen
+  eingepasst, Namen auf Wunsch ganz statt gekürzt.
+- Klick auf ein Kind im Kurs öffnet es unter **Personen**; Checklisten-Spalten
+  per Klick umbenennen; Klassenarbeiten alphabetisch; Spalte aus der
+  Klassenarbeit ohne überflüssige Notiz.
 
 - **Neues Modul KI-Rennen (Beta).** Ein Autorennen von oben: mit den
   Pfeiltasten (am Tablet mit Tasten unter der Strecke) Runden drehen, die

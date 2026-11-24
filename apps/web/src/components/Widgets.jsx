@@ -12,13 +12,79 @@
 //
 // Wer eins ergänzt, trägt es in WIDGETS ein — mehr ist nicht nötig; die
 // Startseite und der Bearbeiten-Bereich zählen die Liste zur Laufzeit durch.
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { COLORS as C, cardStyle, chipStyle, Icon, ICONS, linkBtn } from "./Icons.jsx";
+import { COLORS as C, cardStyle, chipStyle, Icon, ICONS, linkBtn, Skeleton } from "./Icons.jsx";
 import { hol } from "../core/melden.js";
 import { ymd } from "../core/datum.js";
 import { useLanguage } from "../i18n/index.jsx";
+
+// ── Platz fuer ein Widget, bevor es da ist ──
+// Die Widgets holen ihre Daten selbst und zeichneten bis dahin NICHTS: beim Laden der Startseite
+// sprang jede Kachel erst auf, und alles darunter rutschte mit. Dieser Rahmen merkt sich, wie hoch
+// das Widget beim letzten Mal war (localStorage, je Geraet), und haelt genau diesen Platz frei —
+// mit einem Skeleton darin, bis der Inhalt da ist. War es beim letzten Mal leer (Hoehe 0), bleibt
+// auch jetzt kein Platz stehen: dann springt nichts, denn es kommt auch nichts.
+// Beim allerersten Besuch gibt es noch keine Erinnerung; dort bleibt alles wie vorher, danach springt nichts mehr.
+const HOEHE_KEY = (id) => `nuvora_widget_h_${id}`;
+const gemerkteHoehe = (id) => {
+  try { const v = localStorage.getItem(HOEHE_KEY(id)); return v == null ? null : Number(v); } catch { return null; }
+};
+const LEER_NACH_MS = 2500; // so lange gilt „null Hoehe" noch als „laedt", erst danach als „leer"
+
+export function WidgetPlatz({ id, children, abstand = 16 }) {
+  const innen = useRef(null);
+  const [h, setH] = useState(() => gemerkteHoehe(id));   // zuletzt bekannte Hoehe, null = unbekannt
+  const [inhalt, setInhalt] = useState(false);           // ist der Inhalt da?
+  const [abgelaufen, setAbgelaufen] = useState(false);   // Wartezeit fuer „leer" vorbei
+
+  useEffect(() => { const z = setTimeout(() => setAbgelaufen(true), LEER_NACH_MS); return () => clearTimeout(z); }, []);
+
+  useLayoutEffect(() => {
+    const el = innen.current;
+    if (!el) return undefined;
+    let timer = null;
+    const messen = () => {
+      const nh = Math.round(el.offsetHeight);
+      setInhalt(nh > 0);
+      clearTimeout(timer);
+      // Entprellt: eine Kachel waehrend des Aufbaus nicht bei jedem Zwischenstand merken.
+      timer = setTimeout(() => {
+        if (nh > 0) { try { localStorage.setItem(HOEHE_KEY(id), String(nh + abstand)); } catch { /* egal */ } }
+      }, 400);
+    };
+    messen();
+    const beob = new ResizeObserver(messen);
+    beob.observe(el);
+    return () => { clearTimeout(timer); beob.disconnect(); };
+  }, [id, abstand]);
+
+  // Leer gemeldet: Hoehe 0 erinnern, sobald die Wartezeit um ist und noch immer nichts kam.
+  useEffect(() => {
+    if (abgelaufen && !inhalt) { try { localStorage.setItem(HOEHE_KEY(id), "0"); } catch { /* egal */ } }
+  }, [abgelaufen, inhalt, id]);
+
+  // Platz halten, solange der Inhalt fehlt — und nur, wenn beim letzten Mal einer da war.
+  // Ohne Erinnerung (erster Besuch) wird nichts geraten: ein falsch geschaetzter Platz springt genauso.
+  const reserviert = !inhalt && !abgelaufen && h != null && h > 0;
+  const platz = h ?? 0;
+  // EIN Container: das Skeleton liegt HINTER dem Inhalt (absolut), nicht davor. Lagen beide
+  // untereinander, standen sie einen Frame lang zusammen da — genau der Sprung, den es zu
+  // vermeiden gilt. Der Inhalt deckt das Skeleton ab, sobald er etwas zeichnet.
+  return (
+    <div style={{ position: "relative", minHeight: reserviert ? platz : undefined }}>
+      {reserviert && (
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: abstand }} aria-hidden="true">
+          <div style={{ ...cardStyle, padding: 16, height: "100%", boxSizing: "border-box", overflow: "hidden" }}>
+            <Skeleton rows={Math.max(1, Math.floor((platz - abstand - 32) / 40))} height={28} gap={12} />
+          </div>
+        </div>
+      )}
+      <div ref={innen} style={{ position: "relative" }}>{children}</div>
+    </div>
+  );
+}
 
 // Gemeinsamer Rahmen: Überschrift mit Weg ins Modul, darunter der Inhalt.
 // Ohne den hätte jedes Widget seinen eigenen Kasten erfunden — genau das, was
@@ -198,6 +264,46 @@ function Ausleihe() {
 // weiter auf der Startseite, obwohl der Teil, aus dem es seine Zahlen holt, im
 // Zahnrad abgeschaltet war — eine Kachel, die auf etwas zeigt, das es fuer
 // dieses Konto nicht gibt.
+// ── Schwache Lernende (Fruehwarnung) ──
+// Auf Wunsch (Voreinstellung: AUS): die Kinder, die ueber mehrere Tests und Arbeiten hinweg hinter der
+// Klasse zurueckliegen. Die Rechnung steht in app/fruehwarnung.py; hier wird nur gezeigt, was sie meldet.
+// Sie laeuft je Klasse und ist nicht billig — deshalb ist das Widget ausgeschaltet, bis jemand es will,
+// und fragt die Klassen nacheinander statt alle auf einmal. Es ist eine Beobachtung, nie eine Diagnose.
+function SchwacheSuS() {
+  const { t } = useLanguage();
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    let weg = false;
+    (async () => {
+      const klassen = await hol("/api/classes", []);
+      const liste = (Array.isArray(klassen) ? klassen : []).filter((k) => !k.archived && !k.archived_at).slice(0, 8);
+      const aus = [];
+      for (const k of liste) {
+        const d = await hol(`/api/classes/${k.id}/fruehwarnung`, null);
+        (d?.schueler || []).filter((s) => s.status === "melden").forEach((s) => aus.push({ klasse: k, kind: s }));
+      }
+      aus.sort((a, b) => (a.kind.abstand_median ?? 0) - (b.kind.abstand_median ?? 0));
+      if (!weg) setRows(aus);
+    })();
+    return () => { weg = true; };
+  }, []);
+  // Meldet die Fruehwarnung niemanden, steht hier nichts: eine Kachel „zurzeit niemand" ist nur Platz.
+  if (rows === null || rows.length === 0) return null;
+  return (
+    <WidgetKarte titel={t("widget.schwacheSus")}>
+      {rows.slice(0, 8).map(({ klasse, kind }) => (
+        <Link key={`${klasse.id}-${kind.card_id}`} to={`/cardvote/student-evaluation/${klasse.id}/${kind.card_id}`} style={zeile} title={kind.begruendung || ""}>
+          <span style={{ flex: 1, minWidth: 0, fontWeight: 600 }}>{kind.name}</span>
+          {kind.abstand_median != null && (
+            <span style={{ color: C.danger, fontWeight: 700, fontSize: 13 }}>{kind.abstand_median > 0 ? "+" : "\u2212"}{Math.abs(Math.round(kind.abstand_median))} Pp</span>
+          )}
+          <span style={{ ...chipStyle, fontSize: 12 }}>{klasse.name}</span>
+        </Link>
+      ))}
+    </WidgetKarte>
+  );
+}
+
 export const WIDGETS = [
   { key: "heute", modul: "kalender", labelKey: "widget.heute", an: true },
   { key: "schwach", modul: "cardvote", labelKey: "widget.schwach", an: true },
@@ -205,4 +311,5 @@ export const WIDGETS = [
   { key: "todo", modul: "notizbrett", option: "aufgaben", labelKey: "widget.todo", an: false, komponente: OffeneTodos },
   { key: "notiz", modul: "notizbrett", option: "notizen", labelKey: "widget.notiz", an: false, komponente: Notizen },
   { key: "ausleihe", modul: "orga", option: "ausleihe", labelKey: "widget.ausleihe", an: false, komponente: Ausleihe },
+  { key: "schwacheSus", modul: "cardvote", labelKey: "widget.schwacheSus", an: false, sensibel: true, komponente: SchwacheSuS },
 ];

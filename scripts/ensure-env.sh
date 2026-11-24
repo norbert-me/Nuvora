@@ -69,6 +69,7 @@ set_if_empty() {
 }
 
 set_if_empty TOKEN_SECRET "$t"
+set_if_empty NUVORA_DATENSCHLUESSEL "$dsk"
 set_if_empty POSTGRES_PASSWORD "$p"
 
 # PORT und SITE_URL sind keine Secrets, sondern Deployment-Konfiguration:
