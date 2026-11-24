@@ -10,6 +10,7 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
 
+from app.krypto import suchwert
 from app.models import User
 from app.routers import auth as A
 
@@ -34,7 +35,7 @@ async def test_zweite_registrierung_gilt_und_alte_links_verfallen(s, monkeypatch
     await A.register(body("Echtes-Passwort-2", "Lehrerin"), _Req(), db=s)
     link_echt = mails[-1]
 
-    u = (await s.execute(select(User).where(User.email == "lehrerin@schule.de"))).scalar_one()
+    u = (await s.execute(select(User).where(User.email_idx == suchwert("lehrerin@schule.de")))).scalar_one()
     assert A._verify_pw("Echtes-Passwort-2", u.password_hash)
     assert not A._verify_pw("Angreifer-Passwort-1", u.password_hash)
     assert u.name == "Lehrerin"

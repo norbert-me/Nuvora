@@ -39,6 +39,14 @@ export function beamerAktiv(wahl = beamerWahl(), zweiter = zweiterSchirm) {
   return wahl === "an" || (wahl === "auto" && zweiter);
 }
 
+/** Schnellschalter für den Handgriff, den Safari/AirPlay nicht abnimmt:
+ *  "aus"/"auto" -> "an", sonst zurück auf "auto". Gibt die neue Wahl zurück. */
+export function beamerUmschalten() {
+  const neu = beamerWahl() === "an" ? "auto" : "an";
+  setzeBeamerWahl(neu);
+  return neu;
+}
+
 export function beamerFreigeben() { frei = true; melde(); }
 
 if (typeof window !== "undefined" && window.screen) {
@@ -48,6 +56,15 @@ if (typeof window !== "undefined" && window.screen) {
   };
   lesen();
   try { window.screen.addEventListener?.("change", lesen); } catch { /* ältere Browser */ }
+  // Apples Bildschirmübertragung (AirPlay/Spiegeln) meldet ein Browser nicht —
+  // Safari kennt weder isExtended noch eine Ersatzschnittstelle. Darum ein
+  // Tastenkürzel: Strg/Cmd + Umschalt + B schaltet den Schutz sofort ein/aus.
+  window.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "b" || e.key === "B")) {
+      e.preventDefault();
+      beamerUmschalten();
+    }
+  });
   window.addEventListener("storage", (e) => { if (e.key === KEY) melde(); });
 }
 

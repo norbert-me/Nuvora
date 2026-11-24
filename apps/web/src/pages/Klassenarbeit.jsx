@@ -15,13 +15,17 @@ import { mitNummer, themenFuerKurs, themenIndex, useThemen } from "../core/topic
 import { useKurs } from "../core/kurs.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
+import Verteilung from "../components/Verteilung.jsx";
+import { leIst } from "../core/foerderung.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { rememberClass } from "../core/cache.js";
-import { gradeFromPct, gradeDetailed, quantile, stdev, DEFAULT_SCALE } from "../core/grades.js";
+import { gradeFromPct, gradeDetailed, quantile, stdev, DEFAULT_SCALE, datumKurz } from "../core/grades.js";
 import { useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import { alsJson, hol } from "../core/melden.js";
+import { ymd } from "../core/datum.js";
+import { bogenName, druckenMitTitel } from "../core/drucken.js";
 import NotenUebernahme from "../components/NotenUebernahme.jsx";
 import { konfidenzProzent, mittel, streuung, trennschaerfe } from "../core/aufgabenstatistik.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
@@ -277,7 +281,10 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
     if (Array.isArray(r)) return true;                 // Altformat
     return Object.values(r).some((v) => v != null && v !== "");
   };
-  const graded = students.filter(erfasstIst);
+  // LE-Kinder (Foerderschwerpunkt Lernen) haben keine Note: sie zaehlen nicht in
+  // Schnitt, Verteilung und Aufgabenstatistik der Klasse.
+  const ubKinder = new Set((work.unbewertet || []).map(String));
+  const graded = students.filter(erfasstIst).filter((s) => !leIst(s) && !ubKinder.has(String(s.id)));
   // Je Kind seine Wertung und sein Themenprofil — beides in der Fassung,
   // die es je Aufgabe geschrieben hat.
   const wert = new Map(graded.map((s) => [s.id, wertung(wk, s.id, effScale)]));
@@ -703,9 +710,6 @@ export default function Klassenarbeit() {
   const [scaleOpen, setScaleOpen] = useState(false); // Notenschlüssel-Editor auf/zu
   const [expandedTasks, setExpandedTasks] = useState(() => new Set()); // aufgeklappte Teilaufgaben-Auswertung
   const [infoOpen, setInfoOpen] = useState(false); // „Auswertung verstehen"
-  const [distMode, setDistMode] = useState("bar");   // Notenverteilung: "bar" | "box"
-  const [barMode, setBarMode] = useState("whole");   // Balken: "whole" (1..6) | "fine" (Teilnoten)
-  const [boxMode, setBoxMode] = useState("pct");     // Boxplot: "pct" (%) | "note" (Noten)
   // Note-Anzeige NUR aus der Profil-Präferenz (eine Person, eine Präferenz —
   // kein Umschalter je Seite mehr). "note" = Symbol 2+, "wert" = Dezimal 2,3.
   const gradeMode = (() => { try { const u = JSON.parse(localStorage.getItem("user")); return u && u.grade_tendency === false ? "wert" : "note"; } catch { return "note"; } })();
@@ -780,13 +784,14 @@ export default function Klassenarbeit() {
     if (!next || !next.id) return false;
     // scale: echtes dict = Override, sonst {} (Server setzt zurueck auf Profil).
     const scaleOut = (next.scale && Object.keys(next.scale).length) ? next.scale : {};
-    const r = await fetch(`${API}/works/${next.id}`, alsJson("PUT", { name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [], fehler: next.fehler || {}, wechsel: next.wechsel || {} })).catch(() => null);
+    const r = await fetch(`${API}/works/${next.id}`, alsJson("PUT", { name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [], unbewertet: next.unbewertet || [], fehler: next.fehler || {}, wechsel: next.wechsel || {} })).catch(() => null);
     if (!r || !r.ok) { showAlert(t("common.notWork")); return false; }
     setSavedWork(next);
     if (verknuepft.length) {
       const sc = (next.scale && Object.keys(next.scale).length) ? next.scale : scale;
       await fetch(`/api/noten/verknuepft/${next.id}`, alsJson("PUT", {
-        student_ids: students.map((s) => s.id), grades: notenAusArbeit(students, partner ? { ...next, _alt: partner.tasks || [] } : next, sc), note: t("klassenarbeit.title"),
+        student_ids: students.map((s) => s.id), grades: notenAusArbeit(students, partner ? { ...next, _alt: partner.tasks || [] } : next, sc), note: "",
+        nb_ids: students.filter((s) => (next.unbewertet || []).map(String).includes(String(s.id))).map((s) => s.id),
       })).catch(() => null);
     }
     // Die Liste der Arbeiten bekommt den GANZEN gespeicherten Stand, nicht nur
@@ -917,8 +922,14 @@ export default function Klassenarbeit() {
   const [alleTeil, setAlleTeil] = useState("alle");   // welche Auswertung oben steht
   // In der Auswahl steht ein Paar EINMAL: das G-Blatt faellt heraus, wenn sein
   // E-Blatt daneben steht.
-  const auswahl = works.filter((w) => !(w.niveau === "G" && partnerVon(w)));
-  const auswahlLabel = (w) => (partnerVon(w) ? `${w.name} (E/G)` : w.niveau ? `${w.name} (${w.niveau})` : w.name);
+  // Nach Datum der Arbeit, aelteste oben (ohne Datum ans Ende, nach Anlage).
+  const nachDatum = (a, b) => (a.datum ? 0 : 1) - (b.datum ? 0 : 1) || (a.datum || "").localeCompare(b.datum || "") || a.id - b.id;
+  const auswahl = works.filter((w) => !(w.niveau === "G" && partnerVon(w))).sort(nachDatum);
+  const auswahlLabel = (w) => {
+    const basis = partnerVon(w) ? `${w.name} (E/G)` : w.niveau ? `${w.name} (${w.niveau})` : w.name;
+    const tag = datumKurz(w.datum);
+    return tag ? `${basis} · ${tag}` : basis;
+  };
   const auswahlWert = work && work.niveau === "G" && partner ? partner.id : work?.id;
   // Ein Blatt zeigen, aber im Stand des SERVERS: die Liste `works` ist der
   // Stand vom letzten Laden — wer am anderen Blatt (oder an einem anderen
@@ -1105,6 +1116,15 @@ export default function Klassenarbeit() {
     persist({ ...work, results, absent: [...cur] });
   };
 
+  // UB: dieses Kind bekommt in DIESER Arbeit keine Note — Punkte und Rueckmeldung bleiben, es zaehlt aber
+  // nicht in Verteilung und Schnitt und nicht ins Notenbuch. (LE gilt ohnehin immer.)
+  const istUb = (sid) => (work.unbewertet || []).map(String).includes(String(sid));
+  const toggleUb = (sid) => {
+    const cur = new Set((work.unbewertet || []).map(String));
+    if (cur.has(String(sid))) cur.delete(String(sid)); else cur.add(String(sid));
+    persist({ ...work, unbewertet: [...cur] });
+  };
+
   // Gültiger Notenschlüssel: Override der Arbeit, sonst Profil-Voreinstellung.
   const effScale = (work && work.scale && Object.keys(work.scale).length) ? work.scale : scale;
   const setWorkScale = (next) => persist({ ...work, scale: next });
@@ -1137,6 +1157,7 @@ export default function Klassenarbeit() {
   const [bogenWahl, setBogenWahl] = useState(false);
   const [bogenTeile, setBogenTeile] = useState(undefined);
   const [bogenNotenform, setBogenNotenform] = useState("tendenz");
+  const [standDaten, setStandDaten] = useState(null);   // Zwischenstand je Kind aus dem Notenbuch
   const [wdhPool, setWdhPool] = useState(null);
   // Der Pool wird beim OEFFNEN des Dialogs geholt: dann steht dort schon,
   // zu welchen Themen der Lernpfad nichts hat — als Hinweis, nicht als
@@ -1159,6 +1180,31 @@ export default function Klassenarbeit() {
     const kopf = tp ? [tp.fach || ober?.fach, (tp.jahrgang || ober?.jahrgang) ? `Kl. ${tp.jahrgang || ober?.jahrgang}` : ""].filter(Boolean).join(" · ") : "";
     return { kopf, pfad: tp ? (ober ? `${mitNummer(ober)} › ${mitNummer(tp)}` : mitNummer(tp)) : f.thema };
   }), [poolVorab, druckBogenRoh, topics]);
+  // Zwischenstand der Gesamtnote je Kind: Bereiche (Name, Gewicht, Note) und
+  // Gesamtnote aus dem Notenbuch — Halbjahr nach dem Schuljahr des Kontos.
+  const standHolen = async () => {
+    if (!classId) return null;
+    let term = "1";
+    try { const u = JSON.parse(localStorage.getItem("user")); if (u && u.hj2_start && String(u.hj2_start) <= ymd(new Date())) term = "2"; } catch { /* Halbjahr 1 */ }
+    const kp = kursId != null ? `&kurs_id=${kursId}` : "";
+    const heute = async (tm) => {
+      const [secs, sum] = await Promise.all([
+        hol(`/api/noten/classes/${classId}/sections?term=${tm}${kp}`, []),
+        hol(`/api/noten/classes/${classId}/summary?term=${tm}${kp}`, []),
+      ]);
+      return { secs: Array.isArray(secs) ? secs : [], sum: Array.isArray(sum) ? sum : [] };
+    };
+    let d = await heute(term);
+    if (!d.sum.some((r) => r.weighted != null)) d = await heute(term === "1" ? "2" : "1");
+    const karte = new Map();
+    d.sum.forEach((r) => {
+      if (r.le) return;                             // LE: keine Gesamtnote
+      const bereiche = d.secs.filter((x) => r.section_effective && r.section_effective[String(x.id)] != null)
+        .map((x) => ({ name: x.name, gewicht: x.weight, wert: r.section_effective[String(x.id)] }));
+      karte.set(r.student_id, { bereiche, gesamt: r.total_override ?? r.weighted ?? null });
+    });
+    return karte;
+  };
   const bogenDrucken = async (teile, max, notenform) => {
     setBogenWahl(false);
     setBogenNotenform(notenform || "tendenz");
@@ -1166,11 +1212,15 @@ export default function Klassenarbeit() {
     const pool = teile.includes("wdh") && lernpfadAktiv ? (poolVorab || []) : null;
     setWdhPool(pool);
     setBogenTeile(teile);
+    setStandDaten(teile.includes("stand") ? await standHolen() : null);
     // KaTeX zeichnet die Aufgabentexte nachgeladen — kurz warten, sonst steht
     // im Ausdruck der Quelltext.
-    setTimeout(() => window.print(), pool ? 900 : 100);
+    setTimeout(() => druckenMitTitel(bogenName(work && work.name)), pool ? 900 : 100);
   };
-  const druckBogen = useMemo(() => (wdhPool ? wdhZuteilen(druckBogenRoh, wdhPool, themen.byId, wdhMax) : druckBogenRoh), [druckBogenRoh, wdhPool, topics, wdhMax]);
+  const druckBogen = useMemo(() => {
+    const basisListe = wdhPool ? wdhZuteilen(druckBogenRoh, wdhPool, themen.byId, wdhMax) : druckBogenRoh;
+    return standDaten ? basisListe.map((b) => ({ ...b, stand: standDaten.get(b.student_id) || null })) : basisListe;
+  }, [druckBogenRoh, wdhPool, topics, wdhMax, standDaten]);
 
   // Aus den zentralen Tabellenstilen abgeleitet, nicht daneben neu gebaut: nur
   // die kraeftigere Kopf-Trennlinie und die polsterlose Zelle (die Eingabefelder
@@ -1323,6 +1373,14 @@ export default function Klassenarbeit() {
                 {/* Statistik-Kacheln (Anwesend … 95%-KI) — wie CardVote. */}
                 <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
                   <StatCard label={t("klassenarbeit.attendance")} value={`${A.noten.present} / ${A.noten.total}`} />
+                  {(() => {
+                    const nE = alleStudents.filter((s) => s.niveau === "E").length, nG = alleStudents.filter((s) => s.niveau === "G").length;
+                    // Gemeinsame Auswertung: je nach gewaehltem Blatt nur E, nur G oder beide.
+                    if (nE + nG === 0) return null;
+                    if (schluessel === "E") return <StatCard label={t("klassenarbeit.egAnzahlE")} value={String(nE)} />;
+                    if (schluessel === "G") return <StatCard label={t("klassenarbeit.egAnzahlG")} value={String(nG)} />;
+                    return <StatCard label={t("klassenarbeit.egAnzahl")} value={`${nE} / ${nG}`} />;
+                  })()}
                   <StatCard label={t("klassenarbeit.avgGrade")} value={komma(A.noten.avg)} />
                   {A.noten.avgPct != null && <StatCard label={t("klassenarbeit.avgPct")} value={`${A.noten.avgPct}%`} />}
                   {A.noten.medPct != null && <StatCard label={t("klassenarbeit.median")} value={`${A.noten.medPct}%`} />}
@@ -1369,45 +1427,9 @@ export default function Klassenarbeit() {
                     </div>
                   );
                 })()}
-                {/* Verteilung / Boxplot — Panel + Pillen-Umschalter wie CardVote. */}
+                {/* Verteilung / Boxplot: das gemeinsame Feld. */}
                 <div style={{ padding: 16, background: "var(--bg3)", borderRadius: cardStyle.borderRadius, border: "1px solid var(--border)" }}>
-                  {/* Zweimal dieselbe Frage („welche Ansicht?"), also zweimal
-                      dieselbe Form. Links standen vorher zwei Einzelpillen
-                      (r980), rechts eine Gruppe mit r8 — nebeneinander sah das
-                      aus wie zwei verschiedene Bedienarten. */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                    <Tabs value={distMode} onChange={setDistMode}
-                      options={[["bar", t("klassenarbeit.distGrades")], ["box", t("klassenarbeit.distBox")]]} />
-                    {/* Sekundär-Umschalter: Balken = Noten/Teilnoten, Boxplot = %/Noten. */}
-                    <Tabs style={{ marginLeft: "auto" }}
-                      value={distMode === "bar" ? barMode : boxMode}
-                      onChange={distMode === "bar" ? setBarMode : setBoxMode}
-                      options={distMode === "bar"
-                        ? [["whole", t("klassenarbeit.distWhole")], ["fine", t("klassenarbeit.distFine")]]
-                        : [["pct", "%"], ["note", t("klassenarbeit.grade")]]} />
-                  </div>
-                  {distMode === "bar" ? (() => {
-                    const data = barMode === "fine"
-                      ? A.noten.distFine.map((d) => ({ count: d.count, label: d.label, grade: d.grade }))
-                      : A.noten.dist.map((c, i) => ({ count: c, label: String(i + 1), grade: i + 1 }));
-                    const mxc = Math.max(...data.map((d) => d.count), 1);
-                    return (
-                      <div style={{ display: "flex", alignItems: "flex-end", gap: barMode === "fine" ? 3 : 6, height: 105 }}>
-                        {data.map((d, i) => (
-                          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                            {/* Saeule: Radius rundet nur die Kappe der Grafik. */}
-                            <div style={{ width: barMode === "fine" ? "80%" : "60%", height: `${Math.max(3, (d.count / mxc) * 75)}px`, background: d.grade <= 2 ? C.success : d.grade <= 4 ? C.warning : C.danger, borderRadius: 3 }} title={`${d.count}`} />
-                            <span style={{ fontSize: 11, color: "var(--text3)" }}>{d.count}</span>
-                            <span style={{ fontSize: 11, fontWeight: 700 }}>{d.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })() : (
-                    boxMode === "note"
-                      ? <Boxplot values={A.noten.werte} max={6} />
-                      : <Boxplot values={A.noten.pctArr} max={100} unit="%" umgekehrt />
-                  )}
+                  <Verteilung noten={A.noten.werte} pct={A.noten.pctArr} />
                 </div>
                 {/* Min-Punkte je Note entfernt — steht im Notenschlüssel. */}
               </>)}
@@ -1440,8 +1462,7 @@ export default function Klassenarbeit() {
           links={(
             <SuchSelect value={auswahlWert ? String(auswahlWert) : ""} style={{ minWidth: 0, maxWidth: 320 }}
               onChange={(v) => { const w = works.find((x) => String(x.id) === v) || null; if (w) waehleAusListe(w); else wechseln(() => zeigeArbeit(null)); }}
-              optionen={auswahl.map((w) => ({ wert: String(w.id), label: auswahlLabel(w) }))
-                .sort((a, b) => a.label.localeCompare(b.label, "de", { numeric: true, sensitivity: "base" }))} />
+              optionen={auswahl.map((w) => ({ wert: String(w.id), label: auswahlLabel(w) }))} />
           )}
           mehr={work ? [{ key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true, onClick: loeschen }] : []}>
           {/* E | G: zwei Blaetter einer Arbeit. Fehlt eins, legt der Knopf es an. */}
@@ -1586,7 +1607,17 @@ export default function Klassenarbeit() {
           {/* Gewichtung der Themen: wie viele Punkte entfallen auf jedes Thema?
               Beim Erstellen der Arbeit die Frage, ob ein Unterthema mit zwei
               Punkten ueberhaupt etwas aussagen kann. */}
-          <ThemenGewichte gw={themenGewichte(work.tasks)} titel={t("klassenarbeit.gewichtTitel")} hint={t("klassenarbeit.gewichtHint")} themen={themen} t={t} />
+          {/* Die Gewichtung je Aufgabe steht jetzt in der Zeile „Gewicht" unter dem Punkte-Raster; die
+              Aufschluesselung nach THEMEN bleibt, aber eingeklappt — sie war ein weiterer Kasten, der die
+              Seite fuellte, bevor man ueberhaupt Punkte eingetragen hatte. */}
+          {themenGewichte(work.tasks).some((x) => x.topic != null && x.topic !== "form") && (
+            <details style={{ marginBottom: 12 }}>
+              <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text2)" }}>{t("klassenarbeit.gewichtTitel")}</summary>
+              <div style={{ marginTop: 8 }}>
+                <ThemenGewichte gw={themenGewichte(work.tasks)} titel={t("klassenarbeit.gewichtTitel")} hint={t("klassenarbeit.gewichtHint")} themen={themen} t={t} />
+              </div>
+            </details>
+          )}
           </>)}
 
           {/* 2) Punkte-Raster: Zeilen = Schüler, Spalten = Aufgaben (0..max). */}
@@ -1650,7 +1681,8 @@ export default function Klassenarbeit() {
                     // die Klassenstatistik unten rechnet sie raus. Anzeige umschaltbar:
                     // Tendenznote (2+) oder Notenwert in 0,3-Schritten (2,3).
                     const gd = (erfasst && tm) ? gradeDetailed(wt.pct, effScale) : null;
-                    const note = gd ? (gradeMode === "wert" ? komma(gd.wert) : gd.note) : "";
+                    // LE (Foerderschwerpunkt Lernen): nicht bewertet — „NB“ statt Note.
+                    const note = (leIst(s) || istUb(s.id)) ? "NB" : gd ? (gradeMode === "wert" ? komma(gd.wert) : gd.note) : "";
                     return (
                       <tr key={s.id} style={{ ...(abw ? { opacity: 0.5 } : {}), ...(fokus && fokus.sid === s.id ? { background: FOKUS_TON } : {}) }}>
                         <td style={{ ...td, ...klebtLinks, textAlign: "left", padding: "4px 8px", fontWeight: 500, whiteSpace: "nowrap",
@@ -1723,11 +1755,54 @@ export default function Klassenarbeit() {
                         })}
                         <td title={erfasst && wt.bonusPct > 0 ? t("klassenarbeit.eBonus", { p: kommaRund(wt.bonusPct, 1) }) : undefined}
                           style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: !erfasst ? "var(--text3)" : abw ? "var(--text3)" : (tm && wt.pct < 50 ? C.danger : "var(--text)") }}>{erfasst ? `${kommaRund(sum, 2)}/${komma(tm)}` : `–/${komma(tm)}`}</td>
-                        <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{note}</td>
+                        <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>
+                          {/* Klick auf die Note: zwischen NB (nicht bewertet) und der Note wechseln. LE ist immer NB. */}
+                          <button onClick={() => toggleUb(s.id)} disabled={leIst(s)} aria-pressed={istUb(s.id)}
+                            title={t("klassenarbeit.ubHint")} aria-label={t("klassenarbeit.ubHint")}
+                            style={{ border: "none", background: "none", font: "inherit", color: "inherit", cursor: leIst(s) ? "default" : "pointer", minWidth: 32, minHeight: 32, padding: 0 }}>{note || "·"}</button>
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
+                {/* Zwei Zeilen unter dem Raster, beide in PROZENT: wie viel jede Aufgabe an der Arbeit wiegt
+                    (Gewicht) und wie viel der Klasse sie im Schnitt gelungen ist (Ø). Beides stand vorher in
+                    eigenen Kaesten ueber und unter der Tabelle. */}
+                {(() => {
+                  const gesamt = totalMax();
+                  const anteil = (m) => (gesamt > 0 ? Math.round((m / gesamt) * 100) : 0);
+                  const einheitPct = (id) => { const x = analyse && analyse.perUnit.find((y) => y.id === id); return x && x.n > 0 ? x.pct : null; };
+                  const aufgabePct = (id) => { const x = analyse && analyse.perTask.find((y) => y.id === id); return x && x.n > 0 ? x.pct : null; };
+                  const kopf = { ...td, ...klebtLinks, textAlign: "left", fontSize: 12, fontWeight: 700, color: "var(--text2)", background: "var(--bg2)" };
+                  const zelleF = { ...td, fontSize: 12, color: "var(--text2)", background: "var(--bg2)" };
+                  const pctText = (v) => (v == null ? "" : `${v} %`);
+                  return (
+                    <tfoot>
+                      <tr>
+                        <td style={kopf} title={t("klassenarbeit.gewichtZeileHint")}>{t("klassenarbeit.gewichtZeile")}</td>
+                        {(work.tasks || []).flatMap((tk) => spalten(tk).map((sp, j) => {
+                          const rand = j === 0 ? "1px solid var(--border)" : undefined;
+                          if (sp.art === "wahl") return <td key={tk.id + "-wahl"} style={{ ...zelleF, borderLeft: rand }} />;
+                          if (sp.art === "summe") return <td key={tk.id + "-sum"} style={{ ...zelleF, fontWeight: 700 }}>{anteil(basis([tk]))} %</td>;
+                          return <td key={sp.u.id} style={{ ...zelleF, borderLeft: rand }}>{anteil(sp.u.max)} %</td>;
+                        }))}
+                        <td style={{ ...zelleF, fontWeight: 700, borderLeft: "1px solid var(--border)" }}>100 %</td>
+                        <td style={zelleF} />
+                      </tr>
+                      <tr>
+                        <td style={kopf} title={t("klassenarbeit.schnittZeileHint")}>{t("klassenarbeit.schnittZeile")}</td>
+                        {(work.tasks || []).flatMap((tk) => spalten(tk).map((sp, j) => {
+                          const rand = j === 0 ? "1px solid var(--border)" : undefined;
+                          if (sp.art === "wahl") return <td key={tk.id + "-wahl"} style={{ ...zelleF, borderLeft: rand }} />;
+                          if (sp.art === "summe") return <td key={tk.id + "-sum"} style={{ ...zelleF, fontWeight: 700 }}>{pctText(aufgabePct(tk.id))}</td>;
+                          return <td key={sp.u.id} style={{ ...zelleF, borderLeft: rand }}>{pctText(einheitPct(sp.u.id))}</td>;
+                        }))}
+                        <td style={{ ...zelleF, fontWeight: 700, borderLeft: "1px solid var(--border)" }}>{pctText(analyse && analyse.noten && analyse.noten.avgPct)}</td>
+                        <td style={zelleF} />
+                      </tr>
+                    </tfoot>
+                  );
+                })()}
               </table>
             </div>
           )}
@@ -1878,9 +1953,11 @@ export default function Klassenarbeit() {
 // Krank/abwesend bekommt ohnehin keine Note.
 function notenAusArbeit(students, work, scale) {
   const absentU = new Set((work.absent || []).map(String));
+  const ubU = new Set((work.unbewertet || []).map(String));      // einzelne Kinder ohne Note (UB)
   if (!basis(work.tasks)) return [];
   return students
     .filter((s) => {
+      if (leIst(s) || ubU.has(String(s.id))) return false;   // LE oder UB: keine Note
       if (absentU.has(String(s.id))) return false;
       const r = (work.results || {})[String(s.id)];
       if (!r || r === "abwesend") return false;
@@ -1924,6 +2001,9 @@ function quartiles(arr) {
 const boxColor = (med) => (med < 50 ? C.danger : med < 75 ? C.warning : C.success);
 // Boxplot kommt zentral aus Icons.jsx (eine Quelle). Der Vergleich nutzt die
 // kompakte Variante (compact) je Zeile.
+
+// Die Arbeit einer Klasse öffnen (Deep-Link: Klasse, Kurs und Arbeit — ohne den Kurs riete die Auswahl den ersten).
+const arbeitLink = (a) => `/auswertung?tab=klassenarbeit&class=${a.class_id}${a.kurs_id ? `&kurs=${a.kurs_id}` : ""}&work=${a.id}`;
 
 export function KlassenarbeitVergleich() {
   const { t } = useLanguage();
@@ -2022,7 +2102,7 @@ export function KlassenarbeitVergleich() {
         <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
         {works.length > 0 && (
           <SuchSelect value={workId ? String(workId) : ""} onChange={(v) => setWorkId(Number(v))} style={{ minWidth: 0, maxWidth: 320 }}
-            optionen={works.map((w) => ({ wert: String(w.id), label: w.niveau ? `${w.name} (${w.niveau})` : w.name }))} />
+            optionen={[...works].sort((a, b) => (a.datum ? 0 : 1) - (b.datum ? 0 : 1) || (a.datum || "").localeCompare(b.datum || "") || a.id - b.id).map((w) => ({ wert: String(w.id), label: `${w.niveau ? `${w.name} (${w.niveau})` : w.name}${datumKurz(w.datum) ? ` · ${datumKurz(w.datum)}` : ""}` }))} />
         )}
       </div>
 
@@ -2067,7 +2147,10 @@ export function KlassenarbeitVergleich() {
                   const q = quartiles(a.pct_liste);
                   return (
                     <tr key={a.id} style={a.eigene ? { background: "var(--bg2)" } : undefined}>
-                      <td style={{ ...zelle, textAlign: "left", fontWeight: 600 }} title={a.name}>{a.class_name || a.name}</td>
+                      <td style={{ ...zelle, textAlign: "left", fontWeight: 600 }} title={a.name}>
+                        {/* Klick öffnet die Arbeit dieser Klasse (Deep-Link wie aus dem Kalender). */}
+                        <Link to={arbeitLink(a)} style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dotted var(--text3)" }}>{a.class_name || a.name}</Link>
+                      </td>
                       <td style={{ ...zelle, textAlign: "left" }}><Boxplot values={a.pct_liste} max={100} compact umgekehrt /></td>
                       <td style={{ ...zelle, color: "var(--text3)" }}>{a.n}</td>
                       <td style={{ ...zelle, fontWeight: 600 }}>{fmt(a.schnitt)}</td>
@@ -2097,7 +2180,7 @@ export function KlassenarbeitVergleich() {
               <thead>
                 <tr>
                   <th style={{ ...kopf, textAlign: "left" }}>{t("klassenarbeit.cmpTask")}</th>
-                  {klassen.map((a) => <th key={a.id} style={kopf} title={a.name}>{a.class_name || "?"}</th>)}
+                  {klassen.map((a) => <th key={a.id} style={kopf} title={a.name}><Link to={arbeitLink(a)} style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dotted var(--text3)" }}>{a.class_name || "?"}</Link></th>)}
                   {klassen.length > 1 && <th style={kopf}>{t("klassenarbeit.cmpSpread")}</th>}
                   <th style={{ ...kopf, borderLeft: "1px solid var(--border)" }}>{t("klassenarbeit.cmpAll")}</th>
                   <th style={kopf} title={t("klassenarbeit.cmpEmptyHint")}>{t("klassenarbeit.cmpEmpty")}</th>

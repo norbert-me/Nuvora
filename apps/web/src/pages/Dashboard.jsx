@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigationType, useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
@@ -15,7 +15,9 @@ import ZoomImage from "../components/ZoomImage.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import { useAktiv } from "../core/modules.js";
 import { useZiehVorschau } from "../core/ziehsortieren.js";
-import { alsJson, hol } from "../core/melden.js";
+import { alsJson, hol, pruefeAntwort } from "../core/melden.js";
+import { zeigeFehler } from "../core/undo.jsx";
+import { istSvg, svgZuPng } from "../core/bilder.js";
 import { raeumeBrowser } from "../core/abmelden.js";
 import { formelEinfuegen, LATEX_TASTEN_LANG } from "../core/latextabelle.js";
 
@@ -24,11 +26,20 @@ const API = "/api";
 // Bild zu einer Frage hochladen. Stand zweimal in dieser Datei (verwaiste
 // Fragen und Frageeditor) — dieselben vierzehn Zeilen. `dateiWaehlen` aus
 // Icons.jsx macht den Dialog, hier bleibt nur das Hochladen.
-const bildHochladen = (setter) => dateiWaehlen(async (file) => {
+const bildHochladen = (setter) => dateiWaehlen(async (gewaehlt) => {
+  // SVG nimmt der Server nicht an (bewusst, siehe core/bilder.js) — hier wird es zu PNG. Vorher scheiterte es
+  // STILL: das Auswahlfeld bot .svg an, der Server sagte 400, und die Oberflaeche zeigte nichts.
+  let file = gewaehlt;
+  if (istSvg(gewaehlt)) {
+    file = await svgZuPng(gewaehlt);
+    if (!file) { zeigeFehler("Dieses SVG lässt sich nicht in ein Bild umwandeln. Bitte als PNG oder JPEG exportieren."); return; }
+  }
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API}/questions/upload-image`, { method: "POST", body: form });
-  if (res.ok) setter((await res.json()).url);
+  const res = await fetch(`${API}/questions/upload-image`, { method: "POST", body: form }).catch(() => null);
+  // Ein Fehler wird gesagt (Format, Groesse, Verbindung) — nicht verschluckt.
+  if (res && res.ok) setter((await res.json()).url);
+  else await pruefeAntwort(res, "Bild hochladen");
 }, "image/*,.svg");
 
 
@@ -396,17 +407,65 @@ export default function Dashboard() {
   const isTouch = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
   const setZieh = useZiehVorschau(currentSets, setzeSetReihenfolge, !isTouch);
 
+  // Ordner und geoeffnetes Quiz stehen in der Adresse (?ordner=, ?quiz=): jeder
+  // Schritt ist ein Verlaufseintrag, damit der Zurueck-Knopf (Safari, Maus,
+  // Wischgeste) eine Ebene hoch geht statt die ganze Seite zu verlassen.
+  const urlSetzen = (aendern, ersetzen = false) => {
+    const next = new URLSearchParams(params);
+    aendern(next);
+    setParams(next, { replace: ersetzen });
+  };
   const openFolder = (folder) => {
     setPath([...path, { id: folder.id, name: folder.name }]);
     setCurrentFolder(folder.id);
     setEditingSet(null);
+    urlSetzen((p) => { p.set("ordner", String(folder.id)); p.delete("quiz"); });
   };
 
   const goToPath = (idx) => {
     if (idx < 0) { setPath([]); setCurrentFolder(null); }
     else { setPath(path.slice(0, idx + 1)); setCurrentFolder(path[idx].id); }
     setEditingSet(null);
+    urlSetzen((p) => { if (idx < 0) p.delete("ordner"); else p.set("ordner", String(path[idx].id)); p.delete("quiz"); });
   };
+  const oeffneSet = (qs) => {
+    setEditingSet(qs);
+    urlSetzen((p) => p.set("quiz", String(qs.id)));
+  };
+  const schliesseSet = () => {
+    setEditingSet(null);
+    urlSetzen((p) => p.delete("quiz"), true);
+  };
+
+  // Zurueck/Vor des Browsers: Ordner und Quiz aus der Adresse uebernehmen. Nur
+  // bei POP und nur, wenn sich die Adresse wirklich geaendert hat — unsere
+  // eigenen Schritte (PUSH) stehen schon im Zustand.
+  const navTyp = useNavigationType();
+  const letzteUrl = useRef(null);
+  useEffect(() => {
+    const key = params.toString();
+    if (navTyp !== "POP") { letzteUrl.current = key; return; }
+    if (letzteUrl.current === key) return;
+    if (folders.length === 0 && rootSets.length === 0) return;   // noch nicht geladen
+    letzteUrl.current = key;
+    const qz = Number(params.get("quiz")) || null;
+    if (qz) { if (!editingSet || editingSet.id !== qz) sammlungOeffnen(qz); return; }
+    setEditingSet(null);
+    const ord = Number(params.get("ordner")) || null;
+    if (!ord) { setPath([]); setCurrentFolder(null); return; }
+    const gehe = (nodes, spur) => {
+      for (const n of nodes) {
+        const hier = [...spur, { id: n.id, name: n.name }];
+        if (n.id === ord) return hier;
+        const tiefer = gehe(n.children || [], hier);
+        if (tiefer) return tiefer;
+      }
+      return null;
+    };
+    const spur = gehe(folders, []);
+    if (spur) { setPath(spur); setCurrentFolder(ord); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, folders, rootSets, navTyp]);
 
   const createFolder = async (nm) => {
     const name = (nm ?? newFolderName).trim();
@@ -597,7 +656,7 @@ export default function Dashboard() {
   };
 
   if (editingSet) {
-    return <QuestionSetEditor questionSet={editingSet} allQuestions={allQuestions} onBack={() => { setEditingSet(null); load(); }} onDelete={() => deleteSet(editingSet.id)} onQuestionsChange={load} />;
+    return <QuestionSetEditor questionSet={editingSet} allQuestions={allQuestions} onBack={() => { schliesseSet(); load(); }} onDelete={() => deleteSet(editingSet.id)} onQuestionsChange={load} />;
   }
 
   // Collect all valid move targets (excluding the folder being moved and its descendants)
@@ -832,7 +891,7 @@ export default function Dashboard() {
             <div key={qs.id} {...setZieh.props(idx)}
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...cardStyle, marginBottom: 8, cursor: "pointer",
                 opacity: setZieh.vorschau ? 0.92 : 1, transition: "opacity 0.15s" }}>
-              <span onClick={() => setEditingSet(qs)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+              <span onClick={() => oeffneSet(qs)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                 {!isTouch && (
                   <span className="drag-handle" style={{ color: "var(--text3)", display: "inline-flex", cursor: "grab", flexShrink: 0 }}
                     title={t("dash.dragSets")} aria-hidden="true"><Icon d={ICONS.grip} size={15} /></span>
@@ -1004,6 +1063,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
     shuffleA: !!qs.shuffle_answers,
     niveauAktiv: !!qs.niveau_aktiv,
     minuspunkte: !!qs.minuspunkte,
+    unbenotet: !!qs.unbenotet,
     eFragen: Object.entries(qs.niveaus || {}).filter(([, v]) => v === "E").map(([k]) => Number(k)).sort((a, b) => a - b),
   });
   const [gespeichert, setGespeichert] = useState(() => alsEntwurf(questionSet));
@@ -1017,6 +1077,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         shuffle_answers: wert.shuffleA,
         niveau_aktiv: wert.niveauAktiv,
         minuspunkte: wert.minuspunkte,
+        unbenotet: wert.unbenotet,
         // Immer die VOLLE Zuordnung schicken: fehlt eine Frage im Objekt,
         // behaelt der Server ihr altes Niveau — ein Zurueckstellen auf G waere
         // dann wirkungslos.
@@ -1027,7 +1088,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
     onQuestionsChange();
   });
 
-  const { name, shuffleQ, shuffleA, niveauAktiv, minuspunkte } = e.wert;
+  const { name, shuffleQ, shuffleA, niveauAktiv, minuspunkte, unbenotet } = e.wert;
   // Fragen in der Reihenfolge des Entwurfs.
   const questions = e.wert.ids.map((qid) => qMap[qid]).filter(Boolean);
 
@@ -1114,6 +1175,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         <Toggle checked={shuffleA} onChange={(v) => e.setz({ shuffleA: v })} label={t("dash.shuffleA")} />
         <Toggle checked={niveauAktiv} onChange={(v) => e.setz({ niveauAktiv: v })} label={t("dash.niveauToggle")} />
         <Toggle checked={minuspunkte} onChange={(v) => e.setz({ minuspunkte: v })} label={t("dash.minusToggle")} />
+        <Toggle checked={!!unbenotet} onChange={(v) => e.setz({ unbenotet: v })} label={t("dash.unbenotetToggle")} />
       </div>
       {(niveauAktiv || minuspunkte) && (
         <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px", lineHeight: 1.5 }}>

@@ -7,11 +7,11 @@
 //
 // Klick auf einen Namen öffnet alle Infos zur Person. Beobachtungen zählen nie
 // in den Schnitt — „Anstrengungsbereitschaft“ ist kein Messwert.
-import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { memo, useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
-import { Boxplot, COLORS as C, CONTROL_R, DialogKopf, Empty, FOKUS_TON, FOKUS_TON_DECKEND, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { Boxplot, COLORS as C, CONTROL_R, DialogKopf, linkBtn, toolbarBtn, Empty, FOKUS_TON, FOKUS_TON_DECKEND, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Segment, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, segmentBtn, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import { themenFuerKurs, themenIndex, useThemen } from "../core/topics.js";
 import { useKurs } from "../core/kurs.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -19,10 +19,11 @@ import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
+import Verteilung from "../components/Verteilung.jsx";
 import { DialogFuss, nurGeaendertIn, useAutoSpeichern, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useAktiv, useZielFilter } from "../core/modules.js";
-import { datumKurz } from "../core/grades.js";
+import { datumKurz, wertLabel } from "../core/grades.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import { useEinfuegen } from "../core/ziehsortieren.js";
@@ -30,7 +31,10 @@ import { alsJson, hol } from "../core/melden.js";
 import { parseYmd, ymd } from "../core/datum.js";
 import { median as medianVon, mittel, streuung } from "../core/statistik.js";
 import { verteilung } from "../core/notenstufen.js";
-import { notenTrend, spaltenNachZeit } from "../core/notentrend.js";
+import { kurzName, kurzNameAn, useKurzName } from "../core/namen.js";
+import { notenTrend, spaltenDatum, spaltenNachZeit, strichLuecken } from "../core/notentrend.js";
+import { teilen } from "../core/teilen.js";
+import { sortiereKinder } from "../core/namen.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
 
 const API = "/api/noten";
@@ -78,6 +82,11 @@ function parseNote(text) {
 // — `de` wird in vielen Teilkomponenten gerufen, die ihn nicht durchgereicht bekaemen.
 let STELLEN = 2;
 const de = (n) => kommaRund(n, STELLEN);
+// Notenanzeige der BERECHNETEN Noten (Bereichs-, End-, Gesamtnote): „2,46" oder
+// „2− (2,46)". Schalter in der Leiste — wer die Noten zeigt, muss sonst das
+// Komma erklaeren. Eingabefelder bleiben bei der Zahl (`de`).
+let NOTENFORM = "wert";
+const deAnz = (n) => (n == null ? "" : NOTENFORM === "tendenz" ? wertLabel(n) : de(n));   // Tendenz: nur 2−, ohne Kommazahl
 
 export default function Noten() {
   const { t } = useLanguage();
@@ -92,6 +101,7 @@ export default function Noten() {
   const [loading, setLoading] = useState(true);
   const loadedOnce = useRef(false); // Skeleton nur beim allerersten Laden, nicht bei Reloads
   const [entries, setEntries] = useState([]);
+  const kurz = useKurzName();
   const [suche, setSuche] = useState("");          // Kinder in der Tabelle suchen
   const [susModus, setSusModus] = useState(false);  // alle Noten verbergen (SuS schauen mit)
   const [summary, setSummary] = useState([]);
@@ -133,12 +143,14 @@ export default function Noten() {
   // sich die Wahl pro Browser. Die Abschnitts-Gewichtung bleibt unberuehrt.
   const [agg, setAgg] = useState(() => { try { return localStorage.getItem("noten_agg") === "median" ? "median" : "mean"; } catch { return "mean"; } });
   const [yearData, setYearData] = useState({ sections: [], rows: [] });
-  const [dividers, setDividers] = useState([]); // Quartalsstriche: after_category_id[]
-  const [collapsed, setCollapsed] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem("noten_collapsed") || "[]")); } catch { return new Set(); } });
+  const [dividers, setDividers] = useState([]); // Quartalsstriche im Verlauf: Daten ("JJJJ-MM-TT")
+  // Beim Oeffnen sind IMMER alle Spalten ausgeklappt (Wunsch des Nutzers): zugeklappt gilt nur
+  // fuer diese Sitzung und wird nicht gemerkt — sonst fehlen beim naechsten Mal Noten, ohne dass
+  // man sich erinnert, sie eingeklappt zu haben.
+  const [collapsed, setCollapsed] = useState(() => new Set());
   const toggleCollapse = (secId) => setCollapsed((prev) => {
     const n = new Set(prev);
     n.has(secId) ? n.delete(secId) : n.add(secId);
-    localStorage.setItem("noten_collapsed", JSON.stringify([...n]));
     return n;
   });
   const [menuSec, setMenuSec] = useState(null);   // Abschnitt mit offenem Menue
@@ -146,7 +158,7 @@ export default function Noten() {
   // zweite braucht die Hoehe der ersten als Abstand, sonst liegen sie
   // uebereinander. Gemessen statt geraten: die erste Zeile ist je nach Inhalt
   // unterschiedlich hoch.
-  const { rahmenRef, kopf1Ref, th2 } = useKlebenderKopf();
+  const { rahmenRef, kopf1Ref, th2 } = useKlebenderKopf(`${sections.length}:${summary.length}:${loading}:${term}:${collapsed.size}:${kurz.an}`);
   // Abschnitte und Spalten ziehen beide „links/rechts neben den Nachbarn" — das
   // ist dieselbe Bauform wie bei Themen, Kartenstapeln und Karten und steht seit
   // dem Zusammenfuehren nur noch in core/ziehsortieren.js. Die Spalten laufen
@@ -184,25 +196,52 @@ export default function Noten() {
 
   // Noten-Zeilen kommen aus dem KURS (dedupliziert), nicht aus der Fach-Klasse.
   const loadRoster = (id) => hol(`${API}/classes/${id}/students`).then((d) => setStudents(Array.isArray(d) ? d : []));
-  const load = async (id) => {
+  // Jeder Ladevorgang bekommt eine Nummer; gilt am Ende nicht mehr die eigene, ist ein neuerer
+  // gestartet (Klassen-, Kurs-, Halbjahrwechsel, `classes` meldet sich erneut) und diese Antwort
+  // darf nichts mehr ueberschreiben. Vorher gewann, wer ZULETZT ANKAM — nicht, wer zuletzt gefragt
+  // hatte, und eine alte Antwort legte die Tabelle eines anderen Kurses ueber die neue.
+  const ladeNr = useRef(0);
+  // Schlaegt ein Abruf fehl (Netz, Zeitueberschreitung, 429), war das bisher eine LEERE Antwort:
+  // die Tabelle zeigte keine Noten, und nichts sagte, dass sie nur nicht angekommen waren.
+  const [ladefehler, setLadefehler] = useState(false);
+  const holeOderWirf = async (url) => {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(String(r.status));
+    return r.json();
+  };
+  const load = async (id, versuch = 0) => {
     if (!id) return;
+    const meine = ++ladeNr.current;
     setLoading(true);
     loadRoster(id);
-    if (term === "year") {
-      const y = await fetch(`${API}/classes/${id}/year?agg=${agg}${kp}`).then((r) => (r.ok ? r.json() : { sections: [], rows: [] }));
-      setYearData(y); setLoading(false);
+    let sec, ent, sum;
+    try {
+      if (term === "year") {
+        const y = await holeOderWirf(`${API}/classes/${id}/year?agg=${agg}${kp}`);
+        if (meine !== ladeNr.current) return;
+        setYearData(y); setLoading(false); setLadefehler(false);
+        return;
+      }
+      [sec, ent, sum] = await Promise.all([
+        holeOderWirf(`${API}/classes/${id}/sections?term=${term}${kp}`),
+        // term wirkt nur auf die spaltenlosen Beobachtungen (sie tragen das
+        // Halbjahr selbst); Noten kommen ueber ihre Spalte ohnehin je Halbjahr.
+        holeOderWirf(`${API}/classes/${id}/entries?term=${term === "year" ? "" : term}${kp}`),
+        holeOderWirf(`${API}/classes/${id}/summary?term=${term}&agg=${agg}${kp}`),
+      ]);
+    } catch {
+      if (meine !== ladeNr.current) return;
+      // Einmal still nachfassen (kurze Aussetzer sind der Normalfall), danach sagen, dass es klemmt.
+      if (versuch < 2) { setTimeout(() => { if (meine === ladeNr.current) load(id, versuch + 1); }, 1200 * (versuch + 1)); return; }
+      setLoading(false); setLadefehler(true);
       return;
     }
-    const [sec, ent, sum] = await Promise.all([
-      fetch(`${API}/classes/${id}/sections?term=${term}${kp}`).then((r) => (r.ok ? r.json() : [])),
-      // term wirkt nur auf die spaltenlosen Beobachtungen (sie tragen das
-      // Halbjahr selbst); Noten kommen ueber ihre Spalte ohnehin je Halbjahr.
-      fetch(`${API}/classes/${id}/entries?term=${term === "year" ? "" : term}${kp}`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API}/classes/${id}/summary?term=${term}&agg=${agg}${kp}`).then((r) => (r.ok ? r.json() : [])),
-    ]);
-    setSections(sec); setEntries(ent); setSummary(sum); setLoading(false);
+    if (meine !== ladeNr.current) return;
+    setLadefehler(false);
+    setSections((p) => teilen(p, sec, (x) => x.id)); setEntries((p) => teilen(p, ent, (x) => x.id));
+    setSummary((p) => teilen(p, sum, (x) => x.student_id)); setLoading(false);
     loadedOnce.current = true; // ab jetzt kein Skeleton mehr (Reloads z.B. bei Median/Mittel nicht flackern lassen)
-    hol(`${API}/classes/${id}/dividers?term=${term}${kp}`).then((d) => setDividers(Array.isArray(d) ? d : []));
+    hol(`${API}/classes/${id}/quartalsstriche?term=${term}${kp}`).then((d) => setDividers(Array.isArray(d) ? d : []));
   };
   // Fehlzeiten zu den Datumsangaben der Spalten — ein Aufruf fuer alle Tage.
   //
@@ -242,8 +281,14 @@ export default function Noten() {
     if (!cat.date) return "";
     return (fehlzeiten[cat.date] || {})[String(studentId)] || "";
   };
-  const toggleDivider = async (catId) => {
-    const r = await fetch(`${API}/classes/${classId}/dividers/toggle?term=${term}${kp}`, alsJson("POST", { after_category_id: catId })).catch(() => null);
+  // Quartalsstriche im Verlauf der Gesamtnoten: ein Strich = ein Datum. In der Tabelle gibt es keine mehr
+  // (dort standen sie hinter einer Spalte und sagten im zeitlich geordneten Verlauf nichts).
+  const strichSetzen = async (datum) => {
+    const r = await fetch(`${API}/classes/${classId}/quartalsstriche?term=${term}${kp}`, alsJson("POST", { datum })).catch(() => null);
+    if (r && r.ok) setDividers(await r.json());
+  };
+  const strichLoeschen = async (datum) => {
+    const r = await fetch(`${API}/classes/${classId}/quartalsstriche?term=${term}&datum=${encodeURIComponent(datum)}${kp}`, { method: "DELETE" }).catch(() => null);
     if (r && r.ok) setDividers(await r.json());
   };
   useEffect(() => { if (classId) load(classId); }, [classId, kursId, classes, term, agg]);
@@ -253,6 +298,9 @@ export default function Noten() {
   const [stellen, setStellen] = useState(() => { try { return localStorage.getItem("noten_stellen") === "1" ? 1 : 2; } catch { return 2; } });
   const setStellenPersist = (v) => { const n = v === "1" ? 1 : 2; setStellen(n); try { localStorage.setItem("noten_stellen", String(n)); } catch { /* egal */ } };
   STELLEN = stellen;
+  const [form, setForm] = useState(() => { try { return localStorage.getItem("noten_form") === "tendenz" ? "tendenz" : "wert"; } catch { return "wert"; } });
+  const setFormPersist = (v) => { setForm(v); try { localStorage.setItem("noten_form", v); } catch { /* egal */ } };
+  NOTENFORM = form;
   const [stufung, setStufung] = useState(() => { try { const v = localStorage.getItem("noten_stufen"); return v === "halb" || v === "teil" ? v : "ganz"; } catch { return "ganz"; } });
   const setStufungPersist = (v) => { setStufung(v); try { localStorage.setItem("noten_stufen", v); } catch { /* egal */ } };
 
@@ -344,7 +392,7 @@ export default function Noten() {
   const zellFolge = () => {
     const cats = secListe.filter((sec) => !collapsed.has(sec.id))
       .flatMap((sec) => catsVon(sec).map((c) => c.id));
-    return { cats, kinder: (summary || []).map((s) => s.student_id) };
+    return { cats, kinder: zeilen.map((s) => s.student_id) };
   };
   const nachbar = (studentId, catId, rueckwaerts) => {
     const { cats, kinder } = zellFolge();
@@ -362,18 +410,35 @@ export default function Noten() {
     const { cats, kinder } = zellFolge();
     const sp = cats.indexOf(catId), ze = kinder.indexOf(studentId);
     if (sp < 0 || ze < 0) return null;
-    const nze = ze + (hoch ? -1 : 1);
+    // Wer an dem Tag der Spalte gefehlt hat (oder als LE in einer Klassenarbeit nicht benotet
+    // wird), wird uebersprungen: dort gibt es nichts einzutragen, und man tippt sonst ins Leere.
+    let nze = ze + (hoch ? -1 : 1);
+    while (nze >= 0 && nze < kinder.length && zelleUeberspringen(kinder[nze], cats[sp])) nze += hoch ? -1 : 1;
     if (nze < 0 || nze >= kinder.length) return null;
     return `${kinder[nze]}:${cats[sp]}`;
+  };
+  const zelleUeberspringen = (sid, cid) => {
+    const cat = (sections || []).flatMap((x) => x.categories || []).find((c) => c.id === cid);
+    if (!cat) return false;
+    const st = statusVon(sid, cat);
+    if (st === "fehlt" || st === "entsch") return true;
+    return leKinder.has(sid) && !!cat.source_work_id;
   };
 
   // Note in den Entwurf legen. Leeres Feld = Note löschen (beim Speichern);
   // eine unlesbare Eingabe fasst nichts an.
   const noteSetzen = (studentId, catId, text) => {
     setZelle(null);
+    // „NB" in die Zelle: dieses Kind wird in dieser Spalte nicht benotet. Gespeichert wird
+    // es als Kommentar „UB" ohne Note — es zaehlt in keinen Schnitt und gilt nicht als fehlend.
+    if (["UB", "NB"].includes(String(text).trim().toUpperCase())) {
+      entwurf.setz({ [`n:${studentId}:${catId}`]: null, [`k:${studentId}:${catId}`]: "NB" });
+      return;
+    }
     const wert = parseNote(text);
     if (wert === null && String(text).trim() !== "") return;
-    entwurf.setz({ [`n:${studentId}:${catId}`]: wert });
+    // Eine Note ersetzt ein „UB" an derselben Zelle.
+    entwurf.setz({ [`n:${studentId}:${catId}`]: wert, ...(wert != null && istNb(studentId, catId) ? { [`k:${studentId}:${catId}`]: "" } : {}) });
   };
 
   // Kommentar an einer Zelle: „Formel vergessen", „krank, nachgeschrieben".
@@ -381,7 +446,11 @@ export default function Noten() {
   // daneben. (Das frühere Modul „Beobachtungen" lag neben dem Notenbuch; jetzt
   // haengt die Bemerkung an der Zelle, zu der sie gehoert.)
   const [kommentarFuer, setKommentarFuer] = useState(null);   // {sid, cid, text}
-  const kommentarSetzen = (sid, cid, text) => { setKommentarFuer(null); entwurf.setz({ [`k:${sid}:${cid}`]: text.trim() }); };
+  const kommentarSetzen = (sid, cid, text) => {
+    setKommentarFuer(null);
+    if (istNb(sid, cid) && !text.trim()) return;   // leerer Kommentar laesst den NB-Vermerk stehen
+    entwurf.setz({ [`k:${sid}:${cid}`]: text.trim() });
+  };
 
   // ── EIN Entwurf für die ganze Tabelle ──
   //
@@ -391,6 +460,26 @@ export default function Noten() {
   // Der Plan ist flach (`n:` Note, `k:` Kommentar, `so:`/`to:` gesetzte Note,
   // `os`/`oc:` Reihenfolgen) — nur Zahlen, Zeichenketten und ID-Listen, damit
   // ein Neuladen die Arbeitskopie wieder einholt.
+  // Index der Noten-Eintraege: (Kind, Spalte) -> Noten, und Spalte -> alle Werte.
+  // Vorher suchte jede Zelle bei JEDEM Render mit `entries.filter/find` in allen
+  // Eintraegen — bei ~1000 Noten und 1200 Zellen waren das Millionen Vergleiche pro
+  // Klick. Der Index entsteht einmal je Datenstand.
+  const LEER = useMemo(() => [], []);
+  const { notenIndex, werteJeSpalte } = useMemo(() => {
+    const idx = new Map();
+    const je = new Map();
+    for (const e of entries) {
+      if (e.kind !== "grade") continue;
+      const k = `${e.student_id}:${e.category_id}`;
+      const a = idx.get(k);
+      if (a) a.push(e); else idx.set(k, [e]);
+      if (e.value != null) {
+        const w = je.get(e.category_id);
+        if (w) w.push(e.value); else je.set(e.category_id, [e.value]);
+      }
+    }
+    return { notenIndex: idx, werteJeSpalte: je };
+  }, [entries]);
   const basis = useMemo(() => {
     const o = { os: sections.map((x) => x.id) };
     sections.forEach((sec) => {
@@ -399,14 +488,14 @@ export default function Noten() {
         summary.forEach((s) => {
           const v = s.per_category ? s.per_category[String(c.id)] : undefined;
           o[`n:${s.student_id}:${c.id}`] = v === undefined ? null : v;
-          o[`k:${s.student_id}:${c.id}`] = (entries.find((x) => x.student_id === s.student_id && x.category_id === c.id && x.kind === "grade")?.note) || "";
+          o[`k:${s.student_id}:${c.id}`] = (notenIndex.get(`${s.student_id}:${c.id}`)?.[0]?.note) || "";
         });
       });
       summary.forEach((s) => { o[`so:${s.student_id}:${sec.id}`] = s.section_overrides?.[String(sec.id)] ?? null; });
     });
     summary.forEach((s) => { o[`to:${s.student_id}`] = s.total_override ?? null; });
     return o;
-  }, [sections, summary, entries]);
+  }, [sections, summary, notenIndex]);
   const frisch = useRef(false);
   const entwurf = useEntwurf(basis, async (wert) => {
     let ok = true;
@@ -477,34 +566,98 @@ export default function Noten() {
     fn();
   };
   // Anzeige liest den ENTWURF: Reihenfolge, Note, Kommentar, gesetzte Note.
-  const secListe = (entwurf.wert.os || sections.map((x) => x.id)).map((id) => sections.find((x) => x.id === id)).filter(Boolean);
-  const catsVon = (sec) => (entwurf.wert[`oc:${sec.id}`] || (sec.categories || []).map((c) => c.id))
-    .map((id) => (sec.categories || []).find((c) => c.id === id)).filter(Boolean);
+  // Neu angelegte Abschnitte und Spalten stehen NICHT in einer vorher gezogenen
+  // Reihenfolge — sie kommen hinten dazu, statt bis zum Speichern unsichtbar
+  // zu bleiben.
+  const mitNeuen = (reihenfolge, alle) => (reihenfolge ? [...reihenfolge, ...alle.filter((id) => !reihenfolge.includes(id))] : alle);
+  const secListe = mitNeuen(entwurf.wert.os, sections.map((x) => x.id)).map((id) => sections.find((x) => x.id === id)).filter(Boolean);
+  const catsMerk = new Map();   // je Render einmal je Abschnitt (wurde je Zeile neu gerechnet)
+  const catsVon = (sec) => {
+    let r = catsMerk.get(sec.id);
+    if (!r) {
+      const nachId = new Map((sec.categories || []).map((c) => [c.id, c]));
+      r = mitNeuen(entwurf.wert[`oc:${sec.id}`], (sec.categories || []).map((c) => c.id)).map((id) => nachId.get(id)).filter(Boolean);
+      catsMerk.set(sec.id, r);
+    }
+    return r;
+  };
   const noteVon = (sid, cid) => entwurf.wert[`n:${sid}:${cid}`] ?? null;
-  const kommentarVon = (sid, cid) => entwurf.wert[`k:${sid}:${cid}`] || "";
+  // „NB" (nicht bewertet) liegt als Vermerk an der Zelle, ist aber KEIN Kommentar: der Dialog zeigt
+  // ihn nicht, die Ecke sieht ihn nicht, und er zaehlt nicht als „Kommentar da".
+  const rohKommentar = (sid, cid) => entwurf.wert[`k:${sid}:${cid}`] || "";
+  const istNb = (sid, cid) => ["UB", "NB"].includes(rohKommentar(sid, cid));
+  const kommentarVon = (sid, cid) => (istNb(sid, cid) ? "" : rohKommentar(sid, cid));
   const secNoteVon = (s, secId) => (entwurf.wert[`so:${s.student_id}:${secId}`] ?? (s.section_effective?.[String(secId)] ?? null));
   const istSecOverride = (s, secId) => entwurf.wert[`so:${s.student_id}:${secId}`] != null;
-  const endNoteVon = (s) => (entwurf.wert[`to:${s.student_id}`] ?? s.weighted);
+  const endNoteVon = (s) => (s.le ? null : (entwurf.wert[`to:${s.student_id}`] ?? s.weighted));
   const istEndOverride = (s) => entwurf.wert[`to:${s.student_id}`] != null;
 
-  const allCats = sections.flatMap((s) => s.categories || []);
+  const allCats = useMemo(() => sections.flatMap((s) => s.categories || []), [sections]);
+  // Fehlende Note: in einer Spalte, in der andere schon eine haben, hat das Kind
+  // keine — und war an dem Tag nicht abwesend und hat keinen Kommentar dort.
+  // (Eine ganz leere Spalte ist Zukunft, kein Fehlen.)
+  const spaltenMitNoten = useMemo(() => new Set(summary ? summary.flatMap((r) => Object.keys(r.per_category || {})).map(Number) : []), [summary]);
+  // Reihenfolge der Kinder in der Tabelle: wie gepflegt, nach Nach- oder Vornamen, bzw. nach Klasse
+  // (in gemischten Kursen). Eine Anzeigeoption je Gerät, kein Eingriff in die Daten.
+  const [sortierung, setSortierung] = useState(() => { try { return localStorage.getItem("noten_sort") || "liste"; } catch { return "liste"; } });
+  const setSortierungPersist = (v) => { setSortierung(v || "liste"); try { localStorage.setItem("noten_sort", v || "liste"); } catch { /* egal */ } };
+  const mehrereKlassen = useMemo(() => new Set((summary || []).map((r) => r.klasse).filter(Boolean)).size > 1, [summary]);
+  const wirksameSortierung = sortierung === "klasse" && !mehrereKlassen ? "liste" : sortierung;
+  const zeilen = useMemo(() => sortiereKinder(summary || [], wirksameSortierung), [summary, wirksameSortierung]);
+  const leKinder = useMemo(() => new Set((summary || []).filter((r) => r.le).map((r) => r.student_id)), [summary]);
+  // Freiwillige Spalten (Raketenaufgaben, c.optional) zaehlen nie als fehlend.
+  const noteFehltIn = (sid, c) => {
+    // LE-Kinder werden in Klassenarbeiten nicht benotet („NB") — das ist keine Luecke.
+    if (c.source_work_id && leKinder.has(sid)) return false;
+    if (c.optional || !spaltenMitNoten.has(c.id) || noteVon(sid, c.id) != null || rohKommentar(sid, c.id)) return false;
+    const stat = statusVon(sid, c);
+    return stat !== "fehlt" && stat !== "entsch";
+  };
+  const notenFehlen = (sid) => allCats.some((c) => noteFehltIn(sid, c));
 
   const gewichtSumme = sections.reduce((n, s) => n + (s.weight || 0), 0);
-  const notenVon = (sid, cid) => entries.filter((e) => e.student_id === sid && e.category_id === cid && e.kind === "grade");
+  const notenVon = (sid, cid) => notenIndex.get(`${sid}:${cid}`) || LEER;
   // Besser oder schlechter? Je Bereich (Teilnote) und für alle Spalten zusammen.
-  const trendVon = (sid, cats) => notenTrend(spaltenNachZeit(cats).map((c) => {
-    const w = notenVon(sid, c.id).filter((e) => e.value != null);
-    return w.length ? w[w.length - 1].value : null;
-  }).filter((v) => v != null));
+  // Zeitfolge der Spalten und fertige Trends werden je Datenstand gemerkt: das Sortieren
+  // mit localeCompare und das Durchsuchen aller Noten lief je Kind und Abschnitt neu.
+  const zeitFolge = useMemo(() => new WeakMap(), [sections]);
+  const trendMerk = useMemo(() => new WeakMap(), [sections, notenIndex]);
+  const trendVon = (sid, cats) => {
+    let je = trendMerk.get(cats);
+    if (!je) { je = new Map(); trendMerk.set(cats, je); }
+    if (je.has(sid)) return je.get(sid);
+    let folge = zeitFolge.get(cats);
+    if (!folge) { folge = spaltenNachZeit(cats); zeitFolge.set(cats, folge); }
+    const r = notenTrend(folge.map((c) => {
+      const w = notenVon(sid, c.id).filter((e) => e.value != null);
+      return w.length ? w[w.length - 1].value : null;
+    }).filter((v) => v != null));
+    je.set(sid, r);
+    return r;
+  };
   // Auswertung je Spalte: Anzahl, Schnitt, Spanne über alle eingetragenen Noten.
   const colStats = (cid) => {
-    const vals = entries.filter((e) => e.category_id === cid && e.kind === "grade" && e.value != null).map((e) => e.value).sort((a, b) => a - b);
+    const vals = [...(werteJeSpalte.get(cid) || [])].sort((a, b) => a - b);
     if (!vals.length) return null;
     const n = vals.length;
     const median = n % 2 ? vals[(n - 1) / 2] : (vals[n / 2 - 1] + vals[n / 2]) / 2;
     return { n, avg: rund(mittel(vals), 2), median: rund(median, 2), min: vals[0], max: vals[n - 1], werte: vals };
   };
   const sumOf = (studentId) => summary.find((s) => s.student_id === studentId);
+  // Schluessel fuer die Zeilen-Huelle: Reihenfolge von Abschnitten/Spalten und die Eingaben
+  // EINES Kindes (Note, Kommentar, gesetzte Noten). Zeichenketten, damit ein Vergleich billig ist.
+  // Was die Zeile von ANDEREN Kindern abhaengt: welche Spalten irgendwo Noten haben, wer LE ist,
+  // wer in der Tabelle steht (Tab/Enter springen zum Nachbarn). Als Zeichenkette statt der
+  // Liste selbst — die Liste ist nach jedem Laden eine neue.
+  const kinderKey = `${[...spaltenMitNoten].sort((a, b) => a - b).join(",")}#${[...leKinder].join(",")}#${zeilen.map((r) => r.student_id).join(",")}`;
+  const ordnungsKey = secListe.map((sec) => `${sec.id}:${catsVon(sec).map((c) => c.id).join(",")}`).join("|");
+  const zeilenKey = (s) => {
+    const w = entwurf.wert;
+    let k = "";
+    for (const c of allCats) k += `${w[`n:${s.student_id}:${c.id}`] ?? ""}|${w[`k:${s.student_id}:${c.id}`] || ""};`;
+    for (const sec of sections) k += `${w[`so:${s.student_id}:${sec.id}`] ?? ""}|`;
+    return k + (w[`to:${s.student_id}`] ?? "");
+  };
 
   if (classes.length === 0) {
     return (
@@ -548,6 +701,9 @@ export default function Noten() {
             key: "sus", label: t("noten.susModus"), hint: t("noten.susModusHint"),
             value: susModus, onChange: setSusModus,
           }, {
+            key: "kurz", label: t("namen.kuerzen"), hint: t("namen.kuerzenHint"),
+            value: kurz.an, onChange: kurz.umschalten,
+          }, {
             key: "agg", art: "wahl",
             label: t("noten.agg"),
             hint: t("noten.aggHint"),
@@ -556,6 +712,13 @@ export default function Noten() {
             value: agg === "median" ? "median" : "",
             onChange: (v) => setAggPersist(v || "mean"),
             optionen: [{ wert: "", label: t("noten.aggMean") }, { wert: "median", label: t("noten.aggMedian") }],
+          }, {
+            key: "sort", art: "wahl",
+            label: t("noten.sort"),
+            value: wirksameSortierung === "liste" ? "" : wirksameSortierung,
+            onChange: setSortierungPersist,
+            optionen: [{ wert: "", label: t("noten.sortListe") }, { wert: "nachname", label: t("noten.sortNachname") },
+              { wert: "vorname", label: t("noten.sortVorname") }, ...(mehrereKlassen ? [{ wert: "klasse", label: t("noten.sortKlasse") }] : [])],
           }, {
             key: "stellen", art: "wahl",
             label: t("noten.stellen"),
@@ -583,8 +746,8 @@ export default function Noten() {
           <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
             className="icon-btn" style={toolbarIconBtn}>
             <Icon d={ICONS.plus} size={20} color="var(--accent)" />
-          </button>
-        )}
+          </button>)
+        }
       </Werkzeugleiste>
 
       {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>}
@@ -624,7 +787,7 @@ export default function Noten() {
                   ))}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colDist")}</div>
-                <NotenVerteilung werte={st.werte} stufung={stufung} hoehe={100} t={t} />
+                <NotenVerteilung werte={st.werte} stufung={stufung} />
               </div>
             )}
           </Modal>
@@ -647,12 +810,20 @@ export default function Noten() {
 
       {term === "year"
         ? (yearData.rows || []).length > 0 && <NotenStatistik noten={(yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))} stufung={stufung} t={t} />
-        : sections.length > 0 && <NotenStatistik noten={(summary || []).map((s) => endNoteVon(s))} stufung={stufung} t={t} />}
+        : sections.length > 0 && <NotenStatistik noten={(summary || []).filter((s) => !s.le).map((s) => endNoteVon(s))} stufung={stufung} t={t} />}
 
-      {loading && !loadedOnce.current && term !== "year" ? (
+      {ladefehler && loadedOnce.current && (
+        <div role="alert" style={{ fontSize: 13, color: C.danger, marginBottom: 8 }}>{t("noten.ladefehlerAlt")} <button onClick={() => load(classId)} style={linkBtn}>{t("noten.nochmalLaden")}</button></div>
+      )}
+      {ladefehler && !loadedOnce.current ? (
+        <div role="alert" style={{ ...panelStyle, padding: 16, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", borderColor: C.danger }}>
+          <span style={{ flex: 1, minWidth: 0, color: C.danger, fontWeight: 600, fontSize: 14 }}>{t("noten.ladefehler")}</span>
+          <button onClick={() => load(classId)} style={toolbarBtn}>{t("noten.nochmalLaden")}</button>
+        </div>
+      ) : loading && !loadedOnce.current && term !== "year" ? (
         <Skeleton rows={6} height={38} />
       ) : term === "year" ? (
-        <YearTable t={t} data={yearData} cls={cls}
+        <YearTable t={t} data={yearData} cls={cls} suche={suche}
           onSet={(sid, txt) => overrideSetzen(sid, null, txt)}
           onReset={(sid) => overrideReset(sid, null)}
           editing={zelle} setEditing={setZelle} onInfo={setInfoFuer} />
@@ -697,7 +868,11 @@ export default function Noten() {
           {/* SuS-Modus: alle Zellen ausser dem Namen bleiben leer — Platz und
               Raster bleiben, nur die Zahlen sind weg. */}
           {susModus && <style>{".sus-modus tbody td:not(:first-child) > * { visibility: hidden; }"}</style>}
-          <table className={susModus ? "sus-modus" : undefined} style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 14, minWidth: "100%" }}>
+          {/* Die Spalte der offenen Zelle: als Tönung ÜBER der Zelle, per CSS. Als Inline-Stil
+              je Zelle hing die Hervorhebung an jeder Zeile — jede geöffnete Zelle zeichnete
+              die ganze Tabelle neu. Die Tönung ist durchsichtig, Markierungen darunter bleiben sichtbar. */}
+          {fokusSpalte && <style>{`.noten-tab td[data-spalte="${String(fokusSpalte).replace(/[^0-9a-zA-Z_-]/g, "")}"]::after { content: ""; position: absolute; inset: 0; background: ${FOKUS_TON}; pointer-events: none; }`}</style>}
+          <table className={`noten-tab${susModus ? " sus-modus" : ""}`} style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 14, minWidth: "100%" }}>
             <thead>
               <tr ref={kopf1Ref}>
                 <th style={{ ...th, ...stickyLh, whiteSpace: "nowrap", textAlign: "left", fontWeight: 400, fontSize: 13, color: gewichtSumme === 100 ? "var(--text3)" : C.warning }}>
@@ -780,9 +955,8 @@ export default function Noten() {
                       onDragEnd={ziehCol.beenden}
                       style={{ ...th2, padding: 0, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500,
                         cursor: "grab", opacity: ziehCol.zieht === c.id ? 0.4 : 1,
-                        borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
                         boxShadow: colSeite === "vor" ? "inset 3px 0 0 var(--accent)" : colSeite === "nach" ? "inset -3px 0 0 var(--accent)" : undefined,
-                        ...(fokusSpalte === String(c.id) ? { background: FOKUS_TON, color: "var(--accent)" } : null) }}>
+                        ...(fokusSpalte === String(c.id) ? { background: FOKUS_TON_DECKEND, color: "var(--accent)" } : null) }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center", position: "relative" }}>
                         <button onClick={() => setRenameCol(renameCol === c.id ? null : c.id)} title={t("noten.colOverview")}
                           style={{ width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: "8px 6px" }}>{c.name}</button>
@@ -802,8 +976,8 @@ export default function Noten() {
                           </span>
                         ) : null}
                         {renameCol === c.id && (
-                          <ColMenu t={t} cat={c} classId={classId} kursId={kursId} topics={topics} kartenAktiv={kartenAktiv} cvAktiv={cvAktiv} kalenderAktiv={kalenderAktiv} onNachhol={runNachhol} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
-                            onRename={async (name, topicId, datum) => { if (await call(() => fetch(`${API}/categories/${c.id}`, alsJson("PUT", { name, section_id: sec.id, position: c.position ?? i, topic_id: topicId, date: datum })))) setRenameCol(null); }}
+                          <ColMenu t={t} cat={c} classId={classId} kursId={kursId} topics={topics} kartenAktiv={kartenAktiv} cvAktiv={cvAktiv} kalenderAktiv={kalenderAktiv} onNachhol={runNachhol} onStats={() => setStatsCol(c)}
+                            onRename={async (name, topicId, datum, optional) => { if (await call(() => fetch(`${API}/categories/${c.id}`, alsJson("PUT", { name, section_id: sec.id, position: c.position ?? i, topic_id: topicId, date: datum, optional })))) setRenameCol(null); }}
                             onDelete={() => {
                               setRenameCol(null);
                               // Spalte sofort raus, 5 s Undo; erst dann Server-Delete.
@@ -821,8 +995,17 @@ export default function Noten() {
               </tr>
             </thead>
             <tbody>
-              {summary.map((s, si) => !suchTreffer(s) ? null : (
-                <tr key={s.student_id} style={fokusKind === String(s.student_id) ? { background: FOKUS_TON } : undefined}>
+              {zeilen.map((s, si) => {
+                if (!suchTreffer(s)) return null;
+                // Was diese Zeile lesen darf, steht hier — aendert sich nichts davon, bleibt ihr
+                // DOM unberuehrt. Ein Klick auf EINE Zelle zeichnete vorher alle 1200 neu.
+                const zHier = zelle && (String(zelle).startsWith(`${s.student_id}:`) || String(zelle).startsWith(`sec:${s.student_id}:`)
+                  || zelle === `end:${s.student_id}`) ? zelle : null;
+                return (
+                <ZeilenHuelle key={s.student_id} deps={[s, si, kinderKey, sections, fehlzeiten, collapsed, ordnungsKey, zeilenKey(s), zHier,
+                  fokusKind === String(s.student_id), kurz.an, t, stellen, form, stufung, susModus]}
+                  zeile={() => (
+                <tr style={fokusKind === String(s.student_id) ? { background: FOKUS_TON } : undefined}>
                   <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0,
                     ...(fokusKind === String(s.student_id) ? { background: FOKUS_TON_DECKEND, boxShadow: "inset 3px 0 0 var(--accent)" } : null) }}>
                     <button onClick={() => setInfoFuer(s.student_id)} title={t("noten.studentInfo")}
@@ -830,7 +1013,8 @@ export default function Noten() {
                       {/* Nummer in fester Breite, rechtsbuendig: sonst faengt
                           „10. Jamiro" weiter rechts an als „7. Selina" und die
                           Namensspalte franst aus. */}
-                      <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span>{s.name}
+                      <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span><span title={notenFehlen(s.student_id) ? t("noten.notenFehlen") : undefined}
+                        style={notenFehlen(s.student_id) ? { background: `${C.warning}33`, borderRadius: 6, padding: "1px 6px", margin: "0 -6px" } : undefined}>{kurz.name(s.name)}</span>{s.le && <span title={t("kurse.leHint")} style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: C.warning }}>LE</span>}
                     </button>
                   </td>
                   {secListe.map((sec) => {
@@ -863,11 +1047,15 @@ export default function Noten() {
                         const stat = statusVon(s.student_id, c);
                         const statFarbe = (stat === "fehlt" || stat === "entsch") ? C.danger : null;
                         return (
-                          <td key={c.id} title={statFarbe ? t(`anwesenheit.${stat}`) : undefined}
+                          <td key={c.id} data-spalte={c.id} title={statFarbe ? t(`anwesenheit.${stat}`) : undefined}
                             style={{ ...td, padding: 0, position: "relative", width: 56, minWidth: 56, maxWidth: 56, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
                                      // Die Spalte der offenen Zelle; die Abwesenheit geht vor (sie ist eine Aussage, die Toenung nur Orientierung).
-                                     ...(fokusSpalte === String(c.id) ? { background: FOKUS_TON } : null),
-                                     ...(statFarbe ? { background: `${statFarbe}1f`, boxShadow: `inset 3px 0 0 ${statFarbe}` } : null) }}>
+                                     ...(statFarbe ? { background: `${statFarbe}1f`, boxShadow: `inset 3px 0 0 ${statFarbe}` } : null),
+                                     // Hier fehlt die Note: die Zelle selbst leuchtet, nicht nur der Name —
+                                     // sonst sucht man in einer breiten Tabelle die Luecke.
+                                     ...(!s.le && noteFehltIn(s.student_id, c) ? { background: `${C.warning}38`, boxShadow: `inset 0 0 0 2px ${C.warning}` } : null),
+                                     // LE-Kind in einer Klassenarbeits-Spalte: die Zelle selbst ist markiert (schraffiert), nicht nur der Name.
+                                     ...(s.le && c.source_work_id ? { background: "repeating-linear-gradient(135deg, var(--bg2) 0 6px, var(--bg3) 6px 12px)" } : null) }}>
                             {zelle === id
                               ? <Zelle initial={wert != null ? de(wert) : ""}
                                   onSave={(txt) => noteSetzen(s.student_id, c.id, txt)}
@@ -915,7 +1103,10 @@ export default function Noten() {
                                       window.addEventListener("pointermove", aus);
                                     }}
                                     style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 14, fontWeight: wert != null ? 600 : 400 }}>
-                                    {wert != null ? de(wert) : <span style={{ color: "var(--border2)" }}>·</span>}
+                                    {wert != null ? de(wert) : (istNb(s.student_id, c.id) || (s.le && c.source_work_id)
+                                      // LE-Kind in einer Klassenarbeits-Spalte: nicht benotet, nicht „leer".
+                                      ? <span title={t("kurse.leHint")} style={{ color: "var(--text3)", fontSize: 12, fontWeight: 700 }}>NB</span>
+                                      : <span style={{ color: "var(--border2)" }}>·</span>)}
                                   </button>
                                   {/* Ecke oben rechts. Die Trefferflaeche ist 20 px
                                       gross, das Dreieck darin nur 9 — vorher war der
@@ -934,7 +1125,9 @@ export default function Noten() {
                                       // kennt, ist keiner.
                                       opacity: kommentarVon(s.student_id, c.id) ? 1 : 0.35 }}>
                                     <span style={{ display: "block", width: 0, height: 0, pointerEvents: "none",
-                                      borderTop: `9px solid ${kommentarVon(s.student_id, c.id) ? C.warning : "var(--border2)"}`,
+                                      // Dunkel statt Warnfarbe: auf der Markierung (gelb bei fehlender Note, rot bei Abwesenheit)
+                                      // war ein gelbes Dreieck nicht mehr zu sehen.
+                                      borderTop: `9px solid ${kommentarVon(s.student_id, c.id) ? "var(--text)" : "var(--text3)"}`,
                                       borderLeft: "9px solid transparent", marginLeft: 15 }} />
                                   </button>
                                 </div>)}
@@ -945,6 +1138,9 @@ export default function Noten() {
                     ];
                   })}
                   <td style={{ ...td, padding: 0, borderLeft: "2px solid var(--border3)" }}>
+                    {s.le ? (
+                      <div title={t("noten.nbHint")} style={{ minHeight: 32, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 12, fontWeight: 700 }}>NB</div>
+                    ) : (
                     <NoteZelle t={t} bold
                       editing={zelle === `end:${s.student_id}`}
                       onEdit={() => setZelle(`end:${s.student_id}`)}
@@ -954,6 +1150,7 @@ export default function Noten() {
                       onSave={(txt) => overrideSetzen(s.student_id, null, txt)}
                       onCancel={() => setZelle(null)}
                       onReset={() => overrideReset(s.student_id, null)} />
+                    )}
                     {!istEndOverride(s) && s.weighted !== null && s.unweighted_fallback && (
                       <div style={{ fontWeight: 400, fontSize: 11, color: C.warning }}>{t("noten.unweighted")}</div>
                     )}
@@ -965,7 +1162,9 @@ export default function Noten() {
                     </button>
                   </td>
                 </tr>
-              ))}
+                  )} />
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1002,7 +1201,7 @@ export default function Noten() {
       <SpeicherBalken entwurf={entwurf} zeigen={autoSpeichern.zeigen} />
 
       {infoFuer && (
-        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} classId={classId} kursId={kursId} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} />
+        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} classId={classId} kursId={kursId} dividers={dividers} onStrichSetzen={strichSetzen} onStrichLoeschen={strichLoeschen} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} form={form} setForm={setFormPersist} />
       )}
     </div>
   );
@@ -1012,6 +1211,14 @@ export default function Noten() {
 // fuer die schwebende Speicherleiste, die ueber der Tastatur liegt.
 const FREIE_ZEILEN = 3;
 const LEISTE_PX = 64;
+
+// Eine Tabellenzeile, die sich nur neu zeichnet, wenn sich eine ihrer Abhaengigkeiten aendert.
+// `zeile` ist die Zeichenfunktion der LETZTEN Darstellung — gilt eine Zeile als unveraendert,
+// bleiben auch ihre Handler die von damals; das ist unschaedlich, weil alles, was sie lesen
+// (Zustand der Zeile, Kinder, Spalten, Fehlzeiten, Reihenfolge), in `deps` steht und
+// `entwurf.setz` mit einer Funktion arbeitet (nie mit einem alten Stand).
+const ZeilenHuelle = memo(function ZeilenHuelle({ zeile }) { return zeile(); },
+  (a, b) => a.deps.length === b.deps.length && a.deps.every((v, i) => Object.is(v, b.deps[i])));
 
 function scrollBehaelter(el) {
   for (let p = el?.parentElement; p && p !== document.body; p = p.parentElement) {
@@ -1120,7 +1327,7 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, minHeight: 32 }}>
       <button onClick={onEdit} title={t("noten.overrideHint")}
         style={{ border: "none", background: "none", cursor: "pointer", color: isOverride ? "var(--accent)" : "var(--text)", fontWeight: bold ? 700 : 600, fontSize: 14, padding: "0 2px" }}>
-        {value != null ? de(value) : <span style={{ color: "var(--border2)" }}>·</span>}
+        {value != null ? deAnz(value) : <span style={{ color: "var(--border2)" }}>·</span>}
       </button>
       <TrendPfeil t={t} trend={trend} />
       {isOverride && (
@@ -1132,38 +1339,10 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
   );
 }
 
-// Notenverteilung als Balken oder Boxplot — eine Anzeige fuer beide
-// Statistiken (Spalte und Halbjahr). Die Stufung (ganz/halb/Teilnoten) kommt
-// aus dem Zahnrad; Balken oder Boxplot ist ein Umschalter direkt daran, weil
-// man beim Lesen wechselt, nicht beim Einrichten.
-function NotenVerteilung({ werte, stufung, hoehe = 90, t }) {
-  const [box, setBox] = useState(false);
-  const dist = verteilung(werte, stufung);
-  const maxD = Math.max(...dist.map((d) => d.n), 1);
-  const zahlen = (werte || []).filter((v) => v != null && Number.isFinite(Number(v))).map(Number);
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-        <Tabs value={box ? "box" : "balken"} onChange={(v) => setBox(v === "box")}
-          options={[["balken", t("noten.distBalken")], ["box", t("noten.distBox")]]} />
-      </div>
-      {box ? (
-        zahlen.length >= 3 ? <Boxplot values={zahlen} max={6} />
-          : <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("noten.distZuWenig")}</p>
-      ) : (
-        <div style={{ display: "flex", alignItems: "flex-end", gap: stufung === "teil" ? 3 : 8, height: hoehe }}>
-          {dist.map(({ g, n: c }) => (
-            <div key={g} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 0 }}>
-              <div style={{ fontSize: 11, color: "var(--text3)" }}>{c || ""}</div>
-              {/* Saeule: Radius rundet nur die Kappe der Grafik. */}
-              <div style={{ width: "100%", maxWidth: 44, height: `${(c / maxD) * (hoehe - 30)}px`, minHeight: c ? 3 : 0, background: "var(--accent)", borderRadius: "5px 5px 0 0", opacity: c ? 0.85 : 0.15 }} />
-              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)", whiteSpace: "nowrap" }}>{typeof g === "number" ? komma(g) : g}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+// Notenverteilung: das gemeinsame Feld (components/Verteilung.jsx). Die Stufung kommt
+// aus dem Zahnrad und ist nur der Startwert des Ganz/Teilnoten-Schalters.
+function NotenVerteilung({ werte, stufung }) {
+  return <Verteilung noten={werte} stufung={stufung} />;
 }
 
 // Statistische Auswertung der Halbjahresnoten — analog CardVote: Kennzahlen und
@@ -1199,7 +1378,7 @@ function NotenStatistik({ noten, stufung, t }) {
             {tile(t("noten.statMedian"), kommaRund(median, 2))}
             {tile(t("noten.statSd"), `±${kommaRund(sd, 2)}`)}
           </div>
-          <NotenVerteilung werte={noten} stufung={stufung} hoehe={90} t={t} />
+          <NotenVerteilung werte={noten} stufung={stufung} />
         </div>
       )}
     </div>
@@ -1207,8 +1386,8 @@ function NotenStatistik({ noten, stufung, t }) {
 }
 
 // Einfaches modales Popup fuer die Anlage-Formulare (Abschnitt/Spalte).
-function Modal({ title, onClose, children }) {
-  return <UiModal onClose={onClose} width={400} title={title}>{children}</UiModal>;
+function Modal({ title, onClose, children, overlayStyle }) {
+  return <UiModal onClose={onClose} width={400} title={title} overlayStyle={overlayStyle}>{children}</UiModal>;
 }
 
 function SectionForm({ t, onSave, onCancel, initial }) {
@@ -1329,10 +1508,11 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol, onOpen }) {
 }
 
 // Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
-function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, kursId = null, topics = [], onNachhol, kartenAktiv, cvAktiv, kalenderAktiv = false }) {
+function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, classId, kursId = null, topics = [], onNachhol, kartenAktiv, cvAktiv, kalenderAktiv = false }) {
   const [name, setName] = useState(cat.name);
   const [topicId, setTopicId] = useState(cat.topic_id ?? "");
   const [datum, setDatum] = useState(cat.date || "");
+  const [optional, setOptional] = useState(!!cat.optional);
   // Das Thema der Stunde steht im Kalender — es hier ein zweites Mal
   // auszuwählen ist Abtippen. Vorgeschlagen wird nur, was noch leer ist: eine
   // von Hand getroffene Wahl wird nie überschrieben, und ändern lässt sich der
@@ -1356,9 +1536,6 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
     return () => { ab = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datum, kalenderAktiv]);
-  // Auch der Quartalsstrich wartet auf „Speichern" — er schrieb bisher beim
-  // Klick, mitten in einer Maske, die sonst sammelt.
-  const [strich, setStrich] = useState(!!dividerOn);
   const angelegt = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
   // Siehe core/topics.js: Beschriftung und Reihenfolge kommen von dort, damit
   // dieselbe Auswahl ueberall gleich heisst und gleich sortiert ist.
@@ -1370,18 +1547,23 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
   const save = () => {
     const titel = name.trim() || datumKurz(datum);
     if (!titel) return;
-    if (strich !== !!dividerOn) onToggleDivider && onToggleDivider();
-    onRename(titel, topicId === "" ? null : Number(topicId), datum || null);
+    onRename(titel, topicId === "" ? null : Number(topicId), datum || null, optional);
   };
   return (
     <>
       <span onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
       <Popover align="center" onClick={(e) => e.stopPropagation()} style={{ zIndex: 10, top: 26, minWidth: 210, padding: 12, textAlign: "left", fontWeight: 400 }}>
         <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colCreated")}: {angelegt}</div>
-        {/* Auswertung: schlichter Details-Knopf, öffnet das zentrale Modal. */}
-        <button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
+        {/* Zu einer Klassenarbeit verknuepft: „Details" ist die Arbeit selbst. */}
+        {cat.source_work_id ? (
+          <Link to={`/auswertung?tab=klassenarbeit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}&work=${cat.source_work_id}`} onClick={onClose}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer", textDecoration: "none" }}>
+            <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
+          </Link>
+        ) : (<button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
           <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
         </button>
+        )}
         {/* Kein „Vergleichen" mehr an der Spalte. Es war für Klassenarbeiten
             gedacht („dieselbe Arbeit in den anderen Fach-Klassen") und stand
             trotzdem an jeder Spalte: für eine mündliche Note am 07.09. gibt es
@@ -1414,6 +1596,11 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
               optionen={themenFuerKurs(themen, kursObj, topicId ? [Number(topicId)] : []).map((tp) => ({ wert: String(tp.id), label: themen.label(tp) }))} />
           </div>
         )}
+        {/* Freiwillige Abgabe: fehlende Noten werden in dieser Spalte nicht hervorgehoben. */}
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 13, cursor: "pointer" }}>
+          <input type="checkbox" checked={optional} onChange={(e) => setOptional(e.target.checked)} />
+          <span title={t("noten.colOptionalHint")}>{t("noten.colOptional")}</span>
+        </label>
         {cat.topic_id && kartenAktiv && (
           <button onClick={() => { onNachhol(cat); onClose(); }}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: C.warning, cursor: "pointer" }}>
@@ -1436,11 +1623,6 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
           <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text3)", boxSizing: "border-box" }}>
             <Icon d={ICONS.chart} size={14} color="var(--text3)" />{t("noten.fromCd")}
           </div>
-        )}
-        {onToggleDivider && (
-          <button onClick={() => setStrich((v) => !v)} style={{ width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 12, fontWeight: 600, borderRadius: CONTROL_R, cursor: "pointer", border: `1px solid ${strich ? "var(--accent)" : "var(--border2)"}`, background: strich ? "var(--accent)" : "transparent", color: strich ? C.aufAkzent : "var(--text2)" }}>
-            {strich ? t("noten.dividerOff") : t("noten.dividerOn")}
-          </button>
         )}
         <div style={{ display: "flex", gap: 6, justifyContent: "space-between", alignItems: "center" }}>
           <button onClick={save} style={{ ...btnPrimary, padding: "5px 12px", fontSize: 12 }}>{t("common.save")}</button>
@@ -1502,9 +1684,13 @@ function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "", initialDat
  * Beide Tabellen der Seite (Halbjahr und Jahr) nutzen denselben Haken — die
  * Jahresansicht hatte den Mechanismus zuerst nicht und sah genau so kaputt aus.
  */
-function useKlebenderKopf() {
+function useKlebenderKopf(abhaengig) {
   const rahmenRef = useRef(null);
   const kopf1Ref = useRef(null);
+  // Ohne Angabe bei jedem Render (Klassenarbeit). Die Noten geben einen Schluessel
+  // mit: das Messen erzwingt ein Layout der ganzen Tabelle, und das nach JEDEM
+  // Klick war ein Teil der Traegheit — der ResizeObserver unten meldet jede echte
+  // Groessenaenderung ohnehin selbst.
   useLayoutEffect(() => {
     const zeile = kopf1Ref.current, rahmen = rahmenRef.current;
     if (!zeile || !rahmen) return undefined;
@@ -1518,7 +1704,7 @@ function useKlebenderKopf() {
     const beob = new ResizeObserver(mess);
     beob.observe(zeile);
     return () => beob.disconnect();
-  });
+  }, abhaengig === undefined ? undefined : [abhaengig]);
   return { rahmenRef, kopf1Ref, th2: { ...th, top: "var(--kopf2, 0px)" } };
 }
 
@@ -1552,7 +1738,7 @@ function punktText(p, t) {
   return zeilen.join("\n");
 }
 
-function GradeChart({ series, t, titel, hinweis, rechts }) {
+function GradeChart({ series, t, titel, hinweis, rechts, striche = null }) {
   // Eigenes Hinweisfeld statt `<title>` im SVG: das zeigt der Browser
   // unzuverlaessig (und nur einzeilig, nach Verzoegerung). Hier steht es sofort
   // und mehrzeilig — Datum, Spalte, Note.
@@ -1587,6 +1773,17 @@ function GradeChart({ series, t, titel, hinweis, rechts }) {
             <text x={padL - 6} y={y(g) + 3.5} textAnchor="end" fontSize="10" fill="var(--text3)">{g}</text>
           </g>
         ))}
+        {/* Quartalsstriche als DATUM: die Striche der Tabelle stehen hinter einer Spalte, der Verlauf ordnet nach
+            Zeit. Gezeichnet wird deshalb dort, wo das Datum dieser Spalte zwischen zwei Noten liegt. */}
+        {striche && strichLuecken(pts.map((p) => spaltenDatum(p.s.cat)), striche).map((i, q) => {
+          const xs = (pts[i].cx + pts[i + 1].cx) / 2;
+          return (
+            <g key={`q${i}`} style={{ pointerEvents: "none" }}>
+              <line x1={xs} y1={padT} x2={xs} y2={H - padB} stroke="var(--text3)" strokeWidth="1" strokeDasharray="4 3" />
+              <text x={xs + 3} y={padT + 8} fontSize="9" fill="var(--text3)">Q{q + 2}</text>
+            </g>
+          );
+        })}
         <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {pts.map((p, i) => (
           <g key={i}>
@@ -1681,7 +1878,30 @@ function Fehlzeiten({ classId, studentId, t }) {
   );
 }
 
-function StudentInfo({ t, student, summary, sections, entries = [], classId = null, kursId = null, onZeugnis, onClose }) {
+// Der Name im Dialog folgt derselben Option (ausserhalb des Hooks gelesen).
+const kurzNameOrt = (n) => (kurzNameAn() ? kurzName(n) : n);
+
+// Quartalsstriche im Verlauf: Datum wählen, setzen; jeder Strich als Chip mit Kreuz zum Entfernen.
+function StrichLeiste({ t, daten, onSetzen, onLoeschen }) {
+  const [tag, setTag] = useState("");
+  const fmt = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(); } catch { return iso; } };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 6, fontSize: 12, color: "var(--text3)" }}>
+      <span>{t("noten.striche")}</span>
+      {daten.map((d, i) => (
+        <span key={d} style={{ ...chipStyle, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          Q{i + 2} · {fmt(d)}
+          <button onClick={() => onLoeschen(d)} title={t("noten.strichWeg")} aria-label={t("noten.strichWeg")}
+            style={{ ...iconBtn, padding: 0, minWidth: 20, minHeight: 20 }}><Icon d={ICONS.close} size={11} /></button>
+        </span>
+      ))}
+      <input type="date" value={tag} onChange={(e) => setTag(e.target.value)} aria-label={t("noten.strichDatum")} style={{ ...inputStyle, width: "auto", padding: "3px 6px", fontSize: 12 }} />
+      <button onClick={() => { if (tag) { onSetzen(tag); setTag(""); } }} disabled={!tag} style={{ ...btnSecondary, padding: "3px 10px", fontSize: 12, opacity: tag ? 1 : 0.5 }}>{t("noten.strichSetzen")}</button>
+    </div>
+  );
+}
+
+function StudentInfo({ t, student, summary, sections, entries = [], classId = null, kursId = null, dividers = [], onStrichSetzen, onStrichLoeschen, onZeugnis, onClose, form, setForm }) {
   // Hook vor jedem fruehen Ausstieg: sonst haengt die Hook-Reihenfolge daran,
   // ob gerade ein Kind gewaehlt ist.
   const [bereich, setBereich] = useState("gesamt");
@@ -1746,12 +1966,12 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
     // Kind selbst zeigen lassen, ohne dass dahinter die Notentabelle der
     // anderen lesbar bleibt. Stark genug fuer Ziffern, schwach genug, dass die
     // Seite als Ort erkennbar bleibt.
-    <UiModal onClose={onClose} width={460} label={student.name}
+    <UiModal onClose={onClose} width={460} label={kurzNameOrt(student.name)}
       overlayStyle={{ backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
         {/* Zu ist das Kreuz oben rechts (DialogKopf) — ein zweiter
             „Schliessen"-Knopf unter einer langen Maske ist derselbe Weg,
             nur weiter unten. */}
-        <DialogKopf titel={student.name} onClose={onClose} schliessenLabel={t("noten.close")} style={{ marginBottom: 12 }}>
+        <DialogKopf titel={kurzNameOrt(student.name)} onClose={onClose} schliessenLabel={t("noten.close")} style={{ marginBottom: 12 }}>
           {onZeugnis && <button onClick={onZeugnis} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, whiteSpace: "nowrap" }} title={t("noten.zeugnisHint")}>{t("noten.zeugnis")}</button>}
         </DialogKopf>
 
@@ -1760,10 +1980,27 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
             gibt. Was leer ist, faellt weg — eine Ueberschrift ohne Inhalt sagt
             nichts und kostet die halbe Maske. Geaendert wird im Kurs und auf der
             Personenseite; dieselbe Komponente, nur ohne Felder. */}
+        {/* Notenform (Tendenz oder Zahl): gilt fuer die ganze Tabelle, wird aber hier eingestellt. */}
+        {setForm && (
+          <div style={{ marginBottom: 12 }}>
+            <span title={t("noten.formTitel")}>
+              <Segment>
+                <button onClick={() => setForm("wert")} aria-pressed={form === "wert"}
+                  style={{ ...segmentBtn, fontWeight: form === "wert" ? 700 : 500, color: form === "wert" ? "var(--accent)" : "var(--text2)" }}>2,5</button>
+                <button onClick={() => setForm("tendenz")} aria-pressed={form === "tendenz"}
+                  style={{ ...segmentBtn, fontWeight: form === "tendenz" ? 700 : 500, color: form === "tendenz" ? "var(--accent)" : "var(--text2)" }}>2+</button>
+              </Segment>
+            </span>
+          </div>
+        )}
         <Fehlzeiten classId={classId} studentId={student.id} t={t} />
         <SchuelerAngaben studentId={student.id} kursId={kursId} nurLesen t={t} />
 
-        <GradeChart series={serie} t={t}
+        {/* Quartalsstriche setzt man mit einem Datum und löscht sie dort wieder — sie gelten für den ganzen Kurs. */}
+        {bereich === "gesamt" && onStrichSetzen && (
+          <StrichLeiste t={t} daten={dividers} onSetzen={onStrichSetzen} onLoeschen={onStrichLoeschen} />
+        )}
+        <GradeChart series={serie} t={t} striche={bereich === "gesamt" && dividers.length ? dividers : null}
           titel={bereich === "gesamt" ? t("noten.verlauf") : t("noten.verlaufSection", { name: secName })}
           hinweis={modus === "einzeln" ? t("noten.verlaufSingle")
                    : bereich === "gesamt" ? t("noten.verlaufRunning") : t("noten.verlaufRunningSection")}
@@ -1803,7 +2040,7 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
                   </span>
                   <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
                     <TrendPfeil t={t} trend={notenTrend(einzeln(sec.id).map((p) => p.value))} />
-                    <strong>{v !== undefined ? de(v) : "·"}</strong>
+                    <strong>{v !== undefined ? deAnz(v) : "·"}</strong>
                   </span>
                 </div>
               );
@@ -1813,7 +2050,7 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
                 cursor: "pointer", borderRadius: CONTROL_R, background: bereich === "gesamt" ? "var(--bg2)" : "transparent",
                 boxShadow: bereich === "gesamt" ? "inset 3px 0 0 var(--accent)" : undefined }}>
               <span>{t("noten.total")}</span>
-              <span><TrendPfeil t={t} trend={notenTrend(alleEinzeln.map((p) => p.value))} />{" "}{summary.weighted !== null ? de(summary.weighted) : "·"}{summary.unweighted_fallback ? ` (${t("noten.unweighted")})` : ""}</span>
+              <span><TrendPfeil t={t} trend={notenTrend(alleEinzeln.map((p) => p.value))} />{" "}{summary.weighted !== null ? deAnz(summary.weighted) : "·"}{summary.unweighted_fallback ? ` (${t("noten.unweighted")})` : ""}</span>
             </div>
           </div>
         )}
@@ -1871,7 +2108,7 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
 
 // Jahresuebersicht: Bereichsnoten beider Halbjahre, die zwei Halbjahresnoten
 // und die Jahresnote (Mittel der beiden, per Klick ueberschreibbar).
-function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }) {
+function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo, suche = "" }) {
   const { sections = [], rows = [] } = data || {};
   // Derselbe Kopf-Mechanismus wie in der Halbjahres-Tabelle: eigener
   // Scrollrahmen, zweite Kopfzeile klebt um die gemessene Hoehe der ersten
@@ -1904,7 +2141,7 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, ri) => (
+          {rows.map((r, ri) => (suche.trim() && !String(r.name || "").toLowerCase().includes(suche.trim().toLowerCase())) ? null : (
             <tr key={r.student_id}>
               <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0 }}>
                 <button onClick={() => onInfo(r.student_id)} title={t("noten.studentInfo")}

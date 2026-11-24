@@ -6,11 +6,13 @@ import { liegtDavor, nachJahrAbsteigend } from "../core/schuljahr.js";
 import KursKinder from "../components/KursKinder.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
+import KurseZusammen from "../components/KurseZusammen.jsx";
 import KursLinks from "../components/KursLinks.jsx";
+import KursInfo from "../components/KursInfo.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { alsJson, hol, sende } from "../core/melden.js";
 import { AddButton, pageTitle, btnSecondary, btnSmall, selectStyle, chipStyle,
-  Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, toolbarInput, sectionLabel, Toggle, Tabs, Empty, pageApp, LoadError } from "../components/Icons.jsx";
+  Icon, ICONS, iconBtn, linkBtn, COLORS as C, cardStyle, inputStyle, toolbarInput, sectionLabel, Toggle, Tabs, Empty, pageApp, LoadError } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
@@ -33,8 +35,10 @@ const FACH_VORSCHLAEGE = [
 const NEU = "\u0000neu";
 
 export default function Kurse() {
+  const [infoOffen, setInfoOffen] = useState({});
   const { t } = useLanguage();
   const [kurse, setKurse] = useState([]);
+  const [zusammen, setZusammen] = useState(null);   // Kurs, in den zusammengefuehrt wird
   const [allClasses, setAllClasses] = useState([]);
   // Gelöschte Kurse liegen im gemeinsamen Papierkorb des Kerns (/papierkorb).
   const [neu, setNeu] = useState("");
@@ -170,7 +174,12 @@ export default function Kurse() {
         {kurse.map((k) => (
           <div key={k.id} style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <strong style={{ fontSize: 16 }}>{k.name}</strong>
+              {/* Klick auf den Namen klappt die Kurs-Info auf (Kinder, nächste Arbeit, Schnitt, Wiederholungsbedarf). */}
+              <button onClick={() => setInfoOffen((o) => ({ ...o, [k.id]: !o[k.id] }))} aria-expanded={!!infoOffen[k.id]} title={t("kurse.info.titel")}
+                style={{ ...linkBtn, color: "var(--text)", display: "inline-flex", alignItems: "center", gap: 6, margin: 0 }}>
+                <Icon d={infoOffen[k.id] ? ICONS.chevronDown : ICONS.chevronRight} size={13} color="var(--text3)" />
+                <strong style={{ fontSize: 16 }}>{k.name}</strong>
+              </button>
               {k.schuljahr && <span style={chipStyle}>{k.schuljahr}</span>}
               {k.fach && <span style={chipStyle}>{k.fach}</span>}
               {k.raum && <span style={chipStyle}>{k.raum}</span>}
@@ -190,6 +199,7 @@ export default function Kurse() {
                 {k.nachfolger_name && <span title={t("kurse.chainHint")}>{t("kurse.nextYear")}: {k.nachfolger_name} →</span>}
               </div>
             )}
+            {infoOffen[k.id] && <KursInfo kurs={k} />}
             <KursLinks kurs={k} />
 
             {/* Bearbeiten-Bereich (hinter dem Stift): klar gegliedert in Name,
@@ -213,6 +223,11 @@ export default function Kurse() {
                     title={t("classes.archiveHint")}>
                     {archiv ? t("classes.unarchive") : t("classes.archive")}
                   </button>
+                  {!archiv && kurse.length > 1 && (
+                    <button onClick={() => setZusammen(k)} style={{ ...btnSecondary, ...btnSmall }} title={t("kurse.zusammenHint")}>
+                      {t("kurse.zusammen")}
+                    </button>
+                  )}
                 </div>
 
                 {/* Die Kinder stehen im KURS — dort, wo mit ihnen gearbeitet
@@ -341,6 +356,10 @@ export default function Kurse() {
           </div>
         ))}
       </div>
+      {zusammen && (
+        <KurseZusammen ziel={zusammen} kurse={kurse} onClose={() => setZusammen(null)}
+          onFertig={() => { setZusammen(null); load(); loadClasses(); }} />
+      )}
     </div>
   );
 }

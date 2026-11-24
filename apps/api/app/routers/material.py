@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
 from ..besitz import eigenes, gehoert_optional
 from ..database import get_db
-from ..models import Material, Topic, CalendarEntry, Method, WorkAnalysis, User
+from ..models import Material, Topic, CalendarEntry, Method, ReiheStunde, WorkAnalysis, User
 from sqlalchemy import func
 
 from .auth import get_current_user, rate_limit
@@ -52,6 +52,7 @@ class MaterialOut(BaseModel):
     entry_id: Optional[int] = None
     method_id: Optional[int] = None
     work_id: Optional[int] = None
+    reihe_stunde_id: Optional[int] = None
     rolle: str = ""          # "arbeit" | "erwartung" | "" (sonstiger Anhang)
     filename: str
     mime: str
@@ -91,6 +92,16 @@ async def _check_work(db: AsyncSession, user_id: int, work_id: Optional[int]) ->
     return work_id
 
 
+async def _check_reihe_stunde(db: AsyncSession, user_id: int, sid: Optional[int]) -> Optional[int]:
+    if sid is None:
+        return None
+    ok = (await db.execute(select(ReiheStunde.id).where(
+        ReiheStunde.id == sid, ReiheStunde.owner_id == user_id))).scalar_one_or_none()
+    if not ok:
+        raise HTTPException(404, "Stunde nicht gefunden")
+    return sid
+
+
 # Nur benannte Rollen, sonst leer: eine erfundene Rolle wuerde die Datei in der
 # Oberflaeche verschwinden lassen (sie zeigt genau die drei Faelle).
 ROLLEN = ("arbeit", "erwartung")
@@ -98,7 +109,7 @@ ROLLEN = ("arbeit", "erwartung")
 
 @router.get("", response_model=List[MaterialOut])
 async def list_material(topic_id: Optional[int] = None, entry_id: Optional[int] = None, method_id: Optional[int] = None,
-                        work_id: Optional[int] = None, rolle: Optional[str] = None,
+                        work_id: Optional[int] = None, reihe_stunde_id: Optional[int] = None, rolle: Optional[str] = None,
                         user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Material der Lehrkraft, gefiltert nach Thema, Stunde, Einstieg oder Arbeit."""
     q = select(Material).where(Material.owner_id == user.id)
@@ -110,6 +121,8 @@ async def list_material(topic_id: Optional[int] = None, entry_id: Optional[int] 
         q = q.where(Material.method_id == method_id)
     if work_id is not None:
         q = q.where(Material.work_id == work_id)
+    if reihe_stunde_id is not None:
+        q = q.where(Material.reihe_stunde_id == reihe_stunde_id)
     if rolle is not None:
         q = q.where(Material.rolle == (rolle if rolle in ROLLEN else ""))
     rows = (await db.execute(q.order_by(Material.created_at.desc()))).scalars().all()
@@ -119,15 +132,16 @@ async def list_material(topic_id: Optional[int] = None, entry_id: Optional[int] 
 @router.post("", response_model=MaterialOut, status_code=201)
 async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] = Form(None),
                           entry_id: Optional[int] = Form(None), method_id: Optional[int] = Form(None),
-                          work_id: Optional[int] = Form(None), rolle: str = Form(""),
+                          work_id: Optional[int] = Form(None), reihe_stunde_id: Optional[int] = Form(None), rolle: str = Form(""),
                           user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("material_up", f"u{user.id}", 60, 60, "Zu viele Uploads. Bitte kurz warten.")
-    if topic_id is None and entry_id is None and method_id is None and work_id is None:
-        raise HTTPException(400, "Material braucht ein Thema, eine Stunde, einen Einstieg oder eine Klassenarbeit")
+    if topic_id is None and entry_id is None and method_id is None and work_id is None and reihe_stunde_id is None:
+        raise HTTPException(400, "Material braucht ein Thema, eine Stunde, einen Einstieg, eine Klassenarbeit oder eine Reihen-Stunde")
     topic_id = await _check_topic(db, user.id, topic_id)
     entry_id = await _check_entry(db, user.id, entry_id)
     method_id = await _check_method(db, user.id, method_id)
     work_id = await _check_work(db, user.id, work_id)
+    reihe_stunde_id = await _check_reihe_stunde(db, user.id, reihe_stunde_id)
     data = await file.read()
     if not data:
         raise HTTPException(400, "Datei ist leer")
@@ -161,7 +175,7 @@ async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] 
         if used + len(data) > QUOTA_BYTES:
             raise HTTPException(413, f"Speicher voll (max. {QUOTA_BYTES // 1024 // 1024} MB je Konto). Bitte alte Dateien löschen.")
     m = Material(owner_id=user.id, topic_id=topic_id, entry_id=entry_id, method_id=method_id,
-                 work_id=work_id, rolle=rolle if rolle in ROLLEN else "",
+                 work_id=work_id, reihe_stunde_id=reihe_stunde_id, rolle=rolle if rolle in ROLLEN else "",
                  filename=name, mime=mime,
                  size=len(data), sha256=pruef, quelle_id=quelle,
                  data=None if quelle is not None else data)

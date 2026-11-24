@@ -21,7 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..netz import client_ip as _client_ip
 from ..seed import seed_new_account
 from ..rollen import ist_admin
+from ..lokal import LOKAL
 from ..database import get_db
+from ..krypto import suchwert
 from ..models import BugReport, BugReportAnhang, CaldavToken, SchoolClass, Session as CvSession, User, Question, MarketplaceQuiz
 from .. import mailer
 
@@ -688,7 +690,7 @@ async def login(body: LoginBody, request: Request, db: AsyncSession = Depends(ge
     if not _adresse_bekannt(email, ip):
         fehlversuche_pruefen("login_konto", email, 20, 300,
                              "Zu viele Anmeldeversuche für dieses Konto. Bitte kurz warten.")
-    result = await db.execute(select(User).where(User.email == email))
+    result = await db.execute(select(User).where(User.email_idx == suchwert(email)))
     user = result.scalar_one_or_none()
     if not user:
         # Blindpruefung, damit eine unbekannte Adresse genauso lange braucht
@@ -716,7 +718,7 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
     # Anti-Spam: max. 10 Registrierungen pro IP in 10 Minuten
     rate_limit("register", client_ip(request), 10, 600, "Zu viele Registrierungen. Bitte später erneut versuchen.")
     email = body.email.lower().strip()
-    result = await db.execute(select(User).where(User.email == email))
+    result = await db.execute(select(User).where(User.email_idx == suchwert(email)))
     vorhanden = result.scalar_one_or_none()
     if vorhanden:
         # KEINE Auskunft darueber, ob es dieses Konto gibt. Vorher stand hier
@@ -746,7 +748,7 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
     # Fassungen sehen — fuer diese Person ist daran nichts neu.
     from ..admin import APP_VERSION as _fassung
     user = User(email=email, password_hash=_hash_pw(body.password), name=body.name,
-                salutation=body.salutation, email_verified=False, changelog_seen=_fassung)
+                salutation=body.salutation, email_verified=LOKAL, changelog_seen=_fassung)
     db.add(user)
     await db.commit()
     await db.refresh(user)
@@ -761,7 +763,9 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
         await db.rollback()
 
     # Bestätigungs-Mail (best-effort). Login erst nach Bestätigung möglich.
-    await _send_verify_mail(user)
+    # Lokale Installation: kein Mailserver, das Konto gilt sofort als bestaetigt.
+    if not LOKAL:
+        await _send_verify_mail(user)
     return {"ok": True}
 
 
@@ -818,7 +822,7 @@ async def forgot_password(body: ForgotPasswordBody, request: Request, db: AsyncS
     # Rate-Limit gegen Missbrauch/E-Mail-Bombing
     rate_limit("forgot", client_ip(request), 5, 600, "Zu viele Anfragen. Bitte später erneut versuchen.")
     email = body.email.lower().strip()
-    result = await db.execute(select(User).where(User.email == email))
+    result = await db.execute(select(User).where(User.email_idx == suchwert(email)))
     user = result.scalar_one_or_none()
     if user:
         token = _make_reset_token(user)
@@ -915,7 +919,7 @@ class ResendVerifyBody(BaseModel):
 @router.post("/resend-verification")
 async def resend_verification(body: ResendVerifyBody, request: Request, db: AsyncSession = Depends(get_db)):
     rate_limit("resendverify", client_ip(request), 5, 600, "Zu viele Anfragen. Bitte später erneut versuchen.")
-    result = await db.execute(select(User).where(User.email == body.email.lower().strip()))
+    result = await db.execute(select(User).where(User.email_idx == suchwert(body.email)))
     user = result.scalar_one_or_none()
     if user and not user.email_verified:
         await _send_verify_mail(user)
@@ -937,7 +941,7 @@ async def change_email(body: ChangeEmailBody, request: Request, user: User = Dep
         raise HTTPException(400, "Ungültige E-Mail-Adresse")
     if new_email == user.email:
         raise HTTPException(400, "Das ist bereits deine aktuelle E-Mail-Adresse")
-    result = await db.execute(select(User).where(User.email == new_email))
+    result = await db.execute(select(User).where(User.email_idx == suchwert(new_email)))
     if result.scalar_one_or_none():
         raise HTTPException(400, "Diese E-Mail-Adresse wird bereits verwendet")
     # Nur im Speicher setzen — der Token braucht kein Commit, er signiert
@@ -985,7 +989,7 @@ async def confirm_email_change(body: ConfirmEmailChangeBody, request: Request, d
     if int(time.time()) - ts > EMAIL_CHANGE_TTL:
         raise HTTPException(400, "Der Bestätigungslink ist abgelaufen. Bitte die Änderung erneut anfordern.")
     # Zieladresse koennte inzwischen von jemand anderem belegt worden sein
-    result = await db.execute(select(User).where(User.email == user.pending_email, User.id != user.id))
+    result = await db.execute(select(User).where(User.email_idx == suchwert(user.pending_email), User.id != user.id))
     if result.scalar_one_or_none():
         raise HTTPException(400, "Diese E-Mail-Adresse wird inzwischen bereits verwendet")
     user.email = user.pending_email

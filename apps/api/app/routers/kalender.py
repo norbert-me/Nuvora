@@ -5,7 +5,10 @@ dem Kern. Ein Eintrag kann optional an eine Klasse und ein Thema haengen; das
 Thema ist ON DELETE SET NULL, damit das Loeschen eines Themas keinen Eintrag
 mitreisst.
 """
+import json
 import re
+import urllib.parse
+import time
 from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional
 
@@ -15,6 +18,8 @@ from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..zeit import schul_datum, tagesbeginn
+from ..stundenraster import (freie_tage as _freie_tage, slot_active_on as _slot_active_on, tag as _tag,
+                             unterrichtsstunden as _unterrichtsstunden)
 # RRULE ist ICS-Grammatik; die Uebersetzung liegt in app/caldav.py (ohne
 # FastAPI, ohne Datenbank, testbar ohne Server). Eine zweite Fassung hier waere
 # die, in der eine Pruefung fehlt.
@@ -150,6 +155,7 @@ class EntryIn(BaseModel):
         return self
     cardvote_set_id: Optional[int] = None
     karten_deck_id: Optional[int] = None
+    karten_deck_ids: Optional[List[int]] = None   # weitere Stapel der Stunde
     lernpfad_ladder_id: Optional[int] = None
     codedetektiv_puzzle: Optional[str] = None
 
@@ -439,6 +445,7 @@ async def create_entry(body: EntryIn, user: User = Depends(require_module), db: 
     await _check_verknuepfungen(db, user, body)
     daten = body.model_dump()
     daten["topic_ids"] = await _check_topics(db, user, daten.get("topic_ids"))
+    daten["karten_deck_ids"] = await _check_decks(db, user, daten.get("karten_deck_ids"))
     e = CalendarEntry(owner_id=user.id, **daten)
     db.add(e)
     await db.commit()
@@ -459,6 +466,7 @@ async def update_entry(entry_id: int, body: EntryIn, request: Request = None, us
     await _check_verknuepfungen(db, user, body)
     daten = body.model_dump()
     daten["topic_ids"] = await _check_topics(db, user, daten.get("topic_ids"))
+    daten["karten_deck_ids"] = await _check_decks(db, user, daten.get("karten_deck_ids"))
     for k, v in daten.items():
         setattr(e, k, v)
     await db.commit()
@@ -502,8 +510,8 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
                 db.add(CardDeckKurs(deck_id=deck_id, kurs_id=kid))
 
     # Explizit verknuepftes Deck: am Kalendertag freischalten, falls noch Entwurf.
-    if e.karten_deck_id:
-        deck = await db.get(CardDeck, e.karten_deck_id)
+    for deck_id_x in [i for i in [e.karten_deck_id, *(e.karten_deck_ids or [])] if i]:
+        deck = await db.get(CardDeck, deck_id_x)
         if deck and deck.owner_id == user.id:
             if deck.released_at is None:
                 deck.released_at = _tagesbeginn(e.date)
@@ -801,7 +809,7 @@ async def serien_ausnahme(entry_id: int, body: AusnahmeIn,
         felder = {k: getattr(e, k) for k in (
             "class_id", "kurs_id", "topic_id", "topic_ids", "method_id", "period", "title", "notes",
             "location", "start_time", "end_time", "verlaufsplan",
-            "cardvote_set_id", "karten_deck_id", "lernpfad_ladder_id", "codedetektiv_puzzle")}
+            "cardvote_set_id", "karten_deck_id", "karten_deck_ids", "lernpfad_ladder_id", "codedetektiv_puzzle")}
         # Ohne caldav_uid und ohne rrule: die Kopie ist ein eigener Termin, kein
         # zweiter Kopf derselben Serie — sonst legte der naechste Abgleich im
         # Handy zwei Serien uebereinander.
@@ -845,6 +853,21 @@ class ExamOut(ExamIn):
     id: int
     work_id: Optional[int] = None   # verknüpfte Auswertung im Modul „Klassenarbeit"
     model_config = {"from_attributes": True}
+
+
+async def _check_decks(db: AsyncSession, user: User, ids) -> Optional[list]:
+    """Weitere Kartenstapel auf die EIGENEN eingrenzen (wie `_check_topics`:
+    Fremdes fliegt still heraus statt den Termin abzulehnen)."""
+    if not ids:
+        return None
+    eigene = {i for (i,) in (await db.execute(
+        select(CardDeck.id).where(CardDeck.owner_id == user.id, CardDeck.deleted_at.is_(None),
+                                  CardDeck.id.in_(list(ids))))).all()}
+    out = []
+    for i in ids:
+        if i in eigene and i not in out:
+            out.append(i)
+    return out or None
 
 
 async def _check_topics(db: AsyncSession, user: User, ids) -> Optional[list]:
@@ -998,8 +1021,10 @@ async def _korrektur_todo(db, user, e: ExamDate, verschieben: bool = False) -> N
     lab = _kurs_label(await kurs_des_termins(db, user.id, e.kurs_id, e.class_id))
     if lab and lab.lower() not in titel.lower():
         titel = f"{lab}: {titel}"
-    schon = (await db.execute(select(Todo).where(
-        Todo.owner_id == user.id, Todo.text.like(f"%{marke}%")))).scalars().first()
+    # Der Text steht verschluesselt in der Datenbank: LIKE ist nicht mehr moeglich,
+    # gesucht wird unter den To-dos dieses Kontos in Python.
+    schon = next((t for t in (await db.execute(select(Todo).where(
+        Todo.owner_id == user.id))).scalars().all() if marke in (t.text or "")), None)
     if schon:
         if verschieben and not schon.done:
             schon.due_date = (e.date + timedelta(days=7)).date()
@@ -1071,101 +1096,12 @@ async def delete_exam(exam_id: int, user: User = Depends(require_module), db: As
     # Das automatisch angelegte Korrektur-To-do geht mit — aber nur, solange es
     # offen ist. Ein abgehaktes ist Verlauf und wird nicht nachtraeglich getilgt.
     from ..models import Todo
-    for t in (await db.execute(select(Todo).where(
-            Todo.owner_id == user.id, Todo.done.is_(False),
-            Todo.text.like(f"%#ka{e.id}%")))).scalars().all():
+    for t in [t for t in (await db.execute(select(Todo).where(
+            Todo.owner_id == user.id, Todo.done.is_(False)))).scalars().all()
+            if f"#ka{e.id}" in (t.text or "")]:
         await db.delete(t)
     await db.delete(e)
     await db.commit()
-
-
-def _tag(x):
-    """Auf den Kalendertag reduzieren — den Tag AN DER SCHULE, nicht den in UTC.
-
-    Ein Zeitpunkt um Mitternacht Ortszeit liegt in UTC auf 22:00 des Vortags;
-    `x.date()` machte daraus den Vortag. So stand der Tag der Deutschen Einheit
-    am 2. Oktober — im Feed fuers Handy, auf der Startseite und bei der
-    Anwesenheit. `schul_datum` (app/zeit.py) ist die eine Umrechnung dafuer.
-    """
-    if isinstance(x, datetime):
-        return schul_datum(x)
-    return x.date() if hasattr(x, "date") else x
-
-
-def _freie_tage(breaks) -> set:
-    """Alle Tage in den freien Zeitraeumen (Ferien, bewegliche Feiertage)."""
-    from datetime import timedelta as _td
-    raus = set()
-    for b in breaks:
-        d, end = _tag(b.start_date), _tag(b.end_date)
-        while d <= end:
-            raus.add(d)
-            d = d + _td(days=1)
-    return raus
-
-
-def _unterrichtsstunden(*, kurs_id, class_id, start: date, ende: date,
-                        slots, planned, breaks_days: set, cancel_set: set) -> list:
-    """Die Unterrichtsstunden eines Kurses zwischen `start` (mit) und `ende` (ohne).
-
-    Genau die Rechnung, die der Kalender auch anzeigt, und sie steht nur hier:
-    wiederkehrende Stundenplan-Stunden (freie Tage, Ausfaelle und ueberschriebene
-    abgezogen) plus die konkret geplanten Eintraege. Ein konkreter Eintrag mit
-    Stundennummer ERSETZT an dem Tag den wiederkehrenden Slot dieser Stunde —
-    egal fuer welchen Kurs; sonst zaehlte der alte Slot dort weiter mit, wenn der
-    Eintrag den Kurs geaendert hat.
-
-    Zugehoerigkeit:
-    - Kurs gesetzt: der SELBE Kurs zaehlt, dazu kurslose (nur fuer die Klasse
-      geplante) Stunden derselben Klasse. Ein ANDERER Kurs derselben Klasse
-      zaehlt nicht — sonst zaehlte Physik fuer die Mathe-Planung mit.
-    - Nur Klasse: alles dieser Klasse.
-
-    Liefert eine sortierte Liste von (Tag, Stunde). Gebraucht von der
-    Klassenarbeits-Uebersicht („noch wie viele Stunden?") und vom
-    Stoffverteilungsplan („wann ist welches Thema dran?") — zwei Fragen, eine
-    Rechnung.
-    """
-    from datetime import timedelta as _td
-
-    def passt(k_id, c_id):
-        if kurs_id is not None:
-            return k_id == kurs_id or (k_id is None and class_id is not None and c_id == class_id)
-        return class_id is not None and c_id == class_id
-
-    by_wd = {}
-    for s2 in slots:
-        if passt(s2.kurs_id, s2.class_id):
-            by_wd.setdefault(s2.weekday, []).append(s2)
-    ueberschrieben = {(_tag(e.date), e.period) for e in planned if start <= _tag(e.date) < ende}
-
-    treffer = set()
-    d = start
-    while d < ende:
-        if d not in breaks_days:
-            for s2 in by_wd.get(d.weekday(), []):
-                if not _slot_active_on(s2, d):
-                    continue
-                if (d, s2.period) not in cancel_set and (d, s2.period) not in ueberschrieben:
-                    treffer.add((d, s2.period))
-        d = d + _td(days=1)
-    for e in planned:
-        ed = _tag(e.date)
-        if start <= ed < ende and ed not in breaks_days and passt(e.kurs_id, e.class_id):
-            treffer.add((ed, e.period))
-    return sorted(treffer)
-
-
-def _slot_active_on(s: TimetableSlot, d: date) -> bool:
-    """Gilt die (versionierte) Stundenplan-Stunde am Tag d? valid_from/valid_to
-    grenzen sie ein; NULL heißt offen (seit jeher bzw. noch aktiv)."""
-    vf = s.valid_from.date() if isinstance(s.valid_from, datetime) else s.valid_from
-    vt = s.valid_to.date() if isinstance(s.valid_to, datetime) else s.valid_to
-    if vf is not None and d < vf:
-        return False
-    if vt is not None and d > vt:
-        return False
-    return True
 
 
 async def stundenplan_vorkommen(db: AsyncSession, user: User, start: date, ende: date) -> list:
@@ -1558,7 +1494,11 @@ class SlotCancelIn(BaseModel):
 async def list_slot_cancellations(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Ausgefallene Stundenplan-Stunden (Datum + Stunde)."""
     rows = (await db.execute(select(SlotCancellation).where(SlotCancellation.owner_id == user.id))).scalars().all()
-    return [{"date": c.date.isoformat(), "period": c.period} for c in rows]
+    eigene = [{"date": c.date.isoformat(), "period": c.period} for c in rows]
+    # Dazu, was Untis ausfallen laesst: gleiche Wirkung (die Stunde verschwindet), aber nicht von Hand gesetzt
+    # und deshalb nicht wieder einzublenden (`untis: True`).
+    schon = {(c["date"][:10], c["period"]) for c in eigene}
+    return eigene + [a for a in await untis_ausfaelle(user, db) if (a["date"][:10], a["period"]) not in schon]
 
 
 @router.post("/slot-cancellations", status_code=201)
@@ -1784,15 +1724,21 @@ def ext_kurz(key: str) -> str:
 def ext_weitergeben(user, ev: dict) -> bool:
     """Geht dieser fremde Termin nach draussen (ICS-Feed, CalDAV)?
 
-    Die Ansicht-Schalter des Kalenders (fremde Kalender an/aus, einzelne
-    Kalender, Ganztaegiges) blenden nur AUS — sie sperren nichts: wer in Nuvora
-    etwas wegschaltet, damit der Tag uebersichtlich bleibt, will es meist nicht
-    auch im Handy loswerden (geaendert 09.11.2026; vorher war es umgekehrt).
-    Nur der einzeln ausgeblendete Termin (`hidden`) bleibt draussen: er ist das
-    „Loeschen" aus dem Handy (CalDAV DELETE) — kaeme er wieder, stuende er beim
-    naechsten Abgleich erneut da.
+    Je KALENDER entschieden (`export` im Eintrag der Kalenderliste): wer seinen
+    iCloud-Kalender auf dem Handy ohnehin hat, will ihn nicht noch einmal
+    exportieren — den Outlook-Kalender aber schon. Die Ansicht-Schalter des
+    Kalenders (an/aus, einzelne Kalender, Ganztaegiges) blenden nur AUS und
+    sperren nichts (geaendert 09.11.2026). Der einzeln ausgeblendete Termin
+    (`hidden`) bleibt draussen: er ist das „Loeschen" aus dem Handy (CalDAV
+    DELETE) — kaeme er wieder, stuende er beim naechsten Abgleich erneut da.
+    Die Untis-Vertretungen haengen am Gesamtschalter `feed_external` (= mindestens
+    ein Kalender exportiert), den der Server beim Speichern nachfuehrt.
     """
-    return not ev.get("hidden")
+    if ev.get("hidden"):
+        return False
+    if ev.get("untis"):
+        return bool(user.feed_external)
+    return any(c["export"] for c in _ext_calendars(user) if c["url"] == ev.get("cal"))
 
 
 def ganztaegig_weitergeben(user) -> bool:
@@ -2187,6 +2133,7 @@ class ExtCalIn(BaseModel):
     url: str = ""
     color: Optional[str] = ""
     name: Optional[str] = ""
+    export: Optional[bool] = None      # in den ICS-Feed / CalDAV mitschicken (je Kalender)
 
 
 class ExtCalsIn(BaseModel):
@@ -2210,13 +2157,34 @@ def _hide_keys(body: ExtHideIn) -> list:
 def _ext_calendars(user: User) -> list:
     """Die externen Kalender des Nutzers, immer als Liste. Altbestand
     (external_ics_url/_color) wird als erster Eintrag mitgeführt, bis er einmal
-    über die neue Liste überschrieben wird."""
+    über die neue Liste überschrieben wird. `export` fehlt bei Altbestand und
+    folgt dann dem früheren Gesamtschalter."""
+    standard = bool(user.feed_external)
     cals = user.external_calendars
     if isinstance(cals, list) and cals:
-        return [c for c in cals if isinstance(c, dict) and c.get("url")]
+        return [{**c, "export": bool(c.get("export", standard))}
+                for c in cals if isinstance(c, dict) and c.get("url")]
     if user.external_ics_url:
-        return [{"url": user.external_ics_url, "color": user.external_ics_color or "", "name": ""}]
+        return [{"url": user.external_ics_url, "color": user.external_ics_color or "", "name": "",
+                 "export": standard}]
     return []
+
+
+def _name_aus_ics(text: str) -> str:
+    """Der Name, den der Kalender sich selbst gibt (X-WR-CALNAME)."""
+    for zeile in re.sub(r"\r?\n[ \t]", "", text or "").splitlines():
+        if zeile.upper().startswith("X-WR-CALNAME"):
+            return zeile.split(":", 1)[-1].replace("\\,", ",").strip()[:60]
+    return ""
+
+
+def _name_aus_adresse(url: str) -> str:
+    h = (urllib.parse.urlparse(url).hostname or "").lower()
+    for teil, name in (("icloud", "iCloud"), ("office365", "Outlook"), ("outlook", "Outlook"),
+                       ("google", "Google"), ("webuntis", "WebUntis")):
+        if teil in h:
+            return name
+    return h[:60] or "Kalender"
 
 
 @router.get("/external")
@@ -2229,6 +2197,8 @@ async def get_external(user: User = Depends(require_module)):
 
 @router.put("/external")
 async def set_external(body: ExtCalsIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    import asyncio
+    vorher = {c["url"]: c for c in _ext_calendars(user)}
     out = []
     for c in body.calendars:
         url = (c.url or "").strip()
@@ -2239,14 +2209,34 @@ async def set_external(body: ExtCalsIn, user: User = Depends(require_module), db
         url = url.replace("webcal://", "https://", 1)
         col = (c.color or "").strip()
         col = col if re.fullmatch(r"#[0-9a-fA-F]{3,8}", col) else ""
-        out.append({"url": url, "color": col, "name": (c.name or "").strip()[:60]})
+        if c.export is not None:
+            exp = bool(c.export)
+        elif body.mitschicken is not None:
+            exp = bool(body.mitschicken)           # aelterer Client: ein Schalter fuer alle
+        else:
+            exp = bool((vorher.get(url) or {}).get("export", False))
+        out.append({"url": url, "color": col, "name": (c.name or "").strip()[:60], "export": exp})
+    # Ohne Namen holt der Server ihn aus dem Kalender selbst: eine Liste aus
+    # Adressen ist keine Liste, in der man etwas wiederfindet — und die Adresse
+    # ist ein Geheimnis, das nicht herumstehen soll.
+    ohne = [c for c in out if not c["name"]]
+    if ohne:
+        async def _lade(c):
+            try:
+                text = await asyncio.get_event_loop().run_in_executor(None, _fetch_ics, c["url"])
+            except Exception:
+                text = ""
+            c["name"] = _name_aus_ics(text) or _name_aus_adresse(c["url"])
+        await asyncio.gather(*[_lade(c) for c in ohne])
     user.external_calendars = out
     # Altfelder mitziehen (erster Kalender), damit nichts Altes wiederauflebt.
     user.external_ics_url = out[0]["url"] if out else None
     user.external_ics_color = out[0]["color"] if out else ""
-    if body.mitschicken is not None:
-        user.feed_external = bool(body.mitschicken)
+    # Gesamtschalter = mindestens ein Kalender exportiert (die Leser fragen ihn
+    # als schnelle Vorpruefung, bevor sie die Termine holen).
+    user.feed_external = any(c["export"] for c in out)
     await db.commit()
+    _EXT_CACHE.pop(user.id, None); _AUSFALL_CACHE.pop(user.id, None)
     return {"calendars": out, "hidden": user.external_hidden or [],
             "mitschicken": bool(user.feed_external)}
 
@@ -2417,6 +2407,35 @@ def _fetch_ics(url: str) -> str:
     return hole_mit_umleitung(url, timeout=6, max_bytes=2_000_000)
 
 
+# Von Untis ausgefallene Stunden je Konto (datum, start, titel) — stammen aus demselben Abruf wie die
+# Vertretungen und leben so lange wie dessen Zwischenspeicher. Kein Eintrag im Kalender, sondern
+# Material fuer `untis_ausfaelle`.
+_AUSFALL_CACHE: dict = {}
+
+
+async def untis_ausfaelle(user: User, db) -> list:
+    """Stundenplan-Stunden, die laut Untis ausfallen, als [{date, period, untis: True}].
+
+    Eine Entfall-Stunde gehoert nicht als „Entfall: …"-Eintrag in den Kalender, sondern aus dem
+    Stundenplan: sie ist weg, wie nach dem Wegwischen. Untis-Uhrzeiten werden ueber Nuvoras eigenes
+    Stundenraster auf die Stundennummer gelegt; ohne Raster laesst sich nichts zuordnen (leer)."""
+    from .. import untis as U
+    if not (user.untis_ics_url or user.untis_stand):
+        return []
+    if user.id not in _AUSFALL_CACHE:
+        await externe_ereignisse(user, db=db)
+    zeiten = _untis_zeiten(user)
+    raus, gesehen = [], set()
+    for a in _AUSFALL_CACHE.get(user.id) or []:
+        nr = U._stunde_nr(a.get("start"), zeiten)
+        schluessel = (a["datum"], nr)
+        if nr is None or schluessel in gesehen:
+            continue
+        gesehen.add(schluessel)
+        raus.append({"date": f"{a['datum']}T00:00:00", "period": nr, "untis": True})
+    return raus
+
+
 async def externe_ereignisse(user: User, refresh: bool = False,
                              db: Optional[AsyncSession] = None, archiv: bool = False) -> list:
     """ALLE Ereignisse aus den externen ICS-Feeds — auch die ausgeblendeten.
@@ -2439,6 +2458,12 @@ async def externe_ereignisse(user: User, refresh: bool = False,
     if not isinstance(db, AsyncSession):
         db = None          # direkter Aufruf ohne Sitzung (Depends-Platzhalter)
     cals = _ext_calendars(user)
+    if db is not None and _stand_faellig(user, time.time()):
+        import asyncio
+        _STAND_VERSUCH[user.id] = time.time()
+        t = asyncio.ensure_future(_stand_im_hintergrund(user.id))
+        _STAND_TASKS.add(t)
+        t.add_done_callback(_STAND_TASKS.discard)
     # Die Vertretungen aus dem Untis-Abo stehen als eigener Kalender daneben —
     # nicht in der Liste der Abos (die zeigte sonst den ganzen Stundenplan
     # doppelt), sondern hier angehaengt, damit Ausblenden, Archiv, Suche und
@@ -2454,12 +2479,14 @@ async def externe_ereignisse(user: User, refresh: bool = False,
         return [{**r, "hidden": r["key"] in hidden} for r in rows]
 
     if not alle_cals:
-        _EXT_CACHE.pop(user.id, None)
+        _EXT_CACHE.pop(user.id, None); _AUSFALL_CACHE.pop(user.id, None)
         return await _fertig([])
     # Cache-Signatur: URLs + Farben. Die ausgeblendeten Schluessel stehen
     # bewusst NICHT drin — sie werden erst beim Lesen angeheftet, sonst wuerde
     # jedes Ausblenden alle Feeds neu holen.
     sig = "|".join(f"{c['url']}~{c.get('color','')}" for c in alle_cals)
+    if isinstance(user.untis_stand, dict):
+        sig += "|st" + str(user.untis_stand.get("stand", ""))
 
     hit = _EXT_CACHE.get(user.id)
     if not refresh and hit and hit[0] == sig and hit[1] > time.time():
@@ -2481,8 +2508,12 @@ async def externe_ereignisse(user: User, refresh: bool = False,
 
     out = []
     if untis_cal:
-        out.extend(await _untis_vertretungen(user, db, texts[-1], untis_cal, win_start, win_end))
+        zeilen_u, ausfaelle_u = await _untis_vertretungen(user, db, texts[-1], untis_cal, win_start, win_end)
+        out.extend(zeilen_u)
+        _AUSFALL_CACHE[user.id] = ausfaelle_u
         texts = texts[:-1]
+    else:
+        _AUSFALL_CACHE.pop(user.id, None)
     for cal, text in zip(cals, texts):
         color = cal.get("color") or ""
         for e in _parse_ics(text):
@@ -2534,14 +2565,70 @@ UNTIS_FARBE = "#d97706"
 
 
 def _untis_kalender(user: User):
-    """Der Untis-Abo-Link als Kalender der Vertretungen — oder None."""
+    """Der Untis-Abo-Link als Kalender der Vertretungen — oder None.
+
+    Auch ohne Abo-Link, solange ein per Anmeldung geholter Stand da ist: dessen
+    Eintraege kommen mit echten Titeln und brauchen keinen Link."""
     url = (user.untis_ics_url or "").strip()
-    if not url:
+    stand = user.untis_stand if isinstance(user.untis_stand, dict) else None
+    if not url and not (stand and stand.get("stunden")):
         return None
-    return {"url": url, "color": UNTIS_FARBE, "name": "Untis-Vertretungen", "untis": True}
+    return {"url": url or "untis:stand", "color": UNTIS_FARBE, "name": "Untis-Vertretungen", "untis": True}
 
 
-async def _untis_vertretungen(user: User, db, text: str, cal: dict, von, bis) -> list:
+async def _regulaer_aus_plan(user: User, db):
+    """`regulaer(datum, start)` -> Titel, die Nuvoras eigener Plan dort hat; None,
+    wenn sich das nicht beurteilen laesst (kein Raster oder keine Sitzung)."""
+    from .. import untis as U
+    zeiten = _untis_zeiten(user)
+    if db is None or not zeiten:
+        return None
+    slots = (await db.execute(select(TimetableSlot).where(
+        TimetableSlot.owner_id == user.id))).scalars().all()
+
+    def regulaer(d, start):
+        nr = U._stunde_nr(start, zeiten)
+        return [s.title for s in slots if nr and s.period == nr
+                and s.weekday == d.weekday() and _slot_active_on(s, d)]
+    return regulaer
+
+
+def _stand_zeilen(user: User, cal: dict, von, bis) -> tuple:
+    """Die per Anmeldung geholten Abweichungen als Kalenderzeilen (mit Titel)."""
+    import hashlib
+    stand = user.untis_stand if isinstance(user.untis_stand, dict) else {}
+    out, besetzt, ausfaelle = [], set(), []
+    for x in (stand.get("stunden") or [])[:500]:
+        try:
+            d = date.fromisoformat(x.get("datum") or "")
+        except ValueError:
+            continue
+        if not (von <= d <= bis):
+            continue
+        if x.get("faellt_aus"):
+            # Ein Ausfall ist KEIN Eintrag: die Stunde faellt aus dem Stundenplan (siehe `untis_ausfaelle`).
+            ausfaelle.append({"datum": d.isoformat(), "start": x.get("start") or "", "titel": (x.get("titel") or "").strip()})
+            besetzt.add((d.isoformat(), x.get("start") or ""))
+            continue
+        elif x.get("zusatz"):
+            art = "Zusatz"
+        else:
+            art = "Vertretung"
+        titel = (x.get("titel") or "").strip() or "Termin"
+        if x.get("orig") and x.get("orig") not in titel:
+            titel += f" (statt {x['orig']})"
+        iso = d.isoformat()
+        uid = "untis-st-" + hashlib.md5(f"{iso}|{x.get('start')}|{titel}|{art}".encode()).hexdigest()[:16]
+        out.append({"title": f"{art}: {titel}"[:200], "time": x.get("start") or None,
+                    "endtime": x.get("ende") or None, "cal": cal["url"], "cal_name": cal["name"],
+                    "location": x.get("raum", ""), "color": cal["color"], "uid": uid,
+                    "description": x.get("info", ""), "start": iso, "end": iso, "date": iso,
+                    "key": f"{uid}|{iso}", "untis": True})
+        besetzt.add((iso, x.get("start") or ""))
+    return out, besetzt, ausfaelle
+
+
+async def _untis_vertretungen(user: User, db, text: str, cal: dict, von, bis) -> tuple:
     """Aus dem Untis-Abo nur das, was vom regulaeren Plan abweicht.
 
     Der ganze Plan steht schon im Stundenplan; ihn hier noch einmal zu zeigen,
@@ -2552,36 +2639,24 @@ async def _untis_vertretungen(user: User, db, text: str, cal: dict, von, bis) ->
     """
     import hashlib
     from .. import untis as U
+    stand_zeilen, stand_besetzt, stand_ausfaelle = _stand_zeilen(user, cal, von, bis)
     if not text:
-        return []
+        return stand_zeilen, stand_ausfaelle
     alle = U.stunden_aus_ics_text(text, von, bis, mit_ausfall=True)
     stunden = [x for x in alle if not x.get("faellt_aus")]
     ausfaelle = [x for x in alle if x.get("faellt_aus")]
-    regulaer = None
-    zeiten = _untis_zeiten(user)
-    if db is not None and zeiten:
-        slots = (await db.execute(select(TimetableSlot).where(
-            TimetableSlot.owner_id == user.id))).scalars().all()
-
-        def regulaer(d, start):
-            nr = U._stunde_nr(start, zeiten)
-            return [s.title for s in slots if nr and s.period == nr
-                    and s.weekday == d.weekday() and _slot_active_on(s, d)]
+    regulaer = await _regulaer_aus_plan(user, db)
     out = []
     vertretungen = U.abweichungen(stunden, regulaer)
     # Entfall nur, wo nichts an dessen Stelle tritt: gibt es zur selben Zeit eine
     # Vertretung (oder andere Stunde im Feed), ist die Stunde nicht ausgefallen.
     besetzt = {(x["datum"], x.get("start", "")) for x in stunden}
+    gefallen = list(stand_ausfaelle)
     for s in ausfaelle:
-        if (s["datum"], s.get("start", "")) in besetzt:
+        if (s["datum"], s.get("start", "")) in besetzt or (s["datum"], s.get("start", "")) in stand_besetzt:
             continue
-        d = s["datum"]
-        uid = "untis-aus-" + hashlib.md5(f"{d}|{s.get('start')}|{s.get('titel')}".encode()).hexdigest()[:16]
-        out.append({"title": f"Entfall: {s.get('titel', '')}"[:200],
-                    "time": s.get("start") or None, "endtime": s.get("ende") or None,
-                    "cal": cal["url"], "cal_name": cal["name"], "location": s.get("raum", ""),
-                    "color": cal["color"], "uid": uid, "description": "",
-                    "start": d, "end": d, "date": d, "key": f"{uid}|{d}", "untis": True})
+        # Kein „Entfall: …"-Eintrag: die Stunde verschwindet aus dem Stundenplan (`untis_ausfaelle`).
+        gefallen.append({"datum": s["datum"], "start": s.get("start") or "", "titel": s.get("titel", "")})
     for s in vertretungen:
         d = s["datum"]
         uid = "untis-" + hashlib.md5(f"{d}|{s.get('start')}|{s.get('titel')}".encode()).hexdigest()[:16]
@@ -2590,7 +2665,10 @@ async def _untis_vertretungen(user: User, db, text: str, cal: dict, von, bis) ->
                     "cal": cal["url"], "cal_name": cal["name"], "location": s.get("raum", ""),
                     "color": cal["color"], "uid": uid, "description": "",
                     "start": d, "end": d, "date": d, "key": f"{uid}|{d}", "untis": True})
-    return out
+    # Wo der per Anmeldung geholte Stand etwas weiss, gilt er (er hat den echten
+    # Titel); der Abo-Link bleibt fuer alles, was danach dazukam.
+    out = [r for r in out if (r["date"], r.get("time") or "") not in stand_besetzt]
+    return stand_zeilen + out, gefallen
 
 
 # ─── Archiv vergangener fremder Termine ───
@@ -2826,8 +2904,11 @@ class UntisAbrufIn(UntisKonto):
 @router.get("/untis")
 async def untis_konto(user: User = Depends(require_module)):
     """Die gemerkten Angaben — ohne Passwort, weil keins gespeichert wird."""
+    st = user.untis_stand if isinstance(user.untis_stand, dict) else {}
     return {"server": user.untis_server or "", "schule": user.untis_schule or "",
-            "benutzer": user.untis_benutzer or "", "ics_url": user.untis_ics_url or ""}
+            "benutzer": user.untis_benutzer or "", "ics_url": user.untis_ics_url or "",
+            "stand": st.get("stand") or "", "stand_anzahl": len(st.get("stunden") or []),
+            "mobil": bool(user.untis_mobil)}
 
 
 @router.put("/untis")
@@ -2852,6 +2933,166 @@ def _untis_zeiten(user: User) -> list:
     dort also nicht unsere dritte.
     """
     return [(z or {}).get("start", "") for z in (user.timetable_times or []) if isinstance(z, dict)]
+
+
+class UntisMobilIn(BaseModel):
+    link: str = ""
+
+
+def _mobil_zugang(user: User):
+    """Der entschluesselte Untis-Mobile-Zugang, oder None (nicht eingerichtet,
+    oder der Server-Schluessel hat gewechselt)."""
+    from ..geheimnis import entschluesseln
+    roh = entschluesseln(user.untis_mobil or "")
+    try:
+        z = json.loads(roh) if roh else None
+    except ValueError:
+        return None
+    return z if isinstance(z, dict) and z.get("key") else None
+
+
+@router.put("/untis/mobil")
+async def untis_mobil_setzen(body: UntisMobilIn, user: User = Depends(require_module),
+                             db: AsyncSession = Depends(get_db)):
+    """Den Untis-Mobile-Link (QR-Code aus WebUntis) pruefen und verschluesselt merken.
+
+    Der Schluessel gilt nur fuer Apps und ist in WebUntis widerrufbar — das
+    Schulpasswort bleibt draussen. Er wird nie wieder ausgegeben."""
+    from .. import untis as U, untis_mobile as M
+    from ..geheimnis import verschluesseln
+    rate_limit("untis", f"u{user.id}", 10, 300, "Zu viele Untis-Abrufe. Bitte kurz warten.")
+    try:
+        z = M.link_lesen(body.link)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    import asyncio
+    try:
+        await asyncio.get_event_loop().run_in_executor(None, M.MobileSitzung(z).pruefen)
+    except U.UntisFehler as e:
+        return {"ok": False, "grund": e.grund, "meldung": e.text[:300]}
+    user.untis_mobil = verschluesseln(json.dumps(z))
+    await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/untis/mobil", status_code=204)
+async def untis_mobil_trennen(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Zugang UND geholten Stand loeschen: wer trennt, will nichts davon behalten."""
+    user.untis_mobil = None
+    user.untis_stand = None
+    await db.commit()
+    _EXT_CACHE.pop(user.id, None); _AUSFALL_CACHE.pop(user.id, None)
+
+
+async def _stand_speichern(user: User, db, stunden: list, von, bis) -> dict:
+    """Aus den Stunden die Abweichungen filtern und als Stand am Konto merken."""
+    regulaer = await _regulaer_aus_plan(user, db)
+    treffer = [x for x in stunden if x.get("faellt_aus") or x.get("vertretung")]
+    if regulaer:
+        # Eine Stunde, die der eigene Plan zu dieser Zeit nicht kennt (oder
+        # mehrfach, als er Stunden hat), ist Zusatz — z.B. eine Fremdvertretung,
+        # die Untis nicht als „irregular“ fuehrt.
+        gruppen = {}
+        for x in stunden:
+            if x.get("faellt_aus") or x.get("vertretung"):
+                continue
+            try:
+                d = date.fromisoformat(x["datum"])
+            except (KeyError, ValueError):
+                continue
+            gruppen.setdefault((d, x.get("start", "")), []).append(x)
+        for (d, start), liste in gruppen.items():
+            for x in liste[len(regulaer(d, start) or ()):]:
+                treffer.append({**x, "zusatz": True})
+    felder = ("datum", "start", "ende", "titel", "raum", "info", "orig", "faellt_aus", "zusatz")
+    jetzt = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    user.untis_stand = {"stand": jetzt, "von": von.isoformat(), "bis": bis.isoformat(),
+                        "stunden": [{k: x.get(k) for k in felder if x.get(k)} for x in treffer[:500]]}
+    await db.commit()
+    _EXT_CACHE.pop(user.id, None); _AUSFALL_CACHE.pop(user.id, None)
+    return {"ok": True, "anzahl": len(treffer), "gesamt": len(stunden), "stand": jetzt,
+            "mit_info": sum(1 for x in treffer if x.get("info"))}
+
+
+@router.post("/untis/vertretungen")
+async def untis_vertretungen_holen(body: UntisAbrufIn, user: User = Depends(require_module),
+                                   db: AsyncSession = Depends(get_db)):
+    """Abweichungen (Vertretung, Entfall, Zusatz) MIT Titel holen.
+
+    Zwei Wege: mit dem gemerkten Untis-Mobile-Schluessel (kein Passwort noetig),
+    sonst mit Benutzername und Passwort fuer diesen einen Abruf. Der Abo-Link
+    kennt bei manchen Schulen nur Uhrzeiten; hier kommen Fach, Klasse, Raum,
+    Info-Text und der urspruengliche Lehrer dazu. Das Passwort wird nie
+    gespeichert; der Stand ist ein Abbild vom Zeitpunkt des Abrufs.
+    """
+    from .. import untis as U, untis_mobile as M
+    rate_limit("untis", f"u{user.id}", 10, 300, "Zu viele Untis-Abrufe. Bitte kurz warten.")
+    wochen = max(1, min(int(body.wochen or 4), 8))
+    von = date.today()
+    bis = von + timedelta(weeks=wochen)
+    zugang = None if body.passwort else _mobil_zugang(user)
+    if not body.passwort and not zugang:
+        return {"ok": False, "grund": "zugangsdaten",
+                "meldung": "Weder Passwort noch Untis-Mobile-Schlüssel angegeben"}
+
+    def _abrufen():
+        if zugang:
+            return M.MobileSitzung(zugang).stundenplan(von, bis)
+        with U.UntisSitzung(body.server or user.untis_server or "",
+                            body.schule or user.untis_schule or "",
+                            body.benutzer or user.untis_benutzer or "",
+                            body.passwort) as sitzung:
+            return sitzung.stundenplan(von, bis)
+
+    import asyncio
+    try:
+        stunden = await asyncio.get_event_loop().run_in_executor(None, _abrufen)
+    except U.UntisFehler as e:
+        return {"ok": False, "grund": e.grund, "meldung": e.text[:300]}
+    return await _stand_speichern(user, db, stunden, von, bis)
+
+
+# ─── Automatisch auffrischen (nur mit Untis-Mobile-Schluessel) ───
+#
+# Geholt wird beim Lesen des Kalenders, nicht nach Uhr: es gibt keinen Takt, der
+# fuer eine Lehrkraft laeuft, die nie hineinsieht. Hoechstens alle 30 Minuten je
+# Konto — auch nach einem Fehlschlag, damit ein widerrufener Schluessel nicht
+# im Minutentakt gegen Untis laeuft.
+_STAND_VERSUCH: dict = {}
+_STAND_TASKS: set = set()
+STAND_ALTER_S = 30 * 60
+
+
+def _stand_faellig(user: User, jetzt: float) -> bool:
+    if not user.untis_mobil or jetzt - _STAND_VERSUCH.get(user.id, 0) < STAND_ALTER_S:
+        return False
+    st = user.untis_stand if isinstance(user.untis_stand, dict) else {}
+    try:
+        alt = datetime.fromisoformat(st.get("stand", "")).timestamp()
+    except ValueError:
+        return True
+    return jetzt - alt >= STAND_ALTER_S
+
+
+async def _stand_im_hintergrund(user_id: int):
+    from .. import untis as U, untis_mobile as M
+    from ..database import async_session
+    import asyncio
+    try:
+        async with async_session() as db:
+            user = await db.get(User, user_id)
+            zugang = _mobil_zugang(user) if user else None
+            if not zugang or not await is_active(db, user.id, "kalender"):
+                return
+            von = date.today()
+            bis = von + timedelta(weeks=4)
+            stunden = await asyncio.get_event_loop().run_in_executor(
+                None, M.MobileSitzung(zugang).stundenplan, von, bis)
+            await _stand_speichern(user, db, stunden, von, bis)
+    except Exception as e:
+        # Ein Fehlschlag ist hier kein Befund fuer die Seite: der alte Stand bleibt.
+        import logging
+        logging.getLogger("nuvora.untis").info("Untis-Auffrischen fehlgeschlagen: %s", type(e).__name__)
 
 
 @router.post("/untis/vorschau")
@@ -2989,10 +3230,24 @@ async def untis_uebernehmen(body: UntisUebernahmeIn, user: User = Depends(requir
         neue_kurse += 1
 
     gesetzt = 0
+    bewahrt = 0
     for s in body.slots[:200]:
         if not 0 <= s.weekday <= 6 or not stunde_gueltig(s.period):
             continue
         kurs_id = s.kurs_id or nach_name.get((s.kurs_neu or "").strip().lower())
+        # Eine Stunde, die schon einem Kurs oder einer Klasse gehoert, wird von
+        # einem Import OHNE Zuordnung nicht angefasst: reiner Text aus Untis
+        # („INF 6.4") wuerde sonst Kurs, Farbe und Verknuepfungen wegnehmen —
+        # genau so ging ein gepflegter Plan verloren.
+        if not kurs_id and not s.class_id:
+            heute_d = date.today()
+            alt = (await db.execute(select(TimetableSlot).where(
+                TimetableSlot.owner_id == user.id, TimetableSlot.weekday == s.weekday,
+                TimetableSlot.period == s.period,
+                or_(TimetableSlot.valid_to.is_(None), TimetableSlot.valid_to >= heute_d)))).scalars().all()
+            if any(a.kurs_id or a.class_id for a in alt if _slot_active_on(a, heute_d)):
+                bewahrt += 1
+                continue
         await upsert_slot(SlotIn(weekday=s.weekday, period=s.period, title=(s.title or "")[:200],
                                  kurs_id=kurs_id, class_id=s.class_id, topic_id=None), user, db)
         gesetzt += 1
@@ -3024,4 +3279,5 @@ async def untis_uebernehmen(body: UntisUebernahmeIn, user: User = Depends(requir
         frei += 1
 
     await db.commit()
-    return {"slots": gesetzt, "ausfaelle": entfallen, "ferien": frei, "kurse": neue_kurse}
+    return {"slots": gesetzt, "ausfaelle": entfallen, "ferien": frei, "kurse": neue_kurse,
+            "bewahrt": bewahrt}

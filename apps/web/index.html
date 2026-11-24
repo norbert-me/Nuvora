@@ -129,6 +129,13 @@
          einheitlicher Zoom vergrößert ALLE Module gleich (auch die eingebetteten
          Lernpfad-/Code-Detektiv-Ansichten liegen in #root). */
       #root { zoom: 1.06; }
+      /* Der Fuss (Hilfe · Kontakt · Impressum) steht am unteren Bildschirmrand, auch wenn die Seite
+         kurz ist: #root fuellt das Fenster, der Inhalt waechst (`.content-wrap`), der Fuss bleibt unten. */
+      #root { display: flex; flex-direction: column; min-height: var(--voll, 100dvh); }
+      /* Eine volle Fensterhoehe INNERHALB von #root: `100dvh` wird dort mit dem Zoom
+         mitgerechnet (×1,06) und ueberragt das Fenster — eine Scrollleiste an einer leeren
+         Seite. Seiten, die das Fenster fuellen, nehmen deshalb diese Groesse. */
+      :root { --voll: calc(100dvh / 1.06); }
       body {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         -webkit-font-smoothing: antialiased;
@@ -245,6 +252,9 @@
            Container ist. break-inside haelt zusammen, was zusammengehoert:
            lieber eine halb leere Seite als eine zerrissene Rueckmeldung. */
         .druck-seite { break-inside: avoid; page-break-inside: avoid; }
+        /* Ein fester Seitenrand: ohne ihn bestimmt jeder Browser den eigenen, und eine Seite, die auf
+           dem einen Gerät knapp passt, ragt auf dem anderen in die naechste — das ergab leere Blaetter. */
+        @page { margin: 10mm; }
         .druck-seite + .druck-seite { break-before: page; page-break-before: always; }
       }
 </style>

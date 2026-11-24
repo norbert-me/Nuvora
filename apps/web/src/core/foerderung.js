@@ -37,3 +37,10 @@ export const MASSNAHMEN = [
   ["Mündlich statt schriftlich", "Leistung wird mündlich erbracht"],
   ["Sonstiges", "Freie Beschreibung im Feld daneben"],
 ];
+
+/**
+ * Hat dieses Kind den Foerderschwerpunkt Lernen („LE")? Dann gibt es keine
+ * Gesamtnote, und es wird aus den Klassenwerten (Schnitt, Verteilung,
+ * Notenuebernahme) herausgerechnet.
+ */
+export const leIst = (kind) => !!kind && (kind.le === true || (Array.isArray(kind.foerder) && kind.foerder.includes("Lernen")));

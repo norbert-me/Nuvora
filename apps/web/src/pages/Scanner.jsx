@@ -39,6 +39,7 @@ export default function Scanner() {
   const [classStudents, setClassStudents] = useState([]);
   const [recentlyScanned, setRecentlyScanned] = useState([]);
   const [hostRevealed, setHostRevealed] = useState(false);
+  const [hostSkip, setHostSkip] = useState(false);   // Test: Weiter geht auch ohne Aufdecken
   const [hostIsLast, setHostIsLast] = useState(false);
   const [sessionFinished, setSessionFinished] = useState(false);
   // Erkennt das Geraet selbst? Erst wenn opencv.js wirklich laeuft (siehe
@@ -75,6 +76,14 @@ export default function Scanner() {
   const intervalRef = useRef(null);
   const infoTimer = useRef(null);
   const wsRef = useRef(null);
+  // Absichtlich schliessen: markiert die Leitung, damit sie sich NICHT von selbst wieder
+  // aufbaut. Faellt sie dagegen von allein weg (WLAN-Aussetzer, kurzer Netzausfall),
+  // verbindet sich der Scanner mit wachsendem Abstand neu — vorher blieb er danach stumm
+  // und hoerte weder „naechste Frage“ noch den Zustand des Hosts.
+  const schliesseWs = () => {
+    if (wsRef.current) { wsRef.current.absichtlich = true; wsRef.current.close(); wsRef.current = null; }
+  };
+  const wsVersuch = useRef(0);
   const lastSeenCards = useRef({});
 
   // Kamera erst starten, wenn Scannen beginnt (nicht beim Seitenaufruf)
@@ -106,7 +115,7 @@ export default function Scanner() {
     return () => {
       scanLoopActive.current = false;
       if (intervalRef.current) clearTimeout(intervalRef.current);
-      if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+      schliesseWs();
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
@@ -115,10 +124,11 @@ export default function Scanner() {
   }, []);
 
   const connectWs = useCallback((sid) => {
-    if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+    schliesseWs();
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${proto}//${location.host}/ws/session/${sid}`);
     ws.onopen = () => {
+      wsVersuch.current = 0;
       // ueber speicher.js: Safari wirft im privaten Modus schon beim Zugriff,
       // und hier haette das den Scanner beim Verbinden abstuerzen lassen.
       ws.send(JSON.stringify({ type: "auth", token: lies("token") || "" }));
@@ -141,6 +151,7 @@ export default function Scanner() {
         if (msg.type === "host_state") {
           setHostRevealed(!!msg.revealed);
           setHostIsLast(!!msg.is_last);
+          setHostSkip(!!msg.skip);
         }
         if (msg.type === "session_finished") {
           scanLoopActive.current = false;
@@ -152,7 +163,12 @@ export default function Scanner() {
         }
       } catch {}
     };
-    ws.onclose = () => { wsRef.current = null; };
+    ws.onclose = () => {
+      if (wsRef.current === ws) wsRef.current = null;
+      if (ws.absichtlich) return;
+      const pause = Math.min(10000, 1000 * 2 ** Math.min(wsVersuch.current++, 4));
+      setTimeout(() => { if (!ws.absichtlich && !wsRef.current) connectWs(sid); }, pause);
+    };
     wsRef.current = ws;
   }, []);
 
@@ -385,7 +401,7 @@ export default function Scanner() {
       lastSeenCards.current = {};
       setStatus(t("scanner.stopped"));
       stopCamera();
-      if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+      schliesseWs();
     } else {
       setStatus(t("scanner.connecting"));
       const info = await checkSession();
@@ -560,7 +576,7 @@ export default function Scanner() {
             style={hostRevealed ? { ...toolbarBtn, flex: 1, minWidth: 0 } : { ...toolbarBtnPrimary, flex: 1, minWidth: 0 }}>
             <span style={kuerzen}>{hostRevealed ? t("scanner.hide") : t("scanner.reveal")}</span>
           </button>
-          {hostRevealed && (
+          {(hostRevealed || hostSkip) && (
             hostIsLast ? (
               <button onClick={() => sendRemote("finish")}
                 style={{ ...toolbarBtnPrimary, flex: 1, minWidth: 0, background: C.danger, color: C.aufAkzent }}>

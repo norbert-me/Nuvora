@@ -1,5 +1,6 @@
 // Wiederverwendbares Material-/Datei-Panel. Haengt an ein Thema (topicId), eine
-// Stunde (entryId), einen Einstieg (methodId) oder eine Klassenarbeit (workId)
+// Stunde (entryId), einen Einstieg (methodId), eine Klassenarbeit (workId) oder
+// eine Stunde einer Reihe (reiheStundeId)
 // — genau eins davon setzen. Bei der Klassenarbeit sagt `rolle` zusaetzlich,
 // WOFUER die Datei steht ("arbeit"/"erwartung"); `titel` benennt den Kasten
 // entsprechend. Kern-Feature, kein Modul-Gate. Download laeuft ueber fetch (Bearer-Token), nicht ueber <a href>,
@@ -25,7 +26,7 @@ function fmtSize(n) {
 }
 
 export default function MaterialPanel({ topicId = null, entryId = null, methodId = null,
-                                       workId = null, rolle = null, titel = null,
+                                       workId = null, reiheStundeId = null, rolle = null, titel = null,
                                        // Nur ansehen: kein Hochladen, kein Loeschen. Fuer Stellen,
                                        // an denen die Datei zum Nachschlagen dasteht (Vergleich) —
                                        // gepflegt wird sie dort, wo sie hingehoert.
@@ -43,9 +44,10 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
   const q = topicId != null ? `?topic_id=${topicId}`
     : methodId != null ? `?method_id=${methodId}`
     : workId != null ? `?work_id=${workId}${rolle != null ? `&rolle=${rolle}` : ""}`
+    : reiheStundeId != null ? `?reihe_stunde_id=${reiheStundeId}`
     : `?entry_id=${entryId}`;
   const load = () => hol(`${API}${q}`).then((d) => setItems(Array.isArray(d) ? d : []));
-  useEffect(() => { load(); }, [topicId, entryId, methodId, workId, rolle]);
+  useEffect(() => { load(); }, [topicId, entryId, methodId, workId, reiheStundeId, rolle]);
 
   // Laufender Upload — damit das × im Balken ihn abbrechen kann.
   const abbruch = useRef(null);
@@ -64,6 +66,7 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
     if (entryId != null) fd.append("entry_id", String(entryId));
     if (methodId != null) fd.append("method_id", String(methodId));
     if (workId != null) fd.append("work_id", String(workId));
+    if (reiheStundeId != null) fd.append("reihe_stunde_id", String(reiheStundeId));
     if (rolle) fd.append("rolle", rolle);
     // Mit Fortschritt: eine Klassenarbeit als Scan hat schnell 20 MB, und ohne
     // Balken ist der Unterschied zwischen „laedt" und „haengt" nicht zu sehen.

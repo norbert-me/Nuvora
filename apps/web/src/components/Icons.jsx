@@ -45,6 +45,9 @@ export const MODULE_ICONS = {
   mathespiele: ["M10 3a7 7 0 100 14 7 7 0 000-14z", "M10 6.5l2.5 1.8-1 3h-3l-1-3z"],
   // Koerper: ein Quader in Schraegansicht.
   koerper: ["M4 7l6-3 6 3v7l-6 3-6-3z", "M4 7l6 3 6-3", "M10 10v7"],
+  // Zahlenstrahl: Achse mit Teilstrichen und einem Bogenpfeil.
+  zahlenstrahl: ["M2.5 14h15", "M5 12v4M10 12v4M15 12v4", "M5 11c0-5 5-5 5 0", "M9 9.5l1 1.5 1.3-1.6"],
+  reihen: ["M4 4h12", "M4 8h12", "M4 12h8", "M4 16h5", "M14 13l2 2 3-3.5"],
   waage: ["M10 3v13", "M6 17h8", "M3 6h14", "M5 6l-2.5 5h5z", "M15 6l-2.5 5h5z"],
   rennen: ["M3 13l1.5-4.5A2 2 0 016.4 7h7.2a2 2 0 011.9 1.5L17 13", "M2.5 13h15v3h-15z", "M5.5 16v1.5M14.5 16v1.5", "M6 13.2h.01M14 13.2h.01"],
   tafel: ["M3 4h14v10H3z", "M7 8h6", "M7 11h4", "M8 17l2-3 2 3"],
@@ -675,51 +678,66 @@ export const popoverPanel = {
 };
 
 // Aufklappmenü an einem Knopf. Die Ausrichtung (links/rechts/mittig) ist nur
-// der Wunsch — nach dem Öffnen schiebt sich das Panel in den sichtbaren
-// Bereich zurück. Auf dem Handy hing ein Menü sonst halb außerhalb, je nachdem
-// wo sein Knopf stand. Der Elternknoten braucht position: relative.
+// der Wunsch: das Panel steht FEST im Fenster (`position: fixed`, nicht absolut im Elternknoten) und
+// wird nach dem Öffnen in den sichtbaren Bereich gerückt — waagerecht an den Rand geklemmt, senkrecht
+// unter dem Knopf oder, wenn dort kein Platz ist, darüber; reicht beides nicht, wird es scrollbar.
+//
+// Warum fest: ein Menü in einer Karte mit `overflow: hidden` (abgerundete Ecken!) wurde am Kartenrand
+// abgeschnitten — gemeldet an den Import-Menüs der Fragenliste. Fixierte Elemente schneidet `overflow`
+// nicht ab. Der Elternknoten bleibt der Anker (er braucht kein `position: relative` mehr, schadet aber nicht).
+//
+// Gemessen statt gerechnet: #root ist gezoomt (index.html) und ein Vorfahr kann transformiert sein —
+// beides verschiebt `fixed`. Deshalb wird nach dem Setzen die tatsächliche Lage gelesen und der
+// Unterschied ausgeglichen.
 export function Popover({ align = "left", style, children, ...rest }) {
   const ref = useRef(null);
-  const basis = align === "center" ? "translateX(-50%)" : "";
+  // Die Lage bestimmt das Menü selbst: alte Aufrufer gaben top/left/right für die absolute Lage mit.
+  // Hier würden sie das feste Layout verzerren (links UND rechts gesetzt = über die ganze Breite gezogen).
+  const { top: _t, left: _l, right: _r, bottom: _b, ...stilOhneLage } = style || {};
+  const basisMax = stilOhneLage.maxHeight != null ? (typeof stilOhneLage.maxHeight === "number" ? `${stilOhneLage.maxHeight}px` : stilOhneLage.maxHeight) : "";
+  const basisUeber = stilOhneLage.overflowY ?? stilOhneLage.overflow ?? "";
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
-    // Naechster waagerecht scrollbarer Vorfahre — in einer breiten Tabelle wird
-    // dort abgeschnitten, nicht am Fensterrand.
-    const scrollElter = () => {
-      for (let p = el.parentElement; p; p = p.parentElement) {
-        const o = getComputedStyle(p).overflowX;
-        if ((o === "auto" || o === "scroll") && p.scrollWidth > p.clientWidth + 1) return p;
-      }
-      return null;
+    const anker = el && el.parentElement;
+    if (!el || !anker) return undefined;
+    const rand = 12;
+    const platzieren = () => {
+      const a = anker.getBoundingClientRect();
+      // Natürliche Größe messen: Begrenzungen aus dem letzten Durchlauf zurücknehmen.
+      el.style.maxHeight = basisMax; el.style.overflowY = basisUeber;
+      el.style.left = "0px"; el.style.top = "0px";
+      const g = el.getBoundingClientRect();
+      const w = g.width, h = g.height;
+      // Sichtbare Pixel / CSS-Pixel: #root ist gezoomt, `maxHeight` gilt aber in CSS-Pixeln.
+      const zoom0 = el.offsetWidth ? g.width / el.offsetWidth : 1;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      let links = align === "right" ? a.right - w : align === "center" ? a.left + a.width / 2 - w / 2 : a.left;
+      links = Math.max(rand, Math.min(links, vw - rand - w));
+      const unten = a.bottom + 6, platzUnten = vh - rand - unten;
+      const platzOben = a.top - 6 - rand;
+      let oben;
+      if (h <= platzUnten) oben = unten;
+      else if (h <= platzOben) oben = a.top - 6 - h;
+      else if (platzUnten >= platzOben) { oben = unten; el.style.maxHeight = `${Math.max(120, platzUnten) / zoom0}px`; el.style.overflowY = "auto"; }
+      else { const m = Math.max(120, platzOben); oben = a.top - 6 - Math.min(h, m); el.style.maxHeight = `${m / zoom0}px`; el.style.overflowY = "auto"; }
+      // Erst setzen, dann lesen, dann den Rest ausgleichen (Zoom, transformierte Vorfahren).
+      el.style.left = `${links}px`; el.style.top = `${oben}px`;
+      const ist = el.getBoundingClientRect();
+      const zoom = (ist.width && el.offsetWidth) ? ist.width / el.offsetWidth : 1;
+      if (Math.abs(ist.left - links) > 0.5) el.style.left = `${links - (ist.left - links) / (zoom || 1)}px`;
+      if (Math.abs(ist.top - oben) > 0.5) el.style.top = `${oben - (ist.top - oben) / (zoom || 1)}px`;
     };
-    const schieben = () => {
-      el.style.transform = basis;
-      const rand = 12;
-      // Erst den Container mitziehen: ein Menue am rechten Rand einer breiten
-      // Tabelle stand sonst halb ausserhalb — verschoben werden soll die
-      // Tabelle, nicht das Menue aus seiner Zelle heraus.
-      const box = scrollElter();
-      if (box) {
-        const r0 = el.getBoundingClientRect(), c = box.getBoundingClientRect();
-        let ds = 0;
-        if (r0.right > c.right - rand) ds = r0.right - (c.right - rand);
-        else if (r0.left < c.left + rand) ds = r0.left - (c.left + rand);
-        if (ds) box.scrollLeft += ds;
-      }
-      const r = el.getBoundingClientRect();
-      let dx = 0;
-      if (r.right > window.innerWidth - rand) dx = window.innerWidth - rand - r.right;
-      if (r.left + dx < rand) dx = rand - r.left;
-      el.style.transform = dx ? `${basis} translateX(${dx}px)`.trim() : basis;
-    };
-    schieben();
-    window.addEventListener("resize", schieben);
-    return () => window.removeEventListener("resize", schieben);
+    platzieren();
+    const spaeter = () => platzieren();
+    window.addEventListener("resize", spaeter);
+    window.addEventListener("scroll", spaeter, true);   // auch in scrollenden Containern: das Menue folgt seinem Knopf
+    return () => { window.removeEventListener("resize", spaeter); window.removeEventListener("scroll", spaeter, true); };
   });
-  const pos = align === "center" ? { left: "50%", transform: basis } : { [align]: 0 };
   return (
-    <div ref={ref} data-nodrag style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", zIndex: 50, ...pos, ...style }} {...rest}>
+    <div ref={ref} data-nodrag style={{ ...popoverPanel, position: "fixed", left: 0, top: 0, zIndex: 50,
+      // Eigene Breite nach Inhalt, aber nicht ueber den ganzen Bildschirm: absolut im schmalen Knopf umbrachen
+      // lange Texte von selbst, fest im Fenster taten sie das nicht und das Menue wurde 600 px breit.
+      width: "max-content", maxWidth: "min(340px, calc(100vw - 24px))", ...stilOhneLage }} {...rest}>
       {children}
     </div>
   );
@@ -773,11 +791,12 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false, 
   if (!values || values.length < 3) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const q1 = quantileOf(sorted, 0.25), med = quantileOf(sorted, 0.5), q3 = quantileOf(sorted, 0.75);
-  const iqr = q3 - q1, loBound = q1 - 1.5 * iqr, hiBound = q3 + 1.5 * iqr;
-  const inliers = sorted.filter((v) => v >= loBound && v <= hiBound);
-  const lo = inliers.length ? inliers[0] : sorted[0];
-  const hi = inliers.length ? inliers[inliers.length - 1] : sorted[sorted.length - 1];
-  const outliers = sorted.filter((v) => v < loBound || v > hiBound);
+  // Klassischer Kastenplot (Lehrbuch): die Antennen reichen bis zum kleinsten und groessten Wert,
+  // es gibt keine „Ausreisser"-Punkte. Mit der 1,5-IQR-Regel wurde bei einer kleinen Klasse schon ein
+  // einzelner schwacher Wert als roter Punkt abgesetzt, und die Antenne endete ohne Beschriftung.
+  const lo = sorted[0];
+  const hi = sorted[sorted.length - 1];
+  const outliers = [];
   const roh = (v) => (max > 0 ? (v / max) * 100 : 0);
   const pct = (v) => (umgekehrt ? 100 - roh(v) : roh(v));
   // Ein Abschnitt von a bis b: links ist das kleinere Ende in BILDkoordinaten.
@@ -842,7 +861,8 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false, 
           rows[row] = x;
           return { lbl, v, x, row };
         });
-        const nRows = Math.max(1, rows.length);
+        // Mindestens zwei Zeilen: sonst springt die Hoehe beim Umschalten (% / Note), sobald eine Beschriftung in eine andere Zeile rutscht.
+        const nRows = Math.max(2, rows.length);
         return (
           <div style={{ position: "relative", height: nRows * 14 + 2, margin: "4px 20px 0", fontSize: 10.5, color: "var(--text3)" }}>
             {items.map((it, i) => (

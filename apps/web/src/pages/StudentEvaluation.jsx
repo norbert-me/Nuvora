@@ -68,7 +68,7 @@ export default function StudentEvaluation() {
 
       {/* Verlauf gegen die Klasse: dieselbe Auswertung wie auf der Startseite,
           hier nur fuer dieses Kind. Zeigt sich nichts, steht hier auch nichts. */}
-      <FruehwarnPanel classId={classId} nurKind={cardId} />
+      <FruehwarnPanel classId={classId} nurKind={cardId} nur="quiz" />
       {/* Themenstand dieses Kindes: was sitzt, was nicht, und wird es besser? */}
       <Themenstand classId={classId} cardId={cardId} />
       {/* Der Verlauf beider Quellen auf einer Achse — die Frage „wird es
@@ -107,7 +107,6 @@ export default function StudentEvaluation() {
         <thead>
           <tr style={{ borderBottom: "2px solid var(--border3)" }}>
             <th style={th}>{t("cv.thTest")}</th>
-            <th style={{ ...th, textAlign: "center" }}>{t("cv.thPoints")}</th>
             <th style={{ ...th, textAlign: "center" }}>%</th>
           </tr>
         </thead>
@@ -118,9 +117,6 @@ export default function StudentEvaluation() {
                 <Link to={r.link} style={{ color: "var(--accent)", textDecoration: "none" }}>
                   {r.name}
                 </Link>
-              </td>
-              <td style={{ ...tdStyle, textAlign: "center", fontWeight: 600 }}>
-                {r.present ? `${r.score} / ${r.total}` : "–"}
               </td>
               <td style={{
                 ...tdStyle, textAlign: "center", fontWeight: 700,

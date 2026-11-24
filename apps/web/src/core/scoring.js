@@ -60,7 +60,7 @@ export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, 
   // Wie zaehlen die Anforderungsfragen fuer ein G-Kind? „bonus" (Vorgabe),
   // „keine" (sie zaehlen gar nicht) oder „alle" (keine Unterscheidung).
   // Begruendung und Wortlaut siehe app/scoring.py — die Regel steht doppelt.
-  const modus = ["bonus", "keine", "alle"].includes(eModus) ? eModus : "bonus";
+  const modus = ["bonus", "ausgleich", "keine", "alle"].includes(eModus) ? eModus : "bonus";
   const differenziert = !!niveauAktiv && niveau !== "E" && modus !== "alle";
   const fehlt = new Set((gefehltTopics || []).map(Number).filter((x) => Number.isFinite(x)));
   const verpasst = (q) => fehlt.size > 0 && q.topic_id != null && fehlt.has(Number(q.topic_id));
@@ -90,7 +90,14 @@ export function bewerte(questions, answers, { niveau = "", niveauAktiv = false, 
   // mindestens zwei. Begruendung siehe app/scoring.py (die Regel steht doppelt
   // und muss zusammen geaendert werden).
   const netto = rg.falschZehrt ? Math.max(0, eRichtig - eFalsch) : eRichtig;
-  if (bonusFragen.length && netto >= 1) {
+  if (modus === "ausgleich") {
+    // Richtige Anforderungsfragen fuellen die Luecke der Basis auf, nie darueber
+    // (siehe app/scoring.py — die Regel steht doppelt).
+    let ePunkte = bonusFragen.filter(richtig).reduce((a, q) => a + gewicht(q.id), 0);
+    if (rg.falschZehrt) ePunkte -= bonusFragen.filter((q) => gegeben(q) && !richtig(q)).reduce((a, q) => a + gewicht(q.id), 0);
+    const ausgleich = Math.min(Math.max(0, baseMax - score), Math.max(0, ePunkte));
+    bonusPct = baseMax > 0 ? (ausgleich / baseMax) * 100 : 0;
+  } else if (bonusFragen.length && netto >= 1) {
     bonusPct = Math.min(1, netto / Math.max(bonusFragen.length, rg.mindestNenner)) * rg.maxStufen * naechsteStufe(basePct, s);
   }
 

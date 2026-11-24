@@ -57,7 +57,8 @@ async def get_active_sessions(user: User = Depends(get_current_user), db: AsyncS
     sessions = result.scalars().all()
     out = []
     for s in sessions:
-        item = {"id": s.id, "code": s.code, "name": s.name, "class_id": s.class_id, "question_set_id": s.question_set_id, "current_question_id": s.current_question_id, "mode": s.mode}
+        item = {"id": s.id, "code": s.code, "name": s.name, "class_id": s.class_id, "question_set_id": s.question_set_id, "current_question_id": s.current_question_id, "mode": s.mode,
+                "question_layout": s.question_layout}
         if s.class_id:
             cls = await db.get(SchoolClass, s.class_id)
             item["class_name"] = cls.name if cls else None
@@ -166,6 +167,40 @@ class QuestionMapIn(RootModel[Dict[str, Optional[str]]]):
         return v
 
 
+class QuestionLayoutIn(RootModel[List[dict]]):
+    """Gezeigte Reihenfolge: je Frage {id, choices, choice_images, correct_answer}
+    in der Reihenfolge der Sitzung. Nur Form und Groesse werden geprueft."""
+
+    @field_validator("root")
+    @classmethod
+    def form_ok(cls, v):
+        if len(v) > 1000:
+            raise ValueError("zu viele Fragen (max. 1000)")
+        sauber = []
+        for e in v:
+            if not isinstance(e.get("id"), int):
+                raise ValueError("Jede Frage braucht eine id")
+            ch = e.get("choices")
+            if ch is not None and (not isinstance(ch, dict) or len(ch) > 6
+                                   or any(not isinstance(k, str) or len(k) > 2 for k in ch)):
+                raise ValueError("Antworten ungültig")
+            sauber.append({"id": e["id"],
+                           "choices": {k: (str(w)[:1000] if w is not None else None) for k, w in (ch or {}).items()},
+                           "choice_images": ({k: str(w)[:500] for k, w in e["choice_images"].items()}
+                                             if isinstance(e.get("choice_images"), dict) else None),
+                           "correct_answer": (str(e["correct_answer"])[:20] if e.get("correct_answer") is not None else None)})
+        return sauber
+
+
+@router.put("/{session_id}/question-layout")
+async def save_question_layout(session_id: int, body: list, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Merkt die gezeigte Reihenfolge, damit „Fortsetzen“ dieselbe zeigt."""
+    s = await nur_eigenes(db, Session, session_id, user)
+    s.question_layout = geprueft(QuestionLayoutIn, body, "Reihenfolge").model_dump()
+    await db.commit()
+    return {"ok": True}
+
+
 @router.put("/{session_id}/question-map")
 async def save_question_map(session_id: int, body: dict, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """`body: dict` in der Signatur ist Absicht — siehe app/importe.py."""
@@ -178,7 +213,7 @@ async def save_question_map(session_id: int, body: dict, user: User = Depends(ge
 @router.get("/{session_id}")
 async def get_session(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     s = await oder_403(db, Session, session_id, user)
-    out = {"id": s.id, "code": s.code, "name": s.name, "class_id": s.class_id, "question_set_id": s.question_set_id, "current_question_id": s.current_question_id, "status": s.status, "archived": s.archived}
+    out = {"id": s.id, "code": s.code, "name": s.name, "class_id": s.class_id, "question_set_id": s.question_set_id, "current_question_id": s.current_question_id, "status": s.status, "archived": s.archived, "question_layout": s.question_layout}
     if s.class_id:
         cls = await db.get(SchoolClass, s.class_id)
         out["class_name"] = cls.name if cls else None
@@ -247,6 +282,32 @@ async def get_eval_config(session_id: int, user: User = Depends(get_current_user
     return s.eval_config or {}
 
 
+class KursIn(BaseModel):
+    kurs_id: Optional[int] = None
+
+
+@router.put("/{session_id}/kurs")
+async def session_kurs(session_id: int, body: KursIn, user: User = Depends(get_current_user),
+                       db: AsyncSession = Depends(get_db)):
+    """Die Session nachtraeglich einem anderen Kurs DERSELBEN Klasse zuweisen.
+
+    Dieselbe Klasse sitzt oft in mehreren Kursen (Mathe, Lernzeit …); ein Test
+    wird im falschen angelegt, und die Noten landeten im falschen Notenbuch.
+    Erlaubt sind nur Kurse, in denen die Klasse Mitglied ist; leer = zurueck auf
+    den Kurs der Klasse."""
+    from ..kursmitglieder import class_kurs_ids
+    from ..models import Kurs
+    s = await nur_eigenes(db, Session, session_id, user)
+    if body.kurs_id is not None:
+        erlaubt = await class_kurs_ids(db, s.class_id) if s.class_id else set()
+        k = await db.get(Kurs, body.kurs_id)
+        if not k or k.owner_id != user.id or k.id not in erlaubt:
+            raise HTTPException(400, "Dieser Kurs gehört nicht zur Klasse der Session")
+    s.kurs_id = body.kurs_id
+    await db.commit()
+    return {"kurs_id": s.kurs_id}
+
+
 class EvalConfigIn(BaseModel):
     """Auswertungs-Einstellungen einer Session.
 
@@ -257,6 +318,9 @@ class EvalConfigIn(BaseModel):
     wie "eins" ergab dort einen HTTP 500, und zwar erst beim Export, nicht beim
     Speichern."""
     weights: Optional[Dict[str, float]] = None
+    # Fragen, die in DIESER Auswertung nicht zaehlen (z. B. nie gestellt, weil der
+    # Versuch abbrach): fehlende Antworten waeren sonst fuer alle „falsch".
+    ausgeschlossen: Optional[List[int]] = None
     grade_scale: Optional[Dict[str, float]] = None
     krank: Optional[List[Union[int, str]]] = None
     anwesend: Optional[List[Union[int, str]]] = None
@@ -265,7 +329,10 @@ class EvalConfigIn(BaseModel):
     # Wie zaehlen Anforderungsfragen fuer ein Kind im G-Kurs? Siehe
     # app/scoring.e_modus_von — Unbekanntes gilt dort als "bonus", deshalb
     # genuegt hier die Form.
-    e_modus: Optional[Literal["bonus", "keine", "alle"]] = None
+    e_modus: Optional[Literal["bonus", "ausgleich", "keine", "alle"]] = None
+    # Diese Auswertung zaehlt nicht als Note (Rueckmeldung ohne Note, auch fuer
+    # die Kinder). Gilt zusaetzlich zum Schalter am Quiz (`question_sets.unbenotet`).
+    unbenotet: Optional[bool] = None
     model_config = {"extra": "allow"}
 
     @field_validator("grade_scale")

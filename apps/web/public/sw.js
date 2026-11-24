@@ -156,6 +156,41 @@ async function apiAntwort(request) {
   return ausCache(gecacht);
 }
 
+// Seiten (HTML) und die Lernpfad-Statik: netzwerk-first MIT Zeitlimit.
+//
+// Vorher antwortete der Vorrat nur, wenn der Abruf mit einem FEHLER endete. Bei einer kurzen
+// Unterbrechung des Internets (WLAN steht, die Leitung dahinter nicht) kommt aber gar kein
+// Fehler: die Anfrage haengt, bis der Browser nach einer halben Minute aufgibt — und so lange
+// oeffnete sich die Seite nicht, obwohl die ganze Huelle im Cache lag. Jetzt antwortet nach
+// SEITEN_WARTEN_MS der Vorrat (die genaue Seite, sonst die Huelle), waehrend der Abruf im
+// Hintergrund weiterlaeuft und den Cache fuer den naechsten Aufruf auffrischt. Ohne Vorrat wird
+// regulaer gewartet — eine weisse Seite waere schlechter als eine langsame.
+const SEITEN_WARTEN_MS = 3000;
+
+async function seitenAntwort(request, mitHuelle) {
+  const cache = await caches.open(CACHE_NAME);
+  const netz = fetch(request).then((res) => {
+    if (res.ok) cache.put(request, res.clone());
+    return res;
+  });
+  netz.catch(() => {});            // laeuft auch nach dem Zeitlimit zu Ende; die Ablehnung ist erwartet
+  const vorrat = async () => (await cache.match(request)) || (mitHuelle ? await cache.match("/index.html") : undefined);
+  // Der Browser weiss es schon: ohne Verbindung gar nicht erst warten.
+  if (self.navigator && self.navigator.onLine === false) {
+    const alt = await vorrat();
+    if (alt) return alt;
+    return netz;
+  }
+  const bremse = new Promise((fertig) => setTimeout(() => fertig(null), SEITEN_WARTEN_MS));
+  try {
+    const zuerst = await Promise.race([netz, bremse]);
+    if (zuerst) return zuerst;
+  } catch { /* Netzfehler: unten der Vorrat */ }
+  const alt = await vorrat();
+  if (alt) return alt;
+  return netz;                     // kein Vorrat: den Abruf zu Ende warten (oder ehrlich scheitern lassen)
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
@@ -218,23 +253,11 @@ self.addEventListener("fetch", (event) => {
   // Asset-Dateinamen; ein gecachtes altes index.html würde sie nie laden).
   const isNavigation = event.request.mode === "navigate" || url.pathname === "/" || url.pathname.endsWith(".html");
   if (isNavigation) {
-    event.respondWith(
-      fetch(event.request)
-        .then((res) => {
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
-          }
-          return res;
-        })
-        // Offline: erst die genaue Adresse aus dem Cache, sonst die Shell.
-        // Ohne den zweiten Schritt lief jede Adresse, die online nie besucht
-        // wurde (Deep-Link auf /cardvote o.ae.), in respondWith(undefined) und
-        // damit in einen Netzwerkfehler — weisses Fenster statt App. Nuvora ist
-        // eine SPA: index.html kann jede Route rendern, das Routing macht der
-        // Client. Cache-Schluessel der Shell ist "/index.html" (STATIC_ASSETS).
-        .catch(() => caches.match(event.request).then((r) => r || caches.match("/index.html")))
-    );
+    // Offline oder zu langsam: erst die genaue Adresse aus dem Cache, sonst die Shell. Nuvora ist
+    // eine SPA — index.html kann jede Route rendern, das Routing macht der Client (Cache-Schluessel
+    // der Shell ist "/index.html", siehe STATIC_ASSETS). Ohne die Rueckfallstufe lief jede online nie
+    // besuchte Adresse (Deep-Link auf /cardvote o.ae.) in ein weisses Fenster.
+    event.respondWith(seitenAntwort(event.request, true));
     return;
   }
 
@@ -244,17 +267,7 @@ self.addEventListener("fetch", (event) => {
   // frisch ausgelieferte Aenderung im Lernpfad "gleich aus". Also
   // netzwerk-first mit Cache als Offline-Rueckfall, wie bei der Navigation.
   if (url.pathname.startsWith("/lp/")) {
-    event.respondWith(
-      fetch(event.request)
-        .then((res) => {
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
-          }
-          return res;
-        })
-        .catch(() => caches.match(event.request).then((c) => c || Response.error()))
-    );
+    event.respondWith(seitenAntwort(event.request, false));
     return;
   }
 

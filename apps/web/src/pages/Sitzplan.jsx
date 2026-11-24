@@ -4,6 +4,7 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import { cardStyle, chipStyle, panelStyle, sectionLabel, Segment, segmentBtn, toolbarBtn, Icon, ICONS, toolbarIconBtn, CONTROL_R, SHADOW, dateiWaehlen, COLORS as C, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import { useKurzName } from "../core/namen.js";
 import { useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
@@ -82,6 +83,7 @@ export default function Sitzplan() {
   // Knoepfe auf 108 px Breite, davon zwei mit sehr verschiedenen Folgen.
   // Bewusst ein FELD und kein „nach aussen ziehen" — die Flaeche waechst nach
   // unten und rechts, „draussen" ist dort also ein gueltiger Platz.
+  const kurz = useKurzName();
   const [ziehtPlatz, setZiehtPlatz] = useState(false);
   const [namenVoll, setNamenVoll] = useState(false);   // Namen ganz zeigen (Schrift schrumpft) statt mit „…" kuerzen
   const [ueberMuell, setUeberMuell] = useState(false);
@@ -817,6 +819,7 @@ export default function Sitzplan() {
         links={<KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />}
         ansicht={(
           <ViewMenu title={t("sitzplan.view")} items={[
+            { key: "kurzname", label: t("namen.kuerzen"), hint: t("namen.kuerzenHint"), value: kurz.an, onChange: kurz.umschalten },
             { key: "namenVoll", label: t("sitzplan.namenVoll"), hint: t("sitzplan.namenVollHint"), value: namenVoll, onChange: (v) => { setNamenVoll(v); saveView({ namenVoll: v }); } },
             { key: "fotos", label: t("sitzplan.photoToggle"), hint: t("sitzplan.photoHint"), value: fotosOn, onChange: (v) => { setFotosOn(v); saveView({ fotos: v }); } },
             ...(segelTeil ? [{ key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } }] : []),
@@ -1029,7 +1032,7 @@ export default function Sitzplan() {
                       <Icon d={ICONS.rotate} size={11} />
                     </span>
                   </span>
-                  <span title={seat.empty ? t("sitzplan.emptySeat") : s.name}
+                  <span title={seat.empty ? t("sitzplan.emptySeat") : kurz.name(s.name)}
                     style={{ height: NAME_H, display: "flex", alignItems: "center", justifyContent: "center",
                       padding: "0 6px", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: namenVoll ? "clip" : "ellipsis",
                       // Ganzer Name: die Schrift schrumpft mit der Laenge, statt dass
@@ -1055,7 +1058,7 @@ export default function Sitzplan() {
                 <div key={s.id} draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", String(s.id))}
                   style={{ ...chipStyle, padding: "8px 12px", border: "1px solid var(--border2)", background: "var(--card)", color: "var(--text)", fontSize: 13, cursor: "grab", display: "inline-flex", alignItems: "center", gap: 8 }}>
                   {fotosOn && <Portrait student={s} size={22} />}
-                  {s.name}
+                  {kurz.name(s.name)}
                 </div>
               ))}
             </div>

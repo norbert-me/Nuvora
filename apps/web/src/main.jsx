@@ -335,6 +335,7 @@ const Help = React.lazy(() => import("./pages/Help.jsx"));
 const Modules = React.lazy(() => import("./pages/Modules.jsx"));
 const Topics = React.lazy(() => import("./pages/Topics.jsx"));
 const Papierkorb = React.lazy(() => import("./pages/Papierkorb.jsx"));
+const Wiederherstellung = React.lazy(() => import("./pages/Wiederherstellung.jsx"));
 // Sicherungen: Serververwaltung, KEIN Modul — deshalb kein REGISTRY-Eintrag
 // und kein ModuleGate, sondern nur fuer die Administration (Nutzer-ID 1),
 // genau wie der Administrationsteil in /profile.
@@ -357,11 +358,13 @@ const KlassenarbeitVergleich = React.lazy(() => import("./pages/Klassenarbeit.js
 const Notizbrett = React.lazy(() => import("./pages/Notizbrett.jsx"));
 const Mathefussball = React.lazy(() => import("./pages/Mathefussball.jsx"));
 const Koerper = React.lazy(() => import("./pages/Koerper.jsx"));
+const Zahlenstrahl = React.lazy(() => import("./pages/Zahlenstrahl.jsx"));
 const Tafel = React.lazy(() => import("./pages/Tafel.jsx"));
 const Pap = React.lazy(() => import("./pages/Pap.jsx"));
 const Personen = React.lazy(() => import("./pages/Personen.jsx"));
 const PapFrei = React.lazy(() => import("./pages/PapFrei.jsx"));
 const Waage = React.lazy(() => import("./pages/Waage.jsx"));
+const Reihen = React.lazy(() => import("./pages/Reihen.jsx"));
 const WaageFrei = React.lazy(() => import("./pages/WaageFrei.jsx"));
 const Rennen = React.lazy(() => import("./pages/Rennen.jsx"));
 const NichtGefunden = React.lazy(() => import("./pages/NichtGefunden.jsx"));
@@ -428,9 +431,11 @@ function helpArea(pathname) {
   if (pathname === "/pap" || pathname.startsWith("/pap/")) return "pap";
   if (pathname.startsWith("/mathespiele")) return "mathespiele";
   if (pathname.startsWith("/koerper")) return "koerper";
+  if (pathname.startsWith("/zahlenstrahl")) return "zahlenstrahl";
   // Nicht startsWith("/waage") — das faengt auch /waage-frei (oeffentlich).
   if (pathname === "/waage" || pathname.startsWith("/waage/")) return "waage";
   if (pathname.startsWith("/rennen")) return "rennen";
+  if (pathname.startsWith("/reihen")) return "reihen";
   return "core";
 }
 const LP = "/lernpfad";
@@ -445,7 +450,9 @@ const NOTIZBRETT = "/notizbrett";
 const PAP = "/pap";
 const MATHEF = "/mathespiele";
 const KOERPER = "/koerper";
+const ZAHLENSTRAHL = "/zahlenstrahl";
 const WAAGE = "/waage";
+const REIHEN = "/reihen";
 const RENNEN = "/rennen";
 const TAFEL = "/tafel";
 
@@ -466,8 +473,10 @@ const getModuleNavItems = (t, location, user) => {
     : pathname.startsWith(NOTIZBRETT) ? "notizbrett"
     : pathname.startsWith(MATHEF) ? "mathespiele"
     : pathname.startsWith(KOERPER) ? "koerper"
+    : pathname.startsWith(ZAHLENSTRAHL) ? "zahlenstrahl"
     : (pathname === WAAGE || pathname.startsWith(`${WAAGE}/`)) ? "waage"
     : pathname.startsWith(RENNEN) ? "rennen"
+    : pathname.startsWith(REIHEN) ? "reihen"
     : pathname.startsWith(TAFEL) ? "tafel"
     // Nicht startsWith("/pap") — das faengt auch /papierkorb (Kern).
     : (pathname === PAP || pathname.startsWith(`${PAP}?`) || pathname.startsWith(`${PAP}/`)) ? "pap"
@@ -540,6 +549,7 @@ const getModuleNavItems = (t, location, user) => {
   }
   if (area === "mathespiele") return [{ to: MATHEF, label: t("mathefussball.title") }];
   if (area === "koerper") return [{ to: KOERPER, label: t("koerper.title") }];
+  if (area === "zahlenstrahl") return [{ to: ZAHLENSTRAHL, label: t("zahlenstrahl.title") }];
   if (area === "rennen") return [{ to: RENNEN, label: t("rennen.titel") }];
   if (area === "waage") {
     const cur = params.get("tab");
@@ -548,6 +558,7 @@ const getModuleNavItems = (t, location, user) => {
       { to: `${WAAGE}?tab=aufgaben`, label: t("waage.tabAufgaben"), active: cur === "aufgaben" },
     ];
   }
+  if (area === "reihen") return [{ to: REIHEN, label: t("reihen.title") }];
   if (area === "tafel") return [{ to: TAFEL, label: t("tafel.title") }];
   if (area === "pap") {
     const cur = params.get("tab");
@@ -1117,14 +1128,14 @@ function ContentWrapper({ children }) {
   // einheitlich zentriert — dieselbe Spaltenbreite auf jeder Seite, damit die
   // Oberflaeche nicht je Modul anders links klebt.
   const isSession = p.startsWith("/session") || p.startsWith("/cardvote/session");
-  if (isSession) return <div style={{ padding: "24px 16px 64px" }}>{children}</div>;
+  if (isSession) return <div style={{ padding: "24px 16px 64px", flex: "1 0 auto" }}>{children}</div>;
   // Code-Detektiv laeuft ohne Nuvora-Navbar im Vollbild — kein Padding, keine
   // Spaltenbreite, damit das Spiel den ganzen Platz nutzt.
   if (p.startsWith(CD)) return children;
   return (
     <>
       <style>{`@media (max-width: 640px) { .content-wrap { padding: 16px 12px 64px !important; } }`}</style>
-      <div className="content-wrap" style={{ padding: "32px 32px 64px", maxWidth: 1080, margin: "0 auto" }}>{children}</div>
+      <div className="content-wrap" style={{ padding: "32px 32px 64px", maxWidth: 1080, margin: "0 auto", width: "100%", flex: "1 0 auto" }}>{children}</div>
     </>
   );
 }
@@ -1139,11 +1150,17 @@ function FirstRun({ user }) {
 
   React.useEffect(() => {
     if (!user) return;
-    try { if (!localStorage.getItem(key)) setShow(true); } catch { /* egal */ }
+    // Gesehen steht am KONTO (tours_done), nicht nur im Browser: sonst kam das
+    // Willkommen in jedem weiteren Browser und nach jedem geleerten Speicher wieder.
+    if ((user.tours_done || []).includes("willkommen")) return;
+    try { if (!localStorage.getItem(key)) setShow(true); } catch { setShow(true); }
   }, [user, key]);
 
   const done = (go) => {
     try { localStorage.setItem(key, "1"); } catch { /* egal */ }
+    fetch("/api/auth/tour-done", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tour: "willkommen" }),
+    }).catch(() => { /* offline: der localStorage-Eintrag reicht bis zum naechsten Mal */ });
     setShow(false);
     if (go) navigate(go);
   };
@@ -1200,6 +1217,7 @@ function AppRoutes({ user, setUser, logout }) {
           {/* Kern: ein Kind ueber alle Kurse hinweg (Personen-Ebene). */}
           <Route path="/personen" element={user ? <Personen /> : <Landing />} />
           <Route path="/papierkorb" element={user ? <Papierkorb /> : <Landing />} />
+          <Route path="/wiederherstellung" element={user ? <Wiederherstellung /> : <Landing />} />
           {/* Der Navigationspunkt war bereits auf die Administration beschraenkt,
               die Route nicht: jede Lehrkraft sah eine Seite voller Absagen der
               API. Dieselbe Quelle (`istAdmin`) entscheidet jetzt beides. */}
@@ -1225,7 +1243,9 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={NOTIZBRETT} element={user ? <ModuleGate moduleKey="notizbrett"><Notizbrett /></ModuleGate> : <Landing />} />
           <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathespiele"><Mathefussball /></ModuleGate> : <Landing />} />
           <Route path={KOERPER} element={user ? <ModuleGate moduleKey="koerper"><Koerper /></ModuleGate> : <Landing />} />
+          <Route path={ZAHLENSTRAHL} element={user ? <ModuleGate moduleKey="zahlenstrahl"><Zahlenstrahl /></ModuleGate> : <Landing />} />
           <Route path={WAAGE} element={user ? <ModuleGate moduleKey="waage"><Waage /></ModuleGate> : <Landing />} />
+          <Route path={REIHEN} element={user ? <ModuleGate moduleKey="reihen"><Reihen /></ModuleGate> : <Landing />} />
           <Route path={RENNEN} element={user ? <ModuleGate moduleKey="rennen"><Rennen /></ModuleGate> : <Landing />} />
           <Route path={TAFEL} element={user ? <ModuleGate moduleKey="tafel"><Tafel /></ModuleGate> : <Landing />} />
           <Route path={PAP} element={user ? <ModuleGate moduleKey="pap"><Pap /></ModuleGate> : <Landing />} />

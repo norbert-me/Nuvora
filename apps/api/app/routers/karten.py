@@ -213,6 +213,11 @@ async def _class_all_decks_where(db, class_id):
     return CardDeck.class_id == class_id
 
 
+def _stapel_des_kurses(kurs_id):
+    """Stapel EINES Kurses: ihm zugewiesen — oder (noch ohne Zuweisung) von ihm herkommend."""
+    return or_(_zugewiesen([kurs_id]), and_(_ohne_zuweisung(), CardDeck.kurs_id == kurs_id))
+
+
 async def _student_kurs_alle(db, st) -> set:
     """Alle Kurse des Kindes, auch die mit abgeschalteten Karteikarten."""
     return set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id)
@@ -1357,7 +1362,7 @@ async def progress(class_id: int, kurs_id: Optional[int] = None, user: User = De
 
 
 async def themen_lernstand(db: AsyncSession, user: User, class_id: int, students,
-                           jetzt: Optional[datetime] = None) -> dict:
+                           jetzt: Optional[datetime] = None, kurs_id: Optional[int] = None) -> dict:
     """Kartenstand je Kind und Thema — die Kartenquelle des Themenstands.
 
     Kein Endpunkt, sondern eine Auskunft für `themenprofil` (Kern). Die
@@ -1368,6 +1373,9 @@ async def themen_lernstand(db: AsyncSession, user: User, class_id: int, students
 
     - nur ausgerollte, nicht gelöschte Stapel MIT Thema (ein Entwurf ist für
       niemanden fällig, ein Stapel ohne Thema gehört in keine Themenzeile),
+    - mit `kurs_id` nur die Stapel DIESES Kurses: dieselbe Klasse liegt oft in
+      mehreren Kursen (7.5 Mathe und 7.5 LZ), und Karteikarten, die nur in Mathe
+      geübt werden, gehören nicht in den Themenstand der LZ,
     - E/G auf beiden Ebenen (`_sichtbar_karte`) — ein G-Kind darf sich keinen
       Rückstand an E-Karten anrechnen lassen, die es nie zu sehen bekommt,
     - `Treffer = reps`, `Versuche = reps + lapses`. NICHT nach `reps > 0`
@@ -1387,7 +1395,7 @@ async def themen_lernstand(db: AsyncSession, user: User, class_id: int, students
         select(Card.id, Card.niveau, CardDeck.niveau, CardDeck.niveau_aktiv, CardDeck.topic_id)
         .join(CardDeck, Card.deck_id == CardDeck.id)
         .where(CardDeck.owner_id == user.id,
-               await _class_all_decks_where(db, class_id),
+               (_stapel_des_kurses(kurs_id) if kurs_id else await _class_all_decks_where(db, class_id)),
                CardDeck.topic_id.is_not(None),
                CardDeck.deleted_at.is_(None),
                CardDeck.released_at.is_not(None), CardDeck.released_at <= now,
@@ -1772,11 +1780,33 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
             "date": sess.created_at.isoformat() if sess.created_at else None,
             "score": r["punkte"], "total": r["max"], "pct": r["pct"],
             "note": r["note_tendenz"],
+            "unbenotet": bool(r.get("unbenotet")),
+            "le": bool(r.get("le")),
             # Was das Kind aus der Zahl machen soll — ohne das ist eine Prozent-
             # angabe nur eine Zahl. Kein Vergleich mit der Klasse.
-            "sass": r["sass"], "offen": r["offen"],
+            "sass": r["sass"], "offen": r["offen"], "themen": r.get("themen", []),
         })
     return out
+
+
+def _kurs_ohne_klasse(kurs, klassenname: str = "") -> str:
+    """„7.5 Mathematik" -> „Mathematik": die Klasse kennen die Kinder selbst.
+
+    Das Fach des Kurses gilt zuerst; ohne Fach wird eine fuehrende Klassenbezeichnung
+    („7.5", „7a", „10b") vom Namen abgeschnitten — gleich, ob sie der Klassenname ist
+    oder nur so aussieht. Bleibt nichts uebrig, gilt der ganze Name."""
+    import re
+    fach = (kurs.fach or "").strip()
+    if fach:
+        return fach
+    name = (kurs.name or "").strip()
+    kn = (klassenname or "").strip()
+    if kn and name.lower().startswith(kn.lower()):
+        rest = name[len(kn):].strip(" -–—:·")
+        if rest:
+            return rest
+    rest = re.sub(r"^\d{1,2}(?:[.,]\d+)?[a-zA-Z]?\s*[-–—:·]?\s*", "", name).strip()
+    return rest or name
 
 
 @router.get("/lernen/{token}/aktuelle-note")
@@ -1797,12 +1827,15 @@ async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
     # Eine Note je Kurs des Kindes (Mathe, Deutsch …); Bestand ohne Kurs zaehlt als ein Eintrag.
     kurs_ids = sorted(set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id))
     kurse = {k.id: k for k in (await db.execute(select(Kurs).where(Kurs.id.in_(kurs_ids), Kurs.deleted_at.is_(None)))).scalars().all()} if kurs_ids else {}
-    ziele = [(kid, kurse[kid].name) for kid in kurs_ids if kid in kurse] or [(None, "")]
+    klasse = await db.get(SchoolClass, st.class_id)
+    ziele = [(kid, _kurs_ohne_klasse(kurse[kid], klasse.name if klasse else "")) for kid in kurs_ids if kid in kurse] or [(None, "")]
     out = []
     for kid, name in ziele:
         for term in termine:
             secs, rows = await _summarize(db, owner, st.class_id, term, agg="mean", kurs_id=kid)
             r = next((x for x in rows if x.student_id == st.id), None)
+            if r is not None and getattr(r, "le", False):
+                continue          # LE: keine Note — das Kind sieht nur den Hinweis
             wert = (r.total_override if r.total_override is not None else r.weighted) if r else None
             if wert is not None:
                 # Verlauf: die Spaltennoten in Zeitreihenfolge (Datum der Leistung, sonst Anlage).
@@ -1810,8 +1843,13 @@ async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
                     GradeCategory.section_id.in_([x.id for x in secs])))).scalars().all() if secs else []
                 cats.sort(key=lambda c: (str(c.date)[:10] if c.date else (c.created_at.date().isoformat() if c.created_at else ""), c.id))
                 reihe = [r.per_category.get(str(c.id)) for c in cats]
+                # Die Teilnoten sind die BEREICHSNOTEN („Mündlich", „Klassenarbeiten") — nicht
+                # die einzelnen Spaltennoten: das waere fuer ein Kind eine Wand aus Zahlen.
+                teil = [{"name": sec.name, "note": note_label(v), "wert": round(v, 1), "gewicht": round(sec.weight or 0)}
+                        for sec in secs
+                        if (v := (r.section_effective or {}).get(str(sec.id))) is not None]
                 out.append({"kurs": name, "note": note_label(wert), "wert": round(wert, 1), "halbjahr": term,
-                            "trend": noten_trend(reihe)})
+                            "trend": noten_trend(reihe), "teilnoten": teil})
                 break
     return out
 

@@ -27,6 +27,9 @@ import pytest_asyncio
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+# Die personenbezogenen Spalten sind verschluesselt (app/krypto.py): ohne Schluessel
+# laesst sich nicht einmal ein Schueler anlegen. Fester Schluessel NUR fuer Tests.
+os.environ.setdefault("NUVORA_DATENSCHLUESSEL", "bnV2b3JhLXRlc3Qta2V5LW9ubHktZm9yLXRlc3RzISE=")
 os.environ.setdefault("NUVORA_UPLOAD_DIR", tempfile.mkdtemp(prefix="nuvora-test-uploads-"))
 
 from app.models import Base  # noqa: E402 — erst nach der Umleitung importierbar
@@ -61,3 +64,19 @@ async def session(s):
 async def db(s):
     """Dieselbe Sitzung wie `s`, unter dem Namen, den diese Dateien benutzen."""
     return s
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _caldav_anmeldungen_leeren():
+    """Der Anmelde-Zwischenspeicher des CalDAV-Servers lebt im Arbeitsspeicher
+    und gilt je Prozess — ein Test darf nicht von der Anmeldung eines anderen
+    zehren (gleiche Kopfzeile, andere Datenbank)."""
+    try:
+        from app.routers import caldav as _c
+        _c._ANGEMELDET.clear()
+    except Exception:
+        pass
+    yield

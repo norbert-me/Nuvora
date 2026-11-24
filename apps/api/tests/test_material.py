@@ -38,7 +38,7 @@ async def _setup(s):
 @pytest.mark.asyncio
 async def test_upload_und_liste(s):
     u, tp = await _setup(s)
-    out = await M.upload_material(file=_upload("blatt.pdf", b"%PDF-1.4 data"), topic_id=tp.id, entry_id=None, method_id=None, work_id=None, rolle="", user=u, db=s)
+    out = await M.upload_material(file=_upload("blatt.pdf", b"%PDF-1.4 data"), topic_id=tp.id, entry_id=None, method_id=None, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
     assert out.filename == "blatt.pdf" and out.size == len(b"%PDF-1.4 data")
     lst = await M.list_material(topic_id=tp.id, user=u, db=s)
     assert len(lst) == 1 and lst[0].topic_id == tp.id
@@ -48,14 +48,14 @@ async def test_upload_und_liste(s):
 async def test_ohne_thema_und_stunde_verboten(s):
     u, tp = await _setup(s)
     with pytest.raises(HTTPException) as ei:
-        await M.upload_material(file=_upload("x.txt", b"x"), topic_id=None, entry_id=None, method_id=None, work_id=None, rolle="", user=u, db=s)
+        await M.upload_material(file=_upload("x.txt", b"x"), topic_id=None, entry_id=None, method_id=None, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
     assert ei.value.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_fremdes_material_unsichtbar(s):
     u, tp = await _setup(s)
-    await M.upload_material(file=_upload("geheim.pdf", b"data"), topic_id=tp.id, entry_id=None, method_id=None, work_id=None, rolle="", user=u, db=s)
+    await M.upload_material(file=_upload("geheim.pdf", b"data"), topic_id=tp.id, entry_id=None, method_id=None, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
     mid = (await s.execute(select(Material.id))).scalar_one()
 
     v = User(email="v@b.de", password_hash="x", name="V"); s.add(v); await s.commit()
@@ -80,9 +80,9 @@ async def test_material_am_einstieg(s):
     from app.models import Method
     u, _ = await _setup(s)
     m = Method(owner_id=u.id, title="Blitzlicht"); s.add(m); await s.commit()
-    out = await M.upload_material(file=_upload("ab.pdf", b"data"), topic_id=None, entry_id=None, method_id=m.id, work_id=None, rolle="", user=u, db=s)
+    out = await M.upload_material(file=_upload("ab.pdf", b"data"), topic_id=None, entry_id=None, method_id=m.id, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
     assert out.method_id == m.id
-    liste = await M.list_material(method_id=m.id, work_id=None, rolle="", user=u, db=s)
+    liste = await M.list_material(method_id=m.id, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
     assert [x.filename for x in liste] == ["ab.pdf"]
     # Einstieg loeschen -> Material bleibt, method_id genullt (ON DELETE SET NULL).
     await s.execute(sql_delete(Method).where(Method.id == m.id)); await s.commit()
@@ -100,7 +100,7 @@ async def test_zweiter_abruf_spart_die_bytes(s):
     """
     u, tp = await _setup(s)
     await M.upload_material(file=_upload("blatt.pdf", b"%PDF-1.4 " + b"x" * 500),
-                            topic_id=tp.id, entry_id=None, method_id=None, work_id=None, rolle="", user=u, db=s)
+                            topic_id=tp.id, entry_id=None, method_id=None, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
     mid = (await s.execute(select(Material.id))).scalar_one()
 
     erst = await M.download_material(mid, _Anfrage(), user=u, db=s)
@@ -131,7 +131,7 @@ async def test_kleines_pdf_bekommt_auch_eine_kennung(s):
     # durchreicht oder eine Office-Datei wandeln muss.
     await M.upload_material(file=UploadFile(filename="klein.pdf", file=io.BytesIO(b"%PDF-1.4 klein"),
                                             headers={"content-type": "application/pdf"}),
-                            topic_id=tp.id, entry_id=None, method_id=None, work_id=None, rolle="", user=u, db=s)
+                            topic_id=tp.id, entry_id=None, method_id=None, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
     mid = (await s.execute(select(Material.id))).scalar_one()
 
     erst = await M.material_als_pdf(mid, _Anfrage(), user=u, db=s)
@@ -161,9 +161,9 @@ async def test_gleicher_inhalt_wird_nicht_doppelt_gespeichert(s):
     bild = b"\x89PNG\r\n\x1a\n" + b"derselbe inhalt" * 100
 
     a = await M.upload_material(file=_upload("foto.png", bild), topic_id=tp.id, entry_id=None,
-                                method_id=None, work_id=None, rolle="", user=u, db=s)
+                                method_id=None, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
     b = await M.upload_material(file=_upload("nochmal.png", bild), topic_id=tp.id, entry_id=None,
-                                method_id=None, work_id=None, rolle="", user=u, db=s)
+                                method_id=None, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
 
     ra = (await s.execute(select(Material).where(Material.id == a.id))).scalar_one()
     rb = (await s.execute(select(Material).where(Material.id == b.id))).scalar_one()
@@ -190,11 +190,11 @@ async def test_loeschen_der_quelle_befoerdert_einen_verweis(s):
     u, tp = await _setup(s)
     bild = b"\x89PNG\r\n\x1a\n" + b"x" * 500
     a = await M.upload_material(file=_upload("a.png", bild), topic_id=tp.id, entry_id=None,
-                                method_id=None, work_id=None, rolle="", user=u, db=s)
+                                method_id=None, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
     b = await M.upload_material(file=_upload("b.png", bild), topic_id=tp.id, entry_id=None,
-                                method_id=None, work_id=None, rolle="", user=u, db=s)
+                                method_id=None, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
     c = await M.upload_material(file=_upload("c.png", bild), topic_id=tp.id, entry_id=None,
-                                method_id=None, work_id=None, rolle="", user=u, db=s)
+                                method_id=None, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
 
     # Die Quelle (a) loeschen.
     await M.delete_material(a.id, user=u, db=s)
@@ -236,7 +236,7 @@ async def test_grosses_foto_wird_verlustarm_verkleinert(s):
     roh = BytesIO(); bild.save(roh, format="JPEG", quality=100); roh = roh.getvalue()
 
     out = await M.upload_material(file=_upload("foto.jpg", roh), topic_id=tp.id, entry_id=None,
-                                  method_id=None, work_id=None, rolle="", user=u, db=s)
+                                  method_id=None, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
     assert out.size < len(roh), "verkleinert gespeichert"
     r = (await s.execute(select(Material.data, Material.sha256).where(Material.id == out.id))).first()
     assert hashlib.sha256(r[0]).hexdigest() == r[1], "Hash trifft die gespeicherte Form"
@@ -257,7 +257,7 @@ async def test_png_bleibt_unangetastet(s):
     bild = Image.new("RGBA", (50, 50), (255, 0, 0, 128))
     roh = BytesIO(); bild.save(roh, format="PNG"); roh = roh.getvalue()
     out = await M.upload_material(file=_upload("t.png", roh), topic_id=tp.id, entry_id=None,
-                                  method_id=None, work_id=None, rolle="", user=u, db=s)
+                                  method_id=None, work_id=None, reihe_stunde_id=None, rolle="", user=u, db=s)
     r = (await s.execute(select(Material.mime, Material.data).where(Material.id == out.id))).first()
     # Bleibt PNG (nicht zu JPEG umkodiert) und behaelt die Transparenz —
     # verlustfrei optimiert dürfen sich die Bytes aber aendern.

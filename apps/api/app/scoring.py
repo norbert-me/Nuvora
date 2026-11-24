@@ -108,13 +108,13 @@ def note_label(wert: float) -> str:
 
 def noten_trend(werte) -> Optional[int]:
     """Besser (1), schlechter (-1), gleich (0) oder None (unter zwei Noten).
-    Spiegel von core/notentrend.js: erste gegen zweite Haelfte, ab 0,3."""
+    Spiegel von core/notentrend.js: erste gegen zweite Haelfte, ab 0,5 (eine halbe Note)."""
     w = [float(v) for v in (werte or []) if v is not None]
     if len(w) < 2:
         return None
     h = len(w) // 2
     diff = sum(w[-h:]) / h - sum(w[:h]) / h
-    return 1 if diff <= -0.3 else -1 if diff >= 0.3 else 0
+    return 1 if diff <= -0.5 else -1 if diff >= 0.5 else 0
 
 
 def status_of(card_id: int, has_any_scan: bool, config: Optional[dict]) -> str:
@@ -134,13 +134,13 @@ def status_of(card_id: int, has_any_scan: bool, config: Optional[dict]) -> str:
 def e_modus_von(config: Optional[dict]) -> str:
     """Wie zaehlen Anforderungsfragen fuer ein G-Kind? (aus eval_config)
 
-    "bonus" (Vorgabe) | "keine" | "alle" — die Entscheidung gehoert der
+    "bonus" (Vorgabe) | "ausgleich" | "keine" | "alle" — die Entscheidung gehoert der
     einzelnen Auswertung, nicht dem Quiz: dasselbe Quiz kann einmal als
     Lernstand und einmal als Leistung gewertet werden. Unbekanntes und
     Fehlendes gilt als "bonus", damit Bestandsauswertungen sich nicht aendern.
     """
     wert = (config or {}).get("e_modus")
-    return wert if wert in ("bonus", "keine", "alle") else "bonus"
+    return wert if wert in ("bonus", "ausgleich", "keine", "alle") else "bonus"
 
 
 STANDARD_BONUS = {"max_stufen": 1.0, "mindest_nenner": 2, "falsch_zehrt": True}
@@ -236,6 +236,10 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
     # Wie zaehlen die Anforderungsfragen fuer ein Kind im G-Kurs?
     #
     #   "bonus" (Vorgabe) – sie stehen neben der Wertung und geben Bonus.
+    #   "ausgleich"       – richtige Anforderungsfragen GLEICHEN verpasste Grund-
+    #                       fragen aus (5 von 6 + beide E richtig = 6 von 6), nie
+    #                       ueber 100 %. Fuer „E-Fragen sind die Reserve fuer einen
+    #                       Fehler" statt „E-Fragen heben um eine Notenstufe".
     #   "keine"           – sie stehen daneben, geben aber NICHTS. Fuer eine
     #                       Arbeit, in der die Anforderung erkennbar Zusatz ist
     #                       und die Note allein aus der Grundlage kommt.
@@ -246,7 +250,7 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
     # Quiz: dasselbe Quiz kann einmal als Lernstand und einmal als Leistung
     # gewertet werden. Sie gilt nur fuer E/G — ein verpasstes Thema gibt weiter
     # Bonus, das ist ein anderer Sachverhalt.
-    modus = e_modus if e_modus in ("bonus", "keine", "alle") else "bonus"
+    modus = e_modus if e_modus in ("bonus", "ausgleich", "keine", "alle") else "bonus"
     differenziert = bool(niveau_aktiv) and niveau != "E" and modus != "alle"
     fehlt = {int(x) for x in (gefehlt_topics or []) if str(x).lstrip("-").isdigit()}
 
@@ -296,7 +300,16 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
     # Ratefall), aber sie zaehlt: eine von einer ergibt eine halbe Stufe, eine
     # von fuenf ein Fuenftel. Falsche Antworten zehren den Bonus wie bisher auf.
     netto = max(0, e_richtig - e_falsch) if regel["falsch_zehrt"] else e_richtig
-    if bonus_fragen and netto >= 1:
+    if modus == "ausgleich":
+        # Die Punkte richtiger Anforderungsfragen fuellen die Luecke der Basis auf.
+        # Falsche zehren (wie beim Bonus) nur diesen Ausgleich auf, nie die
+        # Grundpunkte; mehr als die Luecke gibt es nicht.
+        e_punkte = sum(gewicht(q["id"]) for q in bonus_fragen if richtig(q))
+        if regel["falsch_zehrt"]:
+            e_punkte -= sum(gewicht(q["id"]) for q in bonus_fragen if beantwortet(q) and not richtig(q))
+        ausgleich = min(max(0.0, base_max - score), max(0.0, e_punkte))
+        bonus_pct = ausgleich / base_max * 100 if base_max > 0 else 0.0
+    elif bonus_fragen and netto >= 1:
         anteil = min(1.0, netto / max(len(bonus_fragen), regel["mindest_nenner"]))
         bonus_pct = anteil * regel["max_stufen"] * naechste_stufe(base_pct, scale)
 
@@ -313,3 +326,22 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
         # Auswertung sagt sonst „E-Bonus", wo gar keine E-Frage im Spiel war.
         "gefehlt_total": sum(1 for q in extra if verpasst(q)),
     }
+
+
+def konfig_mit_vorgaben(config: Optional[dict], user=None) -> dict:
+    """Die Einstellungen einer Auswertung MIT den Vorgaben des Profils.
+
+    Die Auswertungsseite faellt ohne eigene Angabe auf das Profil zurueck (Notenschluessel,
+    Bonusregel). Rechneten die uebrigen Wege (Zugang der Kinder, PDF, Excel, Notenbuch)
+    ohne diesen Rueckgriff, bekam dasselbe Kind dort eine andere Note als in der
+    Auswertung — sobald das Profil von der eingebauten Vorgabe abwich. Eine Quelle:
+    alle Leser holen die Einstellungen hierueber."""
+    out = dict(config or {})
+    skala = getattr(user, "grade_scale", None)
+    if not out.get("grade_scale") and isinstance(skala, dict) and skala:
+        out["grade_scale"] = skala
+    ansichten = getattr(user, "ansichten", None) or {}
+    bonus = ansichten.get("bonus_regel") if isinstance(ansichten, dict) else None
+    if not isinstance(out.get("bonus_regel"), dict) and isinstance(bonus, dict):
+        out["bonus_regel"] = bonus
+    return out

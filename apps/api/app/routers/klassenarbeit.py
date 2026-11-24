@@ -20,8 +20,8 @@ from ..database import get_db
 from .. import arbeitswertung as aw
 # `roster_kurs` heisst hier unten schon ein Endpunkt — deshalb umbenannt
 # importiert, sonst ueberdeckt der Endpunkt den Helfer.
-from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
-from ..models import SchoolClass, WorkAnalysis, Student, Topic, User
+from ..schueler import le_ids, roster_klasse, roster_kurs as _kanon_kurs
+from ..models import ExamDate, Person, SchoolClass, WorkAnalysis, Student, Topic, User
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
 from .anwesenheit import get_day as _tag
@@ -84,6 +84,7 @@ class WorkPut(BaseModel):
     results: Optional[dict] = None      # {student_id: [wrong_task_id]}
     scale: Optional[dict] = None        # Notenschlüssel {"1":87,…} oder null = Profil
     absent: Optional[list] = None       # abwesende student_ids (Punkte bleiben)
+    unbewertet: Optional[list] = None   # Kinder ohne Note in dieser Arbeit (UB)
     fehler: Optional[dict] = None       # {student_id: {unit_id: Fehlerart}}
     wechsel: Optional[dict] = None      # {student_id: [task_id]} — Fassung des anderen Blatts geschrieben
 
@@ -98,10 +99,14 @@ class WorkOut(BaseModel):
     results: dict = {}
     scale: Optional[dict] = None
     absent: list = []
+    unbewertet: list = []
     fehler: dict = {}
     wechsel: dict = {}
     niveau: str = ""
     partner_id: Optional[int] = None
+    # Tag der Arbeit: der Termin aus dem Kalender (wenn verknuepft), sonst der
+    # Tag, an dem sie angelegt wurde. Nur zur Anzeige in der Auswahl.
+    datum: Optional[str] = None
     model_config = {"from_attributes": True}
 
 
@@ -115,12 +120,17 @@ def _keyw(user, class_id, kurs_id):
     return kurs_oder_klasse(WorkAnalysis, user, class_id, kurs_id)
 
 
+_le_ids = le_ids   # eine Quelle: app/schueler.py
+
+
 @router.get("/classes/{class_id}/students")
 async def roster(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     # `niveau` gehoert dazu: eine E- oder G-Arbeit zeigt nur die Kinder, die
     # dieses Blatt geschrieben haben.
-    return [{"id": s.id, "name": s.name, "niveau": s.niveau or ""} for s in await _roster(db, class_id)]
+    rows = await _roster(db, class_id)
+    le = await _le_ids(db, rows)
+    return [{"id": s.id, "name": s.name, "niveau": s.niveau or "", "le": s.id in le} for s in rows]
 
 
 @router.get("/kurse/{kurs_id}/students")
@@ -128,14 +138,26 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
     """SuS eines Kurses — inkl. der EINZELN hinzugefügten (Kurse aus Teilen von
     Klassen). Deduplikat per Name wie beim Klassen-Roster."""
     await eigener_kurs(db, user, kurs_id)
-    return [{"id": s.id, "name": s.name, "class_id": s.class_id, "niveau": s.niveau or ""} for s in await _kanon_kurs(db, kurs_id)]
+    rows = await _kanon_kurs(db, kurs_id)
+    le = await _le_ids(db, rows)
+    return [{"id": s.id, "name": s.name, "class_id": s.class_id, "niveau": s.niveau or "", "le": s.id in le} for s in rows]
 
 
 @router.get("/classes/{class_id}/works", response_model=List[WorkOut])
 async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     rows = (await db.execute(select(WorkAnalysis).where(*_keyw(user, class_id, kurs_id)).order_by(WorkAnalysis.created_at.desc()))).scalars().all()
-    return [WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "") for w in rows]
+    termine = {}
+    if rows:
+        for wid, tag in (await db.execute(select(ExamDate.work_id, ExamDate.date).where(
+                ExamDate.owner_id == user.id, ExamDate.work_id.in_([w.id for w in rows])))).all():
+            termine[wid] = tag
+    def _tag(w):
+        d = termine.get(w.id) or w.created_at
+        return d.date().isoformat() if d else None
+    # Nach Datum der Arbeit, neueste zuerst; gleicher Tag nach Anlage (E/G-Paare bleiben beieinander).
+    rows = sorted(rows, key=lambda w: (_tag(w) or "", w.id), reverse=True)
+    return [WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], unbewertet=w.unbewertet or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "", datum=_tag(w)) for w in rows]
 
 
 @router.post("/works", response_model=WorkOut, status_code=201)
@@ -384,9 +406,11 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
     if body.absent is not None:
         # Abwesende als eindeutige String-IDs; Punkte in results bleiben unberuehrt.
         w.absent = list({str(x)[:40] for x in body.absent[:400]}) or None
+    if body.unbewertet is not None:
+        w.unbewertet = list({str(x)[:40] for x in body.unbewertet[:400]}) or None
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "")
+    return WorkOut(id=w.id, partner_id=w.partner_id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], unbewertet=w.unbewertet or [], fehler=w.fehler or {}, wechsel=w.wechsel or {}, niveau=w.niveau or "")
 
 
 @router.post("/works/{work_id}/teilen", response_model=List[WorkOut])
@@ -816,6 +840,13 @@ def _je_einheit(w: WorkAnalysis) -> list[dict]:
     return aus
 
 
+def klassenstufe(name: str):
+    """Die Stufe aus einem Klassennamen („7.5" -> 7, „10a" -> 10, „WP-INF 8" -> 8), sonst None."""
+    import re
+    m = re.search(r"(?<!\d)(\d{1,2})(?!\d)", name or "")
+    return int(m.group(1)) if m else None
+
+
 @router.get("/works/{work_id}/vergleich")
 async def vergleich(work_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Dieselbe Arbeit über alle Klassen, in denen sie geschrieben wurde."""
@@ -841,11 +872,18 @@ async def vergleich(work_id: int, user: User = Depends(require_module), db: Asyn
     klassen = {c.id: c.name for c in (await db.execute(
         select(SchoolClass).where(SchoolClass.id.in_([x.class_id for x in gruppe])))).scalars().all()}
 
+    # Nur Klassen DERSELBEN Stufe: eine 6. Klasse schreibt zu „Rechnen mit Brüchen" nicht dieselbe Arbeit wie eine 7.
+    # (gleicher Name oder Kopie reicht nicht — gemeldet mit einem Vergleich 6.1 gegen 7.5). Laesst sich die Stufe
+    # aus dem Klassennamen nicht lesen („WP-INF", „Blanko"), bleibt die Klasse drin: geraten wird nicht.
+    eigene_stufe = klassenstufe(klassen.get(w.class_id, ""))
+    if eigene_stufe is not None:
+        gruppe = [x for x in gruppe if x.id == w.id or klassenstufe(klassen.get(x.class_id, "")) in (None, eigene_stufe)]
+
     arbeiten = []
     for x in gruppe:
         pl = _pct_liste(x, user.grade_scale)
         arbeiten.append({
-            "id": x.id, "name": x.name, "class_id": x.class_id,
+            "id": x.id, "name": x.name, "class_id": x.class_id, "kurs_id": x.kurs_id,
             "class_name": klassen.get(x.class_id, ""),
             "eigene": x.id == w.id,
             "n": len(pl), "pct_liste": pl,

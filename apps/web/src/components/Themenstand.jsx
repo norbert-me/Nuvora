@@ -123,7 +123,7 @@ export function ThemenstandKind({ kind, t, offenDefault = false }) {
 }
 
 /** Panel für eine Klasse: Kind wählen, Themen sehen. */
-export default function Themenstand({ classId, studentId = null, cardId = null, titel = true }) {
+export default function Themenstand({ classId, kursId = null, studentId = null, cardId = null, titel = true }) {
   const { t } = useLanguage();
   const [daten, setDaten] = useState(null);
   const [wahl, setWahl] = useState(studentId);
@@ -133,7 +133,9 @@ export default function Themenstand({ classId, studentId = null, cardId = null, 
     let ab = false;
     // Die CardVote-Schuelerseite kennt nur die aufgedruckte Kartennummer, die
     // Klassenarbeit die Datenbank-ID — beide Wege muessen gehen.
-    const q = studentId != null ? `?student_id=${studentId}` : "";
+    // Mit Kurs: Karteikarten nur aus diesem Kurs (dieselbe Klasse liegt oft in mehreren).
+    const teile = [studentId != null ? `student_id=${studentId}` : "", kursId ? `kurs_id=${kursId}` : ""].filter(Boolean);
+    const q = teile.length ? `?${teile.join("&")}` : "";
     hol(`/api/classes/${classId}/themenprofil${q}`, null)
       .then((d) => {
         if (ab) return;
@@ -144,7 +146,7 @@ export default function Themenstand({ classId, studentId = null, cardId = null, 
         setWahl((alt) => treffer?.student_id ?? alt ?? d?.schueler?.[0]?.student_id ?? null);
       });
     return () => { ab = true; };
-  }, [classId, studentId, cardId]);
+  }, [classId, kursId, studentId, cardId]);
 
   if (!daten) return null;
   const kinder = daten.schueler || [];

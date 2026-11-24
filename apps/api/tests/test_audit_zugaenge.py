@@ -335,3 +335,21 @@ async def test_unausgewiesene_leitungen_belegen_keine_plaetze():
         for w in leitungen:
             ws.disconnect(sid, w)
     assert sid not in ws.connections and not ws._wartend
+
+
+@pytest.mark.asyncio
+async def test_caldav_bestaetigte_anmeldung_wird_nicht_neu_gerechnet_und_endet_mit_dem_geraet(s, monkeypatch):
+    u = await _konto(s)
+    anfrage = _Anfrage(headers=_basic(u.email, "geraet-4711"))
+    assert (await C._anmelden(anfrage, s)).id == u.id
+    # Zweiter Aufruf: kein Argon2 mehr (Apple schickt die Anmeldung mit jeder Anfrage).
+    monkeypatch.setattr(C, "_verify_pw", lambda *a: (_ for _ in ()).throw(AssertionError("neu gerechnet")))
+    assert (await C._anmelden(anfrage, s)).id == u.id
+    # Wird das Geraete-Passwort zurueckgenommen, ist die Anmeldung sofort tot.
+    from sqlalchemy import delete
+    from app.models import CaldavToken
+    await s.execute(delete(CaldavToken))
+    await s.commit()
+    monkeypatch.undo()
+    with pytest.raises(C._Unangemeldet):
+        await C._anmelden(anfrage, s)

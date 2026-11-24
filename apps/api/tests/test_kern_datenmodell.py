@@ -141,7 +141,8 @@ async def test_niveau_im_teilkurs_wird_gespeichert(s):
     u = await _user(s)
     await _klasse(s, u, "7a", "Max", "Mia")
     kurs = await K.create_kurs(K.KursIn(name="Förderkurs"), user=u, db=s)
-    max_id = (await s.execute(select(Student.id).where(Student.name == "Max"))).scalar_one()
+    # Der Name ist verschluesselt: gesucht wird in Python, nicht in SQL.
+    max_id = next(r.id for r in (await s.execute(select(Student))).scalars().all() if r.name == "Max")
     await K.add_student_member(kurs.id, max_id, user=u, db=s)
     assert [x["name"] for x in await K.kurs_students(kurs.id, user=u, db=s)] == ["Max"]
 
