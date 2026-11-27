@@ -14,6 +14,17 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## 4.7.0 — 27.11.2026
+
+- **Notenbuch:** am Namen eines Kindes steht der Vergleich — Vorjahresnote (aus dem Vorgängerkurs), je Quartal der Stand am Quartalsstrich, Halbjahre und Jahr, jeweils mit Abstand zur vorigen Note.
+- **Noten:** eine Rechnung für Klassenarbeit, CardVote und Notenbuch — „Note 2 ab 73 %“ heißt: an der Grenze 2-, oben im Band 2+; unter der 5er-Grenze 6+ bis 6. **Bestehende CardVote-Noten können sich dadurch verbessern** (87 % war bisher 2,0, jetzt 1-).
+- **Notenbuch:** der Verlauf der Gesamtnote zeigt nur noch Punkte, an denen das Kind eine Note hat; Notenbuch und Klassenarbeit nutzen am PC die volle Breite.
+- **Klassenarbeit:** Kinder mit LE oder „nicht bewertet“ zählen als mitgeschrieben und stehen in den Listen und auf dem Rückmeldebogen (ohne Note).
+- **Sitzplan:** Erweitern nach links/oben flackert nicht mehr, am Rand scrollt die Fläche mit; zum Entfernen auf „Noch nicht platziert“ ziehen; Markierungen deutlich sichtbar; „Namen ganz zeigen“ und „Nachnamen kürzen“ entfallen.
+- **Checklisten:** das Datum des Abhakens steht unter dem Haken; Export als Text (vorhanden/fehlt) oder Excel.
+- **Anwesenheit:** die Färbung der Status-Knöpfe läuft nicht mehr über die runde Ecke.
+- **Sicherheit:** aktualisierte Python-Abhängigkeiten (FastAPI 0.165 u. a.), Pfadprüfung der lokalen App neu gebaut.
+
 ## 4.6.1 — 23.11.2026
 
 - **Notenbuch:** Quartalsstriche stehen nicht mehr in der Tabelle, sondern im Verlauf der Gesamtnoten — per Datum setzen („Strich setzen“) und mit dem Kreuz wieder entfernen. Bestehende Striche werden einmalig in das Datum ihrer Spalte umgewandelt.
