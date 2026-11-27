@@ -1592,7 +1592,7 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, classId, kursId
             <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>{t("noten.colTopic")}</div>
             <SuchSelect value={topicId} onChange={setTopicId} leerLabel={t("noten.colTopicNone")}
               style={{ width: "100%" }}
-              optionen={themenFuerKurs(themen, kursObj, topicId ? [Number(topicId)] : []).map((tp) => ({ wert: String(tp.id), label: themen.label(tp) }))} />
+              optionen={themenFuerKurs(themen, kursObj, topicId ? [Number(topicId)] : []).map((tp) => ({ wert: String(tp.id), label: themen.auswahlLabel(tp) }))} />
           </div>
         )}
         {/* Freiwillige Abgabe: fehlende Noten werden in dieser Spalte nicht hervorgehoben. */}

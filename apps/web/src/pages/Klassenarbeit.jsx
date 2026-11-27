@@ -821,7 +821,7 @@ export default function Klassenarbeit() {
   // Erst nach `work`: davor stuende es in der TDZ (ReferenceError beim Oeffnen).
   // Nur die Themen dieses Kurses (Fach und Stufe); bereits vergebene bleiben.
   const vergeben = (work?.tasks || []).flatMap((tk) => [tk.topic_id, ...((tk.parts || []).map((p) => p.topic_id))]).filter(Boolean);
-  const themenOptionen = themenFuerKurs(themen, kursObj, vergeben).map((tp) => ({ wert: String(tp.id), label: themen.label(tp) }));
+  const themenOptionen = themenFuerKurs(themen, kursObj, vergeben).map((tp) => ({ wert: String(tp.id), label: themen.auswahlLabel(tp) }));
   const aufgabenAuf = aufgabenOffen ?? !((work && work.tasks) || []).length;
   const offenFuer = work && work.id;
   // Beim Oeffnen einer Arbeit EINMAL entscheiden — nicht laufend: sonst klappte

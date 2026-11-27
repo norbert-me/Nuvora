@@ -1014,10 +1014,11 @@ function StapelEinstellungenModal({ deck, t, themen, showTopic, onClose, onSave 
       <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{t("karten.deckSettings")}</h3>
       {showTopic && (<>
         <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 4 }}>{t("karten.topicHint")}</div>
-        <select value={topicId} onChange={(ev) => e.setz({ topic_id: ev.target.value })} style={{ ...selectStyle, width: "100%", marginBottom: 12 }}>
-          <option value="">– {t("karten.freeCards")} –</option>
-          {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
-        </select>
+        <div style={{ marginBottom: 12 }}>
+          <SuchSelect value={topicId ? String(topicId) : ""} onChange={(v) => e.setz({ topic_id: v })} leerLabel={`– ${t("karten.freeCards")} –`}
+            style={{ width: "100%" }}
+            optionen={themen.geordnet.map((tp) => ({ wert: String(tp.id), label: themen.auswahlLabel(tp) }))} />
+        </div>
       </>)}
       <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 4 }}>{t("karten.niveauHint")}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

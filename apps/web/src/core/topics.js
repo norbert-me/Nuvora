@@ -66,12 +66,12 @@ export function themenIndex(topics) {
     if (!t) return "";
     return t.parent_id ? `${byId.get(t.parent_id) ? mitNummer(byId.get(t.parent_id)) : "?"} / ${mitNummer(t)}` : mitNummer(t);
   };
-  // Für Auswahllisten (Suche im Kalender, Themenwahl): dazu die Stufe, denn
-  // „1 Netzwerk" gibt es in Stufe 5 und in Stufe 9. Unterthemen erben sie
-  // vom Server (`jahrgang` ist dort schon aufgelöst).
+  // Für Auswahllisten: dazu Fach und Stufe, denn „1 Netzwerk" gibt es in Informatik 5 und 9, und „1 Office"
+  // sagt ohne Fach nichts. Gesucht wird ueber den ganzen Text („info 7 netz"). Unterthemen erben Fach und
+  // Stufe vom Server (dort schon aufgeloest).
   const auswahlLabel = (t) => {
     if (!t) return "";
-    return t.jahrgang ? `Stufe ${t.jahrgang} · ${label(t)}` : label(t);
+    return [t.fach, t.jahrgang ? `Stufe ${t.jahrgang}` : "", label(t)].filter(Boolean).join(" · ");
   };
 
   const geordnet = [];

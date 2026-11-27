@@ -12,6 +12,7 @@ import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
+import SuchSelect from "../components/SuchSelect.jsx";
 import { istVorfahre, kinderVon, ordnerMitId, pfadZu } from "../core/ordnerbaum.js";
 import { useAktiv } from "../core/modules.js";
 import PublishModal from "../components/PublishModal.jsx";
@@ -391,7 +392,6 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
   // und sortiert sich in jeder Ansicht gleich (die Regel stand hier vorher als
   // eigene Kopie, in vier Seiten leicht verschieden).
   const themen = themenIndex(topics);
-  const topicLabel = (tp) => themen.label(tp);
   const topicsSorted = themen.geordnet;
   const fld = { ...inputStyle, width: "100%" };
   const lbl = { fontSize: 13, color: "var(--text2)", margin: "12px 0 4px" };
@@ -427,10 +427,9 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
         {topics.length > 0 && (
           <>
             <div style={lbl}>{t("methoden.topic")}</div>
-            <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={fld}>
-              <option value="">{t("methoden.topicNone")}</option>
-              {topicsSorted.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
-            </select>
+            <SuchSelect value={topicId ? String(topicId) : ""} onChange={(v) => setTopicId(v)} leerLabel={t("methoden.topicNone")}
+              style={{ width: "100%" }}
+              optionen={topicsSorted.map((tp) => ({ wert: String(tp.id), label: themen.auswahlLabel(tp) }))} />
           </>
         )}
         {/* Datei-Upload nur beim gespeicherten Einstieg (braucht die id). */}

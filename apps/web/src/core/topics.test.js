@@ -19,11 +19,11 @@ describe("themenIndex", () => {
     expect(geordnet.map((t) => t.id)).toEqual([6, 1, 4, 2, 5, 3, 8, 7]);
   });
 
-  it("zeigt Nummer im Namen und Stufe in der Auswahl", () => {
+  it("zeigt Nummer im Namen, Fach und Stufe in der Auswahl", () => {
     const idx = themenIndex(T);
     expect(idx.label(T[1])).toBe("9.1 Netzwerk / 2 IP-Adressen");
     expect(idx.auswahlLabel(T[1])).toBe("Stufe 9 · 9.1 Netzwerk / 2 IP-Adressen");
-    expect(idx.auswahlLabel(T[6])).toBe("Stufe 6 · Brüche");
+    expect(idx.auswahlLabel(T[6])).toBe("Mathematik · Stufe 6 · Brüche");
   });
 
   it("ohne Nummer entscheidet die gezogene Reihenfolge", () => {
