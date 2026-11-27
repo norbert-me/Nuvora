@@ -1,4 +1,4 @@
-import { Children, Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { Children, Fragment, cloneElement, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { kommaRund } from "../core/zahl.js";
 import { quantil } from "../core/statistik.js";
@@ -497,6 +497,17 @@ export const SHADOW = {
 // dieselbe Bauform, aber offen fuer beliebige Kinder statt nur fuer Reiter.
 // Die Kinder bringen KEINEN eigenen Rahmen mit: dafuer gibt es `segmentBtn`
 // und `segmentInput`.
+// Ein getönter Knopf (Anwesenheit: ✓ grün hinterlegt) lief eckig über die runde Kante der Gruppe — `overflow`
+// darf die Gruppe nicht haben (Popover). Deshalb bekommen das erste und letzte Kind die Innenrundung selbst.
+const INNEN_R = Math.max(0, CONTROL_R - 1);
+function ecken(k, erstes, letztes) {
+  if (!isValidElement(k) || (!erstes && !letztes) || typeof k.type !== "string") return k;
+  const st = { ...(k.props.style || {}) };
+  if (erstes) { st.borderTopLeftRadius = INNEN_R; st.borderBottomLeftRadius = INNEN_R; }
+  if (letztes) { st.borderTopRightRadius = INNEN_R; st.borderBottomRightRadius = INNEN_R; }
+  return cloneElement(k, { style: st });
+}
+
 export function Segment({ children, style }) {
   const kinder = Children.toArray(children).filter(Boolean);
   return (
@@ -512,7 +523,7 @@ export function Segment({ children, style }) {
       {kinder.map((k, i) => (
         <Fragment key={i}>
           {i > 0 && <span aria-hidden style={{ width: 1, background: "var(--border2)", flexShrink: 0 }} />}
-          {k}
+          {ecken(k, i === 0, i === kinder.length - 1)}
         </Fragment>
       ))}
     </div>
