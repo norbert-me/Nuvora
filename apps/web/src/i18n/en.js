@@ -946,6 +946,7 @@ export default {
   "tut.kurse.3": "Seating plan, cards, grades, checklists and attendance belong to the course — separate per subject. Name and photo belong to the person and apply in all of their courses.",
   "tut.kurse.4": "If you need E/G levels, switch them on in the course. The level itself belongs to the person — clicking the name opens their details.",
   "help.title": "Help",
+  "help.suche": "Search help",
   "help.tutorialBanner": "First time here? The {{link}} walks you through Nuvora — restartable any time.",
   "help.tutorialWord": "tutorial",
   "help.contact": "Question not covered? Get in touch via {{link}}.",

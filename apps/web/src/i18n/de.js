@@ -948,6 +948,7 @@ export default {
   "tut.kurse.3": "Sitzplan, Karten, Noten, Checklisten und Anwesenheit hängen am Kurs — je Fach getrennt. Name und Foto gehören der Person und gelten in jedem ihrer Kurse.",
   "tut.kurse.4": "Brauchst du E-/G-Niveaus, schalte sie im Kurs ein. Das Niveau selbst gehört zur Person — ein Klick auf den Namen öffnet ihre Angaben.",
   "help.title": "Hilfe",
+  "help.suche": "Hilfe durchsuchen",
   "help.tutorialBanner": "Zum ersten Mal hier? Das {{link}} führt dich durch Nuvora — jederzeit neu startbar.",
   "help.tutorialWord": "Tutorial",
   "help.contact": "Frage nicht dabei? Über {{link}} melden.",

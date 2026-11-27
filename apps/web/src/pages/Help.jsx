@@ -2,24 +2,44 @@
 //
 // Bereich aus ?area= (die Navbar haengt ihn beim Klick auf Hilfe an). Oben die
 // anderen Bereiche zum Wechseln; nur Kern plus aktive Module.
+import { Children, createContext, isValidElement, useContext, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { pageApp, pageTitle, cardStyle, Tabs } from "../components/Icons.jsx";
+import { pageApp, pageTitle, cardStyle, Tabs, inputStyle } from "../components/Icons.jsx";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 
-const Section = ({ title, children }) => (
+// Suche: ein Abschnitt bzw. eine Frage erscheint nur, wenn ALLE Woerter darin vorkommen (Titel oder Text).
+const SucheCtx = createContext("");
+const textVon = (n) => (n == null || typeof n === "boolean" ? "" : typeof n === "string" || typeof n === "number" ? String(n)
+  : Array.isArray(n) ? n.map(textVon).join(" ") : isValidElement(n) ? textVon(n.props.children) : "");
+const trifft = (q, ...teile) => {
+  const woerter = q.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!woerter.length) return true;
+  const text = teile.map((x) => textVon(Children.toArray(x))).join(" ").toLowerCase();
+  return woerter.every((w) => text.includes(w));
+};
+
+const Section = ({ title, children }) => {
+  const suche = useContext(SucheCtx);
+  if (suche && !trifft(suche, title, children)) return null;
+  return (
   <section style={{ marginBottom: 24 }}>
     <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>{title}</h3>
     <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.7 }}>{children}</div>
   </section>
 );
+};
 
-const Faq = ({ q, children }) => (
-  <details style={{ ...cardStyle, marginBottom: 12, padding: "12px 16px" }}>
+const Faq = ({ q, children }) => {
+  const suche = useContext(SucheCtx);
+  if (suche && !trifft(suche, q, children)) return null;
+  return (
+  <details open={suche ? true : undefined} style={{ ...cardStyle, marginBottom: 12, padding: "12px 16px" }}>
     <summary style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", cursor: "pointer" }}>{q}</summary>
     <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.7, marginTop: 8 }}>{children}</div>
   </details>
-);
+  );
+};
 
 // Text mit einem {{link}}-Platzhalter in JSX aufloesen.
 function withLink(text, to, label) {
@@ -231,7 +251,10 @@ export default function Help() {
   // Kern immer, dann jedes aktive Modul (in Registry-Reihenfolge).
   const aktiveModule = modules.filter((m) => m.active);
   const sichtbar = ["core", ...aktiveModule.map((m) => m.key)];
-  const gewuenscht = params.get("area");
+  // Der Reiter steht in ?thema, NICHT in ?area: an ?area haengt die Navigation oben (aus welchem Modul man
+  // kam). Der Reiter schrieb frueher ?area um, und die Leiste sprang beim Durchklicken der Hilfe mit.
+  const gewuenscht = params.get("thema") || params.get("area");
+  const [suche, setSuche] = useState("");
   const area = sichtbar.includes(gewuenscht) ? gewuenscht : sichtbar[0];
   const Comp = AREA_COMP[area];
   const modInfo = modules.find((m) => m.key === area);
@@ -253,14 +276,24 @@ export default function Help() {
         // Modulen wird waagerecht gescrollt statt umgebrochen: `Tabs` ist EIN
         // Element, kein Haufen einzelner Knöpfe.
         <div style={{ marginBottom: 24, overflowX: "auto", maxWidth: "100%" }}>
-          <Tabs value={area} onChange={(k) => setParams({ area: k })}
+          <Tabs value={area} onChange={(k) => { const n = new URLSearchParams(params); n.set("thema", k); setParams(n); }}
             options={sichtbar.map((k) => [k, label(k)])} />
         </div>
       )}
 
-      {Comp ? <Comp t={t} /> : modInfo ? (
-        <Section title={modInfo.name}>{modInfo.description}</Section>
-      ) : null}
+      {/* Suchen geht ueber ALLE Bereiche: wer „Quartal" tippt, weiss nicht, ob das unter Kern oder Noten steht. */}
+      <input value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("help.suche")} aria-label={t("help.suche")}
+        type="search" style={{ ...inputStyle, width: "100%", marginBottom: 24, boxSizing: "border-box" }} />
+      <SucheCtx.Provider value={suche.trim()}>
+        {suche.trim() ? (
+          sichtbar.map((k) => {
+            const C = AREA_COMP[k];
+            return C ? <div key={k}><C t={t} /></div> : null;
+          })
+        ) : Comp ? <Comp t={t} /> : modInfo ? (
+          <Section title={modInfo.name}>{modInfo.description}</Section>
+        ) : null}
+      </SucheCtx.Provider>
 
       <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 24 }}>
         {withLink(t("help.contact"), "/contact", t("footer.contact"))}

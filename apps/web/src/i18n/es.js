@@ -947,6 +947,7 @@ export default {
   "tut.kurse.3": "El plano de asientos, tarjetas, notas, listas y asistencia pertenecen al curso — separados por asignatura. Nombre y foto pertenecen a la persona y valen en todos sus cursos.",
   "tut.kurse.4": "Si necesitas niveles E/G, actívalos en el curso. El nivel pertenece a la persona — un clic en el nombre abre sus datos.",
   "help.title": "Ayuda",
+  "help.suche": "Buscar en la ayuda",
   "help.tutorialBanner": "¿Primera vez? El {{link}} te guía por Nuvora, reiniciable cuando quieras.",
   "help.tutorialWord": "tutorial",
   "help.contact": "¿Falta tu pregunta? Escríbenos por {{link}}.",
