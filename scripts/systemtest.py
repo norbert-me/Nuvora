@@ -187,6 +187,7 @@ def endpunkte(u):
             ("GET", f"/api/anwesenheit/{c}/student/{s}"),
             ("GET", f"/api/sitzplan/{c}"),
             ("GET", f"/api/sitzplan/{c}/segel"),
+            ("GET", f"/api/sitzplan/{c}/plaene"),
             ("GET", "/api/ausleihe/items"),
             ("GET", "/api/ausleihe/loans"),
         ],

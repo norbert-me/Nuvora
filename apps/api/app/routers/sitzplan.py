@@ -48,10 +48,23 @@ def _key_where(user, class_id, kurs_id):
     return kurs_oder_klasse(SeatingPlan, user, class_id, kurs_id)
 
 
+async def _plan(db, user, class_id, kurs_id, plan_id):
+    """Der gewaehlte Plan dieses Kurses (plan_id), sonst der erste. Ein plan_id, der nicht zu diesem Kurs gehoert,
+    ist 404 — sonst schriebe man ueber eine fremde ID in einen anderen Plan."""
+    q = select(SeatingPlan).where(*_key_where(user, class_id, kurs_id))
+    if plan_id is not None:
+        row = (await db.execute(q.where(SeatingPlan.id == plan_id))).scalar_one_or_none()
+        if row is None:
+            raise HTTPException(404, "Sitzplan nicht gefunden")
+        return row
+    return (await db.execute(q.order_by(SeatingPlan.id).limit(1))).scalar_one_or_none()
+
+
 @router.get("/{class_id}")
-async def get_plan(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def get_plan(class_id: int, kurs_id: Optional[int] = None, plan_id: Optional[int] = None,
+                   user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
-    row = (await db.execute(select(SeatingPlan).where(*_key_where(user, class_id, kurs_id)))).scalar_one_or_none()
+    row = await _plan(db, user, class_id, kurs_id, plan_id)
     return row.data if row and row.data else {"seats": []}
 
 
@@ -63,7 +76,8 @@ def _num(v, default=0.0):
 
 
 @router.put("/{class_id}")
-async def put_plan(class_id: int, body: PlanIn, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def put_plan(class_id: int, body: PlanIn, kurs_id: Optional[int] = None, plan_id: Optional[int] = None,
+                   user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("sitzplan", f"u{user.id}", 300, 60, "Zu viele Änderungen. Bitte kurz warten.")
     await _owned_class(db, user, class_id)
     if kurs_id is not None:   # fremde Kurs-ID nicht in eigene Zeilen schreiben
@@ -82,13 +96,73 @@ async def put_plan(class_id: int, body: PlanIn, kurs_id: Optional[int] = None, u
     if isinstance(body.tafel, dict):
         data["tafel"] = {"x": round(_num(body.tafel.get("x")), 1), "y": round(_num(body.tafel.get("y")), 1),
                          "rot": round(_num(body.tafel.get("rot")), 1)}
-    row = (await db.execute(select(SeatingPlan).where(*_key_where(user, class_id, kurs_id)))).scalar_one_or_none()
+    row = await _plan(db, user, class_id, kurs_id, plan_id)
     if row:
         row.data = data
     else:
         db.add(SeatingPlan(owner_id=user.id, class_id=class_id, kurs_id=kurs_id, data=data))
     await db.commit()
     return data
+
+
+# ─── Mehrere Plaene je Kurs (Klassenraum, Computerraum …) ───
+
+class PlanNeu(BaseModel):
+    name: str = ""
+    kopie_von: Optional[int] = None   # Plaetze eines bestehenden Plans uebernehmen
+
+
+class PlanName(BaseModel):
+    name: str
+
+
+@router.get("/{class_id}/plaene")
+async def list_plaene(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    await _owned_class(db, user, class_id)
+    rows = (await db.execute(select(SeatingPlan).where(*_key_where(user, class_id, kurs_id)).order_by(SeatingPlan.id))).scalars().all()
+    return [{"id": r.id, "name": r.name or ""} for r in rows]
+
+
+@router.post("/{class_id}/plaene", status_code=201)
+async def neuer_plan(class_id: int, body: PlanNeu, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    rate_limit("sitzplan", f"u{user.id}", 300, 60, "Zu viele Änderungen. Bitte kurz warten.")
+    await _owned_class(db, user, class_id)
+    if kurs_id is not None:
+        await eigener_kurs(db, user, kurs_id)
+    anzahl = len((await db.execute(select(SeatingPlan.id).where(*_key_where(user, class_id, kurs_id)))).all())
+    if anzahl >= 10:
+        raise HTTPException(409, "Höchstens 10 Sitzpläne je Kurs")
+    data = {"seats": []}
+    if body.kopie_von is not None:
+        quelle = await _plan(db, user, class_id, kurs_id, body.kopie_von)
+        data = dict(quelle.data or {"seats": []})
+    row = SeatingPlan(owner_id=user.id, class_id=class_id, kurs_id=kurs_id, name=(body.name or "").strip()[:80], data=data)
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return {"id": row.id, "name": row.name}
+
+
+async def _eigener_plan(db, user, plan_id) -> SeatingPlan:
+    row = await db.get(SeatingPlan, plan_id)
+    if row is None or row.owner_id != user.id:
+        raise HTTPException(404, "Sitzplan nicht gefunden")
+    return row
+
+
+@router.patch("/plaene/{plan_id}")
+async def plan_umbenennen(plan_id: int, body: PlanName, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    row = await _eigener_plan(db, user, plan_id)
+    row.name = (body.name or "").strip()[:80]
+    await db.commit()
+    return {"id": row.id, "name": row.name}
+
+
+@router.delete("/plaene/{plan_id}", status_code=204)
+async def plan_loeschen(plan_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    row = await _eigener_plan(db, user, plan_id)
+    await db.delete(row)
+    await db.commit()
 
 
 # ─── SEGEL-Stufen (Helios-Konzept): Hafen → Küste → Meer → Welt ───

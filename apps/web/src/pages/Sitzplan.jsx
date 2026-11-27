@@ -2,7 +2,7 @@
 // drehen (z.B. schräge Tische). Gespeichert wird { seats: [{sid,x,y,rot}] }.
 // Schüler bleiben im Kern; hier nur ihre Positionen (Regel 3).
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
-import { cardStyle, chipStyle, panelStyle, sectionLabel, Segment, segmentBtn, toolbarBtn, Icon, ICONS, toolbarIconBtn, CONTROL_R, SHADOW, dateiWaehlen, COLORS as C, Empty } from "../components/Icons.jsx";
+import { selectStyle, cardStyle, chipStyle, panelStyle, sectionLabel, Segment, segmentBtn, toolbarBtn, Icon, ICONS, toolbarIconBtn, CONTROL_R, SHADOW, dateiWaehlen, COLORS as C, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useKurzName } from "../core/namen.js";
 import { useEntwurf } from "../components/Speichern.jsx";
@@ -12,7 +12,7 @@ import Portrait from "../components/Portrait.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv, useModulOption } from "../core/modules.js";
-import { askPrompt } from "../core/dialog.jsx";
+import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import { heuteYmd } from "../core/datum.js";
 import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import { alsJson, hol, sende } from "../core/melden.js";
@@ -215,6 +215,23 @@ export default function Sitzplan() {
   }, [hervor, foerderArt, students, vorhandeneFoerder, marken, t]);
 
   const kursQ = kursId != null ? `?kurs_id=${kursId}` : "";
+  // ── Mehrere Plaene je Kurs (Klassenraum, Computerraum …) ──
+  // Ohne Wahl gilt der erste (der alte Plan des Kurses). Die Wahl gilt nur fuer diesen Kurs.
+  const [plaene, setPlaene] = useState([]);   // [{id, name}]
+  const [planId, setPlanId] = useState(null);
+  const planQ = (basisQ) => (planId != null ? `${basisQ}${basisQ ? "&" : "?"}plan_id=${planId}` : basisQ);
+  const plaeneLaden = useCallback(async (behalte) => {
+    if (!classId) { setPlaene([]); setPlanId(null); return; }
+    const d = await hol(`${API}/${classId}/plaene${kursId != null ? `?kurs_id=${kursId}` : ""}`, []);
+    const liste = Array.isArray(d) ? d : [];
+    setPlaene(liste);
+    setPlanId((jetzt) => {
+      const wunsch = behalte !== undefined ? behalte : jetzt;
+      return liste.some((x) => x.id === wunsch) ? wunsch : (liste[0]?.id ?? null);
+    });
+  }, [classId, kursId]);
+  useEffect(() => { plaeneLaden(); }, [plaeneLaden]);
+  const planName = (pl, i) => pl.name || t("sitzplan.planNr", { n: i + 1 });
   // Laufende Nummer je Ladevorgang. KursKlasseSelect meldet den Kurs bewusst
   // erst NACH dem Laden der Kursgruppen — der Effekt feuert also immer zweimal:
   // erst ohne Kurs, dann mit. Kommt die erste (klassenweite) Antwort als zweite
@@ -228,7 +245,7 @@ export default function Sitzplan() {
   const load = useCallback((id) => {
     if (!id) return;
     const meine = ++ladenr.current;
-    hol(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`, null).then((d) => {
+    hol(`${API}/${id}${planQ(kursId != null ? `?kurs_id=${kursId}` : "")}`, null).then((d) => {
       if (meine !== ladenr.current) return;
       frisch.current = true;
       fitOffen.current = true;   // frisch geladen: beim Oeffnen immer einpassen
@@ -243,8 +260,8 @@ export default function Sitzplan() {
         setGSeats(migr);
       } else setGSeats([]);
     });
-  }, [kursId]);
-  useEffect(() => { load(classId); }, [classId, kursId, load]);
+  }, [kursId, planId]);   // eslint-disable-line
+  useEffect(() => { load(classId); }, [classId, kursId, planId, load]);
 
   // Die Anwesenheit von HEUTE dazu. Sie gehoert dem Modul Orga (Teil
   // „Anwesenheit"); ist der Teil aus, wird gar nicht erst gefragt — eine
@@ -263,8 +280,9 @@ export default function Sitzplan() {
   const basis = useMemo(() => ({ seats: gSeats, tafel: gTafel, segel: gSegel }), [gSeats, gTafel, gSegel]);
   const e = useEntwurf(basis, async (wert) => {
     if (!classId) return false;
-    const r = await fetch(`${API}/${classId}${kursQ}`, alsJson("PUT", { seats: wert.seats, tafel: wert.tafel })).catch(() => null);
+    const r = await fetch(`${API}/${classId}${planQ(kursQ)}`, alsJson("PUT", { seats: wert.seats, tafel: wert.tafel })).catch(() => null);
     if (!r || !r.ok) { setMsg(t("common.notWork")); return false; }
+    if (planId == null) plaeneLaden();   // erster Plan dieses Kurses ist eben entstanden
     // SEGEL hängt an einem eigenen Endpunkt (je Kind eine Stufe) — nur die
     // geänderten schreiben.
     const keys = new Set([...Object.keys(gSegel), ...Object.keys(wert.segel)]);
@@ -292,6 +310,31 @@ export default function Sitzplan() {
       e.verwerfen();
     }
     fn();
+  };
+
+  const planNeu = async (kopie) => {
+    const name = await askPrompt(t("sitzplan.planNeuFrage"), { placeholder: t("sitzplan.planNeuBeispiel") });
+    if (name == null) return;
+    const r = await fetch(`${API}/${classId}/plaene${kursQ}`, alsJson("POST", { name: name.trim(), kopie_von: kopie ? planId : null })).catch(() => null);
+    if (!r || !r.ok) { setMsg(t("common.notWork")); return; }
+    const d = await r.json();
+    wechseln(() => plaeneLaden(d.id));
+  };
+  const planUmbenennen = async () => {
+    const i = plaene.findIndex((x) => x.id === planId);
+    if (i < 0) return;
+    const name = await askPrompt(t("sitzplan.planUmbenennen"), { initial: plaene[i].name || "" });
+    if (name == null) return;
+    await fetch(`${API}/plaene/${planId}`, alsJson("PATCH", { name: name.trim() })).catch(() => {});
+    plaeneLaden(planId);
+  };
+  const planWeg = async () => {
+    const i = plaene.findIndex((x) => x.id === planId);
+    if (i < 0 || plaene.length < 2) return;
+    if (!(await askConfirm(t("sitzplan.planLoeschenFrage", { name: planName(plaene[i], i) }), { danger: true }))) return;
+    await fetch(`${API}/plaene/${planId}`, { method: "DELETE" }).catch(() => {});
+    e.verwerfen();
+    plaeneLaden(null);
   };
 
   // SEGEL-Stufen je SuS laden (pro Kurs). Toggle in localStorage merken.
@@ -837,7 +880,16 @@ export default function Sitzplan() {
   return (
     <div style={{ maxWidth: "none" }}>
       <Werkzeugleiste
-        links={<KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />}
+        links={<>
+          <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />
+          {/* Die Planwahl erscheint erst ab dem zweiten Plan — bei einem waere sie ein Feld ohne Wahl. */}
+          {plaene.length > 1 && (
+            <select value={planId ?? ""} onChange={(ev) => { const v = Number(ev.target.value); wechseln(() => setPlanId(v)); }}
+              aria-label={t("sitzplan.planWahl")} style={{ ...selectStyle, width: "auto", minWidth: 0 }}>
+              {plaene.map((pl, i) => <option key={pl.id} value={pl.id}>{planName(pl, i)}</option>)}
+            </select>
+          )}
+        </>}
         ansicht={(
           <ViewMenu title={t("sitzplan.view")} items={[
             { key: "fotos", label: t("sitzplan.photoToggle"), hint: t("sitzplan.photoHint"), value: fotosOn, onChange: (v) => { setFotosOn(v); saveView({ fotos: v }); } },
@@ -860,6 +912,10 @@ export default function Sitzplan() {
           ]} />
         )}
         mehr={[
+          { key: "planNeu", label: t("sitzplan.planNeu"), icon: ICONS.plus, onClick: () => planNeu(false) },
+          planId != null && { key: "planKopie", label: t("sitzplan.planKopie"), icon: ICONS.duplicate, onClick: () => planNeu(true) },
+          planId != null && { key: "planName", label: t("sitzplan.planUmbenennen"), icon: ICONS.edit, onClick: planUmbenennen },
+          plaene.length > 1 && { key: "planWeg", label: t("sitzplan.planLoeschen"), icon: ICONS.trash, gefahr: true, onClick: planWeg },
           { key: "export", label: t("sitzplan.export"), icon: ICONS.export, onClick: doExport },
           { key: "import", label: t("sitzplan.import"), icon: ICONS.import, onClick: () => dateiWaehlen(doImport) },
           Object.keys(marken).length > 0 && { key: "markLeeren", label: t("sitzplan.markClear"), icon: ICONS.close || ICONS.trash, onClick: markenLeeren },

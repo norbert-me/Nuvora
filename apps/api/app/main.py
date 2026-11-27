@@ -298,6 +298,7 @@ def _ensure_columns(sync_conn):
         ("kurse", "karten_aktiv", "BOOLEAN DEFAULT true NOT NULL"),
         ("kurse", "color", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("seating_plans", "kurs_id", "INTEGER"),
+        ("seating_plans", "name", "VARCHAR(80) DEFAULT '' NOT NULL"),
         ("orga_items", "kurs_id", "INTEGER"),
         ("orga_items", "done_at", "JSON"),
         ("grade_sections", "kurs_id", "INTEGER"),

@@ -1112,6 +1112,8 @@ class SeatingPlan(Base):
     # Sitzplan haengt am Kurs (Fach): dieselbe Klasse sitzt in Mathe anders als
     # in Info. kurs_id NULL = Klasse ohne Kurs (Fallback auf class_id).
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True)
+    # Mehrere Plaene je Kurs (Klassenraum, Computerraum …): der Name unterscheidet sie. Leer = der erste/alte Plan.
+    name: Mapped[str] = mapped_column(String(80), default="", server_default="")
     data: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
