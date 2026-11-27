@@ -2168,6 +2168,7 @@ export default {
   "klassenarbeit.ci": "IC 95%",
   "klassenarbeit.ciHint": "Intervalo de confianza del 95% de la tasa media de acierto de esta tarea.",
   "klassenarbeit.attendance": "Presentes",
+  "klassenarbeit.ohneNote": "{{n}} sin nota (LE/NC)",
   "klassenarbeit.ubHint": "Clic: NB (sin calificar) o nota",
   "klassenarbeit.gewichtZeile": "Peso",
   "klassenarbeit.gewichtZeileHint": "Parte de la tarea en todo el examen",

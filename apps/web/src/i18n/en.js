@@ -2167,6 +2167,7 @@ export default {
   "klassenarbeit.ci": "95% CI",
   "klassenarbeit.ciHint": "95% confidence interval of this task's mean success rate.",
   "klassenarbeit.attendance": "Present",
+  "klassenarbeit.ohneNote": "{{n}} without grade (LE/NG)",
   "klassenarbeit.ubHint": "Click: NB (not graded) or grade",
   "klassenarbeit.gewichtZeile": "Weight",
   "klassenarbeit.gewichtZeileHint": "Share of this task in the whole test",

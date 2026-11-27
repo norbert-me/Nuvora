@@ -187,10 +187,11 @@ export function vereineAnalysen(teile, topicLabel) {
   }));
   const topics = [...themen.values()].map((x) => ({ ...x, pct: x.m ? Math.round((x.e / x.m) * 100) : 0 })).sort((a, b) => a.pct - b.pct);
   const gradedCount = da.reduce((n, [, a]) => n + a.gradedCount, 0);
+  const geschriebenCount = da.reduce((n, [, a]) => n + (a.geschriebenCount ?? a.gradedCount), 0);
   const schwach = new Map();
   da.forEach(([, a]) => a.weakGroups.forEach((g) => schwach.set(g.label, [...(schwach.get(g.label) || []), ...g.namen])));
   const weakGroups = [...schwach.entries()]
-    .map(([label, namen]) => ({ label, namen, anteil: gradedCount ? Math.round(namen.length / gradedCount * 100) : 0 }))
+    .map(([label, namen]) => ({ label, namen, anteil: geschriebenCount ? Math.round(namen.length / geschriebenCount * 100) : 0 }))
     .sort((a, b) => b.namen.length - a.namen.length);
   const vor = (stufe, x) => `${stufe} · ${x}`;
   // „E · 3. (E)" waere doppelt: das Blatt steht schon vorn. Ein „(G)" am E-Blatt
@@ -202,12 +203,13 @@ export function vereineAnalysen(teile, topicLabel) {
   const pctArr = da.flatMap(([, a]) => a.noten.pctArr);
   const total = da.reduce((n, [, a]) => n + a.noten.total, 0);
   return {
-    topics, weakGroups, gradedCount, perTask, perUnit,
+    topics, weakGroups, gradedCount, geschriebenCount, perTask, perUnit,
     students: da.flatMap(([, a]) => a.students),
     bogen: da.flatMap(([, a]) => a.bogen),
     fehlerRoh: da.flatMap(([, a]) => a.fehlerRoh),
     fehlerStat: fehlerStatAus(da.flatMap(([, a]) => a.fehlerRoh), topicLabel),
-    noten: { ...notenStat(notes, pctArr, total), minPts: [], max: null },
+    noten: { ...notenStat(notes, pctArr, total), present: da.reduce((n, [, a]) => n + (a.noten.present ?? 0), 0),
+      ohneNote: da.reduce((n, [, a]) => n + (a.noten.ohneNote ?? 0), 0), minPts: [], max: null },
   };
 }
 
@@ -284,10 +286,15 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
   // LE-Kinder (Foerderschwerpunkt Lernen) haben keine Note: sie zaehlen nicht in
   // Schnitt, Verteilung und Aufgabenstatistik der Klasse.
   const ubKinder = new Set((work.unbewertet || []).map(String));
-  const graded = students.filter(erfasstIst).filter((s) => !leIst(s) && !ubKinder.has(String(s.id)));
+  // GESCHRIEBEN haben auch sie: in den Listen je Kind (schwache Themen, Fehlerarten, Rueckmeldebogen) und bei
+  // „mitgeschrieben" stehen sie mit — sonst sah es aus, als haetten sie gefehlt. Nur die Klassenwerte
+  // (Schnitt, Verteilung, Themen- und Aufgabenquote) bleiben ohne sie.
+  const geschrieben = students.filter(erfasstIst);
+  const graded = geschrieben.filter((s) => !leIst(s) && !ubKinder.has(String(s.id)));
+  const ohneNote = (s) => leIst(s) || ubKinder.has(String(s.id));
   // Je Kind seine Wertung und sein Themenprofil — beides in der Fassung,
   // die es je Aufgabe geschrieben hat.
-  const wert = new Map(graded.map((s) => [s.id, wertung(wk, s.id, effScale)]));
+  const wert = new Map(geschrieben.map((s) => [s.id, wertung(wk, s.id, effScale)]));
   const themenVon = (sid) => {
     const d = {};
     tasks.forEach((tk) => einheitenFuer(wk, sid, tk).forEach((u) => {
@@ -296,7 +303,7 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
     }));
     return d;
   };
-  const profil = new Map(graded.map((s) => [s.id, themenVon(s.id)]));
+  const profil = new Map(geschrieben.map((s) => [s.id, themenVon(s.id)]));
   const themenIds = [...new Set([...profil.values()].flatMap((d) => Object.keys(d)))];
   const mean = mittel;   // aus core/aufgabenstatistik.js
 
@@ -310,16 +317,16 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
   // erste im Alphabet.
   const weakGroups = (() => {
     const map = new Map();
-    graded.forEach((s) => schwachVon(s.id).forEach((label) => {
+    geschrieben.forEach((s) => schwachVon(s.id).forEach((label) => {
       if (!map.has(label)) map.set(label, []);
       map.get(label).push(s.name);
     }));
     return [...map.entries()]
-      .map(([label, namen]) => ({ label, namen, anteil: graded.length ? Math.round(namen.length / graded.length * 100) : 0 }))
+      .map(([label, namen]) => ({ label, namen, anteil: geschrieben.length ? Math.round(namen.length / geschrieben.length * 100) : 0 }))
       .sort((a, b) => b.namen.length - a.namen.length);
   })();
 
-  const studentsOut = graded.map((s) => {
+  const studentsOut = geschrieben.map((s) => {
     const weak = schwachVon(s.id);
     return weak.length ? { student_id: s.id, name: s.name, weak } : null;
   }).filter(Boolean);
@@ -375,7 +382,7 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
   const notes = graded.map((s) => { const d = gradeDetailed(wert.get(s.id).pct, effScale); return { name: s.name, note: d.note, wert: d.wert, grade: d.grade }; });
   const minPts = [1, 2, 3, 4, 5].map((g) => ({ grade: g, pts: Math.ceil(((effScale[g] || 0) / 100) * tm) }));
   const pctArr = graded.map((s) => wert.get(s.id).pct);
-  const noten = { ...notenStat(notes, pctArr, students.length), minPts, max: tm };
+  const noten = { ...notenStat(notes, pctArr, students.length), present: geschrieben.length, ohneNote: geschrieben.length - graded.length, minPts, max: tm };
   // ── Fehlerarten ──
   // Dieselben zwei Regeln wie im Server (_fehler_gezaehlt in
   // klassenarbeit.py): nur gewertete Kinder, und nur Zellen, in denen
@@ -384,7 +391,7 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
   // Und nur in der Fassung, die das Kind geschrieben hat.
   const meineEinheiten = (sid) => new Map(tasks.flatMap((tk) => einheitenFuer(wk, sid, tk).map((u) => [u.id, u])));
   const fehlerRoh = [];
-  graded.forEach((s) => {
+  geschrieben.forEach((s) => {
     const zeile = (work.fehler || {})[String(s.id)] || {};
     const meine = meineEinheiten(s.id);
     Object.entries(zeile).forEach(([uid, art]) => {
@@ -420,7 +427,7 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
     });
     return liste;
   };
-  const bogen = graded.map((s) => {
+  const bogen = geschrieben.map((s) => {
     const w = wert.get(s.id);
     const themen = Object.entries(profil.get(s.id)).map(([tid, [e, m]]) => (
       { label: topicLabel(Number(tid)), erreicht: e, max: m, pct: m ? Math.round(e / m * 100) : 0 }
@@ -435,11 +442,12 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
       : null;
     return {
       student_id: s.id, name: s.name, punkte: rund(w.erreicht, 2), max: tm, pct: Math.round(w.pct),
-      note: tm ? gradeFromPct(w.pct, effScale) : null,
+      // LE/UB: keine Note auf dem Blatt — alles andere (Punkte, Themen, Wiederholung) schon.
+      note: tm && !ohneNote(s) ? gradeFromPct(w.pct, effScale) : null,
       // Dieselbe Note mit Tendenz („4+") und als Wert („3,7") — welche aufs
       // Blatt kommt, wählt die Lehrkraft vor dem Druck.
-      noteTendenz: tm ? gradeDetailed(w.pct, effScale).note : null,
-      noteWert: tm ? gradeDetailed(w.pct, effScale).wert : null,
+      noteTendenz: tm && !ohneNote(s) ? gradeDetailed(w.pct, effScale).note : null,
+      noteWert: tm && !ohneNote(s) ? gradeDetailed(w.pct, effScale).wert : null,
       // ≥ 75 % sass, < 50 % ist Baustelle. Dazwischen steht bewusst nichts:
       // ein Blatt, auf dem jedes Thema kommentiert ist, liest niemand.
       sass: themen.filter((x) => x.pct >= 75),
@@ -452,7 +460,7 @@ export function rechneAnalyse({ work, wk, students, effScale, topicLabel, eigene
     };
   });
 
-  return { topics: topicsOut, students: studentsOut, weakGroups, fehlerStat, fehlerRoh, bogen, gradedCount: graded.length, perTask, perUnit, noten };
+  return { topics: topicsOut, students: studentsOut, weakGroups, fehlerStat, fehlerRoh, bogen, gradedCount: graded.length, geschriebenCount: geschrieben.length, perTask, perUnit, noten };
 }
 
 // Wiederholung aus dem Lernpfad: statt der Original-Aufgabe bekommt jedes Kind
@@ -1284,7 +1292,7 @@ export default function Klassenarbeit() {
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0 }}>{g.label}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: g.anteil >= 50 ? C.danger : C.warning }}>
-                          {t("klassenarbeit.weakCount", { n: g.namen.length, all: A.gradedCount })}
+                          {t("klassenarbeit.weakCount", { n: g.namen.length, all: A.geschriebenCount ?? A.gradedCount })}
                         </span>
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -1372,7 +1380,8 @@ export default function Klassenarbeit() {
                 <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.gradeResult")}</div>
                 {/* Statistik-Kacheln (Anwesend … 95%-KI) — wie CardVote. */}
                 <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
-                  <StatCard label={t("klassenarbeit.attendance")} value={`${A.noten.present} / ${A.noten.total}`} />
+                  <StatCard label={t("klassenarbeit.attendance")} value={`${A.noten.present} / ${A.noten.total}`}
+                    sub={A.noten.ohneNote ? t("klassenarbeit.ohneNote", { n: A.noten.ohneNote }) : undefined} />
                   {(() => {
                     const nE = alleStudents.filter((s) => s.niveau === "E").length, nG = alleStudents.filter((s) => s.niveau === "G").length;
                     // Gemeinsame Auswertung: je nach gewaehltem Blatt nur E, nur G oder beide.
