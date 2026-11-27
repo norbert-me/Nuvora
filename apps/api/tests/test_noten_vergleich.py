@@ -98,3 +98,17 @@ async def test_fremdes_konto_bleibt_draussen(s):
     await s.commit()
     with pytest.raises(HTTPException):
         await N.vergleich(c7.id, a7.id, kurs_id=jetzt.id, user=fremd, db=s)
+
+
+@pytest.mark.asyncio
+async def test_vorjahr_aus_dem_notenbuch_der_klasse(s):
+    """Bestand von vor dem Kurs-Umbau: das Vorjahres-Notenbuch haengt an der KLASSE (Abschnitte ohne kurs_id)."""
+    u, jetzt, c7, a7, _ = await _welt(s)
+    vor = await s.get(m.Kurs, jetzt.vorgaenger_id)
+    alt = (await s.execute(m.GradeSection.__table__.select().where(m.GradeSection.kurs_id == vor.id))).all()
+    for row in alt:
+        sec = await s.get(m.GradeSection, row.id)
+        sec.kurs_id = None
+    await s.commit()
+    v = await N.vergleich(c7.id, a7.id, kurs_id=jetzt.id, user=u, db=s)
+    assert v.vorjahr is not None and v.vorjahr.jahr == 2.5

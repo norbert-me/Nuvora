@@ -30,6 +30,31 @@ export default function KursKlasseSelect({ value, kursValue = null, onChange, on
     });
   }, []);
 
+  // Ein Link kann auf einen ARCHIVIERTEN Kurs zeigen („Dieser Kurs in … Notenbuch" im Archiv). Die Liste kennt
+  // nur aktive Kurse — die Auswahl fiel dann auf den ersten Kurs, und man sah das Notenbuch eines ganz anderen
+  // Kurses. Steht der gewuenschte Kurs (oder die Klasse) nicht in der Liste, wird er aus dem Archiv
+  // dazugeholt und als „(Archiv)" gekennzeichnet — nur dieser eine, das Archiv bleibt sonst draussen.
+  const [archivGeholt, setArchivGeholt] = useState(false);
+  useEffect(() => {
+    if (!groups.length || archivGeholt) return;
+    const kursDa = kursValue == null || groups.some((g) => String(g.id) === String(kursValue));
+    const klasseDa = value == null || value === "" || groups.some((g) => g.classes.some((c) => c.id === value));
+    if (kursDa && klasseDa) return;
+    setArchivGeholt(true);
+    Promise.all([hol("/api/kurse?archiviert=true"), hol("/api/classes?archiviert=true")]).then(([kurse, classes]) => {
+      const archivKlassen = Array.isArray(classes) ? classes : [];
+      const passend = (Array.isArray(kurse) ? kurse : [])
+        .filter((k) => String(k.id) === String(kursValue) || (k.classes || []).some((c) => c.id === value))
+        .map((k) => ({ id: k.id, name: `${k.name} (Archiv)`, classes: k.classes || [] }))
+        .filter((x) => x.classes.length);
+      if (!passend.length) {
+        const kl = archivKlassen.find((c) => c.id === value);
+        if (kl) passend.push({ id: "none", name: `${kl.name} (Archiv)`, classes: [{ id: kl.id, name: kl.name }] });
+      }
+      if (passend.length) setGroups((alt) => [...alt.filter((g) => !passend.some((p) => String(p.id) === String(g.id))), ...passend]);
+    }).catch(() => { /* ohne Archiv bleibt es bei den aktiven */ });
+  }, [groups, value, kursValue, archivGeholt]);
+
   // Kurs-Auswahl mit value abgleichen: nur neu ableiten, wenn der aktuell
   // gewählte Kurs die value-Klasse NICHT (mehr) enthält (Erstladen oder value
   // wurde von außen auf eine fremde Klasse gesetzt). Sonst den Kurs stehen

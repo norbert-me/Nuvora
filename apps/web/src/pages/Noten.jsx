@@ -1883,7 +1883,7 @@ const kurzNameOrt = (n) => (kurzNameAn() ? kurzName(n) : n);
  * Gerechnet wird am Server (`/students/{id}/vergleich`, dieselbe Rechnung wie die Tabelle): eine Quartalsnote ist
  * der Stand am Tag des Quartalsstrichs, das Vorjahr die Jahresnote im Vorgängerkurs. Ohne Strich gibt es keine
  * Quartale, ohne Vorgängerkurs keine Vorjahresspalte — was fehlt, fällt weg statt als leere Zelle zu stehen.
- * Unter jeder Note der Abstand zur vorigen: kleiner ist besser, deshalb grün bei minus.
+ * Ohne Abstaende zwischen den Zellen (auf Wunsch entfernt): die Noten stehen nebeneinander, das reicht zum Vergleich.
  */
 function NotenVergleich({ t, classId, kursId, studentId, agg = "mean", stand = "" }) {
   const [d, setD] = useState(null);
@@ -1908,36 +1908,17 @@ function NotenVergleich({ t, classId, kursId, studentId, agg = "mean", stand = "
     title: p.bis ? t("noten.quartalStand", { datum: new Date(p.bis + "T00:00:00").toLocaleDateString() }) : undefined }));
   zellen.push({ key: "jahr", label: t("noten.jahr"), note: d.jahr, halb: true });
   if (!zellen.some((z) => z.note != null)) return null;
-  // Abstand zur vorigen BELEGTEN Zelle der eigenen Reihe (das Vorjahr steht davor und vergleicht nicht mit sich).
-  let vorher = null;
-  const mitDelta = zellen.map((z) => {
-    const delta = z.note != null && vorher != null && z.key !== "jahr" ? z.note - vorher : null;
-    if (z.note != null && z.key !== "jahr") vorher = z.note;
-    return { ...z, delta };
-  });
-  const aktuell = d.jahr ?? [...d.verlauf].reverse().find((p) => p.note != null)?.note ?? null;
-  const zumVorjahr = d.vorjahr?.jahr != null && aktuell != null ? aktuell - d.vorjahr.jahr : null;
-  const deltaText = (x) => `${x > 0 ? "+" : "−"}${de(Math.abs(x))}`;
-  const deltaFarbe = (x) => (x <= -0.05 ? C.success : x >= 0.05 ? C.danger : "var(--text3)");
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>{t("noten.vergleich")}</div>
-        {zumVorjahr != null && Math.abs(zumVorjahr) >= 0.05 && (
-          <span style={{ fontSize: 12, color: deltaFarbe(zumVorjahr) }}>{t("noten.zumVorjahr", { wert: deltaText(zumVorjahr) })}</span>
-        )}
-      </div>
+      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{t("noten.vergleich")}</div>
       <div style={{ display: "flex", gap: 4, overflowX: "auto" }}>
-        {mitDelta.map((z) => (
+        {zellen.map((z) => (
           <div key={z.key} title={z.title}
             style={{ flex: "1 0 52px", minWidth: 0, textAlign: "center", padding: "6px 4px", borderRadius: CONTROL_R,
               border: "1px solid var(--border)", background: z.halb ? "var(--bg2)" : "transparent",
               borderStyle: z.vorjahr ? "dashed" : "solid" }}>
             <div style={{ fontSize: 11, color: "var(--text3)", whiteSpace: "nowrap" }}>{z.label}</div>
             <div style={{ fontSize: 16, fontWeight: z.halb ? 700 : 500, fontVariantNumeric: "tabular-nums" }}>{z.note != null ? deAnz(z.note) : "·"}</div>
-            <div style={{ fontSize: 11, minHeight: 14, color: z.delta != null ? deltaFarbe(z.delta) : "transparent" }}>
-              {z.delta != null && Math.abs(z.delta) >= 0.05 ? deltaText(z.delta) : z.delta != null ? "±0" : "·"}
-            </div>
           </div>
         ))}
       </div>

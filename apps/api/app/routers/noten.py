@@ -24,7 +24,7 @@ from sqlalchemy.orm import selectinload
 from ..besitz import eigene_klasse, eigenes, gehoert_optional, kurs_oder_klasse
 from ..uploads import anhang_kopf
 from ..scoring import note_aus_pct
-from ..kursmitglieder import eigener_kurs, member_student_ids, sibling_class_ids, kurs_der_klasse
+from ..kursmitglieder import eigener_kurs, member_class_ids, member_student_ids, sibling_class_ids, kurs_der_klasse
 from ..felder import ohne_leer, ohne_none
 from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
@@ -1033,23 +1033,30 @@ async def _vorjahr(db, user, student: Student, kurs_id: int, mode: str) -> Optio
     vor = await db.get(Kurs, kurs.vorgaenger_id)
     if vor is None or vor.owner_id != user.id or vor.deleted_at is not None:
         return None
-    # Die Spalten liegen je Klasse; welche Klassen das Notenbuch des Vorjahrs fuehrt, sagen seine Abschnitte.
-    klassen = sorted(set((await db.execute(select(GradeSection.class_id).where(
+    leer = VorjahrOut(kurs=kurs_label(vor), schuljahr=vor.schuljahr or "", halbjahre={"1": None, "2": None})
+    # Wo liegt das Notenbuch des Vorjahrs? Am Kurs (Abschnitte mit kurs_id) — oder, beim Bestand von vor dem
+    # Kurs-Umbau, noch an der KLASSE (Abschnitte ohne kurs_id). Beide Wege probieren; sonst blieb die Vorjahresnote
+    # bei genau den alten Kursen leer, um die es beim Vergleich geht.
+    am_kurs = sorted(set((await db.execute(select(GradeSection.class_id).where(
         GradeSection.owner_id == user.id, GradeSection.kurs_id == vor.id))).scalars().all()))
-    if not klassen:
-        return VorjahrOut(kurs=kurs_label(vor), schuljahr=vor.schuljahr or "", halbjahre={"1": None, "2": None})
-    roster = await _kanon_kurs(db, vor.id)
+    klassen_vor = sorted(await member_class_ids(db, [vor.id]))
+    wege = [(cid, vor.id) for cid in am_kurs] + [(cid, None) for cid in klassen_vor]
+    if not wege:
+        return leer
+    # Dasselbe Kind: ueber die Person, sonst den Namen — und zwar JEDE seiner Zeilen (Fach-Klassen fuehren es je
+    # einmal), denn die Notenzeile des Klassen-Wegs ist nicht unbedingt die kanonische des Kurses.
     pid = getattr(student, "person_id", None)
-    treffer = next((x for x in roster if pid and x.person_id == pid), None) \
-        or next((x for x in roster if x.name.strip().lower() == student.name.strip().lower()), None)
-    if treffer is None:
+    name = (student.name or "").strip().lower()
+    zeilen = (await db.execute(select(Student).where(Student.class_id.in_(set(am_kurs) | set(klassen_vor))))).scalars().all()
+    ids = {z.id for z in zeilen if (pid and z.person_id == pid) or (z.name or "").strip().lower() == name}
+    if not ids:
         return None     # das Kind war im Vorjahr nicht in dieser Gruppe
-    for cid in klassen:
-        y = await year_summary(cid, agg=mode, kurs_id=vor.id, user=user, db=db)
-        row = next((r for r in y.rows if r.student_id == treffer.id), None)
+    for cid, kid in wege:
+        y = await year_summary(cid, agg=mode, kurs_id=kid, user=user, db=db)
+        row = next((r for r in y.rows if r.student_id in ids), None)
         if row and (row.year is not None or any(v is not None for v in row.term_ends.values())):
             return VorjahrOut(kurs=kurs_label(vor), schuljahr=vor.schuljahr or "", halbjahre=row.term_ends, jahr=row.year)
-    return VorjahrOut(kurs=kurs_label(vor), schuljahr=vor.schuljahr or "", halbjahre={"1": None, "2": None})
+    return leer
 
 
 @router.get("/classes/{class_id}/students/{student_id}/vergleich", response_model=VergleichOut)

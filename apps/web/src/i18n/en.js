@@ -1100,7 +1100,6 @@ export default {
   "noten.jahr": "Year",
   "noten.hjKurz": "T{{n}}",
   "noten.quartalStand": "As of {{datum}}",
-  "noten.zumVorjahr": "{{wert}} vs. last year",
   "noten.statTitle": "Statistics (final grades)",
   "noten.statAvg": "Average",
   "noten.statMedian": "Median",

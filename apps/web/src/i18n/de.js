@@ -1091,7 +1091,6 @@ export default {
   "noten.jahr": "Jahr",
   "noten.hjKurz": "{{n}}. HJ",
   "noten.quartalStand": "Stand am {{datum}}",
-  "noten.zumVorjahr": "{{wert}} zum Vorjahr",
   "noten.statTitle": "Statistik (Endnoten)",
   "noten.statAvg": "Schnitt",
   "noten.statMedian": "Median",

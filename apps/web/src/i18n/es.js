@@ -1101,7 +1101,6 @@ export default {
   "noten.jahr": "Año",
   "noten.hjKurz": "S{{n}}",
   "noten.quartalStand": "Estado al {{datum}}",
-  "noten.zumVorjahr": "{{wert}} respecto al año anterior",
   "noten.statTitle": "Estadística (notas finales)",
   "noten.statAvg": "Media",
   "noten.statMedian": "Mediana",
