@@ -15,7 +15,6 @@ import { COLORS as C, CONTROL_R, DialogKopf, linkBtn, toolbarBtn, Empty, FOKUS_T
 import { themenFuerKurs, themenIndex, useThemen } from "../core/topics.js";
 import { useKurs } from "../core/kurs.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
-import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
@@ -741,7 +740,8 @@ export default function Noten() {
             && { key: "cd", label: t("noten.fromCd"), icon: ICONS.chart, onClick: () => setCdDialog(true) },
         ] : []}
       >
-        {term !== "year" && classId && (
+        {/* Mit Abschnitten sitzt das Plus im Tabellenkopf hinter dem letzten Abschnitt — dort, wo er entsteht. */}
+        {term !== "year" && classId && sections.length === 0 && (
           <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
             className="icon-btn" style={toolbarIconBtn}>
             <Icon d={ICONS.plus} size={20} color="var(--accent)" />
@@ -875,7 +875,14 @@ export default function Noten() {
             <thead>
               <tr ref={kopf1Ref}>
                 <th style={{ ...th, ...stickyLh, whiteSpace: "nowrap", textAlign: "left", fontWeight: 400, fontSize: 13, color: gewichtSumme === 100 ? "var(--text3)" : C.warning }}>
-                  {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
+                    {/* Neuer Abschnitt: im Kopf der Tabelle, neben der Gewichtssumme, um die es dabei geht. */}
+                    <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
+                      className="icon-btn" style={{ ...iconBtn, padding: 4 }}>
+                      <Icon d={ICONS.plus} size={16} color="var(--accent)" />
+                    </button>
+                  </span>
                 </th>
                 {secListe.map((sec) => {
                   const isCol = collapsed.has(sec.id);
@@ -922,7 +929,8 @@ export default function Noten() {
                       `table-layout: auto` haelt sich keine Zelle an ein
                       `max-width`, das unter ihrer Mindestbreite liegt — und
                       `nowrap` macht den ganzen Namen zur Mindestbreite. */}
-                  <span style={{ display: "block", maxWidth: NAME_SPALTE_MAX, overflow: "hidden", textOverflow: "ellipsis" }}>{cls?.name}</span>
+                  {/* Kein Klassenname mehr: er steht in der Auswahl darueber. */}
+                  <span style={{ display: "block", maxWidth: NAME_SPALTE_MAX }} />
                 </th>
                 {secListe.map((sec) => {
                   const cols = catsVon(sec);
@@ -1601,12 +1609,6 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, classId, kursId
           <input type="checkbox" checked={optional} onChange={(e) => setOptional(e.target.checked)} />
           <span title={t("noten.colOptionalHint")}>{t("noten.colOptional")}</span>
         </label>
-        {cat.topic_id && kartenAktiv && (
-          <button onClick={() => { onNachhol(cat); onClose(); }}
-            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: C.warning, cursor: "pointer" }}>
-            <Icon d={ICONS.bulb} size={14} /> {t("noten.nachhol")}
-          </button>
-        )}
         {cat.source_session_id && cvAktiv && (
           <Link to={`/cardvote/evaluation/${cat.source_session_id}`} onClick={onClose}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--accent)", textDecoration: "none", boxSizing: "border-box" }}>
@@ -2045,7 +2047,8 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
           </div>
         )}
         <Fehlzeiten classId={classId} studentId={student.id} t={t} />
-        <SchuelerAngaben studentId={student.id} kursId={kursId} nurLesen t={t} />
+        {/* E/G und Foerderbedarf stehen nicht mehr hier (auf Wunsch entfernt): beim Blick auf die Noten am Beamer
+            gehoeren sie nicht ins Bild. Gepflegt und gelesen werden sie im Kurs und auf der Personenseite. */}
         <NotenVergleich t={t} classId={classId} kursId={kursId} studentId={student.id} agg={agg}
           stand={`${entries.length}|${dividers.join(",")}|${summary?.weighted ?? ""}|${summary?.total_override ?? ""}`} />
 
