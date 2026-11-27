@@ -1568,6 +1568,12 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, classId, kursId
             style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer", textDecoration: "none" }}>
             <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
           </Link>
+        ) : cat.source_session_id && cvAktiv ? (
+          /* Aus einem CardVote-Test: „Details" ist dessen Auswertung. */
+          <Link to={`/cardvote/evaluation/${cat.source_session_id}`} onClick={onClose}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer", textDecoration: "none" }}>
+            <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
+          </Link>
         ) : (<button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
           <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
         </button>
@@ -1609,12 +1615,6 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, classId, kursId
           <input type="checkbox" checked={optional} onChange={(e) => setOptional(e.target.checked)} />
           <span title={t("noten.colOptionalHint")}>{t("noten.colOptional")}</span>
         </label>
-        {cat.source_session_id && cvAktiv && (
-          <Link to={`/cardvote/evaluation/${cat.source_session_id}`} onClick={onClose}
-            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--accent)", textDecoration: "none", boxSizing: "border-box" }}>
-            <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.fromCardvote")}
-          </Link>
-        )}
         {!cat.source_session_id && cat.source_kind === "karten" && kartenAktiv && (
           <Link to={`/karten?tab=progress&class=${classId}`} onClick={onClose}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: C.success, textDecoration: "none", boxSizing: "border-box" }}>
