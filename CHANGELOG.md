@@ -14,6 +14,13 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## 4.7.1 — 27.11.2026
+
+- **Noten:** der Notenwert bleibt in seiner Note — oben im Band glatt (5,0), an der Grenze 5,4, unter der 5er-Grenze 6; die Tendenz (5+/5/5-) kommt aus den Dritteln des Bandes. 34 % bei „5 ab 18 %“ ist jetzt 5,2 statt 4,9.
+- **Sitzplan:** mehrere Sitzpläne je Kurs (z. B. Klassenraum und Computerraum) — neu anlegen, kopieren, umbenennen, löschen; die Planwahl steht neben der Kurswahl.
+- **Notenbuch:** ein archivierter Kurs öffnet sein eigenes Notenbuch (statt des ersten aktiven); die Vorjahresnote kommt auch aus älteren Notenbüchern, die noch an der Klasse hängen; im Vergleich stehen nur noch die Noten, ohne Abstände.
+- **Hilfe:** Suchfeld über alle Bereiche; ein Klick auf einen Reiter verstellt die Navigation oben nicht mehr.
+
 ## 4.7.0 — 27.11.2026
 
 - **Notenbuch:** am Namen eines Kindes steht der Vergleich — Vorjahresnote (aus dem Vorgängerkurs), je Quartal der Stand am Quartalsstrich, Halbjahre und Jahr, jeweils mit Abstand zur vorigen Note.
