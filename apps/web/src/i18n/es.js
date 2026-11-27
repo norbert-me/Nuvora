@@ -2170,8 +2170,6 @@ export default {
   "klassenarbeit.attendance": "Presentes",
   "klassenarbeit.ohneNote": "{{n}} sin nota (LE/NC)",
   "klassenarbeit.ubHint": "Clic: NB (sin calificar) o nota",
-  "klassenarbeit.gewichtZeile": "Peso",
-  "klassenarbeit.gewichtZeileHint": "Parte de la tarea en todo el examen",
   "klassenarbeit.egAnzahl": "Alumnado E / G",
   "klassenarbeit.egAnzahlE": "Alumnado E",
   "klassenarbeit.egAnzahlG": "Alumnado G",

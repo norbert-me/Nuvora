@@ -1154,19 +1154,20 @@ function ExtInfoModal({ ev, onClose, onHide, onEigen, t }) {
         {ev.time && <Zeile label={t("kalender.extTime")}>{ev.endtime && ev.endtime !== ev.time ? `${ev.time} – ${ev.endtime}` : ev.time}</Zeile>}
         {ev.location && <Zeile label={t("kalender.extLocation")}>{ev.location}</Zeile>}
         {ev.description && <Zeile label={t("kalender.extDesc")}>{ev.description}</Zeile>}
-        <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 8 }}>
+        {/* Umbrechen darf die REIHE, nicht der Knopf: „Als eigenen Termin ändern" stand sonst in vier Zeilen. */}
+        <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {onHide && ev.key && (
-            <button onClick={() => onHide(ev.key)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("kalender.extHideHint")}>
+            <button onClick={() => onHide(ev.key)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }} title={t("kalender.extHideHint")}>
               <Icon d={ICONS.eye} size={15} /> {t("kalender.extHide")}
             </button>
           )}
           {onEigen && (
-            <button onClick={() => onEigen(ev)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("kalender.extEigenHint")}>
+            <button onClick={() => onEigen(ev)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }} title={t("kalender.extEigenHint")}>
               <Icon d={ICONS.edit || ICONS.plus} size={15} /> {t("kalender.extEigen")}
             </button>
           )}
           <span style={{ flex: 1 }} />
-          <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
+          <button onClick={onClose} style={{ ...btnSecondary, whiteSpace: "nowrap" }}>{t("common.close")}</button>
         </div>
     </Modal>
   );

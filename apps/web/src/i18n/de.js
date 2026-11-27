@@ -2152,8 +2152,6 @@ export default {
   "klassenarbeit.attendance": "Anwesend",
   "klassenarbeit.ohneNote": "davon {{n}} ohne Note (LE/NB)",
   "klassenarbeit.ubHint": "Klick: NB (nicht bewertet) oder Note",
-  "klassenarbeit.gewichtZeile": "Gewicht",
-  "klassenarbeit.gewichtZeileHint": "Anteil der Aufgabe an der ganzen Arbeit",
   "klassenarbeit.egAnzahl": "SuS E / G",
   "klassenarbeit.egAnzahlE": "SuS E",
   "klassenarbeit.egAnzahlG": "SuS G",

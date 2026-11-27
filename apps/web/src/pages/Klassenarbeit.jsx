@@ -1773,29 +1773,6 @@ export default function Klassenarbeit() {
                     );
                   })}
                 </tbody>
-                {/* Unter dem Raster das Gewicht jeder Aufgabe in Prozent. Die Zeile „Ø Klasse" ist entfallen:
-                    dieselben Quoten stehen darunter in der Auswertung je Aufgabe. */}
-                {(() => {
-                  const gesamt = totalMax();
-                  const anteil = (m) => (gesamt > 0 ? Math.round((m / gesamt) * 100) : 0);
-                  const kopf = { ...td, ...klebtLinks, textAlign: "left", fontSize: 12, fontWeight: 700, color: "var(--text2)", background: "var(--bg2)" };
-                  const zelleF = { ...td, fontSize: 12, color: "var(--text2)", background: "var(--bg2)" };
-                  return (
-                    <tfoot>
-                      <tr>
-                        <td style={kopf} title={t("klassenarbeit.gewichtZeileHint")}>{t("klassenarbeit.gewichtZeile")}</td>
-                        {(work.tasks || []).flatMap((tk) => spalten(tk).map((sp, j) => {
-                          const rand = j === 0 ? "1px solid var(--border)" : undefined;
-                          if (sp.art === "wahl") return <td key={tk.id + "-wahl"} style={{ ...zelleF, borderLeft: rand }} />;
-                          if (sp.art === "summe") return <td key={tk.id + "-sum"} style={{ ...zelleF, fontWeight: 700 }}>{anteil(basis([tk]))} %</td>;
-                          return <td key={sp.u.id} style={{ ...zelleF, borderLeft: rand }}>{anteil(sp.u.max)} %</td>;
-                        }))}
-                        <td style={{ ...zelleF, fontWeight: 700, borderLeft: "1px solid var(--border)" }}>100 %</td>
-                        <td style={zelleF} />
-                      </tr>
-                    </tfoot>
-                  );
-                })()}
               </table>
             </div>
           )}

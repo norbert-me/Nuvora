@@ -2169,8 +2169,6 @@ export default {
   "klassenarbeit.attendance": "Present",
   "klassenarbeit.ohneNote": "{{n}} without grade (LE/NG)",
   "klassenarbeit.ubHint": "Click: NB (not graded) or grade",
-  "klassenarbeit.gewichtZeile": "Weight",
-  "klassenarbeit.gewichtZeileHint": "Share of this task in the whole test",
   "klassenarbeit.egAnzahl": "Pupils E / G",
   "klassenarbeit.egAnzahlE": "Pupils E",
   "klassenarbeit.egAnzahlG": "Pupils G",
