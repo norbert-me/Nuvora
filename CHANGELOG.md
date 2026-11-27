@@ -14,6 +14,14 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## 4.7.3 — 27.11.2026
+
+- **Namen:** Vorname, weitere Vornamen (mit +) und Nachname je ein eigenes Feld — auf der Personenseite und in der Kinderliste des Kurses. Angezeigt wird überall Vorname + Nachname; Zeugnis und Export behalten den vollen Namen. Namenslisten erkennen „Nachname, Vorname“ und aus Excel kopierte Spalten; die Klassen-Vorlage hat die Spalten Vorname / Weitere Vornamen / Nachname.
+- **Notenbuch:** Spalte Q1 (bzw. Q3) mit der Quartalsnote; die Spalten bis zum Quartalsstrich lassen sich einklappen. Die Tabelle passt sich der Fensterhöhe an — die Seite scrollt nicht mehr, die Fußzeile bleibt sichtbar (PC und Handy).
+- **Schülerseite:** die Kinder sehen je Kurs auch Q1 · 1. HJ · Q3 · 2. HJ.
+- **Tafel:** PDF einfügen, darin scrollen und mit Stift, Marker und Radierer hineinzeichnen (PowerPoint vorher als PDF speichern). Die Safari-Einstellung „Tiere zählen“ bleibt beim Speichern erhalten.
+- **Klassenarbeit:** sichtbarer NB-Schalter neben der Note jedes Kindes.
+
 ## 4.7.2 — 27.11.2026
 
 - **Notenbuch:** Eingabe **X** = keine Note erhalten (zählt nicht, gilt nicht als fehlend); unter der Tabelle stehen die möglichen Eingaben. Das Plus für einen neuen Abschnitt sitzt im Tabellenkopf; der Klassenname steht dort nicht mehr. Beobachtungen nachträglich mit Datum anlegen und bearbeiten. Klick auf einen Namen zeigt kein E/G und keinen Förderbedarf mehr.
