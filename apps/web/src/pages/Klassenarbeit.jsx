@@ -1764,10 +1764,19 @@ export default function Klassenarbeit() {
                         <td title={erfasst && wt.bonusPct > 0 ? t("klassenarbeit.eBonus", { p: kommaRund(wt.bonusPct, 1) }) : undefined}
                           style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: !erfasst ? "var(--text3)" : abw ? "var(--text3)" : (tm && wt.pct < 50 ? C.danger : "var(--text)") }}>{erfasst ? `${kommaRund(sum, 2)}/${komma(tm)}` : `–/${komma(tm)}`}</td>
                         <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>
-                          {/* Klick auf die Note: zwischen NB (nicht bewertet) und der Note wechseln. LE ist immer NB. */}
-                          <button onClick={() => toggleUb(s.id)} disabled={leIst(s)} aria-pressed={istUb(s.id)}
-                            title={t("klassenarbeit.ubHint")} aria-label={t("klassenarbeit.ubHint")}
-                            style={{ border: "none", background: "none", font: "inherit", color: "inherit", cursor: leIst(s) ? "default" : "pointer", minWidth: 32, minHeight: 32, padding: 0 }}>{note || "·"}</button>
+                          {/* Note und daneben ein sichtbarer NB-Schalter: „Klick auf die Note" allein fand niemand.
+                              LE ist immer NB (Schalter gesperrt). */}
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+                            <span>{note || "·"}</span>
+                            {!leIst(s) && (
+                              <button onClick={() => toggleUb(s.id)} aria-pressed={istUb(s.id)}
+                                title={t("klassenarbeit.ubHint")} aria-label={t("klassenarbeit.ubHint")}
+                                style={{ fontSize: 11, fontWeight: 700, lineHeight: 1, padding: "3px 6px", borderRadius: CONTROL_R, cursor: "pointer",
+                                  border: `1px solid ${istUb(s.id) ? "var(--accent)" : "var(--border2)"}`,
+                                  background: istUb(s.id) ? "var(--accent-bg)" : "transparent",
+                                  color: istUb(s.id) ? "var(--accent)" : "var(--text3)" }}>NB</button>
+                            )}
+                          </span>
                         </td>
                       </tr>
                     );

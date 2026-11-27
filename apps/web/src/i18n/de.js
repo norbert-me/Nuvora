@@ -2170,7 +2170,7 @@ export default {
   "klassenarbeit.ciHint": "95%-Konfidenzintervall der mittleren Trefferquote dieser Aufgabe.",
   "klassenarbeit.attendance": "Anwesend",
   "klassenarbeit.ohneNote": "davon {{n}} ohne Note (LE/NB)",
-  "klassenarbeit.ubHint": "Klick: NB (nicht bewertet) oder Note",
+  "klassenarbeit.ubHint": "NB: dieses Kind bekommt in dieser Arbeit keine Note (Punkte bleiben)",
   "klassenarbeit.egAnzahl": "SuS E / G",
   "klassenarbeit.egAnzahlE": "SuS E",
   "klassenarbeit.egAnzahlG": "SuS G",
