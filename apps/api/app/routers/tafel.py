@@ -98,6 +98,8 @@ def _items(roh) -> list:
                 if gut:
                     seiten[str(seite)[:6]] = gut
             sauber["striche"] = seiten
+        if "material_id" in sauber:
+            sauber["material_id"] = int(sauber["material_id"])   # eine ID, keine Kommazahl
         aus.append(sauber)
     return aus
 

@@ -8,7 +8,7 @@ def test_striche_form_und_grenzen():
         "2": [{"c": "#f00", "w": 999, "p": list(range(T.MAX_PUNKTE * 3))}],
     }, "zaehlen": False}]
     it = T._items(roh)[0]
-    assert it["material_id"] == 9.0
+    assert it["material_id"] == 9 and isinstance(it["material_id"], int)
     assert it["striche"]["1"] == [{"c": "#123456", "w": 3.0, "p": [0.1, 0.2, 0.3, 0.4]}]
     zwei = it["striche"]["2"][0]
     assert zwei["w"] == 40.0 and len(zwei["p"]) == T.MAX_PUNKTE * 2
