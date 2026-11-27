@@ -70,38 +70,41 @@ def note_aus_pct(pct: float, scale: Optional[dict] = None) -> float:
         s = {g: s[g] for g in (1, 2, 3, 4, 5, 6)}   # vollstaendig+lesbar? sonst Default
     except (ValueError, TypeError, KeyError):
         s = {int(k): float(v) for k, v in DEFAULT_SCALE.items()}
-    # „Note 2 ab 73 %" heisst: ab 73 % ist es eine 2 — an der Grenze die schwaechste (2-, 2,3), oben im Band die
-    # staerkste (2+, 1,7), dazwischen linear (entschieden 27.11.2026). Die 1 laeuft von 1,3 an der Grenze bis 1,0
-    # bei 100 %, unter der 5er-Grenze laeuft die 6 von 5,7 (6+) bis 6,0 bei 0 %. Vorher gab es zwei Rechnungen:
-    # CardVote/Notenbuch setzten an jede Grenze die schlechtere ganze Note (87 % = 2,0), die Klassenarbeit
-    # drittelte das Band — 10/48 war hier 5,9 und dort 5-.
+    # „Note 2 ab 73 %" heisst: ab 73 % ist es eine 2 — und der Notenwert bleibt in der 2 (entschieden 27.11.2026):
+    # oben im Band 2,0, an der Grenze 2,4, linear dazwischen. Er rutscht nie in die Nachbarnote (34 % bei „5 ab
+    # 18 %" war vorher 4,9 und las sich wie eine 4). Unter der 5er-Grenze glatt 6,0.
     ranges = [(1, s[1], 100), (2, s[2], s[1]), (3, s[3], s[2]), (4, s[4], s[3]), (5, s[5], s[4])]
     for grade, lower, upper in ranges:
         if pct >= lower:
             span = upper - lower
             pos = min(1.0, max(0.0, (pct - lower) / span)) if span > 0 else 1.0
-            if grade == 1:
-                return kaufmaennisch(1.3 - 0.3 * pos, 1)
-            return kaufmaennisch(grade + 0.3 - 0.6 * pos, 1)
-    unten = s[5]
-    pos = min(1.0, max(0.0, pct / unten)) if unten > 0 else 0.0
-    return kaufmaennisch(6.0 - 0.3 * pos, 1)
+            return kaufmaennisch(grade + 0.4 * (1 - pos), 1)
+    return 6.0
 
 
 def note_mit_tendenz(pct: float, scale: Optional[dict] = None) -> str:
-    """Prozent -> Note mit Tendenz („3+", „4-"). Spiegel von gradeDetailed in core/grades.js: die Tendenz
-    folgt aus dem Notenwert (`note_aus_pct`) — eine Rechnung, nicht zwei."""
-    return note_label(note_aus_pct(pct, scale))
+    """Prozent -> Note mit Tendenz („3+", „4-"), Spiegel von gradeDetailed in core/grades.js: im Band oberes
+    Drittel „+", unteres „-"; keine Tendenz an 1 und 6. Der Zahlenwert (`note_aus_pct`) bleibt in derselben Note."""
+    try:
+        s = {int(k): float(v) for k, v in (scale or {}).items()}
+        s = {g: s[g] for g in (1, 2, 3, 4, 5, 6)}
+    except (ValueError, TypeError, KeyError):
+        s = {int(k): float(v) for k, v in DEFAULT_SCALE.items()}
+    for grade, lower, upper in [(1, s[1], 100), (2, s[2], s[1]), (3, s[3], s[2]), (4, s[4], s[3]), (5, s[5], s[4])]:
+        if pct >= lower:
+            span = upper - lower
+            pos = (pct - lower) / span if span > 0 else 1
+            suffix = "+" if pos >= 2 / 3 else "-" if pos < 1 / 3 else ""
+            return str(grade) if grade == 1 else f"{grade}{suffix}"
+    return "6"
 
 
 def note_label(wert: float) -> str:
-    """Notenwert (2,3 / 2,7 …) -> „2+" / „3-". Die 1 kennt nur „1-" (besser als 1,0 gibt es nicht), die 6 nur „6+"."""
+    """Notenwert (2,3 / 2,7 …) -> „2+" / „3-"; kein „1-", kein „6+/-"."""
     g = min(6, max(1, int(round(wert))))
+    if g in (1, 6):
+        return str(g)
     d = wert - g
-    if g == 1:
-        return "1-" if d >= 0.15 else "1"
-    if g == 6:
-        return "6+" if d <= -0.15 else "6"
     return f"{g}+" if d <= -0.15 else f"{g}-" if d >= 0.15 else str(g)
 
 

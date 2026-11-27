@@ -225,9 +225,9 @@ async def test_jahresnote_mittelt_die_halbjahre(s):
 # ─── Prozent -> Note (Bruecke Code-Detektiv; Spiegel von core/grades.js) ───
 
 def test_note_aus_prozent_rundet_kaufmaennisch():
-    """77 % bei „2 ab 76 %" (Band bis 88) ergibt rechnerisch 2,25 — kaufmaennisch 2,3 (wie im Frontend).
+    """Band 2 = [76, 86): 2 + 0,4 · (1 − 3,75/10) = 2,25 bei 79,75 % — kaufmaennisch 2,3 (wie im Frontend).
     Pythons round() haette hier 2,2 gemacht: dieselbe Leistung, andere Note."""
-    assert N._grade_from_pct(77, {1: 88, 2: 76, 3: 59, 4: 45, 5: 20, 6: 0}) == 2.3
+    assert N._grade_from_pct(79.75, {1: 86, 2: 76, 3: 59, 4: 45, 5: 20, 6: 0}) == 2.3
 
 
 def test_note_aus_prozent_bleibt_im_bereich_eins_bis_sechs():
