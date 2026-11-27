@@ -412,7 +412,8 @@ def _ensure_columns(sync_conn):
         ("calendar_entries", "cardvote_set_id", "INTEGER"),
         ("calendar_entries", "karten_deck_id", "INTEGER"),
         ("calendar_entries", "karten_deck_ids", "JSON"),   # weitere Stapel der Stunde
-        ("materials", "reihe_stunde_id", "INTEGER"),       # Datei an einer Stunde einer Reihe
+        ("materials", "reihe_stunde_id", "INTEGER"),
+        ("materials", "tafel_id", "INTEGER"),               # PDF auf einer Tafel       # Datei an einer Stunde einer Reihe
         ("calendar_entries", "lernpfad_ladder_id", "INTEGER"),
         ("calendar_entries", "codedetektiv_puzzle", "VARCHAR(64)"),
         ("calendar_entries", "start_time", "VARCHAR(5) DEFAULT '' NOT NULL"),

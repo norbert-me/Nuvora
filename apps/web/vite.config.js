@@ -34,6 +34,9 @@ function precacheListe() {
         // Vorladen waere sie rund ein Megabyte, das niemand je benutzt. Im
         // Schulnetz ist das die Haelfte der Wartezeit beim ersten Oeffnen.
         .filter((name) => /\.(js|css|woff2|png|svg|jpe?g|webp)$/i.test(name))
+        // pdf.js (rund 450 KB plus 1,3 MB Worker) nur fuer PDFs auf der Tafel: geholt, wenn eins da liegt —
+        // nicht von jedem Geraet vorab (dieselbe Regel wie opencv.js oben).
+        .filter((name) => !/(^|\/)pdf[.-]/.test(name))
         .map((name) => "/" + name);
       this.emitFile({ type: "asset", fileName: "precache.json", source: JSON.stringify(dateien) });
     },
@@ -64,6 +67,10 @@ export default defineConfig({
         manualChunks: (id) => {
           if (/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom)\//.test(id)) return "react";
         },
+        // Der pdf.js-Worker kommt als .mjs. Ein Modul-Worker verlangt einen JavaScript-MIME-Typ, und ob der
+        // nginx des Servers .mjs kennt, haengt an seiner Fassung — als .js ist die Frage erledigt.
+        assetFileNames: (info) => ((info.names?.[0] || info.name || "").endsWith(".mjs")
+          ? "assets/[name]-[hash].js" : "assets/[name]-[hash][extname]"),
       },
     },
   },

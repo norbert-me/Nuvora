@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
 from ..besitz import eigenes, gehoert_optional
 from ..database import get_db
-from ..models import Material, Topic, CalendarEntry, Method, ReiheStunde, WorkAnalysis, User
+from ..models import Material, Topic, CalendarEntry, Method, ReiheStunde, TafelBoard, WorkAnalysis, User
 from sqlalchemy import func
 
 from .auth import get_current_user, rate_limit
@@ -53,6 +53,7 @@ class MaterialOut(BaseModel):
     method_id: Optional[int] = None
     work_id: Optional[int] = None
     reihe_stunde_id: Optional[int] = None
+    tafel_id: Optional[int] = None
     rolle: str = ""          # "arbeit" | "erwartung" | "" (sonstiger Anhang)
     filename: str
     mime: str
@@ -102,6 +103,15 @@ async def _check_reihe_stunde(db: AsyncSession, user_id: int, sid: Optional[int]
     return sid
 
 
+async def _check_tafel(db: AsyncSession, user_id: int, tid: Optional[int]) -> Optional[int]:
+    if tid is None:
+        return None
+    ok = (await db.execute(select(TafelBoard.id).where(TafelBoard.id == tid, TafelBoard.owner_id == user_id))).scalar_one_or_none()
+    if not ok:
+        raise HTTPException(404, "Tafel nicht gefunden")
+    return tid
+
+
 # Nur benannte Rollen, sonst leer: eine erfundene Rolle wuerde die Datei in der
 # Oberflaeche verschwinden lassen (sie zeigt genau die drei Faelle).
 ROLLEN = ("arbeit", "erwartung")
@@ -133,10 +143,14 @@ async def list_material(topic_id: Optional[int] = None, entry_id: Optional[int] 
 async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] = Form(None),
                           entry_id: Optional[int] = Form(None), method_id: Optional[int] = Form(None),
                           work_id: Optional[int] = Form(None), reihe_stunde_id: Optional[int] = Form(None), rolle: str = Form(""),
+                          tafel_id: Optional[int] = Form(None),
                           user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("material_up", f"u{user.id}", 60, 60, "Zu viele Uploads. Bitte kurz warten.")
-    if topic_id is None and entry_id is None and method_id is None and work_id is None and reihe_stunde_id is None:
-        raise HTTPException(400, "Material braucht ein Thema, eine Stunde, einen Einstieg, eine Klassenarbeit oder eine Reihen-Stunde")
+    # Direkt aufgerufen (Tests, interne Wege) steht hier sonst das Form-Objekt statt None.
+    tafel_id = tafel_id if isinstance(tafel_id, int) else None
+    if topic_id is None and entry_id is None and method_id is None and work_id is None and reihe_stunde_id is None and tafel_id is None:
+        raise HTTPException(400, "Material braucht ein Thema, eine Stunde, einen Einstieg, eine Klassenarbeit, eine Reihen-Stunde oder eine Tafel")
+    tafel_id = await _check_tafel(db, user.id, tafel_id)
     topic_id = await _check_topic(db, user.id, topic_id)
     entry_id = await _check_entry(db, user.id, entry_id)
     method_id = await _check_method(db, user.id, method_id)
@@ -175,7 +189,7 @@ async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] 
         if used + len(data) > QUOTA_BYTES:
             raise HTTPException(413, f"Speicher voll (max. {QUOTA_BYTES // 1024 // 1024} MB je Konto). Bitte alte Dateien löschen.")
     m = Material(owner_id=user.id, topic_id=topic_id, entry_id=entry_id, method_id=method_id,
-                 work_id=work_id, reihe_stunde_id=reihe_stunde_id, rolle=rolle if rolle in ROLLEN else "",
+                 work_id=work_id, reihe_stunde_id=reihe_stunde_id, tafel_id=tafel_id, rolle=rolle if rolle in ROLLEN else "",
                  filename=name, mime=mime,
                  size=len(data), sha256=pruef, quelle_id=quelle,
                  data=None if quelle is not None else data)

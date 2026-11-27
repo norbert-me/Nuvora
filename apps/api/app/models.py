@@ -1721,6 +1721,9 @@ class Material(Base):
     work_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
     # ... und an eine Stunde einer Reihe (Modul Reihen) — dieselbe Regel.
     reihe_stunde_id: Mapped[Optional[int]] = mapped_column(ForeignKey("reihen_stunden.id", ondelete="SET NULL"), nullable=True, index=True)
+    # ... und an eine Tafel (PDF zum Zeigen und Hineinzeichnen). CASCADE: ein PDF auf einer geloeschten Tafel
+    # hat keinen Ort mehr — anders als die Unterrichtsdateien oben gehoert es nur dieser Tafel.
+    tafel_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tafel_boards.id", ondelete="CASCADE"), nullable=True, index=True)
     # Wozu die Datei gehoert: "arbeit" | "erwartung" | "" (sonstiger Anhang).
     # Zwei benannte Plaetze statt einer namenlosen Liste — beim Nachkorrigieren
     # sucht niemand, welche der vier PDFs der Erwartungshorizont war. Mehrere je

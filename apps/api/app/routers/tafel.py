@@ -36,6 +36,8 @@ require_module = modul_pflicht(MODULE_KEY)
 MAX_ITEMS = 100
 MAX_TEXT = 5000
 MAX_TAFELN = 100
+MAX_STRICHE = 400      # je PDF-Seite
+MAX_PUNKTE = 2000      # je Strich
 
 
 class TafelIn(BaseModel):
@@ -66,7 +68,7 @@ def _items(roh) -> list:
         # (Lautstaerke-Anzeige) fielen vorher stillschweigend heraus, und die
         # Einstellung war nach dem Speichern weg.
         # `takt` (Stille-Safari: Minuten je Tier) dazu.
-        for zahl in ("minutes", "schwelle", "takt"):
+        for zahl in ("minutes", "schwelle", "takt", "material_id"):
             if zahl in it:
                 try:
                     sauber[zahl] = float(it[zahl])
@@ -76,6 +78,26 @@ def _items(roh) -> list:
             if text in it:
                 wert = it[text]
                 sauber[text] = wert[:MAX_TEXT] if isinstance(wert, str) else wert
+        # PDF: Striche je Seite {"1": [{"c": Farbe, "w": Breite, "p": [x, y, x, y, …]}, …]}, Koordinaten 0..1 der
+        # Seite. Die Form wird geprueft, nicht der Inhalt; Grenzen gegen eine aufgeblaehte Tafel.
+        if isinstance(it.get("striche"), dict):
+            seiten = {}
+            for seite, liste in list(it["striche"].items())[:300]:
+                if not isinstance(liste, list):
+                    continue
+                gut = []
+                for st in liste[:MAX_STRICHE]:
+                    if not isinstance(st, dict) or not isinstance(st.get("p"), list):
+                        continue
+                    try:
+                        punkte = [round(float(v), 4) for v in st["p"][:MAX_PUNKTE * 2]]
+                        breite = max(0.5, min(40.0, float(st.get("w") or 3)))
+                    except (TypeError, ValueError):
+                        continue
+                    gut.append({"c": str(st.get("c") or "#d11")[:9], "w": breite, "p": punkte})
+                if gut:
+                    seiten[str(seite)[:6]] = gut
+            sauber["striche"] = seiten
         aus.append(sauber)
     return aus
 

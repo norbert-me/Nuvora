@@ -2,17 +2,18 @@
 // Jedes Feld ist verschiebbar, in der Größe änderbar und hat eine Schriftgröße.
 // Reiner Client; der Stand liegt lokal (localStorage), damit er den Reload übersteht.
 import { useState, useRef, useEffect } from "react";
-import { btnSecondary, cardStyle, CONTROL_R, Icon, ICONS, iconBtn, popoverPanel, toolbarBtn, toolbarIconBtn, COLORS as C, pageFull, SHADOW } from "../components/Icons.jsx";
+import { btnSecondary, cardStyle, CONTROL_R, dateiWaehlen, Icon, ICONS, iconBtn, popoverPanel, toolbarBtn, toolbarIconBtn, COLORS as C, pageFull, SHADOW } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { alsJson, hol, sende } from "../core/melden.js";
-import { askConfirm, askPrompt } from "../core/dialog.jsx";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import SuchSelect from "../components/SuchSelect.jsx";
 import { hmToMin, minToHm, ymd } from "../core/datum.js";
 import { stundenZeit } from "../core/stunden";
 import { useMikroPegel } from "../core/mikroPegel.js";
 import TafelSafari from "../components/TafelSafari.jsx";
+import TafelPdf from "../components/TafelPdf.jsx";
 
 const KEY = "nuvora_tafel_v1";
 // Stiftfarben der Tafel. Bewusst feste Werte wie ANTWORT_COLORS: die Farbe IST
@@ -121,6 +122,26 @@ export default function Tafel() {
     const w = 1120, h = 630;
     const it = { id: uid(), type: "safari", x: (REF_W - w) / 2, y: 120, w, h, schwelle: 40, takt: 5, modus: "weglaufen", _ref: true };
     setItems((p) => [...p, it]); setSel(it.id);
+  };
+  // PDF (auch eine als PDF gespeicherte PowerPoint): liegt in der Ablage an DIESER Tafel — deshalb muss die Tafel
+  // gespeichert sein, sonst gaebe es nichts, woran die Datei haengt.
+  const addPdf = async () => {
+    if (!offene) { await showAlert(t("tafel.pdfErstSpeichern")); return; }
+    dateiWaehlen(async (datei) => {
+      const fd = new FormData();
+      fd.append("file", datei);
+      fd.append("tafel_id", offene);
+      const r = await fetch("/api/material", { method: "POST", body: fd }).catch(() => null);
+      if (!r || !r.ok) {
+        const d = r ? await r.json().catch(() => ({})) : {};
+        await showAlert(d.detail || t("tafel.pdfFehler"));
+        return;
+      }
+      const m = await r.json();
+      const w = 900, h = 820;
+      const it = { id: uid(), type: "pdf", x: (REF_W - w) / 2, y: 40, w, h, material_id: m.id, titel: datei.name, striche: {}, _ref: true };
+      setItems((p) => [...p, it]); setSel(it.id);
+    }, ".pdf,application/pdf");
   };
   const patch = (id, o) => setItems((p) => p.map((i) => (i.id === id ? { ...i, ...o } : i)));
   const del = (id) => { setItems((p) => p.filter((i) => i.id !== id)); if (sel === id) setSel(null); };
@@ -238,6 +259,8 @@ export default function Tafel() {
           <Icon d={ICONS.volume} size={17} /></button>
         <button onClick={addSafari} className="icon-btn" style={toolbarIconBtn} title={t("tafel.addSafari")} aria-label={t("tafel.addSafari")}>
           <Icon d={ICONS.sun} size={17} /></button>
+        <button onClick={addPdf} className="icon-btn" style={toolbarIconBtn} title={t("tafel.addPdf")} aria-label={t("tafel.addPdf")}>
+          <Icon d={ICONS.pdf} size={17} /></button>
         {kalenderAktiv && <button onClick={addVerlauf} className="icon-btn" style={toolbarIconBtn} title={t("tafel.addVerlauf")} aria-label={t("tafel.addVerlauf")}>
           <Icon d={ICONS.clock} size={17} /></button>}
         <button onClick={() => setFs((v) => !v)} className="icon-btn" style={toolbarIconBtn}
@@ -288,6 +311,8 @@ export default function Tafel() {
                 <TafelLaerm item={it} t={t} />
               ) : it.type === "safari" ? (
                 <TafelSafari item={it} t={t} onPatch={(o) => patch(it.id, o)} />
+              ) : it.type === "pdf" ? (
+                <TafelPdf item={it} t={t} onPatch={(o) => patch(it.id, o)} />
               ) : it.type === "verlauf" ? (
                 <TafelVerlauf t={t} />
               ) : (
