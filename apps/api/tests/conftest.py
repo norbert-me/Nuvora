@@ -78,5 +78,5 @@ def _caldav_anmeldungen_leeren():
         from app.routers import caldav as _c
         _c._ANGEMELDET.clear()
     except Exception:
-        pass
+        pass   # Modul nicht geladen: dann gibt es nichts zu leeren
     yield

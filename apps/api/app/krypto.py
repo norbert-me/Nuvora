@@ -98,7 +98,7 @@ def _lokaler_schluessel() -> str:
     try:
         datei.chmod(0o600)
     except OSError:
-        pass
+        pass   # Dateisystem ohne Rechte (z. B. Windows/FAT): der Schluessel bleibt trotzdem nutzbar
     return k
 
 

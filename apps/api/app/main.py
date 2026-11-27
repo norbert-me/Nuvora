@@ -1407,7 +1407,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                 try:
                     await websocket.send_text(_json.dumps(alt))   # Zustand nachreichen (Wiederverbinden)
                 except Exception:
-                    pass
+                    pass   # Leitung schon wieder zu: der naechste Klick des Hosts schickt den Zustand ohnehin
             break
         while True:
             raw = await websocket.receive_text()
@@ -1420,7 +1420,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
             # remote: Scanner -> Host (Aufdecken/Weiter/...); host_state/session_finished: Host -> Scanner
             if msg.get("type") in ("remote", "host_state", "session_finished"):
                 if msg["type"] == "host_state":
-                    if len(ws.letzter_zustand) >= ws._ZUSTAND_MAX and session_id not in ws.letzter_zustand:
+                    if len(ws.letzter_zustand) >= ws.ZUSTAND_MAX and session_id not in ws.letzter_zustand:
                         ws.letzter_zustand.pop(next(iter(ws.letzter_zustand)), None)   # aeltester raus
                     ws.letzter_zustand[session_id] = msg
                 elif msg["type"] == "session_finished":

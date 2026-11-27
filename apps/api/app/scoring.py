@@ -163,11 +163,11 @@ def bonus_regel_von(config: Optional[dict]) -> dict:
     try:
         out["max_stufen"] = min(3.0, max(0.0, float(roh.get("max_stufen", 1.0))))
     except (TypeError, ValueError):
-        pass
+        pass   # Unlesbares gilt nicht — es bleibt die Vorgabe
     try:
         out["mindest_nenner"] = min(5, max(1, int(roh.get("mindest_nenner", 2))))
     except (TypeError, ValueError):
-        pass
+        pass   # Unlesbares gilt nicht — es bleibt die Vorgabe
     if isinstance(roh.get("falsch_zehrt"), bool):
         out["falsch_zehrt"] = roh["falsch_zehrt"]
     return out

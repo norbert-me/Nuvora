@@ -123,7 +123,7 @@ def _question_from_import(qdata, owner_id) -> Question:
 
 
 # Zelle und Download stehen in app/tabelle.py (auch die Checklisten brauchen sie); die alten Namen bleiben.
-from ..tabelle import XLSX_MEDIA, FORMEL_ANFANG as _FORMEL_ANFANG, xlsx_antwort as _xlsx_response, zelle as _zelle  # noqa: E402,F401
+from ..tabelle import FORMEL_ANFANG as _FORMEL_ANFANG, xlsx_antwort as _xlsx_response, zelle as _zelle  # noqa: E402
 
 
 def _xlsx_template(title: str, headers: list, ausrichten: bool = False):

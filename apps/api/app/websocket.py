@@ -23,7 +23,7 @@ authentifiziert: set = set()
 # Ein Scanner, dessen Leitung kurz weg war, hat die Meldung verpasst — er bekommt sie
 # beim Wiederverbinden sofort nachgereicht, statt bis zum naechsten Klick zu raten.
 letzter_zustand: dict = {}
-_ZUSTAND_MAX = 200
+ZUSTAND_MAX = 200   # gelesen in main.py (Deckel fuer letzter_zustand)
 
 # Obergrenze je Sitzung — gezaehlt werden nur AUSGEWIESENE Verbindungen.
 # Realistisch sind 1 Host + wenige Scanner. Vorher zaehlte jede angenommene
