@@ -1111,10 +1111,10 @@ export default function Sitzplan() {
                     </span>
                   </span>
                   <span title={seat.empty ? t("sitzplan.emptySeat") : kurz.name(s.name)}
-                    style={{ height: NAME_H, display: "flex", alignItems: "center", justifyContent: "center",
-                      padding: "0 6px", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                      // Ganzer Name: die Schrift schrumpft mit der Laenge, statt dass
-                      // der Nachname hinten abgeschnitten wird.
+                    style={{ height: NAME_H, display: "block", textAlign: "left",
+                      padding: "0 6px", lineHeight: `${NAME_H}px`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      // Linksbuendig: abgeschnitten wird hoechstens das Ende — der Nachname, nie der Vorname.
+                      // (Zentriert schnitt ein langer Name an beiden Seiten ab.)
                       color: seat.empty ? "var(--text3)" : undefined }}>
                     {seat.empty ? t("sitzplan.emptySeat") : s.name}
                   </span>
