@@ -33,7 +33,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 PRAEFIX = "ZZ-Selbsttest"
 
@@ -577,7 +577,7 @@ def teste_web_dateien(api, b):
             bis = datetime.strptime(wert.replace("Z", "").split(".")[0], "%Y-%m-%dT%H:%M:%S")
         except ValueError:
             raise AssertionError(f"Expires nicht lesbar: {wert}")
-        tage = (bis - datetime.utcnow()).days
+        tage = (bis - datetime.now(timezone.utc).replace(tzinfo=None)).days
         if tage < 0:
             raise AssertionError(f"abgelaufen seit {-tage} Tagen — Expires neu setzen")
         if tage < 30:
