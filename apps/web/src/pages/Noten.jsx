@@ -1331,9 +1331,17 @@ function Zelle({ onSave, onCancel, onTab, onEnter, onPfeil, initial = "" }) {
   return (
     <input ref={ref} defaultValue={initial} size={1} inputMode="decimal" maxLength={4}
       onInput={(e) => {
-        let v = e.target.value.replace(".", ",").replace(/[^0-9,]/g, "");
+        // Buchstaben: NB (nicht bewertet) und X (keine Note erhalten). Vorher filterte das Feld jeden Buchstaben
+        // heraus — die Vermerke, die unter der Tabelle stehen, liessen sich gar nicht eintippen.
+        const roh = e.target.value;
+        if (/^[a-z]/i.test(roh.trim())) {
+          e.target.value = roh.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
+          return;
+        }
+        // Zahl: eine Ziffer 1–6, dahinter bis zu zwei Nachkommastellen (2,3 oder 2,75).
+        let v = roh.replace(".", ",").replace(/[^0-9,]/g, "");
         const teile = v.split(",");
-        v = teile.length > 1 ? `${teile[0].slice(0, 1)},${teile.slice(1).join("").slice(0, 1)}` : v.slice(0, 1);
+        v = teile.length > 1 ? `${teile[0].slice(0, 1)},${teile.slice(1).join("").slice(0, 2)}` : v.slice(0, 1);
         if (v && !/^[1-6]/.test(v)) v = "";
         e.target.value = v;
       }}
