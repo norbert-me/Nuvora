@@ -2172,8 +2172,6 @@ export default {
   "klassenarbeit.ubHint": "Clic: NB (sin calificar) o nota",
   "klassenarbeit.gewichtZeile": "Peso",
   "klassenarbeit.gewichtZeileHint": "Parte de la tarea en todo el examen",
-  "klassenarbeit.schnittZeile": "Prom. clase",
-  "klassenarbeit.schnittZeileHint": "Cuánto de esta tarea acertó la clase de media",
   "klassenarbeit.egAnzahl": "Alumnado E / G",
   "klassenarbeit.egAnzahlE": "Alumnado E",
   "klassenarbeit.egAnzahlG": "Alumnado G",

@@ -2154,8 +2154,6 @@ export default {
   "klassenarbeit.ubHint": "Klick: NB (nicht bewertet) oder Note",
   "klassenarbeit.gewichtZeile": "Gewicht",
   "klassenarbeit.gewichtZeileHint": "Anteil der Aufgabe an der ganzen Arbeit",
-  "klassenarbeit.schnittZeile": "Ø Klasse",
-  "klassenarbeit.schnittZeileHint": "Wie viel der Klasse diese Aufgabe im Schnitt gelungen ist",
   "klassenarbeit.egAnzahl": "SuS E / G",
   "klassenarbeit.egAnzahlE": "SuS E",
   "klassenarbeit.egAnzahlG": "SuS G",

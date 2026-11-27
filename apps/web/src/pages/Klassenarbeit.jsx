@@ -1773,17 +1773,13 @@ export default function Klassenarbeit() {
                     );
                   })}
                 </tbody>
-                {/* Zwei Zeilen unter dem Raster, beide in PROZENT: wie viel jede Aufgabe an der Arbeit wiegt
-                    (Gewicht) und wie viel der Klasse sie im Schnitt gelungen ist (Ø). Beides stand vorher in
-                    eigenen Kaesten ueber und unter der Tabelle. */}
+                {/* Unter dem Raster das Gewicht jeder Aufgabe in Prozent. Die Zeile „Ø Klasse" ist entfallen:
+                    dieselben Quoten stehen darunter in der Auswertung je Aufgabe. */}
                 {(() => {
                   const gesamt = totalMax();
                   const anteil = (m) => (gesamt > 0 ? Math.round((m / gesamt) * 100) : 0);
-                  const einheitPct = (id) => { const x = analyse && analyse.perUnit.find((y) => y.id === id); return x && x.n > 0 ? x.pct : null; };
-                  const aufgabePct = (id) => { const x = analyse && analyse.perTask.find((y) => y.id === id); return x && x.n > 0 ? x.pct : null; };
                   const kopf = { ...td, ...klebtLinks, textAlign: "left", fontSize: 12, fontWeight: 700, color: "var(--text2)", background: "var(--bg2)" };
                   const zelleF = { ...td, fontSize: 12, color: "var(--text2)", background: "var(--bg2)" };
-                  const pctText = (v) => (v == null ? "" : `${v} %`);
                   return (
                     <tfoot>
                       <tr>
@@ -1795,17 +1791,6 @@ export default function Klassenarbeit() {
                           return <td key={sp.u.id} style={{ ...zelleF, borderLeft: rand }}>{anteil(sp.u.max)} %</td>;
                         }))}
                         <td style={{ ...zelleF, fontWeight: 700, borderLeft: "1px solid var(--border)" }}>100 %</td>
-                        <td style={zelleF} />
-                      </tr>
-                      <tr>
-                        <td style={kopf} title={t("klassenarbeit.schnittZeileHint")}>{t("klassenarbeit.schnittZeile")}</td>
-                        {(work.tasks || []).flatMap((tk) => spalten(tk).map((sp, j) => {
-                          const rand = j === 0 ? "1px solid var(--border)" : undefined;
-                          if (sp.art === "wahl") return <td key={tk.id + "-wahl"} style={{ ...zelleF, borderLeft: rand }} />;
-                          if (sp.art === "summe") return <td key={tk.id + "-sum"} style={{ ...zelleF, fontWeight: 700 }}>{pctText(aufgabePct(tk.id))}</td>;
-                          return <td key={sp.u.id} style={{ ...zelleF, borderLeft: rand }}>{pctText(einheitPct(sp.u.id))}</td>;
-                        }))}
-                        <td style={{ ...zelleF, fontWeight: 700, borderLeft: "1px solid var(--border)" }}>{pctText(analyse && analyse.noten && analyse.noten.avgPct)}</td>
                         <td style={zelleF} />
                       </tr>
                     </tfoot>

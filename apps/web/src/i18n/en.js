@@ -2171,8 +2171,6 @@ export default {
   "klassenarbeit.ubHint": "Click: NB (not graded) or grade",
   "klassenarbeit.gewichtZeile": "Weight",
   "klassenarbeit.gewichtZeileHint": "Share of this task in the whole test",
-  "klassenarbeit.schnittZeile": "Class avg.",
-  "klassenarbeit.schnittZeileHint": "How much of this task the class got right on average",
   "klassenarbeit.egAnzahl": "Pupils E / G",
   "klassenarbeit.egAnzahlE": "Pupils E",
   "klassenarbeit.egAnzahlG": "Pupils G",
