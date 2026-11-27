@@ -25,7 +25,12 @@ export default function SpeicherBalken({ entwurf, style, zeigen = entwurf.geaend
   // Kalender schiebt). Dieselbe Begruendung wie beim schwebenden Knopf in
   // `Speichern.jsx` — deshalb hier dieselbe Bauform.
   if (typeof document === "undefined") return null;
-  return createPortal(
+  // Platzhalter IN der Seite, solange der Balken steht: er schwebt ueber dem unteren Rand und deckte dort das
+  // Letzte der Seite zu (im Sitzplan die Kinder, die noch platziert werden sollen). So laesst sich darunter
+  // weiterscrollen, bis nichts mehr verdeckt ist.
+  return (<>
+    {zeigen && <div aria-hidden style={{ height: 72 }} />}
+    {createPortal(
     <div style={{
       position: "fixed", left: "50%", bottom: "max(16px, env(safe-area-inset-bottom))", transform: "translateX(-50%)", zIndex: 60,
       display: zeigen ? "flex" : "none", alignItems: "center",
@@ -41,5 +46,6 @@ export default function SpeicherBalken({ entwurf, style, zeigen = entwurf.geaend
       <Speicherleiste entwurf={entwurf} angeheftet={false} />
     </div>,
     document.body,
-  );
+  )}
+  </>);
 }

@@ -85,7 +85,6 @@ export default function Sitzplan() {
   // unten und rechts, „draussen" ist dort also ein gueltiger Platz.
   const kurz = useKurzName();
   const [ziehtPlatz, setZiehtPlatz] = useState(false);
-  const [namenVoll, setNamenVoll] = useState(false);   // Namen ganz zeigen (Schrift schrumpft) statt mit „…" kuerzen
   const [ueberMuell, setUeberMuell] = useState(false);
   const muellRef = useRef(null);
   // Anwesenheit lebt im Modul „Orga" (Aufruf-Ansicht nutzt sie).
@@ -308,7 +307,7 @@ export default function Sitzplan() {
     try {
       const v = JSON.parse(localStorage.getItem(`sitzplan_view_${viewKey}`) || "{}");
       setSegelOn(!!v.segel);
-      setHervor(v.hervor || ""); setFoerderArt(v.foerderArt || ""); setNamenVoll(!!v.namenVoll);
+      setHervor(v.hervor || ""); setFoerderArt(v.foerderArt || "");
     } catch { setSegelOn(false); setHervor(""); setFoerderArt(""); }
     // Markierungen haengen am selben Kurs wie die Ansicht.
     try { setMarken(JSON.parse(localStorage.getItem(`sitzplan_mark_${viewKey}`) || "{}")); }
@@ -415,6 +414,24 @@ export default function Sitzplan() {
   // Hand weg: waechst das Blatt links um 40 px, muss auch 40 px weiter rechts
   // gescrollt werden, damit dasselbe im Bild bleibt.
   const versatzVorher = useRef({ x: 0, y: 0 });
+  // Die Zug-Horcher haengen an dem Render, in dem der Zug BEGANN. Waechst die Flaeche waehrend des Zugs nach
+  // links/oben, aendert sich der Versatz — mit dem alten Wert gerechnet sprang der Tisch um genau diesen Betrag
+  // weiter, die Flaeche wuchs erneut, und so fort: das Flackern beim Erweitern. Deshalb der aktuelle Wert per Ref.
+  const versatzRef = useRef({ x: 0, y: 0 });
+  versatzRef.current = { x: versatzX, y: versatzY };
+  // Dasselbe fuer den Plan selbst: beim Loslassen wird mit dem Stand NACH dem Zug normalisiert, nicht mit dem davor.
+  const planRef = useRef({ seats, tafel });
+  planRef.current = { seats, tafel };
+  // Am Rand des Ausschnitts mitscrollen: sonst endet ein Zug nach rechts/unten an der sichtbaren Kante,
+  // obwohl die Flaeche dahinter waechst — „funktioniert teilweise nicht".
+  const randScroll = (e) => {
+    const el = scrollRef.current; if (!el) return;
+    const r = el.getBoundingClientRect(), RAND = 36, SCHRITT = 18;
+    if (e.clientX > r.right - RAND) el.scrollLeft += SCHRITT;
+    else if (e.clientX < r.left + RAND) el.scrollLeft -= SCHRITT;
+    if (e.clientY > r.bottom - RAND) el.scrollTop += SCHRITT;
+    else if (e.clientY < r.top + RAND) el.scrollTop -= SCHRITT;
+  };
   useLayoutEffect(() => {
     const el = scrollRef.current;
     const dx = versatzX - versatzVorher.current.x;
@@ -471,9 +488,11 @@ export default function Sitzplan() {
   };
   const onTafelMove = (e) => {
     const d = tafelRef.current; if (!d) return;
+    randScroll(e);
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx - versatzX, rect.width / zoom - TAFEL_W + RAND_ZUG));
-    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy - versatzY, rect.height / zoom - TAFEL_H + RAND_ZUG));
+    const v = versatzRef.current;
+    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx - v.x, rect.width / zoom - TAFEL_W + RAND_ZUG));
+    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy - v.y, rect.height / zoom - TAFEL_H + RAND_ZUG));
     // rot beibehalten — sonst verliert die Tafel beim Verschieben ihre Drehung.
     setTafel((tf) => ({ ...tf, x, y }));
   };
@@ -481,7 +500,7 @@ export default function Sitzplan() {
     window.removeEventListener("pointermove", onTafelMove);
     window.removeEventListener("pointerup", onTafelUp);
     window.removeEventListener("pointercancel", onTafelUp);
-    const norm = normalisieren(seats, tafel);
+    const norm = normalisieren(planRef.current.seats, planRef.current.tafel);
     if (norm.dx || norm.dy) {
       versatzNeutral(norm.dx, norm.dy);
       persist(norm.liste, norm.tafel);
@@ -529,9 +548,11 @@ export default function Sitzplan() {
     const drin = !!mrect && e.clientX >= mrect.left && e.clientX <= mrect.right && e.clientY >= mrect.top && e.clientY <= mrect.bottom;
     d.imMuell = drin;
     setUeberMuell(drin);
+    randScroll(e);
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx - versatzX, rect.width / zoom - SEAT_W + RAND_ZUG));
-    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy - versatzY, rect.height / zoom - SEAT_H + RAND_ZUG));
+    const v = versatzRef.current;
+    const x = Math.max(-RAND_ZUG, Math.min((e.clientX - rect.left) / zoom - d.dx - v.x, rect.width / zoom - SEAT_W + RAND_ZUG));
+    const y = Math.max(-RAND_ZUG, Math.min((e.clientY - rect.top) / zoom - d.dy - v.y, rect.height / zoom - SEAT_H + RAND_ZUG));
     // rot ausdrücklich beibehalten (Drag darf die Drehung nie verwerfen).
     setSeats((prev) => prev.map((s) => (s.sid === d.sid ? { ...s, x, y, rot: s.rot ?? d.rot } : s)));
   };
@@ -562,7 +583,7 @@ export default function Sitzplan() {
       return;
     }
     if (d?.gezogen) {
-      const norm = normalisieren(seats, tafel);
+      const norm = normalisieren(planRef.current.seats, planRef.current.tafel);
       // `persist` schreibt Plaetze UND Tafel in den Entwurf — ein zweiter
       // Aufruf ueber setSeats/setTafel waere derselbe Zug zweimal.
       if (norm.dx || norm.dy) {
@@ -819,8 +840,6 @@ export default function Sitzplan() {
         links={<KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />}
         ansicht={(
           <ViewMenu title={t("sitzplan.view")} items={[
-            { key: "kurzname", label: t("namen.kuerzen"), hint: t("namen.kuerzenHint"), value: kurz.an, onChange: kurz.umschalten },
-            { key: "namenVoll", label: t("sitzplan.namenVoll"), hint: t("sitzplan.namenVollHint"), value: namenVoll, onChange: (v) => { setNamenVoll(v); saveView({ namenVoll: v }); } },
             { key: "fotos", label: t("sitzplan.photoToggle"), hint: t("sitzplan.photoHint"), value: fotosOn, onChange: (v) => { setFotosOn(v); saveView({ fotos: v }); } },
             ...(segelTeil ? [{ key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } }] : []),
             { key: "hervor", art: "wahl", label: t("sitzplan.hervorLabel"), hint: t(hervor === "foerder" ? "sitzplan.hervorHintFoerder" : "sitzplan.hervorHint"),
@@ -946,22 +965,25 @@ export default function Sitzplan() {
                     display: "flex", flexDirection: "column", overflow: "hidden",
                     borderRadius: CONTROL_R,
                     border: `1px solid ${hf || "var(--border2)"}`,
-                    background: hf ? `${hf}1f` : "var(--bg)", color: "var(--text)", fontSize: 13, fontWeight: 600,
+                    background: hf ? `${hf}33` : "var(--bg)", color: "var(--text)", fontSize: 13, fontWeight: 600,
                     // Wer nicht da ist, tritt zurueck — aber bleibt lesbar:
                     // der Platz gehoert ihm weiter, und morgen sitzt er da.
                     opacity: anwKey === "fehlt" ? 0.45 : 1,
                     cursor: hervor === "mark" && !seat.empty ? "pointer" : "grab",
                     boxShadow: SHADOW.ruhig, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none" }}>
-                  <div style={{ display: "flex", alignItems: "stretch", height: BILD, flexShrink: 0 }}>
-                    {hf && (
-                      // Der Balken traegt die Farbe da, wo sie auch bei
-                      // uebereinanderliegenden Tischen sichtbar bleibt: an der
-                      // Kante. Mehrere Schwerpunkte: ein Streifen je Farbe,
-                      // uebereinander.
-                      <span aria-hidden style={{ width: 5, flexShrink: 0, display: "flex", flexDirection: "column" }}>
+                  {hf && (
+                    // Markierung UEBER dem Inhalt: ein 1-px-Rahmen und ein 5-px-Streifen neben dem Foto gingen
+                    // beim normalen Hinsehen unter (das Foto ist die groesste Flaeche des Platzes und deckte die
+                    // Toenung zu). Jetzt ein kraeftiger Rahmen rundum plus ein Balken ueber die ganze Hoehe —
+                    // mehrere Schwerpunkte: ein Streifen je Farbe, uebereinander.
+                    <span aria-hidden style={{ position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none",
+                      border: `3px solid ${hf}`, borderRadius: CONTROL_R, display: "flex" }}>
+                      <span style={{ width: 8, display: "flex", flexDirection: "column" }}>
                         {hfs.map((c) => <span key={c} style={{ flex: 1, background: c }} />)}
                       </span>
-                    )}
+                    </span>
+                  )}
+                  <div style={{ display: "flex", alignItems: "stretch", height: BILD, flexShrink: 0 }}>
                     {mitFoto && (
                       // `pointerEvents: none`: sonst faengt das Bild den Zug ab
                       // und der Browser startet sein eigenes Bild-Ziehen — der
@@ -1034,10 +1056,9 @@ export default function Sitzplan() {
                   </span>
                   <span title={seat.empty ? t("sitzplan.emptySeat") : kurz.name(s.name)}
                     style={{ height: NAME_H, display: "flex", alignItems: "center", justifyContent: "center",
-                      padding: "0 6px", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: namenVoll ? "clip" : "ellipsis",
+                      padding: "0 6px", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                       // Ganzer Name: die Schrift schrumpft mit der Laenge, statt dass
                       // der Nachname hinten abgeschnitten wird.
-                      ...(namenVoll && !seat.empty ? { fontSize: Math.max(8, Math.min(13, Math.floor(96 / (String(s.name || "").length * 0.58 || 1)))) } : null),
                       color: seat.empty ? "var(--text3)" : undefined }}>
                     {seat.empty ? t("sitzplan.emptySeat") : s.name}
                   </span>
@@ -1050,9 +1071,18 @@ export default function Sitzplan() {
           {/* Sitzen alle, braucht es den Pool nicht: eine leere Flaeche mit der
               Ueberschrift „Noch nicht platziert (0)" ist nur Platz. Sobald
               jemand herausfaellt (neues Kind, Platz entfernt), ist er wieder da. */}
-          {pool.length > 0 && (
-          <div style={{ ...panelStyle, border: "1px dashed var(--border2)", padding: 12, minHeight: 56, background: "var(--bg2)" }}>
-            <div style={{ ...sectionLabel, marginBottom: 8 }}>{t("sitzplan.pool")} ({pool.length})</div>
+          {/* Waehrend ein Platz gezogen wird, IST der Pool der Loeschbereich: zurueck zu den Nicht-Platzierten heisst
+              „vom Plan nehmen". Ein eigener schwebender Muelleimer lag mitten im Bild, deckte sich mit der
+              Speicherleiste und war ein zweiter Ort fuer dieselbe Sache. */}
+          {(pool.length > 0 || ziehtPlatz) && (
+          <div ref={muellRef} style={{ ...panelStyle, padding: 12, minHeight: 56,
+            border: ziehtPlatz ? `2px ${ueberMuell ? "solid" : "dashed"} ${C.danger}` : "1px dashed var(--border2)",
+            background: ziehtPlatz && ueberMuell ? C.danger + "22" : "var(--bg2)" }}>
+            <div style={{ ...sectionLabel, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+              {ziehtPlatz
+                ? <><Icon d={ICONS.trash} size={14} color={C.danger} /><span style={{ color: C.danger }}>{t("sitzplan.poolEntfernen")}</span></>
+                : <>{t("sitzplan.pool")} ({pool.length})</>}
+            </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {pool.map((s) => (
                 <div key={s.id} draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", String(s.id))}
@@ -1065,32 +1095,6 @@ export default function Sitzplan() {
           </div>
           )}
         </>
-      )}
-      {/* Der Muelleimer erscheint nur waehrend eines Zugs — sonst waere er
-          eine Flaeche, die die ganze Zeit auf einen Fehlgriff wartet. Fest am
-          Bildschirm, weil die Zeichenflaeche scrollt und der Zug sie sonst
-          verlassen muesste.
-
-          Er muss dabei UEBER der Speicherleiste liegen und ueber ihr stehen:
-          die schwebt unten mittig (fixed, bottom 16, zIndex 60) und erscheint,
-          sobald etwas offen ist — waehrend eines Zugs also IMMER, denn der Zug
-          selbst oeffnet den Entwurf. Bei zIndex 40 und derselben Ecke deckte
-          sie den Muelleimer vollstaendig zu: man zog nach unten, sah dort nur
-          „Speichern/Abbrechen", bekam nie die rote Faerbung zu sehen und traf
-          neben dem (schmaleren) Feld daneben — „rausziehen zum Loeschen
-          funktioniert nicht". Deshalb eine Leistenhoehe hoeher und darueber. */}
-      {ziehtPlatz && (
-        <div ref={muellRef} aria-hidden
-          style={{ position: "fixed", left: "50%", transform: "translateX(-50%)",
-            bottom: "calc(max(24px, env(safe-area-inset-bottom)) + 60px)", zIndex: 70,
-            display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: CONTROL_R + 4,
-            border: `2px ${ueberMuell ? "solid" : "dashed"} ${C.danger}`,
-            background: ueberMuell ? C.danger : "var(--card)",
-            color: ueberMuell ? C.aufAkzent : C.danger, fontSize: 13, fontWeight: 600,
-            boxShadow: SHADOW.schwebend, pointerEvents: "none" }}>
-          <Icon d={ICONS.trash} size={16} color={ueberMuell ? C.aufAkzent : C.danger} />
-          {t("sitzplan.removeSeat")}
-        </div>
       )}
       <SpeicherBalken entwurf={e} />
     </div>
