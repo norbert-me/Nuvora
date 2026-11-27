@@ -181,6 +181,7 @@ def endpunkte(u):
         ],
         "orga": [
             ("GET", f"/api/orga/{c}"),
+            ("GET", f"/api/orga/{c}/export.xlsx"),
             ("GET", f"/api/anwesenheit/{c}?date={datetime.now().date().isoformat()}"),
             ("GET", f"/api/anwesenheit/{c}/summary"),
             ("GET", f"/api/anwesenheit/{c}/student/{s}"),

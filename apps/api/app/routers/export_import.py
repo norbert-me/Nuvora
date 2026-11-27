@@ -122,20 +122,8 @@ def _question_from_import(qdata, owner_id) -> Question:
     )
 
 
-XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-
-def _xlsx_response(wb, filename: str) -> StreamingResponse:
-    """Arbeitsmappe als Download. Stand dreimal wortgleich, nur der Dateiname
-    war verschieden."""
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    return StreamingResponse(
-        buf,
-        media_type=XLSX_MEDIA,
-        headers={"Content-Disposition": anhang_kopf(filename)},
-    )
+# Zelle und Download stehen in app/tabelle.py (auch die Checklisten brauchen sie); die alten Namen bleiben.
+from ..tabelle import XLSX_MEDIA, FORMEL_ANFANG as _FORMEL_ANFANG, xlsx_antwort as _xlsx_response, zelle as _zelle  # noqa: E402,F401
 
 
 def _xlsx_template(title: str, headers: list, ausrichten: bool = False):
@@ -283,25 +271,6 @@ async def _arbeitsblatt(data: bytes) -> list:
     return await run_in_threadpool(_zeilen_lesen, data)
 
 
-_FORMEL_ANFANG = ("=", "+", "-", "@", "\t", "\r")
-
-
-def _zelle(ws, row: int, column: int, wert):
-    """Zelle schreiben — Text, der wie eine Formel anfaengt, bleibt Text.
-
-    Ein Fragen- oder Schuelername „=HYPERLINK(…)" wuerde sonst beim Oeffnen
-    ausgewertet (Formel-Injektion); openpyxl haelt jede Zeichenkette mit „="
-    sogar selbst fuer eine Formel. Die Zelle wird deshalb als Text markiert und
-    bekommt das Text-Praefix, das Excel wie ein fuehrendes ' behandelt, aber
-    nicht in den Wert schreibt — der Inhalt kommt ueber den Import unveraendert
-    zurueck. Zahlen bleiben unberuehrt.
-    """
-    c = ws.cell(row=row, column=column, value=wert)
-    if isinstance(wert, str) and wert.startswith(_FORMEL_ANFANG):
-        c.value = wert
-        c.data_type = "s"
-        c.quotePrefix = True
-    return c
 
 
 def _csv_text(wert) -> str:

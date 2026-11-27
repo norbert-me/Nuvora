@@ -299,6 +299,7 @@ def _ensure_columns(sync_conn):
         ("kurse", "color", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("seating_plans", "kurs_id", "INTEGER"),
         ("orga_items", "kurs_id", "INTEGER"),
+        ("orga_items", "done_at", "JSON"),
         ("grade_sections", "kurs_id", "INTEGER"),
         ("grade_overrides", "kurs_id", "INTEGER"),
         ("timetable_slots", "kurs_id", "INTEGER"),

@@ -4,6 +4,7 @@ Eigenständig (Regel 3): Schüler kommen aus dem Kern, hier liegen nur die
 Orga-Punkte und wer sie erledigt hat. Beispiel: „Unterschrift der Klassenarbeit
 gesehen" — je Schüler abhaken.
 """
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,7 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..besitz import eigenes, klasse_oder_403, kurs_oder_klasse
 from ..database import get_db
 from ..kursmitglieder import eigener_kurs
-from ..schueler import in_klasse
+from ..schueler import in_klasse, roster_klasse, roster_kurs
+from ..tabelle import xlsx_antwort, zelle
+from ..zeit import schul_datum
 from ..models import OrgaItem, User
 from .auth import rate_limit
 from .modules import modul_pflicht
@@ -47,6 +50,7 @@ class ItemOut(BaseModel):
     name: str
     position: int
     done: list = []
+    done_at: Optional[dict] = None
     model_config = {"from_attributes": True}
 
 
@@ -112,11 +116,48 @@ async def toggle(item_id: int, body: ToggleIn, user: User = Depends(require_modu
     # Nur Schüler der Klasse zulassen.
     await in_klasse(db, body.student_id, it.class_id)
     done = list(it.done or [])
+    wann = dict(it.done_at or {})
     if body.student_id in done:
         done.remove(body.student_id)
+        wann.pop(str(body.student_id), None)
     else:
         done.append(body.student_id)
+        wann[str(body.student_id)] = schul_datum(datetime.now(timezone.utc)).isoformat()
     it.done = done
+    it.done_at = wann
     await db.commit()
     await db.refresh(it)
     return it
+
+
+@router.get("/{class_id}/export.xlsx")
+async def export_xlsx(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Die Checklisten als Tabelle: je Kind eine Zeile, je Punkt eine Spalte, in der Zelle das Datum des
+    Abhakens (ohne Datum: „erledigt"), leer = fehlt. Darunter je Punkt die Zahl."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    cls = await _owned_class(db, user, class_id)
+    if kurs_id is not None:
+        await eigener_kurs(db, user, kurs_id)
+    items = (await db.execute(select(OrgaItem).where(*_key_where(user, class_id, kurs_id))
+                              .order_by(OrgaItem.position, OrgaItem.id))).scalars().all()
+    kinder = await (roster_kurs(db, kurs_id) if kurs_id is not None else roster_klasse(db, class_id))
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Checklisten"
+    zelle(ws, 1, 1, "Name").font = Font(bold=True)
+    for j, it in enumerate(items, start=2):
+        zelle(ws, 1, j, it.name).font = Font(bold=True)
+    for i, k in enumerate(kinder, start=2):
+        zelle(ws, i, 1, k.name)
+        for j, it in enumerate(items, start=2):
+            if k.id in (it.done or []):
+                tag = (it.done_at or {}).get(str(k.id))
+                zelle(ws, i, j, ".".join(reversed(tag.split("-"))) if tag else "erledigt")
+    unten = len(kinder) + 3
+    zelle(ws, unten, 1, "Erledigt").font = Font(bold=True)
+    for j, it in enumerate(items, start=2):
+        n = sum(1 for k in kinder if k.id in (it.done or []))
+        zelle(ws, unten, j, f"{n}/{len(kinder)}")
+    ws.column_dimensions["A"].width = 28
+    return xlsx_antwort(wb, f"Checklisten {getattr(cls, 'name', '')}.xlsx".strip())

@@ -1130,6 +1130,9 @@ class OrgaItem(Base):
     name: Mapped[str] = mapped_column(String(160), default="", server_default="")
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     done: Mapped[list] = mapped_column(JSON, default=list)
+    # Wann abgehakt: {student_id: "JJJJ-MM-TT"} (Schultag). Neben `done`, nicht statt: der Bestand kennt nur
+    # die Liste, und ein Haken ohne Datum ist weiter ein Haken.
+    done_at: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

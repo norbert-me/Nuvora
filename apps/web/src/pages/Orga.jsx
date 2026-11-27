@@ -5,9 +5,9 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { undoDelete } from "../core/undo.jsx";
 import { askChoice, askConfirm, askPrompt } from "../core/dialog.jsx";
-import { AddButton, COLORS as C, CONTROL_R, cardStyle, klebtLinks, pageApp, td, th as thBase, toolbarInput } from "../components/Icons.jsx";
+import { AddButton, ICONS, COLORS as C, CONTROL_R, cardStyle, klebtLinks, pageApp, td, th as thBase, toolbarInput } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
-import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -144,6 +144,27 @@ export default function Orga() {
 
   const th = { ...thBase, verticalAlign: "bottom" };
 
+  // ── Hinaus: als Text (vorhanden / fehlt je Punkt) oder als Excel (je Kind und Punkt das Datum) ──
+  const tagKurz = (iso) => (iso ? iso.slice(8, 10) + "." + iso.slice(5, 7) + "." : "");
+  const alsText = () => items.map((it) => {
+    const da = students.filter((s) => it.done.includes(s.id));
+    const fehlt = students.filter((s) => !it.done.includes(s.id));
+    const mitTag = (s) => { const d = (it.done_at || {})[String(s.id)]; return d ? `${s.name} (${tagKurz(d)})` : s.name; };
+    return [`${it.name} — ${da.length}/${students.length}`,
+      `${t("orga.vorhanden")}: ${da.map(mitTag).join(", ") || "—"}`,
+      `${t("orga.fehlt")}: ${fehlt.map((s) => s.name).join(", ") || "—"}`].join("\n");
+  }).join("\n\n");
+  const textKopieren = async () => {
+    try { await navigator.clipboard.writeText(alsText()); } catch { /* ohne Zwischenablage: nichts */ }
+  };
+  const excel = async () => {
+    const r = await fetch(`${API}/${classId}/export.xlsx${kursQ}`).catch(() => null);
+    if (!r || !r.ok) return;
+    const blob = await r.blob();
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `checklisten-${cls?.name || "kurs"}.xlsx`; a.click(); URL.revokeObjectURL(a.href);
+  };
+
   return (
     <div style={{ ...pageApp }}>
       {/* Zwischen den Werkzeugen wird über die Navbar gewechselt (?tab=…).
@@ -160,6 +181,12 @@ export default function Orga() {
         <input data-tour="orga-neu" value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
           placeholder={t("orga.newPlaceholder")} style={{ ...toolbarInput, flex: 1, minWidth: 200 }} />
         <AddButton onClick={anlegen} title={t("orga.add")} />
+        {items.length > 0 && (
+          <MehrMenu eintraege={[
+            { key: "text", label: t("orga.alsText"), icon: ICONS.duplicate, onClick: textKopieren },
+            { key: "xlsx", label: t("orga.alsExcel"), icon: ICONS.download, onClick: excel },
+          ]} />
+        )}
       </Werkzeugleiste>
 
       {students.length === 0 ? (
@@ -200,8 +227,10 @@ export default function Orga() {
                   </td>
                   {items.map((it) => {
                     const on = !!e.wert[`${it.id}:${s.id}`];
+                    // Wann abgehakt? Nur was gespeichert ist, hat einen Tag — ein frischer Haken bekommt ihn beim Speichern.
+                    const tag = on ? (it.done_at || {})[String(s.id)] : null;
                     return (
-                      <td key={it.id} style={td}>
+                      <td key={it.id} style={{ ...td, textAlign: "center" }}>
                         {/* Sichtbar 24 px, getroffen 32: Polster plus negativer
                             Rand, damit die Zeile nicht hoeher wird. */}
                         <button onClick={() => toggle(it, s.id)} title={on ? t("orga.done") : t("orga.open")}
@@ -213,6 +242,7 @@ export default function Orga() {
                             ✓
                           </span>
                         </button>
+                        {tag && <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{tagKurz(tag)}</div>}
                       </td>
                     );
                   })}
