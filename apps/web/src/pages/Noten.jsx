@@ -429,8 +429,11 @@ export default function Noten() {
     setZelle(null);
     // „NB" in die Zelle: dieses Kind wird in dieser Spalte nicht benotet. Gespeichert wird
     // es als Kommentar „UB" ohne Note — es zaehlt in keinen Schnitt und gilt nicht als fehlend.
-    if (["UB", "NB"].includes(String(text).trim().toUpperCase())) {
-      entwurf.setz({ [`n:${studentId}:${catId}`]: null, [`k:${studentId}:${catId}`]: "NB" });
+    // „X": keine Note erhalten (z. B. nicht abgegeben) — ebenso ohne Wert, ohne Schnitt, nicht „fehlend", aber
+    // sichtbar etwas anderes als „nicht bewertet".
+    const marke = String(text).trim().toUpperCase();
+    if (["UB", "NB", "X"].includes(marke)) {
+      entwurf.setz({ [`n:${studentId}:${catId}`]: null, [`k:${studentId}:${catId}`]: marke === "X" ? "X" : "NB" });
       return;
     }
     const wert = parseNote(text);
@@ -583,7 +586,8 @@ export default function Noten() {
   // „NB" (nicht bewertet) liegt als Vermerk an der Zelle, ist aber KEIN Kommentar: der Dialog zeigt
   // ihn nicht, die Ecke sieht ihn nicht, und er zaehlt nicht als „Kommentar da".
   const rohKommentar = (sid, cid) => entwurf.wert[`k:${sid}:${cid}`] || "";
-  const istNb = (sid, cid) => ["UB", "NB"].includes(rohKommentar(sid, cid));
+  const istNb = (sid, cid) => ["UB", "NB", "X"].includes(rohKommentar(sid, cid));
+  const vermerk = (sid, cid) => (rohKommentar(sid, cid) === "X" ? "X" : "NB");
   const kommentarVon = (sid, cid) => (istNb(sid, cid) ? "" : rohKommentar(sid, cid));
   const secNoteVon = (s, secId) => (entwurf.wert[`so:${s.student_id}:${secId}`] ?? (s.section_effective?.[String(secId)] ?? null));
   const istSecOverride = (s, secId) => entwurf.wert[`so:${s.student_id}:${secId}`] != null;
@@ -1112,7 +1116,7 @@ export default function Noten() {
                                     style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 14, fontWeight: wert != null ? 600 : 400 }}>
                                     {wert != null ? de(wert) : (istNb(s.student_id, c.id) || (s.le && c.source_work_id)
                                       // LE-Kind in einer Klassenarbeits-Spalte: nicht benotet, nicht „leer".
-                                      ? <span title={t("kurse.leHint")} style={{ color: "var(--text3)", fontSize: 12, fontWeight: 700 }}>NB</span>
+                                      ? <span title={vermerk(s.student_id, c.id) === "X" ? t("noten.xHint") : t("kurse.leHint")} style={{ color: "var(--text3)", fontSize: 12, fontWeight: 700 }}>{istNb(s.student_id, c.id) ? vermerk(s.student_id, c.id) : "NB"}</span>
                                       : <span style={{ color: "var(--border2)" }}>·</span>)}
                                   </button>
                                   {/* Ecke oben rechts. Die Trefferflaeche ist 20 px
@@ -1182,8 +1186,10 @@ export default function Noten() {
           beim Eintragen niemand stellt — und wer sie stellt, findet die
           Antwort in der Hilfe (help.nt.avg). Der Hinweis auf den Klick am
           Namen bleibt: den sieht man der Tabelle nicht an. */}
+      {/* Was in eine Zelle darf — man sieht es der Tabelle nicht an (Wunsch des Nutzers). Der fruehere Satz
+          „Klick auf einen Namen zeigt E-/G-Kurs und Förderbedarf" ist entfallen: der Dialog zeigt das nicht mehr. */}
       <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 12, lineHeight: 1.6 }}>
-        {t("noten.clickStudent")}
+        {t("noten.eingaben")}
       </p>
 
       {beobFuer && (
