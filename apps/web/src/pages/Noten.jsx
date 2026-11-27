@@ -1201,7 +1201,7 @@ export default function Noten() {
       <SpeicherBalken entwurf={entwurf} zeigen={autoSpeichern.zeigen} />
 
       {infoFuer && (
-        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} classId={classId} kursId={kursId} dividers={dividers} onStrichSetzen={strichSetzen} onStrichLoeschen={strichLoeschen} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} form={form} setForm={setFormPersist} />
+        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} classId={classId} kursId={kursId} agg={agg} term={term} dividers={dividers} onStrichSetzen={strichSetzen} onStrichLoeschen={strichLoeschen} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} form={form} setForm={setFormPersist} />
       )}
     </div>
   );
@@ -1726,19 +1726,16 @@ function punktText(p, t) {
   const cat = p.cat || {};
   const tag = cat.date || (cat.created_at ? String(cat.created_at).slice(0, 10) : "");
   const datum = tag ? tag.split("-").reverse().join(".") : "";
-  const herkunft = cat.source_kind === "karten" ? t("noten.fromKarten")
-    : cat.source_session_id ? t("noten.fromCardvote")
-    : cat.source_kind === "codedetektiv" ? t("noten.fromCd") : "";
+  // Keine Herkunftszeile („Zur CardVote-Auswertung"): der Hinweis ist kein Link, und die Herkunft steht in der Tabelle.
   const zeilen = [
     [datum, cat.name].filter(Boolean).join(" · "),
     p.einzeln != null ? `${t("noten.gradeShortLabel")}: ${kommaRund(p.einzeln, 2)}` : null,
     `${p.istSchnitt ? t("noten.runningAvg") : t("noten.gradeShortLabel")}: ${kommaRund(p.value, 2)}`,
-    herkunft || null,
   ].filter(Boolean);
   return zeilen.join("\n");
 }
 
-function GradeChart({ series, t, titel, hinweis, rechts, striche = null }) {
+function GradeChart({ series, t, titel, hinweis, rechts, striche = null, q0 = 0 }) {
   // Eigenes Hinweisfeld statt `<title>` im SVG: das zeigt der Browser
   // unzuverlaessig (und nur einzeilig, nach Verzoegerung). Hier steht es sofort
   // und mehrzeilig — Datum, Spalte, Note.
@@ -1780,7 +1777,7 @@ function GradeChart({ series, t, titel, hinweis, rechts, striche = null }) {
           return (
             <g key={`q${i}`} style={{ pointerEvents: "none" }}>
               <line x1={xs} y1={padT} x2={xs} y2={H - padB} stroke="var(--text3)" strokeWidth="1" strokeDasharray="4 3" />
-              <text x={xs + 3} y={padT + 8} fontSize="9" fill="var(--text3)">Q{q + 2}</text>
+              <text x={xs + 3} y={padT + 8} fontSize="9" fill="var(--text3)">Q{q0 + q + 2}</text>
             </g>
           );
         })}
@@ -1881,8 +1878,76 @@ function Fehlzeiten({ classId, studentId, t }) {
 // Der Name im Dialog folgt derselben Option (ausserhalb des Hooks gelesen).
 const kurzNameOrt = (n) => (kurzNameAn() ? kurzName(n) : n);
 
+/**
+ * Vergleich eines Kindes: Vorjahr, Quartale, Halbjahre, Jahr — nebeneinander.
+ *
+ * Gerechnet wird am Server (`/students/{id}/vergleich`, dieselbe Rechnung wie die Tabelle): eine Quartalsnote ist
+ * der Stand am Tag des Quartalsstrichs, das Vorjahr die Jahresnote im Vorgängerkurs. Ohne Strich gibt es keine
+ * Quartale, ohne Vorgängerkurs keine Vorjahresspalte — was fehlt, fällt weg statt als leere Zelle zu stehen.
+ * Unter jeder Note der Abstand zur vorigen: kleiner ist besser, deshalb grün bei minus.
+ */
+function NotenVergleich({ t, classId, kursId, studentId, agg = "mean", stand = "" }) {
+  const [d, setD] = useState(null);
+  useEffect(() => {
+    if (!classId || !studentId) { setD(null); return; }
+    let ab = false;
+    const kp = kursId ? `&kurs_id=${kursId}` : "";
+    hol(`${API}/classes/${classId}/students/${studentId}/vergleich?agg=${agg}${kp}`)
+      .then((x) => { if (!ab) setD(x && Array.isArray(x.verlauf) ? x : null); })
+      .catch(() => { if (!ab) setD(null); });
+    return () => { ab = true; };
+  }, [classId, kursId, studentId, agg, stand]);
+  if (!d) return null;
+  const zellen = [];
+  if (d.vorjahr) {
+    const vj = d.vorjahr;
+    const hj = [vj.halbjahre?.["1"], vj.halbjahre?.["2"]].map((v) => (v == null ? "·" : deAnz(v))).join(" / ");
+    zellen.push({ key: "vj", label: t("noten.vorjahr"), note: vj.jahr, vorjahr: true,
+      title: `${vj.kurs}${vj.schuljahr ? ` (${vj.schuljahr})` : ""} · ${t("noten.halbjahre")}: ${hj}` });
+  }
+  d.verlauf.forEach((p) => zellen.push({ key: `${p.term}-${p.label}`, label: p.art === "halbjahr" ? t("noten.hjKurz", { n: p.term }) : p.label, note: p.note, halb: p.art === "halbjahr",
+    title: p.bis ? t("noten.quartalStand", { datum: new Date(p.bis + "T00:00:00").toLocaleDateString() }) : undefined }));
+  zellen.push({ key: "jahr", label: t("noten.jahr"), note: d.jahr, halb: true });
+  if (!zellen.some((z) => z.note != null)) return null;
+  // Abstand zur vorigen BELEGTEN Zelle der eigenen Reihe (das Vorjahr steht davor und vergleicht nicht mit sich).
+  let vorher = null;
+  const mitDelta = zellen.map((z) => {
+    const delta = z.note != null && vorher != null && z.key !== "jahr" ? z.note - vorher : null;
+    if (z.note != null && z.key !== "jahr") vorher = z.note;
+    return { ...z, delta };
+  });
+  const aktuell = d.jahr ?? [...d.verlauf].reverse().find((p) => p.note != null)?.note ?? null;
+  const zumVorjahr = d.vorjahr?.jahr != null && aktuell != null ? aktuell - d.vorjahr.jahr : null;
+  const deltaText = (x) => `${x > 0 ? "+" : "−"}${de(Math.abs(x))}`;
+  const deltaFarbe = (x) => (x <= -0.05 ? C.success : x >= 0.05 ? C.danger : "var(--text3)");
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>{t("noten.vergleich")}</div>
+        {zumVorjahr != null && Math.abs(zumVorjahr) >= 0.05 && (
+          <span style={{ fontSize: 12, color: deltaFarbe(zumVorjahr) }}>{t("noten.zumVorjahr", { wert: deltaText(zumVorjahr) })}</span>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 4, overflowX: "auto" }}>
+        {mitDelta.map((z) => (
+          <div key={z.key} title={z.title}
+            style={{ flex: "1 0 52px", minWidth: 0, textAlign: "center", padding: "6px 4px", borderRadius: CONTROL_R,
+              border: "1px solid var(--border)", background: z.halb ? "var(--bg2)" : "transparent",
+              borderStyle: z.vorjahr ? "dashed" : "solid" }}>
+            <div style={{ fontSize: 11, color: "var(--text3)", whiteSpace: "nowrap" }}>{z.label}</div>
+            <div style={{ fontSize: 16, fontWeight: z.halb ? 700 : 500, fontVariantNumeric: "tabular-nums" }}>{z.note != null ? deAnz(z.note) : "·"}</div>
+            <div style={{ fontSize: 11, minHeight: 14, color: z.delta != null ? deltaFarbe(z.delta) : "transparent" }}>
+              {z.delta != null && Math.abs(z.delta) >= 0.05 ? deltaText(z.delta) : z.delta != null ? "±0" : "·"}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Quartalsstriche im Verlauf: Datum wählen, setzen; jeder Strich als Chip mit Kreuz zum Entfernen.
-function StrichLeiste({ t, daten, onSetzen, onLoeschen }) {
+function StrichLeiste({ t, daten, onSetzen, onLoeschen, q0 = 0 }) {
   const [tag, setTag] = useState("");
   const fmt = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(); } catch { return iso; } };
   return (
@@ -1890,7 +1955,7 @@ function StrichLeiste({ t, daten, onSetzen, onLoeschen }) {
       <span>{t("noten.striche")}</span>
       {daten.map((d, i) => (
         <span key={d} style={{ ...chipStyle, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}>
-          Q{i + 2} · {fmt(d)}
+          Q{q0 + i + 2} · {fmt(d)}
           <button onClick={() => onLoeschen(d)} title={t("noten.strichWeg")} aria-label={t("noten.strichWeg")}
             style={{ ...iconBtn, padding: 0, minWidth: 20, minHeight: 20 }}><Icon d={ICONS.close} size={11} /></button>
         </span>
@@ -1901,12 +1966,14 @@ function StrichLeiste({ t, daten, onSetzen, onLoeschen }) {
   );
 }
 
-function StudentInfo({ t, student, summary, sections, entries = [], classId = null, kursId = null, dividers = [], onStrichSetzen, onStrichLoeschen, onZeugnis, onClose, form, setForm }) {
+function StudentInfo({ t, student, summary, sections, entries = [], classId = null, kursId = null, agg = "mean", term = "1", dividers = [], onStrichSetzen, onStrichLoeschen, onZeugnis, onClose, form, setForm }) {
   // Hook vor jedem fruehen Ausstieg: sonst haengt die Hook-Reihenfolge daran,
   // ob gerade ein Kind gewaehlt ist.
   const [bereich, setBereich] = useState("gesamt");
   const [modus, setModus] = useState("schnitt");   // „schnitt" (laufend) oder „einzeln"
   if (!student) return null;
+  // Quartale zählen übers Jahr: im 2. Halbjahr beginnt es bei Q3 (Q1, 1. HJ = Q2, Q3, 2. HJ = Q4).
+  const q0 = term === "2" ? 2 : 0;
   // Verlauf der GESAMTNOTE (gewichtet) über die Zeit: nach jeder neuen Note die
   // gewichtete Gesamtnote aus allen bis dahin vorhandenen Noten. Kategorien in
   // Zeitreihenfolge (created_at, sonst Reihenfolge Abschnitt/Kategorie).
@@ -1995,12 +2062,14 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
         )}
         <Fehlzeiten classId={classId} studentId={student.id} t={t} />
         <SchuelerAngaben studentId={student.id} kursId={kursId} nurLesen t={t} />
+        <NotenVergleich t={t} classId={classId} kursId={kursId} studentId={student.id} agg={agg}
+          stand={`${entries.length}|${dividers.join(",")}|${summary?.weighted ?? ""}|${summary?.total_override ?? ""}`} />
 
         {/* Quartalsstriche setzt man mit einem Datum und löscht sie dort wieder — sie gelten für den ganzen Kurs. */}
         {bereich === "gesamt" && onStrichSetzen && (
-          <StrichLeiste t={t} daten={dividers} onSetzen={onStrichSetzen} onLoeschen={onStrichLoeschen} />
+          <StrichLeiste t={t} q0={q0} daten={dividers} onSetzen={onStrichSetzen} onLoeschen={onStrichLoeschen} />
         )}
-        <GradeChart series={serie} t={t} striche={bereich === "gesamt" && dividers.length ? dividers : null}
+        <GradeChart series={serie} t={t} q0={q0} striche={bereich === "gesamt" && dividers.length ? dividers : null}
           titel={bereich === "gesamt" ? t("noten.verlauf") : t("noten.verlaufSection", { name: secName })}
           hinweis={modus === "einzeln" ? t("noten.verlaufSingle")
                    : bereich === "gesamt" ? t("noten.verlaufRunning") : t("noten.verlaufRunningSection")}

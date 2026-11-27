@@ -151,6 +151,7 @@ def endpunkte(u):
             ("GET", f"/api/noten/classes/{c}/summary"),
             ("GET", f"/api/noten/classes/{c}/year"),
             ("GET", f"/api/noten/classes/{c}/quartalsstriche"),
+            ("GET", f"/api/noten/classes/{c}/students/{s}/vergleich"),
             ("GET", f"/api/noten/classes/{c}/export"),
             ("GET", "/api/noten/code-sessions"),
             ("GET", f"/api/klassenarbeit/classes/{c}/students"),
@@ -423,6 +424,11 @@ def inhalt_auswertung(api, u, spuren):
     zeile = _finde(zus, student_id=u.students[0])
     if not zeile or not gleich(zeile["per_category"].get(str(spalte["id"])), 2.3):
         raise AssertionError(f"Schnitt der Spalte falsch: {zeile}")
+    # Vergleich des Kindes (Quartale/Halbjahre/Jahr/Vorjahr): dieselbe Rechnung wie die Zusammenfassung.
+    vgl = api.call("GET", f"/api/noten/classes/{u.class_id}/students/{u.students[0]}/vergleich", erwartet=(200,))
+    hj1 = next((p for p in vgl.get("verlauf", []) if p.get("art") == "halbjahr" and p.get("term") == "1"), None)
+    if not hj1 or not gleich(hj1.get("note"), zeile.get("total_override") or zeile.get("weighted")):
+        raise AssertionError(f"Vergleich weicht von der Zusammenfassung ab: {vgl} / {zeile}")
 
     arbeit = api.call("POST", "/api/klassenarbeit/works",
                       {"class_id": u.class_id, "name": f"{PRAEFIX} Arbeit"}, erwartet=(201,))

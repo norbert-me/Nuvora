@@ -95,6 +95,7 @@ function AuswertungHilfe({ t }) {
       <Faq q={t("help.nt.beamerQ")}>{t("help.nt.beamerA")}</Faq>
       <Faq q={t("help.nt.wegQ")}>{withLink(t("help.nt.wegA"), "/wiederherstellung", t("help.wh.link"))}</Faq>
       <Faq q={t("help.nt.stricheQ")}>{t("help.nt.stricheA")}</Faq>
+      <Faq q={t("help.nt.vergleichQ")}>{t("help.nt.vergleichA")}</Faq>
       <Section title={t("help.kla.whatT")}>{t("help.kla.what")}</Section>
       <Section title={t("help.kla.evalT")}>{t("help.kla.eval")}</Section>
     </>

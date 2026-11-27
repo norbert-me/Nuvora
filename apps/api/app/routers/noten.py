@@ -31,6 +31,7 @@ from ..database import get_db
 # `roster_kurs` heisst hier unten schon ein Endpunkt — deshalb umbenannt
 # importiert, sonst ueberdeckt der Endpunkt den Helfer.
 from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
+from ..kurslabel import kurs_label
 from ..importe import geprueft
 from ..models import (
     GradeCategory, GradeEntry, GradeSection, GradeOverride, QuartalDatum,
@@ -777,6 +778,13 @@ class StudentSummary(BaseModel):
     klasse: str = ""
 
 
+def _spalten_tag(c):
+    """Tag einer Spalte im Verlauf: Datum der Leistung, sonst Anlagedatum (wie `spaltenDatum` im Frontend)."""
+    if c.date:
+        return c.date
+    return c.created_at.date() if c.created_at else None
+
+
 def _agg(werte, mode):
     """Mehrere Noten zu einer zusammenfassen: Mittel oder Median. Die
     Abschnitts-Gewichtung bleibt davon unberuehrt — sie ist Fachkonferenz-Recht."""
@@ -790,10 +798,13 @@ def _agg(werte, mode):
     return round(sum(werte) / len(werte), 2)
 
 
-async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
+async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None, bis=None):
     """Berechnet die Uebersicht eines Halbjahrs. Gibt (sections, out) zurueck.
     agg steuert nur, wie mehrere Einzelnoten zusammengefasst werden.
-    Abschnitte/Endnoten hängen am Kurs (Fach)."""
+    Abschnitte/Endnoten hängen am Kurs (Fach).
+
+    `bis` (date): Stand zu einem Tag — nur Spalten mit Datum (Leistung, sonst Anlage) bis dahin, und OHNE die von
+    Hand gesetzten Noten: die gelten dem ganzen Halbjahr, nicht einem Zwischenstand (Quartalsnote)."""
     if kurs_id is not None:
         # Beobachtungen haengen ohne owner_id am Kurs — der Kurs gehoert geprueft,
         # sonst liest ein fremder kurs_id Freitexte ueber fremde Kinder.
@@ -809,6 +820,8 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
     cats = [c for c in (await db.execute(
         select(GradeCategory).where(GradeCategory.owner_id == user.id, GradeCategory.class_id == class_id)
     )).scalars().all() if c.section_id in sec_ids]
+    if bis is not None:
+        cats = [c for c in cats if (_spalten_tag(c) or bis) <= bis]
     cat_ids = {c.id for c in cats}
 
     students = await _kurs_roster(db, user, class_id, kurs_id)
@@ -831,6 +844,8 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
         select(GradeOverride).where(GradeOverride.owner_id == user.id, GradeOverride.class_id == class_id)
     )).scalars().all()
     # (student_id, section_id) -> value; section_id None = Endnote
+    if bis is not None:
+        overrides = []
     sec_over = {(o.student_id, o.section_id): o.value for o in overrides if o.section_id in sec_ids}
     # Endnote-Override (section_id NULL) am Kurs: nur die des gewaehlten Kurses.
     total_over = {o.student_id: o.value for o in overrides
@@ -974,6 +989,97 @@ async def year_summary(class_id: int, agg: str = "mean", kurs_id: Optional[int] 
             term_ends={"1": end1, "2": end2}, year=year, year_override=year_over.get(sid),
         ))
     return YearOut(sections=sections, rows=rows)
+
+
+# ─── Vergleich eines Kindes: Quartale, Halbjahre, Jahr — und das Vorjahr ───
+#
+# Die Fragen beim Elterngespraech: „wie stand es zum Quartal?" und „wie war es letztes Jahr?". Beides steht schon
+# in Nuvora, nur verstreut: die Quartalsstriche sind Daten im Verlauf, das Vorjahr ist der Vorgaengerkurs
+# (`kurse.vorgaenger_id`). Gerechnet wird mit `_summarize` — dieselbe Rechnung wie die Tabelle, eine Wahrheit.
+#   Quartalsnote = Stand der Gesamtnote am Tag des Strichs (alle Noten des Halbjahrs bis dahin, ohne die von
+#   Hand gesetzten — die gelten dem Halbjahr). Das letzte Stueck eines Halbjahrs IST die Halbjahresnote.
+#   Vorjahr = Jahresnote im Vorgaengerkurs, gefunden ueber die Person (sonst den Namen). Keine Note ohne Vorgaenger.
+
+class VergleichPunkt(BaseModel):
+    art: str                    # "quartal" | "halbjahr"
+    term: str
+    label: str                  # "Q1", "1. HJ", …
+    bis: Optional[str] = None   # Tag des Strichs (nur Quartale)
+    note: Optional[float] = None
+
+
+class VorjahrOut(BaseModel):
+    kurs: str
+    schuljahr: str = ""
+    halbjahre: dict
+    jahr: Optional[float] = None
+
+
+class VergleichOut(BaseModel):
+    verlauf: List[VergleichPunkt]
+    jahr: Optional[float] = None
+    vorjahr: Optional[VorjahrOut] = None
+
+
+def _end(r):
+    return None if r is None else (r.total_override if r.total_override is not None else r.weighted)
+
+
+async def _vorjahr(db, user, student: Student, kurs_id: int, mode: str) -> Optional[VorjahrOut]:
+    from ..models import Kurs
+    kurs = await eigener_kurs(db, user, kurs_id)
+    if not kurs.vorgaenger_id:
+        return None
+    vor = await db.get(Kurs, kurs.vorgaenger_id)
+    if vor is None or vor.owner_id != user.id or vor.deleted_at is not None:
+        return None
+    # Die Spalten liegen je Klasse; welche Klassen das Notenbuch des Vorjahrs fuehrt, sagen seine Abschnitte.
+    klassen = sorted(set((await db.execute(select(GradeSection.class_id).where(
+        GradeSection.owner_id == user.id, GradeSection.kurs_id == vor.id))).scalars().all()))
+    if not klassen:
+        return VorjahrOut(kurs=kurs_label(vor), schuljahr=vor.schuljahr or "", halbjahre={"1": None, "2": None})
+    roster = await _kanon_kurs(db, vor.id)
+    pid = getattr(student, "person_id", None)
+    treffer = next((x for x in roster if pid and x.person_id == pid), None) \
+        or next((x for x in roster if x.name.strip().lower() == student.name.strip().lower()), None)
+    if treffer is None:
+        return None     # das Kind war im Vorjahr nicht in dieser Gruppe
+    for cid in klassen:
+        y = await year_summary(cid, agg=mode, kurs_id=vor.id, user=user, db=db)
+        row = next((r for r in y.rows if r.student_id == treffer.id), None)
+        if row and (row.year is not None or any(v is not None for v in row.term_ends.values())):
+            return VorjahrOut(kurs=kurs_label(vor), schuljahr=vor.schuljahr or "", halbjahre=row.term_ends, jahr=row.year)
+    return VorjahrOut(kurs=kurs_label(vor), schuljahr=vor.schuljahr or "", halbjahre={"1": None, "2": None})
+
+
+@router.get("/classes/{class_id}/students/{student_id}/vergleich", response_model=VergleichOut)
+async def vergleich(class_id: int, student_id: int, agg: str = "mean", kurs_id: Optional[int] = None,
+                    user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    await _owned_class(db, user, class_id)
+    mode = "median" if agg == "median" else "mean"
+    if not await _student_in_kurs(db, class_id, student_id, kurs_id):
+        raise HTTPException(404, "Schüler nicht gefunden")
+    student = await db.get(Student, student_id)
+    if student is None:
+        raise HTTPException(404, "Schüler nicht gefunden")
+
+    verlauf = []
+    q = 0
+    for term in ("1", "2"):
+        for tag in await _strich_liste(db, class_id, term, kurs_id, user):
+            _, out = await _summarize(db, user, class_id, term, agg=mode, kurs_id=kurs_id, bis=_date.fromisoformat(tag))
+            q += 1
+            r = next((x for x in out if x.student_id == student_id), None)
+            verlauf.append(VergleichPunkt(art="quartal", term=term, label=f"Q{q}", bis=tag, note=r.weighted if r else None))
+        _, out = await _summarize(db, user, class_id, term, agg=mode, kurs_id=kurs_id)
+        r = next((x for x in out if x.student_id == student_id), None)
+        q += 1
+        verlauf.append(VergleichPunkt(art="halbjahr", term=term, label=f"{term}. HJ", note=_end(r)))
+
+    y = await year_summary(class_id, agg=mode, kurs_id=kurs_id, user=user, db=db)
+    jahr = next((r.year for r in y.rows if r.student_id == student_id), None)
+    vorjahr = await _vorjahr(db, user, student, kurs_id, mode) if kurs_id is not None else None
+    return VergleichOut(verlauf=verlauf, jahr=jahr, vorjahr=vorjahr)
 
 
 # ─── CardVote-Testergebnis als Noten uebernehmen ───
