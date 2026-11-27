@@ -1132,10 +1132,13 @@ function ContentWrapper({ children }) {
   // Code-Detektiv laeuft ohne Nuvora-Navbar im Vollbild — kein Padding, keine
   // Spaltenbreite, damit das Spiel den ganzen Platz nutzt.
   if (p.startsWith(CD)) return children;
+  // Tabellen (Notenbuch, Klassenarbeit) nehmen am PC die ganze Breite: zwanzig Spalten in 1080 px heisst
+  // waagerecht scrollen, waehrend links und rechts die Haelfte des Bildschirms leer steht.
+  const breit = p.startsWith(AUSW);
   return (
     <>
       <style>{`@media (max-width: 640px) { .content-wrap { padding: 16px 12px 64px !important; } }`}</style>
-      <div className="content-wrap" style={{ padding: "32px 32px 64px", maxWidth: 1080, margin: "0 auto", width: "100%", flex: "1 0 auto" }}>{children}</div>
+      <div className="content-wrap" style={{ padding: "32px 32px 64px", maxWidth: breit ? "none" : 1080, margin: "0 auto", width: "100%", flex: "1 0 auto", boxSizing: "border-box" }}>{children}</div>
     </>
   );
 }
