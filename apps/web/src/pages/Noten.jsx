@@ -2001,6 +2001,9 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
   const gesamt = [];
   cats.forEach((c) => {
     prefix.add(c.id);
+    // Ein Punkt nur, wo DIESES Kind eine Note hat: sonst stand nach jeder Spalte ohne Note (gefehlt, noch nicht
+    // eingetragen) ein unveraenderter Punkt mehr da, und Schnitt- und Einzelansicht hatten verschieden viele.
+    if (gradeOf(c.id) == null) return;
     const v = overallUpTo(prefix);
     if (v != null) gesamt.push({ cat: c, value: v, istSchnitt: true, einzeln: gradeOf(c.id) });
   });
