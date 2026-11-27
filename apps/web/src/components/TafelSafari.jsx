@@ -14,7 +14,7 @@
 // "pause": die Szene haelt an, es kommt keins dazu). Die Tiere selbst sind
 // Zustand der Stunde und werden nicht gespeichert.
 import { useEffect, useRef, useState } from "react";
-import { CONTROL_R, COLORS as C, btnSecondary } from "./Icons.jsx";
+import { CONTROL_R, COLORS as C, ICONS, Icon, Segment, SHADOW, btnSecondary, segmentBtn } from "./Icons.jsx";
 import { useMikroPegel } from "../core/mikroPegel.js";
 
 const TIERE = ["🦒", "🐘", "🦓", "🦁", "🐆", "🦛", "🦏", "🐃", "🦩", "🐒", "🐊", "🦅", "🐗", "🦔"];
@@ -29,6 +29,12 @@ const MAX_TIERE = 40;
 // Zufaellige Wartezeit um den Takt herum (0,6- bis 1,4-fach): genau alle fuenf
 // Minuten waere nach dem zweiten Tier vorhersehbar.
 const naechsteWartezeit = (takt) => takt * 60000 * (0.6 + Math.random() * 0.8);
+// Das ERSTE Tier kommt nach spaetestens einer halben Minute Ruhe: drei bis sieben Minuten ohne jedes Zeichen
+// sahen aus, als funktioniere die Safari nicht („es kommen keine Tiere").
+const ERSTES_MS = 30000;
+// Voreinstellungen: wie laut darf es sein (Schwelle 0..100) und wie oft kommt ein Tier (Minuten).
+const LAGEN = [["still", 25], ["einzel", 40], ["partner", 55]];
+const TEMPI = [["ruhig", 8], ["normal", 5], ["lebhaft", 2]];
 
 function neuesTier(vorhandene) {
   const frei = TIERE.filter((e) => !vorhandene.some((x) => x.e === e));
@@ -38,14 +44,17 @@ function neuesTier(vorhandene) {
   return { id: `${Date.now()}-${Math.random()}`, e, x: 6 + Math.random() * 84, y, spiegeln: Math.random() < 0.5, weg: false };
 }
 
-export default function TafelSafari({ item, t }) {
+export default function TafelSafari({ item, t, onPatch }) {
   const schwelle = item.schwelle ?? 40;
   const takt = item.takt ?? 5;
   const modus = item.modus === "pause" ? "pause" : "weglaufen";
   const [tiere, setTiere] = useState([]);
   const [laut, setLaut] = useState(false);
   const ruhig = useRef(0);                         // gesammelte Ruhezeit (ms)
-  const warte = useRef(naechsteWartezeit(takt));   // bis zum naechsten Tier
+  const warte = useRef(Math.min(ERSTES_MS, naechsteWartezeit(takt)));   // bis zum naechsten Tier
+  const zaehlen = item.zaehlen !== false;          // Zahl der Tiere oben zeigen
+  const [offen, setOffen] = useState(false);       // Einstellungen
+  const [messe, setMesse] = useState(null);        // Einmessen: {bis, max}
   const ueber = useRef(0);                         // seit wann ueber der Schwelle (ms)
   const lautSeit = useRef(0);                      // fuer das Weglaufen
   const tiereRef = useRef(tiere);
@@ -54,7 +63,7 @@ export default function TafelSafari({ item, t }) {
   // Neu anfangen (Knopf in der Leiste, `_reset` am Element).
   useEffect(() => {
     if (!item._reset) return;
-    setTiere([]); ruhig.current = 0; warte.current = naechsteWartezeit(takt);
+    setTiere([]); ruhig.current = 0; warte.current = Math.min(ERSTES_MS, naechsteWartezeit(takt));
   }, [item._reset]);
   // Anderer Takt: die Wartezeit neu wuerfeln, sonst gilt bis zum naechsten
   // Tier noch der alte.
@@ -68,7 +77,19 @@ export default function TafelSafari({ item, t }) {
     setTimeout(() => setTiere((l) => l.filter((x) => x.id !== opfer.id)), 1200);
   };
 
-  const { an, pegel, fehler, start, stopp } = useMikroPegel((wert, delta) => {
+  const { an, pegel, fehler, start, stopp } = useMikroPegel((wert, delta, ctx) => {
+    // Safari haelt einen Audio-Kontext gern angehalten, wenn er nicht direkt im Klick entsteht — dann misst er
+    // still Null. Anschubsen kostet nichts.
+    if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+    // Einmessen: ein paar Sekunden den Raum hoeren, dann die Schwelle knapp darueber setzen.
+    if (messe) {
+      const max = Math.max(messe.max, wert);
+      if (performance.now() >= messe.bis) {
+        setMesse(null);
+        onPatch?.({ schwelle: Math.max(10, Math.min(95, Math.round(max + 8))) });
+      } else if (max !== messe.max) setMesse({ ...messe, max });
+      return;
+    }
     if (wert >= schwelle) {
       ueber.current += delta;
       if (ueber.current >= LAUT_HALTE_S * 1000) {
@@ -92,6 +113,8 @@ export default function TafelSafari({ item, t }) {
   });
 
   const anzahl = tiere.filter((x) => !x.weg).length;
+  const alleZeigen = () => setTiere(TIERE.map((e, i) => ({ ...neuesTier([]), id: `alle-${i}-${Date.now()}`, e, x: 5 + (i * 90) / TIERE.length })));
+  const einmessen = async () => { if (!an) await start(); setMesse({ bis: performance.now() + 4000, max: 0 }); };
   const status = !an ? t("tafel.safariAus") : laut ? (modus === "pause" ? t("tafel.safariPause") : t("tafel.safariWeg")) : t("tafel.safariKommen");
   const statusFarbe = !an ? "var(--text3)" : laut ? C.danger : C.success;
   const balkenFarbe = pegel >= schwelle ? C.danger : pegel >= schwelle * 0.75 ? C.warning : C.success;
@@ -151,7 +174,7 @@ export default function TafelSafari({ item, t }) {
         borderRadius: CONTROL_R, padding: "10px 16px", display: "flex", flexDirection: "column", gap: 6, minWidth: "40%", color: "#1d1d1f" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "space-between", fontSize: 22, fontWeight: 700 }}>
           <span style={{ color: statusFarbe }}>● {status}</span>
-          <span>{anzahl} 🐾</span>
+          {zaehlen && <span>{anzahl} 🐾</span>}
         </div>
         <div style={{ position: "relative", height: 14, background: "#e5e7eb", borderRadius: CONTROL_R, overflow: "hidden" }}>
           <div style={{ width: `${pegel}%`, height: "100%", background: balkenFarbe, transition: "width .12s linear" }} />
@@ -163,11 +186,77 @@ export default function TafelSafari({ item, t }) {
           ? <button onClick={start} style={safariBtn}>{t("tafel.laermStart")}</button>
           : <button onClick={stopp} style={safariBtn}>{t("tafel.laermStop")}</button>}
       </div>
+      {/* Einstellungen am Feld: Zahnrad oben rechts. pointerdown nicht weitergeben — sonst zieht der Klick das Feld. */}
+      {onPatch && (
+        <button onPointerDown={(e) => e.stopPropagation()} onClick={() => setOffen((v) => !v)}
+          title={t("tafel.safariEinst")} aria-label={t("tafel.safariEinst")}
+          style={{ ...safariBtn, position: "absolute", top: 16, right: 16, padding: 8, fontSize: 16 }}>
+          <Icon d={ICONS.settings || ICONS.gear || ICONS.edit} size={18} color="#1d1d1f" />
+        </button>
+      )}
+      {offen && onPatch && (
+        <div onPointerDown={(e) => e.stopPropagation()}
+          style={{ position: "absolute", top: 64, right: 16, width: 340, maxWidth: "calc(100% - 32px)", maxHeight: "calc(100% - 80px)", overflowY: "auto",
+            background: "var(--card)", color: "var(--text)", borderRadius: CONTROL_R + 4, boxShadow: SHADOW.ueber, padding: 16, display: "grid", gap: 12, fontSize: 13 }}>
+          <Feld titel={t("tafel.safariLage")}>
+            <Segment>
+              {LAGEN.map(([k, v]) => (
+                <button key={k} onClick={() => onPatch({ schwelle: v })} aria-pressed={schwelle === v}
+                  style={{ ...segmentBtn, fontWeight: schwelle === v ? 700 : 500, color: schwelle === v ? "var(--accent)" : "var(--text2)" }}>{t(`tafel.safariLage.${k}`)}</button>
+              ))}
+            </Segment>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+              <span style={{ color: "var(--text3)" }}>{t("tafel.laermSchwelle", { n: schwelle })}</span>
+              <button onClick={einmessen} disabled={!!messe} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12, marginLeft: "auto" }}
+                title={t("tafel.safariEinmessenHint")}>{messe ? t("tafel.safariMisst") : t("tafel.safariEinmessen")}</button>
+            </div>
+          </Feld>
+          <Feld titel={t("tafel.safariBeiLaerm")}>
+            <Segment>
+              {[["weglaufen", "tafel.safariModusWeg"], ["pause", "tafel.safariModusPause"]].map(([k, l]) => (
+                <button key={k} onClick={() => onPatch({ modus: k })} aria-pressed={modus === k}
+                  style={{ ...segmentBtn, fontWeight: modus === k ? 700 : 500, color: modus === k ? "var(--accent)" : "var(--text2)" }}>{t(l)}</button>
+              ))}
+            </Segment>
+          </Feld>
+          <Feld titel={t("tafel.safariWieOft")}>
+            <Segment>
+              {TEMPI.map(([k, v]) => (
+                <button key={k} onClick={() => onPatch({ takt: v })} aria-pressed={takt === v}
+                  style={{ ...segmentBtn, fontWeight: takt === v ? 700 : 500, color: takt === v ? "var(--accent)" : "var(--text2)" }}>{t(`tafel.safariTempo.${k}`)}</button>
+              ))}
+            </Segment>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, color: "var(--text2)" }}>
+              {t("tafel.safariEtwaAlle")}
+              <input type="number" min={1} max={30} value={takt} onChange={(e) => { const n = Number(e.target.value); if (n >= 1 && n <= 30) onPatch({ takt: n }); }}
+                style={{ width: 56, padding: "2px 6px", borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }} />
+              {t("tafel.safariMinuten")}
+            </label>
+          </Feld>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={zaehlen} onChange={(e) => onPatch({ zaehlen: e.target.checked })} /> {t("tafel.safariZaehlen")}
+          </label>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={alleZeigen} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13 }}>{t("tafel.safariAlle")}</button>
+            <button onClick={() => { setTiere([]); ruhig.current = 0; warte.current = Math.min(ERSTES_MS, naechsteWartezeit(takt)); }}
+              style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13 }}>{t("tafel.safariNeu")}</button>
+          </div>
+        </div>
+      )}
       {fehler && (
         <div style={{ position: "absolute", bottom: 80, left: 16, right: 16, textAlign: "center", fontSize: 22, color: C.danger, background: "rgba(255,255,255,0.9)", borderRadius: CONTROL_R, padding: 8 }}>
           {t(`tafel.mikro.${fehler}`)}
         </div>
       )}
+    </div>
+  );
+}
+
+function Feld({ titel, children }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--text3)", marginBottom: 6 }}>{titel}</div>
+      {children}
     </div>
   );
 }

@@ -287,7 +287,7 @@ export default function Tafel() {
               ) : it.type === "laerm" ? (
                 <TafelLaerm item={it} t={t} />
               ) : it.type === "safari" ? (
-                <TafelSafari item={it} t={t} />
+                <TafelSafari item={it} t={t} onPatch={(o) => patch(it.id, o)} />
               ) : it.type === "verlauf" ? (
                 <TafelVerlauf t={t} />
               ) : (
