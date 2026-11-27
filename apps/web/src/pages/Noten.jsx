@@ -142,6 +142,9 @@ export default function Noten() {
   const [agg, setAgg] = useState(() => { try { return localStorage.getItem("noten_agg") === "median" ? "median" : "mean"; } catch { return "mean"; } });
   const [yearData, setYearData] = useState({ sections: [], rows: [] });
   const [dividers, setDividers] = useState([]); // Quartalsstriche im Verlauf: Daten ("JJJJ-MM-TT")
+  // Quartal eingeklappt? Eine Ansicht, kein Inhalt — im Browser gemerkt.
+  const [qEin, setQEin] = useState(() => { try { return localStorage.getItem("noten_quartal_zu") === "1"; } catch { return false; } });
+  const setQEinPersist = (v) => { setQEin(v); try { localStorage.setItem("noten_quartal_zu", v ? "1" : "0"); } catch { /* egal */ } };
   // Beim Oeffnen sind IMMER alle Spalten ausgeklappt (Wunsch des Nutzers): zugeklappt gilt nur
   // fuer diese Sitzung und wird nicht gemerkt — sonst fehlen beim naechsten Mal Noten, ohne dass
   // man sich erinnert, sie eingeklappt zu haben.
@@ -583,6 +586,30 @@ export default function Noten() {
     return r;
   };
   const noteVon = (sid, cid) => entwurf.wert[`n:${sid}:${cid}`] ?? null;
+  // ── Quartal: einklappen und Quartalsnote ──
+  // Der letzte Quartalsstrich dieses Halbjahrs trennt: Spalten mit Datum (Leistung, sonst Anlage) bis dahin
+  // gehoeren zum Quartal. Eingeklappt verschwinden sie, und die Spalte „Q1" zeigt den Stand am Strich —
+  // dieselbe Rechnung wie der Server (Mittel/Median je Abschnitt, gewichtet, ohne von Hand gesetzte Noten).
+  const qTag = term !== "year" && dividers.length ? [...dividers].sort().slice(-1)[0] : null;
+  const qName = qTag ? `Q${(term === "2" ? 2 : 0) + dividers.length}` : "";
+  const istQ = (c) => !!qTag && !!spaltenDatum(c) && spaltenDatum(c) <= qTag;
+  const zeigCats = (sec) => (qTag && qEin ? catsVon(sec).filter((c) => !istQ(c)) : catsVon(sec));
+  const secZu = (sec) => collapsed.has(sec.id) || (qTag && qEin && catsVon(sec).length > 0 && zeigCats(sec).length === 0);
+  const quartalNote = (s) => {
+    if (!qTag || s.le) return null;
+    const teile = [];
+    for (const sec of secListe) {
+      const werte = catsVon(sec).filter(istQ).map((c) => noteVon(s.student_id, c.id)).filter((v) => v != null);
+      if (!werte.length) continue;
+      let w;
+      if (agg === "median") { const x = [...werte].sort((a, b) => a - b); const m = Math.floor(x.length / 2); w = x.length % 2 ? x[m] : (x[m - 1] + x[m]) / 2; }
+      else w = werte.reduce((a, b) => a + b, 0) / werte.length;
+      teile.push({ w, g: sec.weight || 0 });
+    }
+    if (!teile.length) return null;
+    const gs = teile.reduce((a, x) => a + x.g, 0);
+    return gs > 0 ? teile.reduce((a, x) => a + x.w * x.g, 0) / gs : teile.reduce((a, x) => a + x.w, 0) / teile.length;
+  };
   // „NB" (nicht bewertet) liegt als Vermerk an der Zelle, ist aber KEIN Kommentar: der Dialog zeigt
   // ihn nicht, die Ecke sieht ihn nicht, und er zaehlt nicht als „Kommentar da".
   const rohKommentar = (sid, cid) => entwurf.wert[`k:${sid}:${cid}`] || "";
@@ -888,9 +915,22 @@ export default function Noten() {
                     </button>
                   </span>
                 </th>
+                {qTag && (
+                  <th rowSpan={2} style={{ ...th, borderLeft: "2px solid var(--border3)", whiteSpace: "nowrap" }} title={t("noten.quartalNoteHint", { name: qName })}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      {/* Einklappen: die Spalten bis zum Quartalsstrich verschwinden, die Quartalsnote bleibt. */}
+                      <button onClick={() => setQEinPersist(!qEin)} className="icon-btn" style={{ ...iconBtn, padding: 1 }}
+                        title={qEin ? t("noten.quartalAuf", { name: qName }) : t("noten.quartalZu", { name: qName })}
+                        aria-label={qEin ? t("noten.quartalAuf", { name: qName }) : t("noten.quartalZu", { name: qName })}>
+                        <Icon d={qEin ? ICONS.plus : ICONS.minus} size={14} />
+                      </button>
+                      {qName}
+                    </span>
+                  </th>
+                )}
                 {secListe.map((sec) => {
-                  const isCol = collapsed.has(sec.id);
-                  const cols = isCol ? 0 : catsVon(sec).length || 1;
+                  const isCol = secZu(sec);
+                  const cols = isCol ? 0 : zeigCats(sec).length || 1;
                   const secSeite = ziehSec.seite(sec.id);
                   return (
                     <th key={sec.id} colSpan={cols + 1}
@@ -937,13 +977,13 @@ export default function Noten() {
                   <span style={{ display: "block", maxWidth: NAME_SPALTE_MAX }} />
                 </th>
                 {secListe.map((sec) => {
-                  const cols = catsVon(sec);
+                  const cols = zeigCats(sec);
                   const bereich = (
-                    <th key={`sn-${sec.id}`} style={{ ...th2, borderLeft: collapsed.has(sec.id) ? "2px solid var(--border3)" : undefined, borderRight: "2px solid var(--border3)", fontWeight: 500, minWidth: 56 }} title={t("noten.sectionGradeHint")}>
+                    <th key={`sn-${sec.id}`} style={{ ...th2, borderLeft: secZu(sec) ? "2px solid var(--border3)" : undefined, borderRight: "2px solid var(--border3)", fontWeight: 500, minWidth: 56 }} title={t("noten.sectionGradeHint")}>
                       {t("noten.sectionGrade")}
                     </th>
                   );
-                  if (collapsed.has(sec.id)) return [bereich];
+                  if (secZu(sec)) return [bereich];
                   if (cols.length === 0) {
                     return [
                       <th key={`empty-${sec.id}`} style={{ ...th2, borderLeft: "2px solid var(--border3)", fontWeight: 400 }}>
@@ -1013,7 +1053,7 @@ export default function Noten() {
                 const zHier = zelle && (String(zelle).startsWith(`${s.student_id}:`) || String(zelle).startsWith(`sec:${s.student_id}:`)
                   || zelle === `end:${s.student_id}`) ? zelle : null;
                 return (
-                <ZeilenHuelle key={s.student_id} deps={[s, si, kinderKey, sections, fehlzeiten, collapsed, ordnungsKey, zeilenKey(s), zHier,
+                <ZeilenHuelle key={s.student_id} deps={[s, si, kinderKey, sections, fehlzeiten, collapsed, ordnungsKey, zeilenKey(s), zHier, qTag, qEin, agg,
                   fokusKind === String(s.student_id), kurz.an, t, stellen, form, stufung, susModus]}
                   zeile={() => (
                 <tr style={fokusKind === String(s.student_id) ? { background: FOKUS_TON } : undefined}>
@@ -1028,10 +1068,16 @@ export default function Noten() {
                         style={notenFehlen(s.student_id) ? { background: `${C.warning}33`, borderRadius: 6, padding: "1px 6px", margin: "0 -6px" } : undefined}>{kurz.name(s.name)}</span>{s.le && <span title={t("kurse.leHint")} style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: C.warning }}>LE</span>}
                     </button>
                   </td>
+                  {qTag && (
+                    <td style={{ ...td, fontWeight: 600, background: "var(--bg2, rgba(0,0,0,0.02))", borderLeft: "2px solid var(--border3)" }}
+                      title={t("noten.quartalNoteHint", { name: qName })}>
+                      {quartalNote(s) != null ? deAnz(quartalNote(s)) : <span style={{ color: "var(--border2)" }}>·</span>}
+                    </td>
+                  )}
                   {secListe.map((sec) => {
-                    const cols = catsVon(sec);
+                    const cols = zeigCats(sec);
                     const bereichTd = (
-                      <td key={`sn-${sec.id}`} style={{ ...td, padding: 0, borderLeft: collapsed.has(sec.id) ? "2px solid var(--border3)" : undefined, borderRight: "2px solid var(--border3)", background: "var(--bg2, rgba(0,0,0,0.02))" }}>
+                      <td key={`sn-${sec.id}`} style={{ ...td, padding: 0, borderLeft: secZu(sec) ? "2px solid var(--border3)" : undefined, borderRight: "2px solid var(--border3)", background: "var(--bg2, rgba(0,0,0,0.02))" }}>
                         <NoteZelle t={t}
                           editing={zelle === `sec:${s.student_id}:${sec.id}`}
                           onEdit={() => setZelle(`sec:${s.student_id}:${sec.id}`)}
@@ -1043,7 +1089,7 @@ export default function Noten() {
                           onReset={() => overrideReset(s.student_id, sec.id)} />
                       </td>
                     );
-                    if (collapsed.has(sec.id)) return [bereichTd];
+                    if (secZu(sec)) return [bereichTd];
                     if (cols.length === 0) return [<td key={`e-${sec.id}`} style={{ ...td, borderLeft: "2px solid var(--border3)" }}></td>, bereichTd];
                     return [
                       ...cols.map((c, i) => {
