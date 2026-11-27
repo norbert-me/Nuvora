@@ -184,7 +184,7 @@ async def _kurse_je_deck(db, deck_ids) -> dict:
     return out
 
 
-async def _kurs_decks_where(cls, kurs_id=None):
+async def _kurs_decks_where(cls, kurs_id=None, db=None):
     """Stapel dieser Klasse/dieses Kurses (Lehrkraft-Sicht der alten Wege).
 
     kurs_id gesetzt = die dem Kurs ZUGEWIESENEN Stapel, dazu die Bestandsstapel
@@ -196,8 +196,18 @@ async def _kurs_decks_where(cls, kurs_id=None):
     Übernahme aus dem Marktplatz legen ohne kurs_id an.
     """
     if kurs_id is not None:
-        alt = or_(CardDeck.kurs_id == kurs_id,
-                  and_(CardDeck.class_id == cls.id, CardDeck.kurs_id.is_(None)))
+        klasse_ohne_kurs = and_(CardDeck.class_id == cls.id, CardDeck.kurs_id.is_(None))
+        # Liegt die Klasse in mehreren Kursen, gehoert ein Klassen-Stapel mit Fach nur zu dem Kurs desselben
+        # Fachs — sonst stand der Mathe-Stapel auch im Kurs GA (gemeldet 27.11.2026).
+        if db is not None and len(await class_kurs_ids(db, cls.id)) > 1:
+            kurs = await db.get(Kurs, kurs_id)
+            decks = (await db.execute(select(CardDeck.id, CardDeck.topic_id).where(
+                CardDeck.class_id == cls.id, CardDeck.kurs_id.is_(None)))).all()
+            faecher = await _deck_faecher(db, decks)
+            fremd = [did for did, f in faecher.items() if f and not _fach_passt(f, kurs.fach if kurs else "")]
+            if fremd:
+                klasse_ohne_kurs = and_(klasse_ohne_kurs, ~CardDeck.id.in_(fremd))
+        alt = or_(CardDeck.kurs_id == kurs_id, klasse_ohne_kurs)
         return or_(_zugewiesen([kurs_id]), and_(_ohne_zuweisung(), alt))
     return and_(_ohne_zuweisung(), CardDeck.class_id == cls.id, CardDeck.kurs_id.is_(None))
 
@@ -263,38 +273,48 @@ async def _student_deck_where(db, st):
     return and_(_ohne_zuweisung(), alt)
 
 
-async def _bestandsstapel_aus(db, st, aus_kurse, aktive_kurse) -> list:
-    """IDs der Klassen-Stapel (ohne Kurs), die wegen abgeschalteter Kurse
-    nicht an dieses Kind gehen."""
+def _fach_passt(a: str, b: str) -> bool:
+    """Wie fachPasst in core/topics.js: „Mathe" passt zu „Mathematik", leer passt NICHT (hier wird ausgeschlossen)."""
+    x, y = (a or "").strip().casefold(), (b or "").strip().casefold()
+    return bool(x and y) and (x == y or x.startswith(y) or y.startswith(x))
+
+
+async def _deck_faecher(db, decks) -> dict:
+    """{deck_id: Fach des Themas (Oberthema erbt)} fuer [(deck_id, topic_id), …]."""
     from ..models import Topic
-    def norm(x):
-        return (x or "").strip().casefold()
-    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
-        Kurs.id.in_(set(aus_kurse) | set(aktive_kurse))))).scalars().all()}
-    aus_faecher = {norm(kurse[k].fach) for k in aus_kurse if k in kurse and norm(kurse[k].fach)}
-    aktive_faecher = {norm(kurse[k].fach) for k in aktive_kurse if k in kurse and norm(kurse[k].fach)}
-    decks = (await db.execute(select(CardDeck.id, CardDeck.topic_id).where(
-        CardDeck.class_id == st.class_id, CardDeck.kurs_id.is_(None), CardDeck.deleted_at.is_(None)))).all()
-    if not decks:
-        return []
-    topics = {}
     tids = {tid for _, tid in decks if tid}
+    tp = {}
     if tids:
         tp = {t.id: t for t in (await db.execute(select(Topic).where(Topic.id.in_(tids)))).scalars().all()}
         eltern = {t.parent_id for t in tp.values() if t.parent_id}
         if eltern:
             tp.update({t.id: t for t in (await db.execute(select(Topic).where(Topic.id.in_(eltern)))).scalars().all()})
-        topics = tp
-    out = []
+    out = {}
     for did, tid in decks:
-        t = topics.get(tid)
-        fach = norm(t.fach) if t and norm(t.fach) else (norm(topics[t.parent_id].fach) if t and t.parent_id in topics else "")
-        if fach:
-            # Fach bekannt: nur verstecken, wenn ein Kurs dieses Fachs aus ist und
-            # kein anderer Kurs desselben Fachs noch an.
-            if fach in aus_faecher and fach not in aktive_faecher:
-                out.append(did)
-        else:
+        t = tp.get(tid)
+        out[did] = ((t.fach or "").strip() if t and (t.fach or "").strip()
+                    else ((tp[t.parent_id].fach or "").strip() if t and t.parent_id in tp else ""))
+    return out
+
+
+async def _bestandsstapel_aus(db, st, aus_kurse, aktive_kurse) -> list:
+    """IDs der Klassen-Stapel (ohne Kurs), die wegen abgeschalteter Kurse
+    nicht an dieses Kind gehen."""
+    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
+        Kurs.id.in_(set(aus_kurse) | set(aktive_kurse))))).scalars().all()}
+    decks = (await db.execute(select(CardDeck.id, CardDeck.topic_id).where(
+        CardDeck.class_id == st.class_id, CardDeck.kurs_id.is_(None), CardDeck.deleted_at.is_(None)))).all()
+    if not decks:
+        return []
+    # Ein Klassen-Stapel mit Fach geht nur noch ueber einen AKTIVEN Kurs desselben Fachs hinaus (unscharf:
+    # „Mathe" = „Mathematik"). Vorher wurde nur versteckt, wenn das Fach eines abgeschalteten Kurses exakt
+    # gleich hiess — und ein Kurs ohne Fach (oder ein anderes Fach wie GA) bekam die Mathe-Karten mit.
+    faecher = await _deck_faecher(db, decks)
+    aktive = [kurse[k].fach for k in aktive_kurse if k in kurse]
+    out = []
+    for did, _ in decks:
+        fach = faecher.get(did, "")
+        if not fach or not any(_fach_passt(fach, a) for a in aktive):
             out.append(did)
     return out
 
@@ -555,7 +575,7 @@ async def _aktive_decks(db, user, bereich):
 @router.get("/classes/{class_id}/decks", response_model=List[DeckOut])
 async def list_decks(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     cls = await _owned_class(db, user, class_id)
-    return await _aktive_decks(db, user, await _kurs_decks_where(cls, kurs_id))
+    return await _aktive_decks(db, user, await _kurs_decks_where(cls, kurs_id, db))
 
 
 @router.get("/classes/{class_id}/all-decks", response_model=List[DeckOut])
@@ -572,7 +592,7 @@ async def list_deck_trash(class_id: int, kurs_id: Optional[int] = None, user: Us
     cls = await _owned_class(db, user, class_id)
     from sqlalchemy.orm import selectinload
     r = await db.execute(
-        select(CardDeck).where(CardDeck.owner_id == user.id, await _kurs_decks_where(cls, kurs_id), CardDeck.deleted_at.is_not(None))
+        select(CardDeck).where(CardDeck.owner_id == user.id, await _kurs_decks_where(cls, kurs_id, db), CardDeck.deleted_at.is_not(None))
         .options(selectinload(CardDeck.cards)).order_by(CardDeck.deleted_at.desc())
     )
     return await _decks_out(db, r.scalars().all())
@@ -1316,7 +1336,7 @@ async def progress(class_id: int, kurs_id: Optional[int] = None, user: User = De
     # Nur ausgerollte Stapel zaehlen — Entwuerfe verzerren den Fortschritt nicht.
     deck_ids = (await db.execute(select(CardDeck.id).where(
         CardDeck.owner_id == user.id,
-        await _kurs_decks_where(cls, kurs_id),
+        await _kurs_decks_where(cls, kurs_id, db),
         CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None),
         CardDeck.released_at <= now,
     ))).scalars().all()
@@ -1457,7 +1477,7 @@ async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] =
     now = _now()
     _dl = (await db.execute(select(CardDeck).where(
         CardDeck.owner_id == user.id,
-        await _kurs_decks_where(cls, kurs_id), CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None), CardDeck.released_at <= now,
+        await _kurs_decks_where(cls, kurs_id, db), CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None), CardDeck.released_at <= now,
     ))).scalars().all()
     decks = {d.id: d.name for d in _dl}
     deck_niveaus = {d.id: d.niveau or "" for d in _dl}
