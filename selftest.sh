@@ -335,6 +335,11 @@ if [ "$MIT_DESKTOP" = "1" ]; then
     DESKTOP_GRUND="apps/desktop fehlt in diesem Arbeitsverzeichnis"
   elif [ ! -d "$DIR/apps/desktop/node_modules/electron" ]; then
     DESKTOP_GRUND="Electron nicht installiert — 'cd apps/desktop && npm install' (ca. 400 MB, wird hier absichtlich nicht nachgeholt)"
+  elif [ ! -f "$DIR/apps/desktop/node_modules/electron/path.txt" ]; then
+    # Das Paket liegt da, die App selbst nicht: der Download nach der Installation (postinstall) lief nie —
+    # etwa nach `npm install --ignore-scripts` oder einem abgebrochenen Lauf. Nur den Ordner zu pruefen hielt
+    # das fuer „installiert", und beide Desktop-Teile wurden ROT statt uebersprungen.
+    DESKTOP_GRUND="Electron-App nicht heruntergeladen — 'cd apps/desktop && node node_modules/electron/install.js' (wird hier absichtlich nicht nachgeholt)"
   elif [ ! -f "$DIR/scripts/desktop-test.mjs" ] || [ ! -f "$DIR/scripts/desktop-offline.mjs" ]; then
     DESKTOP_GRUND="scripts/desktop-test.mjs oder scripts/desktop-offline.mjs fehlt"
   elif [ -z "$SELFTEST_EMAIL" ] || [ -z "$SELFTEST_PASSWORD" ]; then
