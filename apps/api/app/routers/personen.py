@@ -9,6 +9,7 @@ Regel 3 gilt auch hier: jede Quelle wird einzeln gefragt (`is_active`), ein
 fehlendes Modul laesst seinen Teil weg — es gibt kein 403 und keine leere
 Seite, nur weniger Zeilen.
 """
+import re
 from datetime import datetime
 from typing import List, Optional
 
@@ -233,7 +234,9 @@ async def update_person(person_id: int, body: PersonPatch,
     """
     p = await _eigene(db, person_id, user)
     if body.name is not None:
-        neu_name = " ".join((body.name or "").split())[:200]
+        # Nur normale Leerzeichen zusammenfassen: ein geschuetztes (U+00A0) haelt einen Nachnamen aus zwei Woertern
+        # zusammen („Klein Müller") — str.split() ohne Argument wuerde es mit zerlegen.
+        neu_name = " ".join(w for w in re.split(r"[ \t\r\n]+", (body.name or "").strip()) if w)[:200]
         if not neu_name:
             raise HTTPException(400, "Name darf nicht leer sein")
         p.name = neu_name

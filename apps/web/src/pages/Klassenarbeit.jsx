@@ -2,6 +2,7 @@
 // Punkte-Raster (Zeilen = SuS, Spalten = Aufgaben, Zelle = erreichte Punkte).
 // Daraus LIVE je SuS ein Fehlerprofil nach Thema, eine Note (Punkte/Max → Skala)
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
+import { anzeigeName } from "../core/namen.js";
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ANTWORT_COLORS, Boxplot, FOKUS_TON, FOKUS_TON_DECKEND, Segment, segmentBtn, COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, td as tdBase, th as thBase, toolbarBtn, toolbarIconBtn } from "../components/Icons.jsx";
@@ -1350,7 +1351,7 @@ export default function Klassenarbeit() {
                         <span key={st.student_id} style={{ ...chipStyle, fontWeight: 500, background: "var(--bg2)", display: "inline-flex", alignItems: "center", gap: 5 }}
                           title={FEHLER.filter((x) => st.typen[x.key]).map((x) => `${t(`klassenarbeit.fehler.${x.key}`)}: ${st.typen[x.key]}`).join("\n")}>
                           <span style={{ ...fehlerChip, background: f ? f.color : "var(--bg3)", color: C.aufAkzent }}>{f ? f.ab : "?"}</span>
-                          {st.name}
+                          {anzeigeName(st.name)}
                         </span>
                       );
                     })}
@@ -1704,7 +1705,7 @@ export default function Klassenarbeit() {
                               aria-label={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")} aria-pressed={abw}
                               style={{ border: "none", background: "none", cursor: "pointer", color: abw ? C.warning : "var(--text3)", padding: 0, display: "inline-flex",
                                 alignItems: "center", justifyContent: "center", minWidth: 32, minHeight: 32, margin: "-4px 0 -4px -8px" }}><Icon d={abw ? ICONS.eyeOff : ICONS.eye} size={15} /></button>
-                            {s.name}
+                            {anzeigeName(s.name)}
                           </span>
                         </td>
                         {(work.tasks || []).flatMap((tk) => {

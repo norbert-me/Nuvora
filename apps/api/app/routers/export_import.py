@@ -196,13 +196,17 @@ async def export_question_set(set_id: int, user: User = Depends(get_current_user
 async def class_xlsx_template():
     from openpyxl.styles import Alignment
 
-    wb, ws = _xlsx_template("Klasse", ["Karten-Nr", "Name"], ausrichten=True)
+    # Vorname, weitere Vornamen und Nachname je eine Spalte (Wunsch 27.11.2026). Die alte Vorlage mit einer
+    # Spalte „Name" wird beim Import weiter gelesen.
+    wb, ws = _xlsx_template("Klasse", ["Karten-Nr", "Vorname", "Weitere Vornamen", "Nachname"], ausrichten=True)
 
     for i in range(1, 36):
         ws.cell(row=i + 1, column=1, value=i).alignment = Alignment(horizontal="center")
 
     ws.column_dimensions["A"].width = 12
-    ws.column_dimensions["B"].width = 30
+    ws.column_dimensions["B"].width = 20
+    ws.column_dimensions["C"].width = 22
+    ws.column_dimensions["D"].width = 24
 
     return _xlsx_response(wb, "CardVote_Vorlage.xlsx")
 
@@ -221,7 +225,7 @@ MAX_XLSX_ZEILEN = 5000
 _NICHT_LESBAR = "Die Datei laesst sich nicht lesen — bitte eine Excel-Datei (.xlsx) hochladen."
 
 
-def _zeilen_lesen(data: bytes) -> list:
+def _zeilen_lesen(data: bytes, kopf: bool = False):
     """Synchron: Datei pruefen, oeffnen und die Zeilen ab Zeile 2 liefern.
 
     Laeuft im Threadpool (`_arbeitsblatt`) — Entpacken und Parsen sind reine
@@ -245,9 +249,12 @@ def _zeilen_lesen(data: bytes) -> list:
         ws = wb.active
         if ws is None:
             raise HTTPException(400, "Die Excel-Datei enthaelt kein Tabellenblatt")
-        zeilen = []
+        zeilen, kopfzeile = [], None
         try:
-            for row in ws.iter_rows(min_row=2, values_only=True):
+            for row in ws.iter_rows(min_row=1, values_only=True):
+                if kopfzeile is None:
+                    kopfzeile = row       # Zeile 1: die Spaltenkoepfe
+                    continue
                 if len(zeilen) >= MAX_XLSX_ZEILEN:
                     raise HTTPException(400, f"Zu viele Zeilen (max {MAX_XLSX_ZEILEN})")
                 zeilen.append(row)
@@ -255,12 +262,12 @@ def _zeilen_lesen(data: bytes) -> list:
             raise
         except Exception:
             raise HTTPException(400, _NICHT_LESBAR)
-        return zeilen
+        return (kopfzeile or (), zeilen) if kopf else zeilen
     finally:
         wb.close()
 
 
-async def _arbeitsblatt(data: bytes) -> list:
+async def _arbeitsblatt(data: bytes, kopf: bool = False):
     """Excel-Datei oeffnen und die Datenzeilen (ab Zeile 2) des ersten Blatts liefern.
 
     Ohne diesen Mantel endete jede Datei, die keine .xlsx ist (eine .csv, eine
@@ -268,7 +275,7 @@ async def _arbeitsblatt(data: bytes) -> list:
     openpyxl-Traceback — die Lehrkraft erfuhr nicht, dass schlicht das Format
     nicht passt."""
     from starlette.concurrency import run_in_threadpool
-    return await run_in_threadpool(_zeilen_lesen, data)
+    return await run_in_threadpool(_zeilen_lesen, data, kopf)
 
 
 
@@ -304,17 +311,41 @@ async def import_class_xlsx(name: str = "Neue Klasse", file: UploadFile = File(.
     data = await file.read(MAX_XLSX_BYTES + 1)
     if len(data) > MAX_XLSX_BYTES:
         raise HTTPException(400, "Datei zu gross (max 5 MB)")
-    zeilen = await _arbeitsblatt(data)
+    kopfzeile, zeilen = await _arbeitsblatt(data, kopf=True)
 
     sc = SchoolClass(name=name, owner_id=user.id)
     db.add(sc)
     await db.flush()
 
+    # Spalten aus der Kopfzeile: „Vorname"/„Weitere Vornamen"/„Nachname" (neue Vorlage) oder „Name" (alte).
+    # Ein Nachname aus mehreren Woertern wird mit einem geschuetzten Leerzeichen zusammengehalten — so bleibt im
+    # gespeicherten Namen „letztes Wort = Nachname" wahr (core/namen.js).
+    spalten = {}
+    for zeile in (kopfzeile,):
+        for i, zelle in enumerate(zeile or []):
+            k = str(zelle or "").strip().casefold()
+            if k.startswith("vorname"):
+                spalten["vor"] = i
+            elif k.startswith("weitere"):
+                spalten["weitere"] = i
+            elif k.startswith("nachname"):
+                spalten["nach"] = i
+
+    def _wort(x):
+        return " ".join(str(x or "").split())
+
+    def _name(row):
+        if "vor" in spalten and "nach" in spalten:
+            hol = lambda key: _wort(row[spalten[key]]) if key in spalten and spalten[key] < len(row) else ""
+            nach = "\u00a0".join(hol("nach").split(" ")) if hol("nach") else ""
+            return " ".join(x for x in (hol("vor"), hol("weitere"), nach) if x)
+        return str(row[1] or "").strip() if len(row) > 1 else ""
+
     count = 0
     for row in zeilen:
         if not row or len(row) < 2:
             continue
-        card_id_val, name_val = row[0], row[1]
+        card_id_val, name_val = row[0], _name(row)
         if not name_val or not str(name_val).strip():
             continue
         try:

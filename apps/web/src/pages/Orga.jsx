@@ -1,6 +1,7 @@
 // Modul Orga — Sammel-Checklisten je Klasse. Punkte (z.B. „Unterschrift KA1")
 // als Spalten, Schüler als Zeilen, je Zelle ein Häkchen. Nur die Häkchen liegen
 // im Modul, die Schüler im Kern.
+import { anzeigeName } from "../core/namen.js";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { undoDelete } from "../core/undo.jsx";
@@ -149,10 +150,10 @@ export default function Orga() {
   const alsText = () => items.map((it) => {
     const da = students.filter((s) => it.done.includes(s.id));
     const fehlt = students.filter((s) => !it.done.includes(s.id));
-    const mitTag = (s) => { const d = (it.done_at || {})[String(s.id)]; return d ? `${s.name} (${tagKurz(d)})` : s.name; };
+    const mitTag = (s) => { const d = (it.done_at || {})[String(s.id)]; return d ? `${anzeigeName(s.name)} (${tagKurz(d)})` : anzeigeName(s.name); };
     return [`${it.name} — ${da.length}/${students.length}`,
       `${t("orga.vorhanden")}: ${da.map(mitTag).join(", ") || "—"}`,
-      `${t("orga.fehlt")}: ${fehlt.map((s) => s.name).join(", ") || "—"}`].join("\n");
+      `${t("orga.fehlt")}: ${fehlt.map((s) => anzeigeName(s.name)).join(", ") || "—"}`].join("\n");
   }).join("\n\n");
   const textKopieren = async () => {
     try { await navigator.clipboard.writeText(alsText()); } catch { /* ohne Zwischenablage: nichts */ }
@@ -223,7 +224,7 @@ export default function Orga() {
               {students.map((s, i) => (
                 <tr key={s.id}>
                   <td style={{ ...td, ...klebtLinks, textAlign: "left", fontWeight: 500 }}>
-                    <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>{s.name}
+                    <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>{anzeigeName(s.name)}
                   </td>
                   {items.map((it) => {
                     const on = !!e.wert[`${it.id}:${s.id}`];
@@ -234,7 +235,7 @@ export default function Orga() {
                         {/* Sichtbar 24 px, getroffen 32: Polster plus negativer
                             Rand, damit die Zeile nicht hoeher wird. */}
                         <button onClick={() => toggle(it, s.id)} title={on ? t("orga.done") : t("orga.open")}
-                          aria-label={`${s.name}: ${on ? t("orga.done") : t("orga.open")}`} aria-pressed={on}
+                          aria-label={`${anzeigeName(s.name)}: ${on ? t("orga.done") : t("orga.open")}`} aria-pressed={on}
                           style={{ padding: 4, margin: -4, border: "none", background: "transparent", cursor: "pointer", display: "inline-flex", verticalAlign: "middle" }}>
                           <span style={{ width: 24, height: 24, borderRadius: CONTROL_R, fontSize: 14, fontWeight: 700, boxSizing: "border-box",
                             display: "flex", alignItems: "center", justifyContent: "center",

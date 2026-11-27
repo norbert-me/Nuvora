@@ -1,5 +1,6 @@
 // Modul Material-Ausleihe — Gegenstände verleihen und Rückgabe im Blick.
 // Ausleiher: ein Kern-Schüler (Klasse wählen) oder ein Freitextname.
+import { anzeigeName } from "../core/namen.js";
 import { useState, useEffect, useCallback } from "react";
 import { undoDelete } from "../core/undo.jsx";
 import { AddButton, badge, btnSecondary, btnSmall, cardStyle, CONTROL_R, selectStyle, Toggle, Icon, ICONS, toolbarBtnPrimary, toolbarIconBtn, toolbarInput, COLORS as C, inputStyle, Empty } from "../components/Icons.jsx";
@@ -107,7 +108,7 @@ export default function Ausleihe() {
                     {classId ? (
                       <select value={studentId} onChange={(e) => setStudentId(e.target.value)} style={selectStyle}>
                         <option value="">– {t("ausleihe.pickStudent")} –</option>
-                        {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        {students.map((s) => <option key={s.id} value={s.id}>{anzeigeName(s.name)}</option>)}
                       </select>
                     ) : (
                       <input value={borrower} onChange={(e) => setBorrower(e.target.value)} placeholder={t("ausleihe.borrowerPlaceholder")} style={{ ...fld, flex: 1, minWidth: 160 }} />

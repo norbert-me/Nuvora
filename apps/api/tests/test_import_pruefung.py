@@ -394,6 +394,27 @@ async def test_excel_import_normalfall_bleibt_heil(s):
     assert res["count"] == 2
 
 
+@pytest.mark.asyncio
+async def test_excel_import_mit_vorname_und_nachname(s):
+    """Neue Vorlage: Vorname / Weitere Vornamen / Nachname je eine Spalte; ein Doppel-Nachname bleibt zusammen."""
+    from openpyxl import Workbook
+    import io as _io
+    from sqlalchemy import select
+    from app.models import Student
+    u = await _lehrkraft(s)
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Karten-Nr", "Vorname", "Weitere Vornamen", "Nachname"])
+    ws.append([1, "Anna", "Lena", "Klein Müller"])
+    ws.append([2, "Ben", None, "Meier"])
+    buf = _io.BytesIO()
+    wb.save(buf)
+    res = await EXP.import_class_xlsx(name="7d", file=_Datei(buf.getvalue()), user=u, db=s)
+    assert res["count"] == 2
+    namen = sorted(x.name for x in (await s.execute(select(Student).where(Student.class_id == res["id"]))).scalars().all())
+    assert namen == ["Anna Lena Klein\u00a0Müller", "Ben Meier"]
+
+
 # ─── Session-Einstellungen: was die Auswertung spaeter liest ───
 
 async def _session(s, u):

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { anzeigeName } from "../core/namen.js";
 import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useAktiv } from "../core/modules.js";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
@@ -813,7 +814,7 @@ export default function Evaluation() {
                       style={{ color: "var(--text)", textDecoration: "none" }}
                       title={t("cv.downloadPdf")}
                     >
-                      {student.name}{" "}
+                      {anzeigeName(student.name)}{" "}
                       <Icon d={ICONS.download} size={15} color="var(--text3)" />
                     </a>
                     {/* Kursniveau steht immer neben dem Ergebnis, nicht nur bei
@@ -905,7 +906,7 @@ export default function Evaluation() {
             {absentStudents.map((student) => (
               <tr key={student.card_id} style={{ opacity: 0.4 }}>
                 <td style={{ ...td, ...klebtLinks, fontWeight: "bold", fontStyle: "italic" }}>
-                  {student.name}
+                  {anzeigeName(student.name)}
                   {/* Doch anwesend: dann zählt die fehlende Abgabe als 0 mit. */}
                   <button onClick={() => setStatus(student.card_id, "anwesend")}
                     style={{ ...linkBtn, marginLeft: 8, fontSize: 11, fontStyle: "normal" }}>

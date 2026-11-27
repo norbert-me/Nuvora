@@ -1,6 +1,7 @@
 // Modul Zufallsschüler — zieht per Knopfdruck eine zufällige Person aus einer
 // Klasse. Reiner Client: liest nur die Kern-Klassen, speichert nichts.
 // "Ohne Wiederholung" merkt sich die schon Gezogenen, bis die Klasse durch ist.
+import { anzeigeName } from "../core/namen.js";
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { btnPrimary, btnSecondary, cardStyle, selectStyle, inputStyle, ICONS, pageApp } from "../components/Icons.jsx";
@@ -202,7 +203,7 @@ export default function Zufall() {
                   <div style={{ fontSize: 13, fontWeight: 700, color: "var(--accent)", marginBottom: 8 }}>{t("zufall.group", { n: i + 1 })} <span style={{ color: "var(--text3)", fontWeight: 400 }}>· {g.length}</span></div>
                   {g.map((s) => (
                     <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, padding: "3px 0" }}>
-                      <Portrait student={s} size={22} />{s.name}
+                      <Portrait student={s} size={22} />{anzeigeName(s.name)}
                     </div>
                   ))}
                 </div>

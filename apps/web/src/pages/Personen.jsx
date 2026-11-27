@@ -11,6 +11,8 @@ import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
 import BildZuschnitt from "../components/BildZuschnitt.jsx";
 import { oeffentlicheBasis } from "../core/basis.js";
 import { dateiWaehlen, btnSecondary, btnSmall, iconBtn, inputStyle, Modal } from "../components/Icons.jsx";
+import NamenFelder from "../components/NamenFelder.jsx";
+import { anzeigeName, nameAusEingabe } from "../core/namen.js";
 import { useLanguage } from "../i18n";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 
@@ -142,7 +144,8 @@ export default function Personen() {
   // Halbjahr zuzieht, sitzt noch in keiner Liste. Die Zugehörigkeiten kommen
   // danach, im Detail.
   const personAnlegen = async () => {
-    const name = neuName.trim();
+    // „Nachname, Vorname" und aus Excel kopierte Spalten werden erkannt (core/namen.js).
+    const name = nameAusEingabe(neuName);
     if (!name) return;
     const r = await fetch("/api/personen", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
@@ -259,7 +262,7 @@ export default function Personen() {
             style={{ display: "flex", alignItems: "center", gap: 12, width: "100%",
               border: "none", background: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
             <Portrait key={`${p.id}-${fotoVer}`} student={{ id: p.id, name: p.name, has_photo: p.has_photo }} size={34} form="eckig" quelle="person" />
-            <span style={{ fontWeight: 600, flex: 1, minWidth: 0, color: "var(--text)" }}>{p.name}</span>
+            <span style={{ fontWeight: 600, flex: 1, minWidth: 0, color: "var(--text)" }}>{anzeigeName(p.name)}</span>
             <span style={{ color: "var(--text3)", display: "inline-flex",
               transform: offen === p.id ? "rotate(90deg)" : "none", transition: "transform .15s" }}>
               <Icon d={ICONS.open} size={14} />
@@ -299,10 +302,7 @@ export default function Personen() {
                   </div>
                   {nameEdit && nameEdit.id === p.id && (
                     <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                      <input value={nameEdit.wert} autoFocus
-                        onChange={(e) => setNameEdit({ ...nameEdit, wert: e.target.value })}
-                        onKeyDown={(e) => { if (e.key === "Enter") nameSpeichern(); if (e.key === "Escape") setNameEdit(null); }}
-                        style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
+                      <NamenFelder wert={nameEdit.wert} autoFocus onChange={(v) => setNameEdit({ ...nameEdit, wert: v })} onEnter={nameSpeichern} />
                       <button onClick={nameSpeichern} style={{ ...btnSecondary, ...btnSmall }}>{t("common.save")}</button>
                       {/* Abbrechen sichtbar, nicht nur auf Escape: eine Zeile,
                           aus der man nur mit einer Taste herauskommt, ist auf

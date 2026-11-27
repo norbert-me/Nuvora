@@ -1,6 +1,7 @@
 // Modul Anwesenheit — Anwesenheit/Fehlzeiten je Klasse und Tag.
 // Pro Schüler ein Status (da/fehlt/verspätet/entschuldigt). "da" ist Normalfall
 // und wird nicht gespeichert. Übersicht zeigt Fehlzeiten und lässt nachtragen.
+import { anzeigeName } from "../core/namen.js";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askConfirm } from "../core/dialog.jsx";
@@ -375,7 +376,7 @@ export default function Anwesenheit() {
                 <div key={s.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", flexWrap: "wrap" }}>
                   <span style={{ color: "var(--text3)", fontSize: 12, width: 24, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
                   <Portrait student={s} size={26} />
-                  <span style={{ flex: 1, fontWeight: 500, minWidth: NAME_MIN, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+                  <span style={{ flex: 1, fontWeight: 500, minWidth: NAME_MIN, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{anzeigeName(s.name)}</span>
                   {vor && (
                     <span style={{ fontSize: 11, color: "var(--text3)", flexShrink: 0 }}
                       title={vor.quelle ? t("anwesenheit.vorschlagVon", { p: vor.quelle }) : t("anwesenheit.vorschlagTag")}>
@@ -406,7 +407,7 @@ export default function Anwesenheit() {
                 <div key={s.id} style={{ ...cardStyle, padding: 0 }}>
                   <button onClick={() => oeffnen(s.id)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", width: "100%", background: "none", border: "none", cursor: "pointer", textAlign: "left", color: "var(--text)" }}>
                     <span style={{ color: "var(--text3)", fontSize: 12, width: 24, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
-                    <span style={{ flex: 1, fontWeight: 500 }}>{s.name}</span>
+                    <span style={{ flex: 1, fontWeight: 500 }}>{anzeigeName(s.name)}</span>
                     {leer ? <span style={{ fontSize: 13, color: "var(--text3)" }}>—</span> : (
                       <span style={{ display: "inline-flex", gap: 8, fontSize: 13, fontWeight: 600 }}>
                         {a.fehlt > 0 && <span style={{ color: COL.fehlt }}>{a.fehlt}× {t("anwesenheit.fehltShort")}</span>}

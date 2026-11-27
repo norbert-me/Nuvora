@@ -8,6 +8,8 @@ import Portrait from "./Portrait.jsx";
 import SchuelerAngaben from "./SchuelerAngaben.jsx";
 import BildZuschnitt from "./BildZuschnitt.jsx";
 import { askConfirm } from "../core/dialog.jsx";
+import NamenFelder from "./NamenFelder.jsx";
+import { anzeigeName, nameAusEingabe, teileName } from "../core/namen.js";
 import { useLanguage } from "../i18n";
 
 // Die Kinder eines Kurses — dort gepflegt, wo man mit ihnen arbeitet.
@@ -38,7 +40,7 @@ export default function KursKinder({ kursId, t: tProp }) {
 
   const anlegen = async () => {
     const name = neu.trim();
-    if (!name) return;
+    if (!name || !teileName(name).vorname) return;
     const r = await fetch(`/api/kurse/${kursId}/kinder`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
@@ -65,7 +67,9 @@ export default function KursKinder({ kursId, t: tProp }) {
     if (!importText.trim()) return;
     const r = await fetch(`/api/kurse/${kursId}/kinder/import`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: importText }),
+      // Jede Zeile auf die gespeicherte Form bringen: „Nachname, Vorname" und aus Excel kopierte Spalten
+      // (Vorname <Tab> … <Tab> Nachname) werden erkannt; ein Nachname aus zwei Woertern bleibt zusammen.
+      body: JSON.stringify({ text: importText.split(/\r?\n/).map(nameAusEingabe).filter(Boolean).join("\n") }),
     }).catch(() => null);
     if (r && r.ok) { setImportText(""); setImportOffen(false); laden(); }
   };
@@ -103,8 +107,7 @@ export default function KursKinder({ kursId, t: tProp }) {
       <div style={{ ...sectionLabel, margin: "0 0 8px" }}>{text("kurse.kinder", { n: liste.length })}</div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
-          placeholder={text("kurse.kindNeu")} style={{ ...toolbarInput, flex: "1 1 200px", minWidth: 0 }} />
+        <NamenFelder wert={neu} onChange={setNeu} onEnter={anlegen} />
         <AddButton onClick={anlegen} title={text("kurse.kindNeu")} />
         <button onClick={() => setImportOffen((v) => !v)} className="icon-btn" aria-pressed={importOffen}
           title={text("kurse.kindListe")} aria-label={text("kurse.kindListe")}
@@ -161,7 +164,7 @@ export default function KursKinder({ kursId, t: tProp }) {
                 // Wie linkBtn: Polster fuer die Trefferflaeche, negativer Rand
                 // nimmt es optisch zurueck.
                 padding: "7px 0", margin: "-7px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {k.name}
+              {anzeigeName(k.name)}
             </button>
             {/* LRS und LE verändern die Benotung (LE: keine Noten) — deshalb als
                 Kürzel in der Liste, sonst nur im Dialog des Kindes. Links vom

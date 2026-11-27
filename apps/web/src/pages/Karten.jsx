@@ -1,5 +1,6 @@
 // Modul Karten (Lehrer): Stapel & Karten verwalten, QR-Tokens drucken,
 // Fortschritt sehen. Schüler lernen kontenlos über den Token (siehe Lernen.jsx).
+import { anzeigeName } from "../core/namen.js";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
@@ -517,7 +518,7 @@ export default function Karten() {
             {(tokens || []).map((s) => (
               <div key={s.student_id} style={{ ...panelStyle, textAlign: "center", padding: 12, background: "#fff" }}>
                 <img src={`${API}/qr/${s.token}.png?base=${encodeURIComponent(qrBasis)}`} alt="" width={120} height={120} style={{ display: "block", margin: "0 auto 6px" }} />
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{s.name}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{anzeigeName(s.name)}</div>
                 <div style={{ fontSize: 11, color: "#666" }}>#{s.card_id}</div>
               </div>
             ))}
@@ -556,8 +557,8 @@ function StudentDetail({ detail, t, onClose }) {
   }
   const rows = Object.entries(sets);
   return (
-    <UiModal onClose={onClose} width={520} label={student.name}>
-        <DialogKopf titel={student.name} onClose={onClose} schliessenLabel={t("common.close")} style={{ marginBottom: 8 }} />
+    <UiModal onClose={onClose} width={520} label={anzeigeName(student.name)}>
+        <DialogKopf titel={anzeigeName(student.name)} onClose={onClose} schliessenLabel={t("common.close")} style={{ marginBottom: 8 }} />
         <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{student.reviewed} / {student.total} {t("karten.reviewed").toLowerCase()} · {student.due || 0} {t("karten.due").toLowerCase()}</div>
         {rows.length === 0 ? (
           <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("karten.noRolledOut")}</p>
@@ -1484,7 +1485,7 @@ function QrDruck({ tokens, api, basis }) {
           {seite.map((s) => (
             <div key={s.student_id} style={{ border: "1px dashed #999", borderRadius: 6, padding: "3mm", textAlign: "center", breakInside: "avoid", overflow: "hidden" }}>
               <img src={`${api}/qr/${s.token}.png?base=${encodeURIComponent(basis)}`} alt="" style={{ display: "block", margin: "0 auto 2mm", width: "34mm", height: "34mm" }} />
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{s.name}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{anzeigeName(s.name)}</div>
               <div style={{ fontSize: 11, color: "#555" }}>#{s.card_id}</div>
             </div>
           ))}

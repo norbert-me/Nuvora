@@ -29,7 +29,7 @@ import { useEinfuegen } from "../core/ziehsortieren.js";
 import { alsJson, hol } from "../core/melden.js";
 import { parseYmd, ymd } from "../core/datum.js";
 import { median as medianVon, mittel, streuung } from "../core/statistik.js";
-import { kurzName, kurzNameAn, useKurzName } from "../core/namen.js";
+import { kurzName, kurzNameAn, useKurzName, anzeigeName } from "../core/namen.js";
 import { notenTrend, spaltenDatum, spaltenNachZeit, strichLuecken } from "../core/notentrend.js";
 import { teilen } from "../core/teilen.js";
 import { sortiereKinder } from "../core/namen.js";
@@ -871,7 +871,7 @@ export default function Noten() {
                 <div key={s.student_id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderTop: i === 0 ? "none" : "1px solid var(--border)" }}>
                   <button onClick={() => setInfoFuer(s.student_id)} title={t("noten.studentInfo")}
                     style={{ flex: 1, minWidth: 0, minHeight: 32, textAlign: "left", padding: "2px 0", border: "none", background: "none", color: "var(--text)", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-                    <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 8 }}>{i + 1}.</span>{s.name}
+                    <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 8 }}>{i + 1}.</span>{anzeigeName(s.name)}
                   </button>
                   <button onClick={() => setBeobFuer(s.student_id)} title={t("noten.obsHeading")}
                     style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4, border: "none", background: "none", cursor: "pointer", color: s.observations ? "var(--accent)" : "var(--text3)", fontSize: 13, padding: 4, minWidth: 32, minHeight: 32 }}>
@@ -1976,7 +1976,7 @@ function Fehlzeiten({ classId, studentId, t }) {
 }
 
 // Der Name im Dialog folgt derselben Option (ausserhalb des Hooks gelesen).
-const kurzNameOrt = (n) => (kurzNameAn() ? kurzName(n) : n);
+const kurzNameOrt = (n) => (kurzNameAn() ? kurzName(n) : anzeigeName(n));
 
 /**
  * Vergleich eines Kindes: Vorjahr, Quartale, Halbjahre, Jahr — nebeneinander.
@@ -2331,7 +2331,7 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo, 
               <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0 }}>
                 <button onClick={() => onInfo(r.student_id)} title={t("noten.studentInfo")}
                   style={{ width: "100%", textAlign: "left", padding: "6px 8px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer" }}>
-                  <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 8 }}>{ri + 1}.</span>{r.name}
+                  <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 8 }}>{ri + 1}.</span>{anzeigeName(r.name)}
                 </button>
               </td>
               {sec1.map((s, i) => (

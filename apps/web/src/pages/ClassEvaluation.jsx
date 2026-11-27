@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { anzeigeName } from "../core/namen.js";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { ICONS, Icon, LoadError, StatCard, Toggle, chipStyle, klebtLinks, pageApp, panelStyle, quoteFlaeche, td as tdBasis, th as thBasis } from "../components/Icons.jsx";
 import Verteilung from "../components/Verteilung.jsx";
@@ -212,7 +213,7 @@ export default function ClassEvaluation() {
                       to={`/cardvote/student-evaluation/${id}/${student.card_id}`}
                       style={{ color: "var(--accent)", textDecoration: "none" }}
                     >
-                      {student.name}
+                      {anzeigeName(student.name)}
                     </Link>
                   ) : student.name}
                   {/* Kursniveau steht immer neben dem Ergebnis. */}

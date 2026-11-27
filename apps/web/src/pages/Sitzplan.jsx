@@ -1116,7 +1116,7 @@ export default function Sitzplan() {
                       // Linksbuendig: abgeschnitten wird hoechstens das Ende — der Nachname, nie der Vorname.
                       // (Zentriert schnitt ein langer Name an beiden Seiten ab.)
                       color: seat.empty ? "var(--text3)" : undefined }}>
-                    {seat.empty ? t("sitzplan.emptySeat") : s.name}
+                    {seat.empty ? t("sitzplan.emptySeat") : kurz.name(s.name)}
                   </span>
                 </div>
               );

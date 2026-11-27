@@ -8,6 +8,7 @@ Mitgliedschaft ist many-to-many (Tabelle kurs_tags): eine Klasse kann in
 mehreren Kursen sein. Alle Mitglieder eines Kurses teilen — es gibt keinen
 Unterschied „Sharing vs. Tag" mehr.
 """
+import re
 from typing import Union, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -453,7 +454,8 @@ async def import_kinder(kurs_id: int, body: KinderImportIn,
     for zeile in (body.text or "").splitlines():
         # Aus Tabellen kommt oft „Meyer<TAB>Anna" oder „Meyer, Anna" — beides
         # ist EIN Kind, kein zweites.
-        name = " ".join(zeile.replace("\t", " ").strip().split())
+        # Nur normale Leerzeichen zusammenfassen (das geschuetzte U+00A0 haelt einen Doppel-Nachnamen zusammen).
+        name = " ".join(w for w in re.split(r"[ \t\r\n]+", zeile.strip()) if w)
         if name and name not in namen:
             namen.append(name)
     if not namen:

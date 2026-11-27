@@ -13,27 +13,77 @@ export function setzeKurzName(an) {
   hoerer.forEach((f) => f());
 }
 
+// ── Namen in Teilen: Vorname, weitere Vornamen, Nachname ──
+// Gespeichert bleibt EIN Name („Alexis Kate Geraldine Klein Müller"); die Teile ergeben sich daraus: das erste
+// Wort ist der Vorname, das letzte der Nachname, dazwischen die weiteren Vornamen. Ein Nachname aus mehreren
+// Woertern („Klein Müller") haelt intern ein GESCHUETZTES Leerzeichen zusammen — so bleibt „letztes Wort =
+// Nachname" wahr, ohne dass die Datenbank ein neues Feld braucht. Getrennt wird deshalb nur an normalen
+// Leerzeichen (/\s/ wuerde auch das geschuetzte trennen).
+export const NBSP = "\u00a0";
+const WORT = /[ \t\r\n]+/;
+
+/** {vorname, weitere: [], nachname} aus dem gespeicherten Namen. */
+export function teileName(name) {
+  const w = String(name == null ? "" : name).trim().split(WORT).filter(Boolean);
+  if (w.length === 0) return { vorname: "", weitere: [], nachname: "" };
+  if (w.length === 1) return { vorname: w[0].replaceAll(NBSP, " "), weitere: [], nachname: "" };
+  return { vorname: w[0], weitere: w.slice(1, -1), nachname: w[w.length - 1].replaceAll(NBSP, " ") };
+}
+
+/** Gespeicherter Name aus den Teilen; Leerzeichen im Nachnamen werden geschuetzt. */
+export function bauName({ vorname = "", weitere = [], nachname = "" } = {}) {
+  const v = String(vorname).trim().split(WORT).filter(Boolean);
+  const mitte = (weitere || []).flatMap((x) => String(x).trim().split(WORT)).filter(Boolean);
+  const n = String(nachname).trim().split(WORT).filter(Boolean).join(NBSP);
+  return [...v.slice(0, 1), ...v.slice(1), ...mitte, n].filter(Boolean).join(" ");
+}
+
+/**
+ * Eine eingegebene oder importierte Zeile in den gespeicherten Namen:
+ *   „Klein Müller, Anna Lena"  -> Nachname vor dem Komma (bleibt zusammen), dann Vornamen
+ *   „Anna<TAB>Lena<TAB>Klein Müller" (aus Excel kopiert) -> erste Spalte Vorname, letzte Nachname
+ *   „Anna Lena Müller"         -> wie gehabt (letztes Wort Nachname)
+ */
+export function nameAusEingabe(zeile) {
+  const z = String(zeile == null ? "" : zeile).trim();
+  if (!z) return "";
+  if (z.includes("\t")) {
+    const sp = z.split("\t").map((x) => x.trim()).filter(Boolean);
+    if (sp.length >= 2) return bauName({ vorname: sp[0], weitere: sp.slice(1, -1), nachname: sp[sp.length - 1] });
+  }
+  if (z.includes(",")) {
+    const [nach, ...rest] = z.split(",");
+    const vor = rest.join(" ").trim().split(WORT).filter(Boolean);
+    if (nach.trim() && vor.length) return bauName({ vorname: vor[0], weitere: vor.slice(1), nachname: nach });
+  }
+  return z.split(WORT).filter(Boolean).join(" ");
+}
+
+/** Wie das Kind ueberall heisst: 1. Vorname und (ganzer) Nachname — „Alexis Klein Müller". */
+export function anzeigeName(name) {
+  const { vorname, nachname } = teileName(name);
+  return [vorname, nachname].filter(Boolean).join(" ");
+}
+
 /** „Anna Meier" -> „Anna M."; ein einzelnes Wort und schon Gekürztes bleiben. */
 export function kurzName(name) {
-  const text = String(name == null ? "" : name).trim();
-  const teile = text.split(/\s+/);
-  if (teile.length < 2) return text;
-  const letzter = teile[teile.length - 1];
-  if (letzter.endsWith(".")) return text;
-  return `${teile.slice(0, -1).join(" ")} ${Array.from(letzter)[0]}.`;
+  const { vorname, nachname } = teileName(name);
+  if (!nachname) return vorname;
+  if (nachname.endsWith(".")) return `${vorname} ${nachname}`;
+  return `${vorname} ${Array.from(nachname)[0]}.`;
 }
 
 /** Hook: { an, name(n), umschalten(v) } — der Name wird nur gekürzt, wenn die Option an ist. */
 export function useKurzName() {
   const an = useSyncExternalStore((f) => { hoerer.add(f); return () => hoerer.delete(f); }, kurzNameAn, () => false);
-  return { an, name: (n) => (an ? kurzName(n) : n), umschalten: setzeKurzName };
+  return { an, name: (n) => (an ? kurzName(n) : anzeigeName(n)), umschalten: setzeKurzName };
 }
 
 /** Vor- und Nachname aus „Anna Maria Meier": der LETZTE Teil ist der Nachname (wie kurzName). */
 export function nameTeile(name) {
-  const teile = String(name == null ? "" : name).trim().split(/\s+/).filter(Boolean);
-  if (teile.length < 2) return { vor: "", nach: teile[0] || "" };
-  return { vor: teile.slice(0, -1).join(" "), nach: teile[teile.length - 1] };
+  const { vorname, weitere, nachname } = teileName(name);
+  if (!nachname) return { vor: "", nach: vorname };
+  return { vor: [vorname, ...weitere].join(" "), nach: nachname };
 }
 
 const vgl = (a, b) => String(a || "").localeCompare(String(b || ""), "de", { sensitivity: "base", numeric: true });
