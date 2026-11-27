@@ -889,7 +889,7 @@ export default function Noten() {
         // --tabellenkopf-top: 0 heisst „kleb am Rahmen, nicht unter der Navbar";
         // --kopf2 ist die gemessene Hoehe der ersten Kopfzeile, damit die zweite
         // darunter einrastet statt darauf.
-        <div ref={rahmenRef} className="schiene-sichtbar" style={{ overflow: "auto", maxHeight: "calc(100vh - 210px)", border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, WebkitOverflowScrolling: "touch",
+        <div ref={rahmenRef} className="schiene-sichtbar" style={{ overflow: "auto", maxHeight: "calc(100vh - 210px)", minHeight: 0, border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, WebkitOverflowScrolling: "touch",
           "--tabellenkopf-top": "0px" }}>
           {/* borderCollapse: separate — mit „collapse" gehoeren die Rahmen der
               Tabelle, nicht den Zellen, und ein `position: sticky` an einer
@@ -1759,7 +1759,53 @@ function useKlebenderKopf(abhaengig) {
     beob.observe(zeile);
     return () => beob.disconnect();
   }, abhaengig === undefined ? undefined : [abhaengig]);
+  useFensterHoehe(rahmenRef);
   return { rahmenRef, kopf1Ref, th2: { ...th, top: "var(--kopf2, 0px)" } };
+}
+
+// Die Tabelle bekommt genau so viel Hoehe, dass alles darunter (Eingabehinweis, Fusszeile) noch ins Fenster passt:
+// die SEITE scrollt nicht mehr, nur die Tabelle in sich — Kopf und Namen bleiben stehen. Gemessen statt fest
+// („100vh − 210px" stimmte nur fuer eine bestimmte Leiste und schob die Fusszeile aus dem Bild). Auf dem Handy
+// gilt dasselbe; mindestens 240 px, damit auf sehr kleinen Fenstern noch Zeilen zu sehen sind.
+function useFensterHoehe(rahmenRef) {
+  // Der Rahmen entsteht erst, wenn die Daten da sind — also bei jedem Rendern nachsehen und nur bei einem NEUEN
+  // Element anhaengen (ein Effekt mit [rahmenRef] lief einmal, als es ihn noch nicht gab).
+  const dran = useRef({ el: null, weg: null });
+  useLayoutEffect(() => {
+    const el = rahmenRef.current;
+    if (el === dran.current.el) return;
+    if (dran.current.weg) dran.current.weg();
+    dran.current = { el, weg: null };
+    if (!el) return;
+    let rahmen = 0;
+    const fit = () => {
+      cancelAnimationFrame(rahmen);
+      rahmen = requestAnimationFrame(() => {
+        const zoom = parseFloat(getComputedStyle(document.getElementById("root") || document.body).zoom) || 1;
+        // Was unter der Tabelle noch Platz braucht: die folgenden Geschwister (Hinweiszeile …) samt Abstand, der
+        // untere Innenabstand des Inhalts und die Fusszeile.
+        let unten = 0;
+        for (let n = el.nextElementSibling; n; n = n.nextElementSibling) {
+          const cs = getComputedStyle(n);
+          if (cs.position === "fixed" || cs.display === "none") continue;
+          unten += n.getBoundingClientRect().height / zoom + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+        }
+        const wrap = el.closest(".content-wrap");
+        if (wrap) unten += parseFloat(getComputedStyle(wrap).paddingBottom) || 0;
+        const fuss = document.querySelector("#root > footer");
+        if (fuss) unten += fuss.getBoundingClientRect().height / zoom;
+        const oben = (el.getBoundingClientRect().top + window.scrollY) / zoom;
+        const h = Math.max(240, Math.floor(window.innerHeight / zoom - oben - unten - 4));
+        if (el.style.maxHeight !== `${h}px`) el.style.maxHeight = `${h}px`;
+      });
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    const beob = new ResizeObserver(fit);
+    beob.observe(document.body);
+    dran.current.weg = () => { cancelAnimationFrame(rahmen); window.removeEventListener("resize", fit); beob.disconnect(); };
+  });
+  useEffect(() => () => { if (dran.current.weg) dran.current.weg(); }, []);
 }
 
 // Notenverlauf: eine Linie über die Kategorien in Zeitreihenfolge. Deutsche Noten
