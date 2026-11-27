@@ -1840,7 +1840,27 @@ async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
     owner_id = (await db.execute(select(SchoolClass.owner_id).where(SchoolClass.id == st.class_id))).scalar()
     if not owner_id or not await is_active(db, owner_id, "auswertung"):
         return []
-    from .noten import _summarize          # erst hier: noten.py importiert karten.py
+    from .noten import _summarize, _strich_liste   # erst hier: noten.py importiert karten.py
+    from datetime import date as _d
+
+    async def _verlauf(kid):
+        """Quartale und Halbjahre fuer das Kind (Q1, 1. HJ, Q3, 2. HJ) — dieselbe Rechnung wie der Vergleich im
+        Notenbuch: Quartal = Stand am Strich ohne von Hand gesetzte Noten, Halbjahr = Endnote."""
+        punkte, q = [], 0
+        for term in ("1", "2"):
+            for tag in await _strich_liste(db, st.class_id, term, kid, owner):
+                q += 1
+                _, rs = await _summarize(db, owner, st.class_id, term, agg="mean", kurs_id=kid, bis=_d.fromisoformat(tag))
+                x = next((y for y in rs if y.student_id == st.id), None)
+                if x is not None and x.weighted is not None:
+                    punkte.append({"label": f"Q{q}", "note": note_label(x.weighted), "wert": round(x.weighted, 1)})
+            q += 1
+            _, rs = await _summarize(db, owner, st.class_id, term, agg="mean", kurs_id=kid)
+            x = next((y for y in rs if y.student_id == st.id), None)
+            w = (x.total_override if x.total_override is not None else x.weighted) if x else None
+            if w is not None:
+                punkte.append({"label": f"{term}. HJ", "note": note_label(w), "wert": round(w, 1)})
+        return punkte
     owner = await db.get(User, owner_id)
     heute = jetzt().date()
     termine = ["2", "1"] if owner.hj2_start and owner.hj2_start <= heute else ["1", "2"]
@@ -1869,7 +1889,7 @@ async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
                         for sec in secs
                         if (v := (r.section_effective or {}).get(str(sec.id))) is not None]
                 out.append({"kurs": name, "note": note_label(wert), "wert": round(wert, 1), "halbjahr": term,
-                            "trend": noten_trend(reihe), "teilnoten": teil})
+                            "trend": noten_trend(reihe), "teilnoten": teil, "verlauf": await _verlauf(kid)})
                 break
     return out
 

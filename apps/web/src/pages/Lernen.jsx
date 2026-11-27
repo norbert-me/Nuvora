@@ -7,7 +7,7 @@
 // liest sie trotzdem.
 import React, { useState, useEffect, useCallback } from "react";
 import CardFace from "../components/CardFace.jsx";
-import { COLORS as C, REIFE_COLORS, Icon, ICONS, Tabs, btnPrimary, btnSecondary, cardStyle } from "../components/Icons.jsx";
+import { COLORS as C, CONTROL_R, REIFE_COLORS, Icon, ICONS, Tabs, btnPrimary, btnSecondary, cardStyle } from "../components/Icons.jsx";
 import { useParams } from "react-router-dom";
 import RechtsFuss from "../components/RechtsFuss.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -270,6 +270,17 @@ function Ergebnisse({ results, noten = [], t }) {
                   <span title={t(n.trend > 0 ? "noten.trendBesser" : n.trend < 0 ? "noten.trendSchlechter" : "noten.trendGleich")}
                     style={{ marginLeft: 6, color: n.trend > 0 ? C.success : n.trend < 0 ? C.danger : "var(--text3)" }}>{n.trend > 0 ? "↗" : n.trend < 0 ? "↘" : "→"}</span>
                 )}</div>
+              {/* Quartale und Halbjahre nebeneinander (Q1 · 1. HJ · Q3 · 2. HJ) — nur, was es schon gibt. */}
+              {(n.verlauf || []).length > 1 && (
+                <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 10 }}>
+                  {n.verlauf.map((v) => (
+                    <span key={v.label} style={{ border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: "4px 10px", fontSize: 13 }}>
+                      <span style={{ color: "var(--text3)", marginRight: 6 }}>{v.label}</span>
+                      <strong>{String(v.note).replace("-", "−")}</strong>
+                    </span>
+                  ))}
+                </div>
+              )}
               {/* Teilnoten = die Bereiche (Muendlich, Klassenarbeiten …): eine ruhige Tabelle —
                   Name links, Note und Gewicht in festen Spalten rechts. */}
               {(n.teilnoten || []).length > 0 && (
