@@ -43,7 +43,7 @@ export function gradeFromPct(pct, scale) {
 }
 
 // Note MIT Tendenz und Notenwert. Die Tendenz kommt aus den Dritteln des Bandes (oben „+", unten „-", keine an
-// 1 und 6), der Wert aus `gradeFromPct` — er bleibt in derselben Note (5+ ist 5,0, 5- an der Grenze 5,4).
+// der 1; die 6 unter der 5er-Grenze ebenso gedrittelt), der Wert aus `gradeFromPct` — er bleibt in derselben Note (5+ ist 5,0, 5- an der Grenze 5,4).
 // Spiegel: note_mit_tendenz in app/scoring.py.
 export function gradeDetailed(pct, scale) {
   const s = skala(scale);
@@ -57,7 +57,9 @@ export function gradeDetailed(pct, scale) {
       return { note: grade + suffix, wert, grade };
     }
   }
-  return { note: "6", wert: 6, grade: 6 };
+  // Unter der 5er-Grenze ist es eine 6 — auch sie gedrittelt (knapp darunter 6+, ganz unten 6-). Der Wert bleibt 6,0.
+  const pos6 = s[5] > 0 ? pct / s[5] : 0;
+  return { note: pos6 >= 2 / 3 ? "6+" : pos6 < 1 / 3 ? "6-" : "6", wert: 6, grade: 6 };
 }
 
 // Die Statistik-Helfer für die Kennzahlen (Notenwert-Verteilung) standen hier

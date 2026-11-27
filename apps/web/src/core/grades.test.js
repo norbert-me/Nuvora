@@ -102,7 +102,16 @@ describe("gradeDetailed — Note mit Tendenz und Notenwert", () => {
 
   it("unter der 5er-Grenze glatt 6", () => {
     expect(gradeDetailed(20, DEFAULT_SCALE)).toEqual({ note: "5-", wert: 5.4, grade: 5 });
-    expect(gradeDetailed(19.9, DEFAULT_SCALE)).toEqual({ note: "6", wert: 6, grade: 6 });
+    expect(gradeDetailed(19.9, DEFAULT_SCALE)).toEqual({ note: "6+", wert: 6, grade: 6 });
+    expect(gradeDetailed(10, DEFAULT_SCALE)).toEqual({ note: "6", wert: 6, grade: 6 });
+    expect(gradeDetailed(0, DEFAULT_SCALE)).toEqual({ note: "6-", wert: 6, grade: 6 });
+  });
+
+  it("ZAP-Schluessel: 10/48 ist 5-, 8/48 ist 6+, 2/48 ist 6-", () => {
+    const ZAP = { 1: 87, 2: 73, 3: 59, 4: 45, 5: 18, 6: 0 };
+    expect(gradeDetailed(10 / 48 * 100, ZAP).note).toBe("5-");
+    expect(gradeDetailed(8 / 48 * 100, ZAP).note).toBe("6+");
+    expect(gradeDetailed(2 / 48 * 100, ZAP).note).toBe("6-");
   });
 
   it("rechnet mit dem eigenen Schluessel der Lehrkraft", () => {

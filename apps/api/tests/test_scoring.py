@@ -207,7 +207,7 @@ def test_e_modus_von_liest_die_konfiguration():
 def test_note_mit_tendenz_spiegelt_das_frontend():
     from app.scoring import note_mit_tendenz as n
     # Tendenz aus den Dritteln des Bandes, keine an 1 und 6.
-    assert [n(p) for p in (95, 87, 80, 73, 60, 50, 19.9, 0)] == ["1", "1", "2", "2-", "3-", "4", "6", "6"]
+    assert [n(p) for p in (95, 87, 80, 73, 60, 50, 19.9, 10, 0)] == ["1", "1", "2", "2-", "3-", "4", "6+", "6", "6-"]
     # 10/48 bei „5 ab 18 %": eine 5-; 16,5/48 (34 %) ist eine 5, nicht 4,9.
     S = {1: 87, 2: 73, 3: 59, 4: 45, 5: 18, 6: 0}
     assert n(10 / 48 * 100, S) == "5-"

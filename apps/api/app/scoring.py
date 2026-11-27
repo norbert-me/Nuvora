@@ -84,7 +84,7 @@ def note_aus_pct(pct: float, scale: Optional[dict] = None) -> float:
 
 def note_mit_tendenz(pct: float, scale: Optional[dict] = None) -> str:
     """Prozent -> Note mit Tendenz („3+", „4-"), Spiegel von gradeDetailed in core/grades.js: im Band oberes
-    Drittel „+", unteres „-"; keine Tendenz an 1 und 6. Der Zahlenwert (`note_aus_pct`) bleibt in derselben Note."""
+    Drittel „+", unteres „-"; keine an der 1, die 6 (unter der 5er-Grenze) ebenso gedrittelt. Der Zahlenwert (`note_aus_pct`) bleibt in derselben Note."""
     try:
         s = {int(k): float(v) for k, v in (scale or {}).items()}
         s = {g: s[g] for g in (1, 2, 3, 4, 5, 6)}
@@ -96,7 +96,9 @@ def note_mit_tendenz(pct: float, scale: Optional[dict] = None) -> str:
             pos = (pct - lower) / span if span > 0 else 1
             suffix = "+" if pos >= 2 / 3 else "-" if pos < 1 / 3 else ""
             return str(grade) if grade == 1 else f"{grade}{suffix}"
-    return "6"
+    # Unter der 5er-Grenze ist es eine 6 — auch sie gedrittelt (knapp darunter 6+, ganz unten 6-).
+    pos = pct / s[5] if s[5] > 0 else 0
+    return "6+" if pos >= 2 / 3 else "6-" if pos < 1 / 3 else "6"
 
 
 def note_label(wert: float) -> str:
