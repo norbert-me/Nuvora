@@ -1197,8 +1197,9 @@ async def import_session(body: ImportBody, user: User = Depends(require_module),
         if not sid:
             continue
         db.add(GradeEntry(
-            category_id=cat.id, student_id=sid, kind="grade", value=g.value,
-            note=f"Aus Test: {sess.name}" if sess.name else "Aus CardVote-Test",
+            # Kein Kommentar „Aus Test: …": die Herkunft steht an der Spalte (Verweis auf die Auswertung), und
+            # ein Kommentar in jeder Zelle markierte die ganze Spalte als kommentiert.
+            category_id=cat.id, student_id=sid, kind="grade", value=g.value, note="",
         ))
         angelegt += 1
     if angelegt == 0:
