@@ -865,6 +865,7 @@ export default {
   "noten.obsHeading": "Observaciones",
   "noten.obsSub": "Las observaciones nunca cuentan en la media. Son tu memoria para el final del trimestre.",
   "noten.obsPlaceholder": "p. ej. ayudó sin que se lo pidieran",
+  "noten.obsDatum": "Fecha de la observación",
   "noten.note": "Anotar",
   "noten.close": "Cerrar",
   "noten.covered": "Qué porcentaje de tu esquema está cubierto por notas hasta ahora",

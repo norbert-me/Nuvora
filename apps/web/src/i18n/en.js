@@ -864,6 +864,7 @@ export default {
   "noten.obsHeading": "Observations",
   "noten.obsSub": "Observations never count in the average. They are your memory for the end of term.",
   "noten.obsPlaceholder": "e.g. helped without being asked",
+  "noten.obsDatum": "Date of the observation",
   "noten.note": "Note",
   "noten.close": "Close",
   "noten.covered": "How much of your scheme is covered by grades so far",

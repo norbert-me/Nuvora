@@ -866,6 +866,7 @@ export default {
   "noten.obsHeading": "Beobachtungen",
   "noten.obsSub": "Beobachtungen zählen nie in den Schnitt. Sie sind dein Gedächtnis fürs Quartalsende.",
   "noten.obsPlaceholder": "z. B. hat unaufgefordert geholfen",
+  "noten.obsDatum": "Tag der Beobachtung",
   "noten.note": "Notieren",
   "noten.close": "Schließen",
   "noten.covered": "So viel Prozent deines Konzepts sind bisher mit Noten belegt",

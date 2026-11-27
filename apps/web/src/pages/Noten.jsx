@@ -1183,7 +1183,8 @@ export default function Noten() {
           entries={entries.filter((e) => e.student_id === beobFuer && e.kind === "observation")}
           onClose={() => setBeobFuer(null)}
           onSave={(b) => call(() => fetch(`${API}/entries`, alsJson("POST", { ...b, class_id: classId, kurs_id: kursId ?? null, term })))}
-          onDelete={(id) => call(() => fetch(`${API}/entries/${id}`, { method: "DELETE" }))} />
+          onDelete={(id) => call(() => fetch(`${API}/entries/${id}`, { method: "DELETE" }))}
+          onEdit={(id, b) => call(() => fetch(`${API}/entries/${id}/beobachtung`, alsJson("PATCH", b)))} />
       )}
 
       {kommentarFuer && (
@@ -2111,7 +2112,7 @@ function StudentInfo({ t, student, summary, sections, entries = [], classId = nu
   );
 }
 
-function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete }) {
+function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete, onEdit }) {
   // Beobachtungen haengen an KEINER Spalte (grade_entries.category_id ist bei
   // ihnen NULL): sie zaehlen nie in einen Schnitt, brauchen also auch keine
   // Zelle. Vorher war das eine Sackgasse — „hat heute geholfen" faellt am
@@ -2120,11 +2121,17 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
   // anzuzeigen.
   const [tendency, setTendency] = useState(1);
   const [note, setNote] = useState("");
+  // Nachtraeglich: der Tag ist waehlbar (vorbelegt heute). Gespeichert wird Mittag, damit keine Zeitzone den Tag
+  // verschiebt. Bearbeitet wird eine Zeile in derselben Form (`bearb`).
+  const heute = () => new Date().toISOString().slice(0, 10);
+  const [tag, setTag] = useState(heute);
+  const alsZeit = (ymd) => `${ymd}T12:00:00Z`;
+  const [bearb, setBearb] = useState(null);   // { id, tendency, note, tag }
   // Eine Beobachtung ohne Text sagt nichts: erst mit Text laesst sie sich
   // speichern — sonst sammeln sich leere Zeilen, die niemand mehr zuordnet.
   const speichern = () => {
     if (!note.trim()) return;
-    onSave({ student_id: student.student_id, kind: "observation", tendency, note: note.trim() });
+    onSave({ student_id: student.student_id, kind: "observation", tendency, note: note.trim(), date: alsZeit(tag || heute()) });
     setNote("");
   };
   return (
@@ -2139,9 +2146,33 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
             onKeyDown={(e) => { if (e.key === "Enter") speichern(); }}
             style={{ ...inp, flex: 1, minWidth: 140 }} />
         </div>
-        <button onClick={speichern} disabled={!note.trim()} style={{ ...btnPrimary, opacity: note.trim() ? 1 : 0.4, marginBottom: 16 }}>{t("noten.note")}</button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
+          <input type="date" value={tag} onChange={(e) => setTag(e.target.value)} aria-label={t("noten.obsDatum")} title={t("noten.obsDatum")}
+            style={{ ...inp, width: "auto" }} />
+          <button onClick={speichern} disabled={!note.trim()} style={{ ...btnPrimary, opacity: note.trim() ? 1 : 0.4 }}>{t("noten.note")}</button>
+        </div>
         {entries.map((e) => {
           const k = cats.find((c) => c.id === e.category_id);
+          if (bearb && bearb.id === e.id) {
+            const fertig = () => {
+              if (!bearb.note.trim()) return;
+              onEdit(e.id, { note: bearb.note.trim(), tendency: bearb.tendency, date: alsZeit(bearb.tag) });
+              setBearb(null);
+            };
+            return (
+              <div key={e.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13 }}>
+                <input type="date" value={bearb.tag} onChange={(ev) => setBearb({ ...bearb, tag: ev.target.value })} style={{ ...inp, width: "auto" }} aria-label={t("noten.obsDatum")} />
+                {[[1, "+"], [0, "·"], [-1, "−"]].map(([v, label]) => (
+                  <button key={v} onClick={() => setBearb({ ...bearb, tendency: v })} style={{ width: 32, cursor: "pointer", borderRadius: CONTROL_R, fontWeight: 700, border: bearb.tendency === v ? "1px solid var(--accent)" : "1px solid var(--border2)", background: bearb.tendency === v ? "var(--accent-bg)" : "var(--card)", color: bearb.tendency === v ? "var(--accent)" : "var(--text2)" }}>{label}</button>
+                ))}
+                <input value={bearb.note} onChange={(ev) => setBearb({ ...bearb, note: ev.target.value })} maxLength={2000} autoFocus
+                  onKeyDown={(ev) => { if (ev.key === "Enter") fertig(); if (ev.key === "Escape") setBearb(null); }}
+                  style={{ ...inp, flex: 1, minWidth: 140 }} />
+                <button onClick={fertig} disabled={!bearb.note.trim()} style={{ ...btnPrimary, padding: "4px 10px" }}>{t("common.save")}</button>
+                <button onClick={() => setBearb(null)} className="icon-btn" style={iconBtn} title={t("common.abort")} aria-label={t("common.abort")}><Icon d={ICONS.close} /></button>
+              </div>
+            );
+          }
           return (
             <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13 }}>
               <span style={{ width: 62, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>
@@ -2149,6 +2180,7 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
               {/* Spaltenname nur bei Bestands-Beobachtungen, die noch an einer
                   Spalte haengen. */}
               <span style={{ flex: 1, minWidth: 0 }}>{k && <span style={{ color: "var(--text3)" }}>{k.name}: </span>}{e.note}</span>
+              {onEdit && <button onClick={() => setBearb({ id: e.id, tendency: e.tendency ?? 0, note: e.note || "", tag: String(e.date).slice(0, 10) })} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} /></button>}
               <button onClick={() => onDelete(e.id)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
             </div>
           );

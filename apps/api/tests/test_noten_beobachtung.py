@@ -123,3 +123,18 @@ async def test_fremder_kurs_liest_keine_beobachtungen(s):
     with pytest.raises(HTTPException) as e:
         await N.list_entries(cls.id, kurs_id=k.id, user=u, db=s)
     assert e.value.status_code in (403, 404)
+
+
+@pytest.mark.asyncio
+async def test_beobachtung_nachtraeglich_mit_datum_und_aenderbar(s):
+    from datetime import datetime, timezone
+    from fastapi import HTTPException
+    u, cls, max_ = (await _grund(s))[:3]
+    tag = datetime(2026, 11, 2, 12, 0, tzinfo=timezone.utc)
+    out = await N.create_entry(_beob(cls, max_, date=tag), user=u, db=s)
+    assert out.date.date() == tag.date()
+    neu = await N.beobachtung_aendern(out.id, N.BeobachtungAenderung(note="hat geholfen", tendency=1,
+                                      date=datetime(2026, 11, 3, 12, 0, tzinfo=timezone.utc)), user=u, db=s)
+    assert neu.note == "hat geholfen" and neu.tendency == 1 and neu.date.day == 3
+    with pytest.raises(HTTPException):
+        await N.beobachtung_aendern(out.id, N.BeobachtungAenderung(note="  "), user=u, db=s)

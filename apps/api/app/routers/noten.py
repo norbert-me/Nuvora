@@ -694,6 +694,46 @@ async def delete_entry(entry_id: int, user: User = Depends(require_module), db: 
     await db.commit()
 
 
+class BeobachtungAenderung(BaseModel):
+    note: Optional[str] = None
+    tendency: Optional[int] = None
+    date: Optional[datetime] = None
+    note_ok = field_validator("note")(lambda v: _pruefe_notiz(v) if v is not None else v)
+
+    @field_validator("tendency")
+    @classmethod
+    def tendency_ok(cls, v):
+        if v is not None and v not in (-1, 0, 1):
+            raise ValueError("Tendenz muss -1, 0 oder 1 sein")
+        return v
+
+
+@router.patch("/entries/{entry_id}/beobachtung", response_model=EntryOut)
+async def beobachtung_aendern(entry_id: int, body: BeobachtungAenderung, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Eine Beobachtung nachtraeglich aendern: Text, Tendenz, Tag. Nur Beobachtungen — eine Note aendert man in
+    ihrer Zelle. Besitz wie beim Loeschen: ueber die Spalte, sonst ueber die Klasse."""
+    entry = await db.get(GradeEntry, entry_id)
+    if not entry or entry.kind != "observation":
+        raise HTTPException(404, "Beobachtung nicht gefunden")
+    if entry.category_id is not None:
+        await _owned_category(db, user, entry.category_id)
+    elif entry.class_id is not None:
+        await _owned_class(db, user, entry.class_id)
+    else:
+        raise HTTPException(404, "Beobachtung nicht gefunden")
+    if body.note is not None:
+        if not body.note.strip():
+            raise HTTPException(400, "Eine Beobachtung braucht einen Text")
+        entry.note = body.note.strip()
+    if body.tendency is not None:
+        entry.tendency = body.tendency
+    if body.date is not None:
+        entry.date = body.date
+    await db.commit()
+    await db.refresh(entry)
+    return entry
+
+
 # ─── Manuelle Noten (Bereichs- und Endnote ueberschreiben) ───
 
 class OverrideIn(BaseModel):
