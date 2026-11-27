@@ -72,7 +72,7 @@ def _items(roh) -> list:
                     sauber[zahl] = float(it[zahl])
                 except (TypeError, ValueError):
                     pass    # keine Zahl: das Feld faellt weg, die Tafel bleibt gueltig
-        for text in ("text", "color", "bold", "align", "bis", "titel", "kurs_id", "muted", "_ref", "modus"):
+        for text in ("text", "color", "bold", "align", "bis", "titel", "kurs_id", "muted", "_ref", "modus", "zaehlen"):
             if text in it:
                 wert = it[text]
                 sauber[text] = wert[:MAX_TEXT] if isinstance(wert, str) else wert
