@@ -218,8 +218,8 @@ function notenStat(notes, pctArr, total) {
   const werte = notes.map((x) => x.wert).sort((a, b) => a - b);
   const dist = [1, 2, 3, 4, 5, 6].map((g) => notes.filter((x) => x.grade === g).length);
   // Teilnoten-Verteilung (Tendenz: 1+ 1 2+ 2 2- …) — feinere Alternative.
-  // Kein "1+": im Einserband vergibt gradeDetailed keine Tendenz (siehe dort).
-  const FINE = ["1", "2+", "2", "2-", "3+", "3", "3-", "4+", "4", "4-", "5+", "5", "5-", "6"];
+  // Kein "1+" und kein "6-": besser als 1,0 und schlechter als 6,0 gibt es nicht (siehe gradeDetailed).
+  const FINE = ["1", "1-", "2+", "2", "2-", "3+", "3", "3-", "4+", "4", "4-", "5+", "5", "5-", "6+", "6"];
   const distFine = FINE.map((lbl) => ({ label: lbl, grade: parseInt(lbl), count: notes.filter((x) => x.note === lbl).length }));
   const avg = werte.length ? Math.round((werte.reduce((a, b) => a + b, 0) / werte.length) * 100) / 100 : null;
   const r2 = (x) => rund(x, 2);

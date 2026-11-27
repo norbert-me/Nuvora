@@ -15,28 +15,22 @@ const EIGEN = { "1": 90, "2": 80, "3": 65, "4": 50, "5": 25, "6": 0 };
 const SWEEP = Array.from({ length: 1001 }, (_, i) => Math.round(i) / 10);
 
 describe("gradeFromPct — stetige Dezimalnote", () => {
-  it("liefert an der Bandgrenze genau den Uebergangswert", () => {
-    // Die Skala interpoliert innerhalb des Bandes: oben im Band steht die Note
-    // selbst, unten die naechstschlechtere. 87 % ist der Boden des Einserbandes
-    // und ergibt deshalb 2,0 — nicht 1,0 (siehe Befund im Bericht).
+  it("Note 2 ab 73 %: an der Grenze die schwaechste Fassung, oben im Band die staerkste", () => {
+    // Entschieden 27.11.2026: ab der Grenze gilt die Note — an der Grenze 2- (2,3), oben 2+ (1,7).
     expect(gradeFromPct(100, DEFAULT_SCALE)).toBe(1);
-    expect(gradeFromPct(87, DEFAULT_SCALE)).toBe(2);
-    expect(gradeFromPct(73, DEFAULT_SCALE)).toBe(3);
-    expect(gradeFromPct(59, DEFAULT_SCALE)).toBe(4);
-    expect(gradeFromPct(45, DEFAULT_SCALE)).toBe(5);
-    expect(gradeFromPct(20, DEFAULT_SCALE)).toBe(6);
+    expect(gradeFromPct(87, DEFAULT_SCALE)).toBe(1.3);
+    expect(gradeFromPct(86.99, DEFAULT_SCALE)).toBe(1.7);
+    expect(gradeFromPct(73, DEFAULT_SCALE)).toBe(2.3);
+    expect(gradeFromPct(80, DEFAULT_SCALE)).toBe(2);
+    expect(gradeFromPct(45, DEFAULT_SCALE)).toBe(4.3);
+    expect(gradeFromPct(20, DEFAULT_SCALE)).toBe(5.3);
   });
 
-  it("ist an der Grenze stetig — knapp darunter dasselbe Ergebnis", () => {
-    for (const grenze of [87, 73, 59, 45, 20]) {
-      expect(gradeFromPct(grenze - 0.001, DEFAULT_SCALE)).toBeCloseTo(gradeFromPct(grenze, DEFAULT_SCALE), 1);
-    }
-  });
-
-  it("faengt die Enden ab: 100 % ist 1,0, alles unter der 5er-Grenze ist 6,0", () => {
-    expect(gradeFromPct(100)).toBe(1);
-    expect(gradeFromPct(19.9)).toBe(6);
-    expect(gradeFromPct(0)).toBe(6);
+  it("10/48 bei 5 ab 18 % ist eine 5- — und unter der Grenze laeuft die 6 von 6+ bis 6", () => {
+    const S = { 1: 87, 2: 73, 3: 59, 4: 45, 5: 18, 6: 0 };
+    expect(gradeFromPct(10 / 48 * 100, S)).toBe(5.2);
+    expect(gradeFromPct(17.99, S)).toBe(5.7);
+    expect(gradeFromPct(0, S)).toBe(6);
   });
 
   it("bleibt ueber den ganzen Prozentbereich in 1..6 und faellt monoton", () => {
@@ -56,12 +50,10 @@ describe("gradeFromPct — stetige Dezimalnote", () => {
   });
 
   it("rechnet mit dem eigenen Schluessel der Lehrkraft", () => {
-    expect(gradeFromPct(90, EIGEN)).toBe(2);      // Boden des Einserbandes
+    expect(gradeFromPct(90, EIGEN)).toBe(1.3);
     expect(gradeFromPct(100, EIGEN)).toBe(1);
-    expect(gradeFromPct(24.9, EIGEN)).toBe(6);
-    // 75 % liegt bei EIGEN im 3er-Band [65, 80): 3 + (80-75)/15 = 3,33
-    expect(gradeFromPct(75, EIGEN)).toBe(3.3);
-    // derselbe Prozentwert ist mit dem strengeren Schluessel schlechter
+    // 75 % im 3er-Band [65, 80): 3,3 − 0,6 · 10/15 = 2,9
+    expect(gradeFromPct(75, EIGEN)).toBe(2.9);
     expect(gradeFromPct(75, EIGEN)).toBeGreaterThan(gradeFromPct(75, DEFAULT_SCALE));
   });
 
@@ -80,15 +72,9 @@ describe("gradeFromPct — stetige Dezimalnote", () => {
 });
 
 describe("gradeDetailed — Note mit Tendenz und Notenwert", () => {
-  it("vergibt im Einserband weder 1+ noch 1-", () => {
-    for (const p of SWEEP) {
-      const d = gradeDetailed(p, DEFAULT_SCALE);
-      expect(d.note).not.toBe("1+");
-      expect(d.note).not.toBe("1-");
-    }
-    // die drei Stellen im Band ausdruecklich: unten, Mitte, oben
-    expect(gradeDetailed(87, DEFAULT_SCALE)).toEqual({ note: "1", wert: 1, grade: 1 });
-    expect(gradeDetailed(93.5, DEFAULT_SCALE)).toEqual({ note: "1", wert: 1, grade: 1 });
+  it("vergibt im Einserband nie 1+ (besser als 1,0 gibt es nicht)", () => {
+    for (const p of SWEEP) expect(gradeDetailed(p, DEFAULT_SCALE).note).not.toBe("1+");
+    expect(gradeDetailed(87, DEFAULT_SCALE)).toEqual({ note: "1-", wert: 1.3, grade: 1 });
     expect(gradeDetailed(100, DEFAULT_SCALE)).toEqual({ note: "1", wert: 1, grade: 1 });
   });
 
@@ -104,34 +90,22 @@ describe("gradeDetailed — Note mit Tendenz und Notenwert", () => {
     }
   });
 
-  it("setzt die Tendenz an den Dritteln des Bandes", () => {
-    // 2er-Band ist [73, 87), Spanne 14: "-" unter 77,67, "+" ab 82,33.
+  it("Tendenz aus dem Notenwert: Grenze = Minus, oben im Band Plus", () => {
     expect(gradeDetailed(73, DEFAULT_SCALE)).toEqual({ note: "2-", wert: 2.3, grade: 2 });
-    expect(gradeDetailed(77.6, DEFAULT_SCALE).note).toBe("2-");
-    expect(gradeDetailed(77.7, DEFAULT_SCALE)).toEqual({ note: "2", wert: 2, grade: 2 });
-    expect(gradeDetailed(82.3, DEFAULT_SCALE).note).toBe("2");
-    expect(gradeDetailed(82.4, DEFAULT_SCALE)).toEqual({ note: "2+", wert: 1.7, grade: 2 });
-    expect(gradeDetailed(86.9, DEFAULT_SCALE).note).toBe("2+");
+    expect(gradeDetailed(80, DEFAULT_SCALE)).toEqual({ note: "2", wert: 2, grade: 2 });
+    expect(gradeDetailed(86.9, DEFAULT_SCALE)).toEqual({ note: "2+", wert: 1.7, grade: 2 });
   });
 
-  it("faengt das untere Ende ab: unter der 5er-Grenze eine glatte 6", () => {
+  it("unter der 5er-Grenze: knapp darunter 6+, ganz unten 6", () => {
     expect(gradeDetailed(20, DEFAULT_SCALE)).toEqual({ note: "5-", wert: 5.3, grade: 5 });
-    expect(gradeDetailed(19.9, DEFAULT_SCALE)).toEqual({ note: "6", wert: 6, grade: 6 });
+    expect(gradeDetailed(19.9, DEFAULT_SCALE)).toEqual({ note: "6+", wert: 5.7, grade: 6 });
     expect(gradeDetailed(0, DEFAULT_SCALE)).toEqual({ note: "6", wert: 6, grade: 6 });
-  });
-
-  it("vergibt an der 6 keine Tendenz", () => {
-    for (const p of SWEEP) {
-      const d = gradeDetailed(p, DEFAULT_SCALE);
-      if (d.grade === 6) expect(d.note).toBe("6");
-    }
+    for (const p of SWEEP) expect(gradeDetailed(p, DEFAULT_SCALE).note).not.toBe("6-");
   });
 
   it("rechnet mit dem eigenen Schluessel der Lehrkraft", () => {
-    expect(gradeDetailed(90, EIGEN)).toEqual({ note: "1", wert: 1, grade: 1 });
-    // 3er-Band bei EIGEN ist [65, 80), Spanne 15: ab 75 ist es "3+"
-    expect(gradeDetailed(75, EIGEN)).toEqual({ note: "3+", wert: 2.7, grade: 3 });
-    expect(gradeDetailed(24.9, EIGEN)).toEqual({ note: "6", wert: 6, grade: 6 });
+    expect(gradeDetailed(90, EIGEN)).toEqual({ note: "1-", wert: 1.3, grade: 1 });
+    expect(gradeDetailed(75, EIGEN)).toEqual({ note: "3", wert: 2.9, grade: 3 });
   });
 
   it("stuerzt bei unlesbarem Schluessel nicht ab und bleibt in 1..6", () => {
@@ -202,7 +176,7 @@ describe("datumKurz", () => {
 import { wertLabel } from "./grades.js";
 describe("wertLabel", () => {
   it("Tendenz aus dem Notenwert", () => {
-    expect([1.0, 1.7, 2.0, 2.3, 2.46, 2.7, 3.0, 5.7, 6.0].map(wertLabel)).toEqual(["1", "2+", "2", "2−", "2−", "3+", "3", "6", "6"]);
+    expect([1.0, 1.3, 1.7, 2.0, 2.3, 2.46, 2.7, 3.0, 5.7, 6.0].map(wertLabel)).toEqual(["1", "1−", "2+", "2", "2−", "2−", "3+", "3", "6+", "6"]);
   });
   it("leer bleibt leer", () => { expect(wertLabel(null)).toBe(""); });
 });

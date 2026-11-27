@@ -28,40 +28,29 @@ export function gradeFromPct(pct, scale) {
     [4, s[4], s[3]],
     [5, s[5], s[4]],
   ];
+  // „Note 2 ab 73 %": ab der Grenze gilt die Note — an der Grenze die schwaechste (2-, 2,3), oben im Band die
+  // staerkste (2+, 1,7), dazwischen linear (entschieden 27.11.2026). Die 1 laeuft von 1,3 bis 1,0, unter der
+  // 5er-Grenze die 6 von 5,7 (6+) bis 6,0. Spiegel: note_aus_pct in app/scoring.py — zusammen aendern.
+  const r1 = (x) => Math.round(x * 10) / 10;
   for (const [grade, lower, upper] of ranges) {
     if (pct >= lower) {
       const span = upper - lower;
-      if (span <= 0) return grade;
-      return Math.round((grade + (upper - pct) / span) * 10) / 10;
+      const pos = span > 0 ? Math.min(1, Math.max(0, (pct - lower) / span)) : 1;
+      return grade === 1 ? r1(1.3 - 0.3 * pos) : r1(grade + 0.3 - 0.6 * pos);
     }
   }
-  return 6.0;
+  const pos = s[5] > 0 ? Math.min(1, Math.max(0, pct / s[5])) : 0;
+  return r1(6 - 0.3 * pos);
 }
 
-// Note MIT Tendenz (1+, 2-, …) und Notenwert (Ganzzahl ∓0,3), wie in der
-// Klassenarbeits-Auswertung. Basis-Note aus der Lehrer-Skala; innerhalb des
-// Bandes oberes Drittel „+", unteres „-". Kein „1-", kein „6+/-".
+// Note MIT Tendenz und Notenwert — aus EINER Rechnung (`gradeFromPct`), die Tendenz folgt aus dem Wert.
+// `grade` ist die Note des Bandes (ab welcher Grenze), nicht der gerundete Wert: 1,3 bleibt eine 1.
 export function gradeDetailed(pct, scale) {
+  const wert = gradeFromPct(pct, scale);
   const s = skala(scale);
-  const ranges = [
-    [1, s[1], 100], [2, s[2], s[1]], [3, s[3], s[2]],
-    [4, s[4], s[3]], [5, s[5], s[4]],
-  ];
-  for (const [grade, lower, upper] of ranges) {
-    if (pct >= lower) {
-      const span = upper - lower;
-      const pos = span > 0 ? (pct - lower) / span : 1;   // 0 = unten, 1 = oben im Band
-      let suffix = pos >= 2 / 3 ? "+" : pos < 1 / 3 ? "-" : "";
-      // Im Einserband gibt es weder 1- noch 1+: nach unten waere es eine 2,
-      // nach oben ein Notenwert von 0,7 — den weist die Notenuebernahme als
-      // ausserhalb von 1..6 zurueck, und zwar STILL. Der beste Schueler der
-      // Klasse fiel damit aus der uebernommenen Spalte heraus.
-      if (grade === 1) suffix = "";
-      const wert = grade + (suffix === "+" ? -0.3 : suffix === "-" ? 0.3 : 0);
-      return { note: grade + suffix, wert: Math.round(wert * 10) / 10, grade };
-    }
-  }
-  return { note: "6", wert: 6, grade: 6 };
+  const grade = [1, 2, 3, 4, 5].find((g) => pct >= s[g]) || 6;
+  // ASCII-Minus wie bisher in der Klassenarbeit (Verteilung vergleicht auf „2-").
+  return { note: wertLabel(wert).replace("−", "-"), wert, grade };
 }
 
 // Die Statistik-Helfer für die Kennzahlen (Notenwert-Verteilung) standen hier
@@ -98,13 +87,15 @@ export function datumKurz(iso) {
 
 /**
  * Notenwert -> Note mit Tendenz („2,3" -> „2+", „2,7" -> „3−"). Spiegel von
- * note_label in app/scoring.py: kein „1−", kein „6+/−".
+ * note_label in app/scoring.py: an der 1 nur „1−", an der 6 nur „6+".
  */
 export function wertLabel(wert) {
   if (wert == null || !Number.isFinite(Number(wert))) return "";
   const w = Number(wert);
   const g = Math.min(6, Math.max(1, Math.round(w)));
-  if (g === 1 || g === 6) return String(g);
   const d = w - g;
+  // Die 1 kennt nur „1-" (besser als 1,0 gibt es nicht), die 6 nur „6+".
+  if (g === 1) return d >= 0.15 ? "1−" : "1";
+  if (g === 6) return d <= -0.15 ? "6+" : "6";
   return d <= -0.15 ? `${g}+` : d >= 0.15 ? `${g}−` : String(g);
 }

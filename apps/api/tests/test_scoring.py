@@ -206,7 +206,10 @@ def test_e_modus_von_liest_die_konfiguration():
 
 def test_note_mit_tendenz_spiegelt_das_frontend():
     from app.scoring import note_mit_tendenz as n
-    assert [n(p) for p in (95, 87, 80, 73, 60, 50, 10, 0)] == ["1", "1", "2", "2-", "3-", "4", "6", "6"]
+    # „Note 2 ab 73 %": an der Grenze die schwaechste Fassung (87 % = 1-, 73 % = 2-), knapp unter 20 % eine 6+.
+    assert [n(p) for p in (95, 87, 80, 73, 60, 50, 19.9, 0)] == ["1", "1-", "2", "2-", "3-", "4", "6+", "6"]
+    # 10/48 bei „5 ab 18 %": eine 5-, keine 6.
+    assert n(10 / 48 * 100, {1: 87, 2: 73, 3: 59, 4: 45, 5: 18, 6: 0}) == "5-"
     assert n(85) == "2+" and n(70) == "3+"
 
 

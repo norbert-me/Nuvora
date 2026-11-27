@@ -216,6 +216,8 @@ Zwei Dinge tut es bewusst **nicht**, und das darf nicht aufweichen:
 
 **Der Vergleich eines Kindes (Quartale, Halbjahre, Jahr, Vorjahr) rechnet am Server** (`GET /api/noten/classes/{c}/students/{s}/vergleich`, Anzeige `NotenVergleich` im Schülerdialog) mit `_summarize` — keine zweite Rechnung. Eine **Quartalsnote ist der Stand am Tag des Quartalsstrichs** (`bis`: nur Spalten mit Datum bis dahin, **ohne** von Hand gesetzte Noten — die gelten dem Halbjahr); das letzte Stück eines Halbjahrs ist die Halbjahresnote. Gezählt wird übers Jahr (Q1, 1. HJ, Q3, 2. HJ). Das **Vorjahr** ist die Jahresnote im Vorgängerkurs (`kurse.vorgaenger_id`), gefunden über die Person, sonst den Namen; ohne Vorgänger oder ohne das Kind darin fällt es weg. Test `tests/test_noten_vergleich.py`.
 
+**Prozent → Note ist EINE Rechnung** (`gradeFromPct`/`gradeDetailed` in `core/grades.js`, `note_aus_pct`/`note_mit_tendenz`/`note_label` in `app/scoring.py` — zusammen ändern; entschieden 27.11.2026): „Note 2 ab 73 %" heißt, ab der Grenze gilt die Note — an der Grenze die schwächste Fassung (2-, 2,3), oben im Band die stärkste (2+, 1,7), linear dazwischen; die 1 läuft 1,3 → 1,0, unter der 5er-Grenze die 6 von 5,7 (6+) bis 6,0. Die Tendenz folgt aus dem Wert (±0,15). Vorher gab es zwei Rechnungen: CardVote/Notenbuch setzten an jede Grenze die schlechtere ganze Note (87 % = 2,0), die Klassenarbeit drittelte das Band — 10/48 war hier 5,9 und dort 5-.
+
 Gewichte gibt das Werkzeug keine vor — das Leistungskonzept ist Fachkonferenz-Recht. Es zeigt nur die Summe und markiert, wenn sie nicht 100 % ergibt.
 
 ### iPhone/iPad: keine eigene App
