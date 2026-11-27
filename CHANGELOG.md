@@ -14,6 +14,19 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## 4.7.2 — 27.11.2026
+
+- **Notenbuch:** Eingabe **X** = keine Note erhalten (zählt nicht, gilt nicht als fehlend); unter der Tabelle stehen die möglichen Eingaben. Das Plus für einen neuen Abschnitt sitzt im Tabellenkopf; der Klassenname steht dort nicht mehr. Beobachtungen nachträglich mit Datum anlegen und bearbeiten. Klick auf einen Namen zeigt kein E/G und keinen Förderbedarf mehr.
+- **Notenbuch:** ein Link auf einen archivierten Kurs öffnet ihn auch dann, wenn die Klasse in einem aktiven Kurs liegt. „Details“ an einer CardVote-Spalte öffnet die Auswertung des Tests; übernommene CardVote-Noten tragen keinen Kommentar „Aus Test: …“ mehr.
+- **Noten:** unter der 5er-Grenze wird die 6 gedrittelt (6+ / 6 / 6-).
+- **Karteikarten:** Stapel, die nur an der Klasse hängen, gehen nur noch über einen aktiven Kurs desselben Fachs hinaus — ein Kurs mit abgeschalteten Karten (z. B. Mathe) gibt sie nicht mehr über einen anderen Kurs derselben Klasse (z. B. GA) weiter.
+- **Klassenarbeit:** die Zeilen „Gewicht“ und „Ø Klasse“ unter der Tabelle entfallen (stehen in der Auswertung).
+- **Themenauswahl:** zeigt Fach und Stufe und ist durchsuchbar (Einstiege, Kartenstapel, Notenspalte, Klassenarbeit).
+- **Tafel:** Stille-Safari mit Einstellungen am Feld (wie leise, Einmessen, bei Lärm weglaufen/anhalten, wie oft, zählen, alle Tiere zeigen); das erste Tier kommt nach spätestens 30 Sekunden Ruhe.
+- **Sitzplan:** Namen linksbündig, abgeschnitten wird höchstens der Nachname.
+- **Fehler melden:** nach dem Absenden nur ein kurzes „Danke!“ statt eines zweiten Fensters.
+- **Kalender:** die Knöpfe an fremden Terminen brechen nicht mehr mitten im Text um.
+
 ## 4.7.1 — 27.11.2026
 
 - **Noten:** der Notenwert bleibt in seiner Note — oben im Band glatt (5,0), an der Grenze 5,4, unter der 5er-Grenze 6; die Tendenz (5+/5/5-) kommt aus den Dritteln des Bandes. 34 % bei „5 ab 18 %“ ist jetzt 5,2 statt 4,9.
