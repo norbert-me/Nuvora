@@ -130,8 +130,10 @@ export default function Orga() {
       { key: "rename", label: t("orga.umbenennen") },
       { key: "del", label: t("common.delete"), danger: true },
     ]);
+    // Kein zweites „Wirklich löschen?": „Löschen" ist schon in dieser Auswahl gewählt, und danach steht
+    // fünf Sekunden „Rückgängig" bereit (undoDelete) — zweimal fragen war ein Handgriff ohne Entscheidung.
     if (wahl === "del") {
-      if (await askConfirm(t("orga.spalteLoeschen", { name: it.name }), { danger: true, ok: t("common.delete") })) loeschen(it.id);
+      loeschen(it.id);
     } else if (wahl === "rename") {
       const neu = await askPrompt(t("orga.umbenennen"), { initial: it.name, ok: t("common.save") });
       const name = (neu || "").trim();

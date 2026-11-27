@@ -466,7 +466,8 @@ const bedienung = (td) => [
     pfad: "/cardvote/questions",
     async anlegen(seite) {
       await seite.locator("[title='Hinzufügen']").first().click({ timeout: 8000 });
-      await seite.getByRole("button", { name: "+ Neues Frageset", exact: true }).first().click({ timeout: 8000 });
+      // Das Plus ist ein Symbol, kein Zeichen mehr — der Name des Knopfs ist nur noch das Wort.
+      await seite.getByRole("button", { name: /^\+?\s*Neues Frageset$/ }).first().click({ timeout: 8000 });
       await seite.locator("input[placeholder='Name des Fragesets']").first().fill(MARKE_UI, { timeout: 8000 });
       await seite.getByRole("button", { name: "OK", exact: true }).first().click({ timeout: 8000 });
       // Das neue Frageset geht SOFORT im Editor auf (createSet setzt
@@ -710,8 +711,9 @@ const bedienung = (td) => [
     beweis: "KI gestartet, Generation 2 läuft",
     async eigen(seite) {
       await seite.getByRole("button", { name: "KI lernt", exact: true }).first().click({ timeout: 8000 });
-      await seite.getByRole("button", { name: "10×", exact: true }).first().click({ timeout: 8000 });
+      // Erst „Los": vorher steht das Startbild des Modus, und die Regler (auch das Tempo) sind ausgeblendet.
       await seite.getByRole("button", { name: "Los", exact: true }).first().click({ timeout: 8000 });
+      await seite.getByRole("button", { name: "10×", exact: true }).first().click({ timeout: 8000 });
       try {
         await seite.getByText(/Generation ([2-9]|\d\d)/).first().waitFor({ timeout: 30000 });
       } catch { return "nach 30 s noch keine zweite Generation"; }
