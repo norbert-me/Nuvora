@@ -38,26 +38,39 @@ def einhaengen(app) -> None:
             return FileResponse(eigene, media_type="application/json")
         return JSONResponse({})
 
+    # Die Anfrage beruehrt das Dateisystem NIE: der Web-Ordner wird einmal eingelesen (relativer Pfad ->
+    # Datei), und die Adresse ist nur ein Schluessel darin. Was nicht in der Liste steht, gibt es nicht — kein
+    # ../, keine Symlinks hinaus, und die statische Analyse muss keine Schranke erkennen (vorher realpath +
+    # startswith, von CodeQL als path-injection gemeldet). Ein neuer Build heisst ohnehin Neustart der Huelle.
+    dateien: dict = {}
+
+    def _einlesen():
+        if dateien:
+            return dateien
+        basis = os.path.realpath(str(wurzel))
+        for ordner, _, namen in os.walk(basis):
+            for n in namen:
+                voll = os.path.join(ordner, n)
+                if os.path.realpath(voll).startswith(basis + os.sep):
+                    dateien[os.path.relpath(voll, basis).replace(os.sep, "/")] = voll
+        return dateien
+
     @app.get("/{pfad:path}", include_in_schema=False)
     async def oberflaeche(pfad: str):
         if pfad.startswith(("api/", "ws/")) or pfad in ("api", "ws"):
             raise HTTPException(404)
-        # Mit os.path statt pathlib: so lassen sich Normalisieren (realpath) und die Pruefung auf den
-        # Web-Ordner in EINER Folge lesen — und die statische Analyse erkennt sie als Schranke.
-        wurzel_s = os.path.realpath(str(wurzel))
-        ziel = os.path.realpath(os.path.join(wurzel_s, pfad)) if pfad else os.path.join(wurzel_s, "index.html")
-        # Nie aus dem Web-Ordner heraus (../, Symlinks) — nur Dateien darin.
-        if not (ziel == wurzel_s or ziel.startswith(wurzel_s + os.sep)):
-            raise HTTPException(404)
-        if os.path.isdir(ziel):
-            ziel = os.path.join(ziel, "index.html")
-        if not os.path.isfile(ziel):
+        liste = _einlesen()
+        schluessel = pfad.strip("/")
+        ziel = liste.get(schluessel) or liste.get(f"{schluessel}/index.html" if schluessel else "index.html")
+        if ziel is None:
             # Bekannte Statik-Endungen: 404 statt der Startseite (sonst bekommt
             # ein fehlendes Skript HTML und der Fehler zeigt in die falsche Richtung).
-            if "." in pfad.rsplit("/", 1)[-1]:
+            if "." in schluessel.rsplit("/", 1)[-1]:
                 raise HTTPException(404)
-            ziel = os.path.join(wurzel_s, "index.html")        # Seitenroute der Oberflaeche
-        teile = ziel[len(wurzel_s):].split(os.sep)
-        kopf = {"Cache-Control": "no-cache"} if os.path.basename(ziel) in _NIE_CACHEN else (
-            {"Cache-Control": "public, max-age=31536000, immutable"} if "assets" in teile else {})
+            ziel = liste.get("index.html")                    # Seitenroute der Oberflaeche
+            if ziel is None:
+                raise HTTPException(404)
+        name = os.path.basename(ziel)
+        kopf = {"Cache-Control": "no-cache"} if name in _NIE_CACHEN else (
+            {"Cache-Control": "public, max-age=31536000, immutable"} if schluessel.startswith("assets/") else {})
         return FileResponse(ziel, headers=kopf)

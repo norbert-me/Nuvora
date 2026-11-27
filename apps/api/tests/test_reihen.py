@@ -7,7 +7,7 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
 
-from app.models import (CalendarEntry, Kurs, KursTag, Material, Reihe, ReiheStunde, SchoolClass,
+from app.models import (CalendarEntry, Kurs, KursTag, Material, SchoolClass,
                         TimetableSlot, User, UserModule)
 from app.routers import reihen as R
 

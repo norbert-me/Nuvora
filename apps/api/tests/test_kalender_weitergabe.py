@@ -107,6 +107,6 @@ async def test_speichern_holt_den_namen_und_fuehrt_den_gesamtschalter_nach(s, mo
     assert [c["export"] for c in d["calendars"]] == [False, True, False]
     assert u.feed_external is True
 
-    d = await K.set_external(K.ExtCalsIn(calendars=[
+    await K.set_external(K.ExtCalsIn(calendars=[
         K.ExtCalIn(url="https://x.example/a.ics", name="A", export=False)]), user=u, db=s)
     assert u.feed_external is False, "kein Kalender exportiert -> der Gesamtschalter geht aus"

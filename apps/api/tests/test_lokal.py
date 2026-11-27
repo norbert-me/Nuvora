@@ -24,8 +24,14 @@ class _Client:
         import asyncio
 
         async def lauf():
-            teile, aus = [], {}
+            teile, aus, gelesen = [], {}, []
             async def empfang():
+                # Einmal die Anfrage, danach wartet die Leitung (wie eine echte, die offen bleibt). Lieferte
+                # sie endlos `http.request`, kreiste Starlettes Warten auf `http.disconnect` neben der
+                # FileResponse ohne Ende — der ganze Testlauf hing an dieser Datei.
+                if gelesen:
+                    await asyncio.Event().wait()
+                gelesen.append(1)
                 return {"type": "http.request", "body": b"", "more_body": False}
             async def senden(m):
                 if m["type"] == "http.response.start":

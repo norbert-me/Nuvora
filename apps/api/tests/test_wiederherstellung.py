@@ -2,7 +2,6 @@
 import os
 
 import pytest
-from sqlalchemy import select
 
 from app import models as m
 from app import wiederherstellung as wh

@@ -11,7 +11,7 @@ import { memo, useState, useEffect, useLayoutEffect, useMemo, useRef } from "rea
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
-import { Boxplot, COLORS as C, CONTROL_R, DialogKopf, linkBtn, toolbarBtn, Empty, FOKUS_TON, FOKUS_TON_DECKEND, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Segment, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, segmentBtn, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { COLORS as C, CONTROL_R, DialogKopf, linkBtn, toolbarBtn, Empty, FOKUS_TON, FOKUS_TON_DECKEND, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Segment, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, pageForm, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, segmentBtn, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import { themenFuerKurs, themenIndex, useThemen } from "../core/topics.js";
 import { useKurs } from "../core/kurs.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -30,12 +30,11 @@ import { useEinfuegen } from "../core/ziehsortieren.js";
 import { alsJson, hol } from "../core/melden.js";
 import { parseYmd, ymd } from "../core/datum.js";
 import { median as medianVon, mittel, streuung } from "../core/statistik.js";
-import { verteilung } from "../core/notenstufen.js";
 import { kurzName, kurzNameAn, useKurzName } from "../core/namen.js";
 import { notenTrend, spaltenDatum, spaltenNachZeit, strichLuecken } from "../core/notentrend.js";
 import { teilen } from "../core/teilen.js";
 import { sortiereKinder } from "../core/namen.js";
-import { komma, kommaRund, rund } from "../core/zahl.js";
+import { kommaRund, rund } from "../core/zahl.js";
 
 const API = "/api/noten";
 

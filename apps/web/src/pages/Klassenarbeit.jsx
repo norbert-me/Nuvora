@@ -695,7 +695,6 @@ function ThemenGewichte({ gw, titel, hint, themen, t, rand = 16 }) {
 export default function Klassenarbeit() {
   const { t } = useLanguage();
   const aktiv = useAktiv();
-  const kartenAktiv = aktiv("karten");
   const lernpfadAktiv = aktiv("lernpfad");
   const notenAktiv = aktiv("auswertung");
   const cardvoteAktiv = aktiv("cardvote");

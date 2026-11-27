@@ -17,7 +17,7 @@
 // bewegt ueber SVG-Attribute statt CSS-Transforms (Safari verrechnete sonst
 // die Trefferflaechen).
 import { useEffect, useMemo, useRef, useState } from "react";
-import { COLORS as C, CONTROL_R, btnSecondary, btnSmall, panelStyle } from "./Icons.jsx";
+import { COLORS as C, btnSecondary, btnSmall, panelStyle } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { ablesen, geloest, gleich, gleichungText, kopie, loesung, neigung, opText, probeText, term, MAX_SCHRITTE } from "../core/waage.js";
 

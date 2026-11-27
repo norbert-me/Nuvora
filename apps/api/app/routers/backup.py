@@ -56,7 +56,6 @@ die Zeilen vergleicht.
 from __future__ import annotations
 
 import asyncio
-import base64
 import hashlib
 import io
 import json
@@ -66,7 +65,7 @@ import re
 import shutil
 import tempfile
 import zipfile
-from datetime import datetime, date, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile

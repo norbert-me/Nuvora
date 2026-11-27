@@ -5,13 +5,12 @@ Chiffretext, die Anwendung sieht Klartext, ein falscher Schluessel oder eine
 veraenderte Zelle faellt laut auf, und der Bestand im Klartext wird beim Start
 umgeschrieben, ohne dass etwas verloren geht.
 """
-import json
 
 import pytest
 from sqlalchemy import select, text
 
 from app import krypto, verschluesselung
-from app.models import (AppSetting, Attendance, Base, GradeEntry, Person, SchoolClass,
+from app.models import (Base, GradeEntry, SchoolClass,
                         Student, User, WorkAnalysis)
 
 

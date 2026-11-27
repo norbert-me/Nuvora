@@ -30,7 +30,6 @@ import { useLanguage } from "../i18n/index.jsx";
 const API = "/api/reihen";
 const FAECHER = ["Mathematik", "Deutsch", "Englisch", "Informatik", "Geschichte", "Geografie", "Biologie", "Physik", "Chemie", "Politik", "Religion", "Kunst", "Musik", "Sport"];
 
-const ymd = (d) => d.toISOString().slice(0, 10);
 
 export default function Reihen() {
   const [params] = useSearchParams();

@@ -8,7 +8,6 @@ mitreisst.
 import json
 import re
 import urllib.parse
-import time
 from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional
 
@@ -17,7 +16,7 @@ from pydantic import BaseModel, Field, model_validator, field_validator
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..zeit import schul_datum, tagesbeginn
+from ..zeit import tagesbeginn
 from ..stundenraster import (freie_tage as _freie_tage, slot_active_on as _slot_active_on, tag as _tag,
                              unterrichtsstunden as _unterrichtsstunden)
 # RRULE ist ICS-Grammatik; die Uebersetzung liegt in app/caldav.py (ohne
@@ -3075,7 +3074,7 @@ def _stand_faellig(user: User, jetzt: float) -> bool:
 
 
 async def _stand_im_hintergrund(user_id: int):
-    from .. import untis as U, untis_mobile as M
+    from .. import untis_mobile as M
     from ..database import async_session
     import asyncio
     try:

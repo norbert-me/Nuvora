@@ -21,7 +21,7 @@ from .. import arbeitswertung as aw
 # `roster_kurs` heisst hier unten schon ein Endpunkt — deshalb umbenannt
 # importiert, sonst ueberdeckt der Endpunkt den Helfer.
 from ..schueler import le_ids, roster_klasse, roster_kurs as _kanon_kurs
-from ..models import ExamDate, Person, SchoolClass, WorkAnalysis, Student, Topic, User
+from ..models import ExamDate, SchoolClass, WorkAnalysis, Student, Topic, User
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
 from .anwesenheit import get_day as _tag

@@ -35,7 +35,7 @@ const LEER_NACH_MS = 2500; // so lange gilt „null Hoehe" noch als „laedt", e
 
 export function WidgetPlatz({ id, children, abstand = 16 }) {
   const innen = useRef(null);
-  const [h, setH] = useState(() => gemerkteHoehe(id));   // zuletzt bekannte Hoehe, null = unbekannt
+  const [h] = useState(() => gemerkteHoehe(id));   // zuletzt bekannte Hoehe, null = unbekannt
   const [inhalt, setInhalt] = useState(false);           // ist der Inhalt da?
   const [abgelaufen, setAbgelaufen] = useState(false);   // Wartezeit fuer „leer" vorbei
 

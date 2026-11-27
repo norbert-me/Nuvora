@@ -11,7 +11,7 @@
 //     Mutationsstaerke, Anzahl und Tempo sind einstellbar.
 //   • Gegen die KI — selbst fahren gegen die beste bisher gelernte KI.
 import { useEffect, useRef, useState } from "react";
-import { CONTROL_R, Segment, segmentBtn, selectStyle, cardStyle, pageFull, toolbarBtn, toolbarBtnPrimary, panelStyle, COLORS as C } from "../components/Icons.jsx";
+import { CONTROL_R, Segment, segmentBtn, selectStyle, cardStyle, pageFull, toolbarBtn, toolbarBtnPrimary } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import RennenExperiment from "../components/RennenExperiment.jsx";
 import RennenErklaerung from "../components/RennenErklaerung.jsx";

@@ -297,7 +297,6 @@ async def anwenden(db, pfad: str, uid: int, modul: str, auswahl: list[dict]) -> 
     nie still ersetzt. Jede Zeile läuft in ihrem eigenen Teil-Savepoint: eine Zeile, die an einem
     Fremdschlüssel scheitert, reißt die anderen nicht mit.
     """
-    from sqlalchemy import bindparam, update  # noqa: F401  (update: unten)
     from sqlalchemy.exc import SQLAlchemyError
 
     from .sicherungsformat import passend_machen
@@ -312,7 +311,6 @@ async def anwenden(db, pfad: str, uid: int, modul: str, auswahl: list[dict]) -> 
 
     sich = lies_sicherung(pfad, uid, modul, roh_ids={t: set(v) for t, v in gewuenscht.items()})
     eigene_heute = await eigene_ids_heute(db, uid)
-    meta = Base.metadata.tables
     ergebnis = {"eingefuegt": 0, "ueberschrieben": 0, "uebersprungen": []}
     neu_da: dict[str, set] = {}
 
