@@ -1,7 +1,7 @@
 // Einheitliche Auswahl: erst Kurs, dann — nur wenn der Kurs mehrere Fach-Klassen
 // hat — das Fach. Gibt weiterhin eine class_id nach außen (Backend unverändert),
 // die Oberfläche denkt aber in Kursen. Bei 1 Klasse/Kurs nur ein Feld.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { selectStyle } from "./Icons.jsx";
 import { hol } from "../core/melden.js";
 
@@ -34,13 +34,19 @@ export default function KursKlasseSelect({ value, kursValue = null, onChange, on
   // nur aktive Kurse — die Auswahl fiel dann auf den ersten Kurs, und man sah das Notenbuch eines ganz anderen
   // Kurses. Steht der gewuenschte Kurs (oder die Klasse) nicht in der Liste, wird er aus dem Archiv
   // dazugeholt und als „(Archiv)" gekennzeichnet — nur dieser eine, das Archiv bleibt sonst draussen.
-  const [archivGeholt, setArchivGeholt] = useState(false);
+  // „offen" → „laeuft" → „fertig". Bis „fertig" wird kein Kurs nach aussen gemeldet: sonst meldete das Feld den
+  // zuerst gewaehlten aktiven Kurs, der Aufrufer uebernahm ihn — und der Wunsch aus dem Link war ueberschrieben,
+  // bevor das Archiv ueberhaupt gefragt wurde.
+  const [archiv, setArchiv] = useState("offen");
+  // Der Kurs, den der Aufrufer beim Oeffnen wollte (z. B. ?kurs= aus einem Link) — bis er eingeloest ist.
+  const wunsch = useRef(null);
+  if (wunsch.current == null && archiv === "offen" && kursValue != null) wunsch.current = kursValue;
   useEffect(() => {
-    if (!groups.length || archivGeholt) return;
+    if (!groups.length || archiv !== "offen") return;
     const kursDa = kursValue == null || groups.some((g) => String(g.id) === String(kursValue));
     const klasseDa = value == null || value === "" || groups.some((g) => g.classes.some((c) => c.id === value));
-    if (kursDa && klasseDa) return;
-    setArchivGeholt(true);
+    if (kursDa && klasseDa) { setArchiv("fertig"); return; }
+    setArchiv("laeuft");
     Promise.all([hol("/api/kurse?archiviert=true"), hol("/api/classes?archiviert=true")]).then(([kurse, classes]) => {
       const archivKlassen = Array.isArray(classes) ? classes : [];
       const passend = (Array.isArray(kurse) ? kurse : [])
@@ -52,8 +58,8 @@ export default function KursKlasseSelect({ value, kursValue = null, onChange, on
         if (kl) passend.push({ id: "none", name: `${kl.name} (Archiv)`, classes: [{ id: kl.id, name: kl.name }] });
       }
       if (passend.length) setGroups((alt) => [...alt.filter((g) => !passend.some((p) => String(p.id) === String(g.id))), ...passend]);
-    }).catch(() => { /* ohne Archiv bleibt es bei den aktiven */ });
-  }, [groups, value, kursValue, archivGeholt]);
+    }).catch(() => { /* ohne Archiv bleibt es bei den aktiven */ }).finally(() => setArchiv("fertig"));
+  }, [groups, value, kursValue, archiv]);
 
   // Kurs-Auswahl mit value abgleichen: nur neu ableiten, wenn der aktuell
   // gewählte Kurs die value-Klasse NICHT (mehr) enthält (Erstladen oder value
@@ -62,6 +68,11 @@ export default function KursKlasseSelect({ value, kursValue = null, onChange, on
   useEffect(() => {
     if (!groups.length) return;
     const cur = groups.find((g) => String(g.id) === String(kursId));
+    // Der Kurs aus dem Link (auch ein erst nachgeladener aus dem Archiv) wird EINMAL eingeloest, danach gilt die
+    // Wahl im Feld. Als dauernder Vorrang kaempfte er gegen die eigene Rueckmeldung (onKurs) — 183 ↔ 7 im Wechsel.
+    const w = wunsch.current;
+    const gewuenscht = w != null ? groups.find((x) => String(x.id) === String(w) && x.classes.some((c) => c.id === value)) : null;
+    if (gewuenscht) { wunsch.current = null; if (String(gewuenscht.id) !== String(kursId)) { setKursId(String(gewuenscht.id)); return; } }
     if (cur && cur.classes.some((c) => c.id === value)) return; // Wahl gilt weiter
     // Gespeicherten Kurs bevorzugen (kursValue): eine Klasse kann in mehreren
     // Kursen liegen — ohne diesen Hinweis riete das Ableiten den ERSTEN Kurs und
@@ -96,7 +107,7 @@ export default function KursKlasseSelect({ value, kursValue = null, onChange, on
   // das einen von außen gesetzten kursValue (z.B. Edit einer Klassenarbeit) nullt,
   // bevor die Ableitung ihn überhaupt anwenden konnte — danach riete sie den ersten
   // Kurs (Bug: hinterlegter Kurs „7.5" sprang auf „7.5 LZ").
-  useEffect(() => { if (onKurs && groups.length) onKurs(curKurs); }, [curKurs, groups.length]); // eslint-disable-line
+  useEffect(() => { if (onKurs && groups.length && archiv === "fertig" && wunsch.current == null) onKurs(curKurs); }, [curKurs, groups.length, archiv]); // eslint-disable-line
 
   if (!groups.length && !allowNone) return null;
 
