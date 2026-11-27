@@ -45,7 +45,9 @@ export default function KursInfo({ kurs }) {
 
   if (!d) return <div style={{ fontSize: 13, color: "var(--text3)", padding: "8px 0" }}>{t("kurse.info.laedt")}</div>;
   const zeile = { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap", padding: "6px 0", borderTop: "1px solid var(--border)", fontSize: 14 };
-  const kopf = { ...sectionLabel, width: 120, flexShrink: 0 };
+  // Breit genug fuer „WIEDERHOLUNGSBEDARF" in Grossbuchstaben (bei 120 px lief es in die Themen hinein);
+  // auf schmalen Schirmen bricht die Zeile um, das Label steht dann darueber.
+  const kopf = { ...sectionLabel, width: 190, flexShrink: 0, margin: 0 };
   return (
     <div style={{ marginTop: 10 }}>
       <div style={{ ...zeile, borderTop: "none" }}>
@@ -86,8 +88,9 @@ export default function KursInfo({ kurs }) {
               : d.bedarf.themen.map((th) => (
                 <div key={th.topic_id} style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
                   <span style={{ flex: 1, minWidth: 0 }}>{th.name || `#${th.topic_id}`}</span>
-                  <span style={{ fontWeight: 700, color: th.pct < 50 ? C.danger : C.warning }}>{th.pct} %</span>
-                  <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>{t("kurse.info.darunter", { n: th.darunter, von: th.n })}</span>
+                  {/* Feste, rechtsbuendige Spalten: sonst steht „26 %" anders als „39 %" und die Zahlen springen. */}
+                  <span style={{ fontWeight: 700, color: th.pct < 50 ? C.danger : C.warning, minWidth: "3.2em", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{th.pct} %</span>
+                  <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap", minWidth: "10.5em", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{t("kurse.info.darunter", { n: th.darunter, von: th.n })}</span>
                 </div>
               ))}
         </span>
