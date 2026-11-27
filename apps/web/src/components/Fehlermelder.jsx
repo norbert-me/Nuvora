@@ -39,7 +39,10 @@ export default function Fehlermelder() {
   const [mitUmg, setMitUmg] = useState(true);
   const [logOffen, setLogOffen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [fertig, setFertig] = useState(false);
+  // Nach dem Absenden kein zweites Fenster: der Dialog schliesst, ein kurzes „Danke" steht 2,5 s am Knopf —
+  // wer etwas meldet, will weiterarbeiten, nicht noch einen Dialog wegklicken.
+  const [danke, setDanke] = useState(false);
+  useEffect(() => { if (!danke) return undefined; const h = setTimeout(() => setDanke(false), 2500); return () => clearTimeout(h); }, [danke]);
   const [fehler, setFehler] = useState("");
   // „Grosser Bildschirm" statt „Desktop": entscheidend ist der Platz, nicht das
   // Geraet. Ein Tablet im Querformat bekommt denselben Knopf wie der Rechner.
@@ -94,14 +97,15 @@ export default function Fehlermelder() {
       setFehler(d.detail || t("melder.fehler"));
       return;
     }
-    setFertig(true);
+    schliessen();
+    setDanke(true);
     leeren();
     setProblem(false);
   };
 
   const schliessen = () => {
     setOffen(false);
-    setText(""); setFertig(false); setFehler(""); setLogOffen(false); setDateien([]);
+    setText(""); setFehler(""); setLogOffen(false); setDateien([]);
   };
 
 
@@ -163,16 +167,18 @@ export default function Fehlermelder() {
         )}
       </button>
 
+      {danke && (
+        <div role="status" style={{ position: "fixed", right: 16, bottom: `calc(max(16px, env(safe-area-inset-bottom)) + ${gross ? 62 : 52}px)`, zIndex: 300,
+          background: "var(--card)", border: "1px solid var(--border2)", borderRadius: CONTROL_R, boxShadow: SHADOW.schwebend,
+          padding: "8px 14px", fontSize: 14, fontWeight: 600, color: C.success }}>
+          {t("melder.danke")}
+        </div>
+      )}
+
       {offen && (
         <Modal onClose={schliessen} width={520} label={t("melder.titel")}>
           <DialogKopf titel={t("melder.titel")} onClose={schliessen} schliessenLabel={t("common.close")} />
-          {fertig ? (
-            <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
-              <div style={{ color: C.success, fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{t("melder.danke")}</div>
-
-              <button onClick={schliessen} style={{ ...btnSecondary, marginTop: 12 }}>{t("common.close")}</button>
-            </div>
-          ) : (
+          {(
             <div onDragOver={(ev) => { if (nurDateien(ev)) { ev.preventDefault(); setZiehtDatei(true); } }}
               onDragLeave={(ev) => { if (!ev.currentTarget.contains(ev.relatedTarget)) setZiehtDatei(false); }}
               onDrop={dateiDrop}
