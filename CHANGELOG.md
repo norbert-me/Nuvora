@@ -14,6 +14,16 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## 4.7.4 — 28.11.2026
+
+- **CardVote:** Antworten in der Auswertung per Klick ändern, das gescannte Original lässt sich jederzeit zurückholen. Die übernommene Notenspalte folgt der Auswertung wie bei der Klassenarbeit.
+- **Notenbuch:** Suche im Tabellenkopf, Statistik als Knopf in der Leiste, die Tabelle nutzt die ganze Höhe. Die Statistik folgt Nachkommastellen und Teilnoten aus der Ansicht. Zellen nehmen NB und X an.
+- **Klassenarbeit:** Auswertung und Rückmeldebogen im eigenen Reiter (Punkte | Auswertung bzw. E | G | Auswertung); „Noten aller“ folgt Alle | E | G. Kinder ohne Punkte sind hervorgehoben. Umbenennen und Kopieren im ⋯-Menü, Notenschlüssel hinter dem Stift.
+- **Sortierung** der Kinder gilt für Notenbuch und Klassenarbeit gemeinsam.
+- **Boxplot** nutzt die ganze Breite; Note und % sehen gleich aus.
+- **Genau hinschauen:** ohne Befund nur noch eine schmale Zeile.
+- **Kurse:** Kurs-Info — Beschriftung „Wiederholungsbedarf“ überlappt nicht mehr.
+
 ## 4.7.3 — 27.11.2026
 
 - **Namen:** Vorname, weitere Vornamen (mit +) und Nachname je ein eigenes Feld — auf der Personenseite und in der Kinderliste des Kurses. Angezeigt wird überall Vorname + Nachname; Zeugnis und Export behalten den vollen Namen. Namenslisten erkennen „Nachname, Vorname“ und aus Excel kopierte Spalten; die Klassen-Vorlage hat die Spalten Vorname / Weitere Vornamen / Nachname.
