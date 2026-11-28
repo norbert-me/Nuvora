@@ -1426,7 +1426,8 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
 // Notenverteilung: das gemeinsame Feld (components/Verteilung.jsx). Die Stufung kommt
 // aus dem Zahnrad und ist nur der Startwert des Ganz/Teilnoten-Schalters.
 function NotenVerteilung({ werte, stufung }) {
-  return <Verteilung noten={werte} stufung={stufung} />;
+  // Ganz/Halb/Teilnoten stellt das Ansicht-Menue ein — ein zweiter Schalter daneben waere dieselbe Frage zweimal.
+  return <Verteilung noten={werte} stufung={stufung} ohneFein />;
 }
 
 // Statistische Auswertung der Halbjahresnoten — analog CardVote: Kennzahlen und

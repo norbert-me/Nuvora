@@ -23,7 +23,8 @@ const farbe = (g) => {
   return n <= 2 ? C.success : n <= 4 ? C.warning : C.danger;
 };
 
-export default function Verteilung({ noten, pct, stufung = "ganz", fein: feinAussen, onFein }) {
+// ohneFein: kein Umschalter Noten/Teilnoten — die Stufung kommt von aussen (Notenbuch: Ansicht-Menue).
+export default function Verteilung({ noten, pct, stufung = "ganz", fein: feinAussen, onFein, ohneFein = false }) {
   const { t } = useLanguage();
   const zahlen = (a) => (a || []).filter((v) => v != null && Number.isFinite(Number(v))).map(Number);
   const nw = noten ? zahlen(noten) : null;
@@ -45,7 +46,7 @@ export default function Verteilung({ noten, pct, stufung = "ganz", fein: feinAus
 
   const links = nw ? [["bar", t("klassenarbeit.distGrades")], ["box", t("klassenarbeit.distBox")]] : null;
   const rechts = ansicht === "bar"
-    ? [["ganz", t("klassenarbeit.distWhole")], ["fein", t("klassenarbeit.distFine")]]
+    ? ohneFein ? null : [["ganz", t("klassenarbeit.distWhole")], ["fein", t("klassenarbeit.distFine")]]
     : (pw && nw ? [["pct", "%"], ["note", t("klassenarbeit.grade")]] : null);
 
   const box = eh === "pct" ? pw : nw;
