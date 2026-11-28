@@ -20,7 +20,7 @@ import Verteilung from "../components/Verteilung.jsx";
 import { leIst } from "../core/foerderung.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
-import { askConfirm, showAlert } from "../core/dialog.jsx";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { rememberClass } from "../core/cache.js";
 import { gradeFromPct, gradeDetailed, quantile, stdev, DEFAULT_SCALE, datumKurz } from "../core/grades.js";
 import { useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
@@ -839,6 +839,10 @@ export default function Klassenarbeit() {
   // Der Name bleibt: jede Geste geht weiter denselben einen Weg — nur endet er
   // jetzt im Entwurf statt beim Server.
   const persist = (next) => entwurf.setz(next);
+  const umbenennen = async () => {
+    const neu = await askPrompt(t("klassenarbeit.umbenennen"), { initial: work?.name || "" });
+    if (neu != null && neu.trim()) persist({ name: neu.trim() });
+  };
   const workId = work && work.id;
   useEffect(() => {
     if (!notenAktiv || !workId) { setVerknuepft([]); return; }
@@ -967,6 +971,9 @@ export default function Klassenarbeit() {
   };
 
   const alleAn = alleSicht && !!(work && work.niveau && partner);
+  // Auswertung ohne zweites Blatt: dieselbe Trennung — eingetragen wird unter „Punkte", ausgewertet im
+  // eigenen Reiter (Wunsch des Nutzers: die Auswertung vollstaendig in den Auswertungsreiter).
+  const nurAuswertung = alleSicht && !!work && !alleAn;
   // Vor der Gesamtsicht: Offenes speichern und den Stand BEIDER Blaetter neu
   // holen — das andere Blatt steht in `works` so, wie es beim letzten Laden war.
   const alleZeigen = async () => {
@@ -1475,10 +1482,15 @@ export default function Klassenarbeit() {
           )}
           mehr={work ? [{ key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true, onClick: loeschen }] : []}>
           {/* E | G: zwei Blaetter einer Arbeit. Fehlt eins, legt der Knopf es an. */}
-          {work && work.niveau && (
+          {work && (
             <Segment>
-              {["E", "G"].map((n) => {
-                const aktiv = !alleAn && work.niveau === n;
+              {!work.niveau && (
+                <button onClick={() => setAlleSicht(false)} aria-pressed={!alleSicht}
+                  style={{ ...segmentBtn, fontWeight: !alleSicht ? 700 : 500, color: !alleSicht ? "var(--accent)" : "var(--text2)" }}>
+                  {t("klassenarbeit.punkteSicht")}
+                </button>)}
+              {work.niveau && ["E", "G"].map((n) => {
+                const aktiv = !alleSicht && work.niveau === n;
                 const fehlt = work.niveau !== n && !partner;
                 return (
                   <button key={n} onClick={() => { setAlleSicht(false); blattWechseln(n); }} aria-pressed={aktiv}
@@ -1488,19 +1500,25 @@ export default function Klassenarbeit() {
                   </button>
                 );
               })}
-              {partner && (
-                <button onClick={alleZeigen} aria-pressed={alleAn} title={t("klassenarbeit.alleBlaetterHint")}
-                  style={{ ...segmentBtn, fontWeight: alleAn ? 700 : 500, color: alleAn ? "var(--accent)" : "var(--text2)" }}>
-                  {t("klassenarbeit.alleBlaetter")}
-                </button>
-              )}
+              <button onClick={alleZeigen} aria-pressed={alleSicht} title={partner ? t("klassenarbeit.alleBlaetterHint") : undefined}
+                style={{ ...segmentBtn, fontWeight: alleSicht ? 700 : 500, color: alleSicht ? "var(--accent)" : "var(--text2)" }}>
+                {t("klassenarbeit.alleBlaetter")}
+              </button>
             </Segment>
           )}
           {work && !work.niveau && (
             <button onClick={teilen} disabled={!hatNiveaus} style={{ ...toolbarBtn, ...(hatNiveaus ? {} : { opacity: 0.5, cursor: "default" }) }}
               title={hatNiveaus ? t("klassenarbeit.teilen") : t("klassenarbeit.teilenOhneNiveau")}>E/G</button>
           )}
-          <button data-tour="ka-new" onClick={() => setNeuOffen(true)} style={toolbarBtn}>{t("klassenarbeit.new")}</button>
+          {/* Umbenennen hinter dem Stift: der Name steht schon im Auswahlfeld — ein zweites Feld darunter
+              war derselbe Name noch einmal. */}
+          {work && !alleAn && (
+            <button onClick={umbenennen} className="icon-btn" style={toolbarIconBtn} title={t("klassenarbeit.umbenennen")} aria-label={t("klassenarbeit.umbenennen")}>
+              <Icon d={ICONS.edit} />
+            </button>)}
+          <button data-tour="ka-new" onClick={() => setNeuOffen(true)} className="icon-btn" style={toolbarIconBtn} title={t("klassenarbeit.new")} aria-label={t("klassenarbeit.new")}>
+            <Icon d={ICONS.plus} color="var(--accent)" />
+          </button>
           {/* Parallelklassen schreiben dieselbe Arbeit — sie zweimal einzutippen
               ist dieselbe Arbeit zweimal. */}
           {work && <button onClick={() => setKopieOffen(true)} className="icon-btn" style={toolbarIconBtn} title={t("klassenarbeit.copyTo")} aria-label={t("klassenarbeit.copyTo")}><Icon d={ICONS.duplicate} /></button>}
@@ -1511,12 +1529,10 @@ export default function Klassenarbeit() {
         <>
           {/* SuS-Ansicht (Präsentation): alles über der Auswertung ausblenden —
               Aufgaben-Editor, Punkte-Raster, Aktionen. Nur die Auswertung bleibt. */}
-          {!hideIndividual && !alleAn && (<>
+          {!hideIndividual && !alleSicht && (<>
           {/* Name sofort auch im Auswahl-Dropdown zeigen (nicht erst nach Reload). */}
           {/* Der Name geht in den Entwurf; im Auswahlfeld oben steht er nach dem
               Speichern (vorher wäre dort ein Name, den es serverseitig nicht gibt). */}
-          <input value={work.name} onChange={(e) => persist({ name: e.target.value })} placeholder={t("klassenarbeit.newName")}
-            style={{ ...inputStyle, fontSize: 16, fontWeight: 600, marginBottom: 12, maxWidth: 360 }} />
 
           {/* Anhänge: die Arbeit selbst und ihr Erwartungshorizont. Zwei
               benannte Plätze statt einer namenlosen Liste — beim Nachkorrigieren
@@ -1705,7 +1721,12 @@ export default function Klassenarbeit() {
                               aria-label={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")} aria-pressed={abw}
                               style={{ border: "none", background: "none", cursor: "pointer", color: abw ? C.warning : "var(--text3)", padding: 0, display: "inline-flex",
                                 alignItems: "center", justifyContent: "center", minWidth: 32, minHeight: 32, margin: "-4px 0 -4px -8px" }}><Icon d={abw ? ICONS.eyeOff : ICONS.eye} size={15} /></button>
-                            {anzeigeName(s.name)}
+                            {/* Noch keine Punkte (und weder abwesend noch NB): hervorgehoben wie die
+                                fehlende Note im Notenbuch — beim Korrigieren sieht man, wer noch fehlt. */}
+                            <span title={!erfasst && !abw && !leIst(s) && !istUb(s.id) ? t("klassenarbeit.nochOhnePunkte") : undefined}
+                              style={!erfasst && !abw && !leIst(s) && !istUb(s.id) ? { background: `${C.warning}33`, borderRadius: CONTROL_R, padding: "1px 6px", margin: "0 -6px" } : undefined}>
+                              {anzeigeName(s.name)}
+                            </span>
                           </span>
                         </td>
                         {(work.tasks || []).flatMap((tk) => {
@@ -1787,23 +1808,23 @@ export default function Klassenarbeit() {
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap", alignItems: "center" }}>
+          {/* Eine Reihe: Verknuepfung (nur Symbol, Ziel im title), Rueckmeldebogen, Notenschluessel hinter dem Stift. */}
+          <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap", alignItems: "center" }}>
             {notenAktiv && (work.tasks || []).length > 0 && (verknuepft.length ? (
-              <Link to={`/auswertung?tab=noten&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`} title={t("klassenarbeit.verknuepftHint")}
-                style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "var(--text2)" }}>
-                <Icon d={ICONS.link} size={14} /> {verknuepft.map((v) => v.section ? `${v.section} · ${v.name}` : v.name).join(", ")}
+              <Link to={`/auswertung?tab=noten&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`}
+                title={`${t("klassenarbeit.verknuepftHint")}: ${verknuepft.map((v) => v.section ? `${v.section} · ${v.name}` : v.name).join(", ")}`}
+                aria-label={t("klassenarbeit.verknuepftHint")}
+                className="icon-btn" style={{ ...toolbarIconBtn, display: "inline-flex", alignItems: "center", justifyContent: "center", color: C.success }}>
+                <Icon d={ICONS.link} size={16} />
               </Link>
             ) : <button onClick={() => setNotenModal(true)} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.link} size={15} /> {t("klassenarbeit.toNoten")}</button>)}
-            {/* Ein Blatt je Kind. Der Ausdruck laesst den Rahmen weg (Druck-CSS
-                in index.html: `.nur-drucken` gewinnt), deshalb reicht hier
-                window.print() ohne eigenes Fenster. */}
-            {analyse && analyse.bogen.length > 0 && (
-              <button onClick={bogenOeffnen} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
-                title={t("bogen.printHint")}><Icon d={ICONS.print} size={15} /> {t("bogen.print")}</button>
-            )}
             {(work.tasks || []).length > 0 && (
-              <button onClick={() => setScaleOpen((v) => !v)} style={{ ...btnSecondary, marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6 }}
-                title={t("klassenarbeit.scaleHint")}>{t("klassenarbeit.scale")}{(work.scale && Object.keys(work.scale).length) ? " •" : ""}</button>
+              <button onClick={() => setScaleOpen((v) => !v)} aria-pressed={scaleOpen} aria-label={t("klassenarbeit.scale")}
+                className="icon-btn" style={{ ...toolbarIconBtn, position: "relative", ...(scaleOpen ? { borderColor: "var(--accent)", color: "var(--accent)" } : null) }}
+                title={`${t("klassenarbeit.scale")} — ${t("klassenarbeit.scaleHint")}`}>
+                <Icon d={ICONS.edit} size={16} />
+                {(work.scale && Object.keys(work.scale).length) ? <span style={{ position: "absolute", top: 4, right: 4, width: 6, height: 6, borderRadius: "50%", background: C.warning }} /> : null}
+              </button>
             )}
           </div>
           {scaleOpen && (work.tasks || []).length > 0 && (
@@ -1881,7 +1902,14 @@ export default function Klassenarbeit() {
               <div style={{ fontSize: 14, fontWeight: 700, margin: "20px 0 8px" }}>{t("klassenarbeit.notenAller")}</div>
               <AlleBlaetter blaetter={[work, partner]} alleStudents={alleStudents} scale={scale} t={t} />
             </>)}
-          </>) : zeigeAuswertung(analyse)}
+          </>) : nurAuswertung ? (<>
+            {zeigeAuswertung(analyse)}
+            {analyse && analyse.bogen.length > 0 && (
+              <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+                <button onClick={bogenOeffnen} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
+                  title={t("bogen.printHint")}><Icon d={ICONS.print} size={15} /> {t("bogen.print")}</button>
+              </div>)}
+          </>) : null}
         </>
       )}
       {neuOffen && <NeueArbeitModal t={t} onClose={() => setNeuOffen(false)} onAnlegen={anlegen}

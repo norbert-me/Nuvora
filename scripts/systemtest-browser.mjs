@@ -176,6 +176,8 @@ const verbindungen = (td) => [
       // Auswahlfeldes, und ein option gilt Playwright grundsaetzlich als
       // unsichtbar. Vorhanden heisst hier: die Liste ist geladen.
       await seite.getByText(`${MARKE}-Arbeit`).first().waitFor({ state: "attached", timeout: 15000 });
+      // Der Rueckmeldebogen steht im Reiter „Auswertung", nicht mehr unter den Punkten.
+      await seite.getByRole("button", { name: "Auswertung", exact: true }).first().click({ timeout: 10000 }).catch(() => {});
       await seite.getByRole("button", { name: "Rückmeldebogen drucken" }).first().click({ timeout: 10000 }).catch(() => {});
       await seite.waitForTimeout(300);
     },

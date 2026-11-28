@@ -195,6 +195,29 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true, 
 
   if (nurKind != null && zeigen.length === 0) return null;
 
+  // Nichts zu melden: eine schmale Zeile statt einer Karte. Die Karte war so gross wie eine echte Meldung —
+  // fuer etwas, das gerade niemanden betrifft. Die Regel steht im title.
+  if (nurKind == null && zeigen.length === 0) {
+    const satz = erhebungen === 0 ? grund()
+      : alle.every((s) => s.status === "zu_wenig_daten") ? t("fw.tooEarly", { n: erhebungen })
+      : `${t("fw.none")} ${t("fw.basedOn", { n: erhebungen })}`;
+    const regel = daten.regel?.abstand
+      ? t("fw.rule", { abstand: daten.regel.abstand, von: daten.regel.von, bis: daten.regel.bis, min: daten.regel.mindest_antworten }) : "";
+    return (
+      <div title={regel} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12,
+        padding: "4px 4px 4px 12px", border: "1px solid var(--border)", borderRadius: CONTROL_R, fontSize: 13, color: "var(--text3)" }}>
+        {titel && <span style={{ fontWeight: 700, color: "var(--text2)" }}>{t("fw.title")}</span>}
+        <span style={{ flex: 1, minWidth: 0 }}>{satz}</span>
+        {titel && (
+          <button onClick={() => setEmpfindlich(!empfindlich)} title={t("fw.sensitiveHint")}
+            style={{ ...chipStyle, cursor: "pointer", background: "var(--card)", minHeight: 28, boxSizing: "border-box", fontSize: 12,
+              border: `1px solid ${empfindlich ? "var(--accent)" : "var(--border2)"}`, color: empfindlich ? "var(--accent)" : "var(--text3)" }}>
+            {t("fw.sensitive")}
+          </button>)}
+      </div>
+    );
+  }
+
   return (
     <div style={{ ...cardStyle, marginBottom: 16 }}>
       {titel && (

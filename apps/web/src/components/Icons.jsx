@@ -808,7 +808,13 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false, 
   const lo = sorted[0];
   const hi = sorted[sorted.length - 1];
   const outliers = [];
-  const roh = (v) => (max > 0 ? (v / max) * 100 : 0);
+  // Die grosse Fassung zoomt auf die Daten (plus Rand): auf der festen Skala 0..max lag der Kasten in einem
+  // Drittel der Breite, und Noten (0..6) und Prozent (0..100) sahen fuer dieselbe Arbeit verschieden aus.
+  // Die kompakte Listenzeile behaelt die feste Skala — dort muessen alle Zeilen vergleichbar sein.
+  const rand = Math.max((hi - lo) * 0.12, max * 0.02);
+  const von = compact ? 0 : Math.max(0, lo - rand);
+  const bis = compact ? max : Math.min(max, hi + rand);
+  const roh = (v) => (bis > von ? ((v - von) / (bis - von)) * 100 : 50);
   const pct = (v) => (umgekehrt ? 100 - roh(v) : roh(v));
   // Ein Abschnitt von a bis b: links ist das kleinere Ende in BILDkoordinaten.
   const spanne = (a, b) => ({ left: `${Math.min(pct(a), pct(b))}%`, width: `${Math.abs(pct(b) - pct(a))}%` });
