@@ -8,7 +8,7 @@ from sqlalchemy import select, func, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..besitz import oder_403
+from ..besitz import nur_eigenes, oder_403
 from ..database import get_db
 from ..nebenlauf import mit_wiederholung
 from ..kursmitglieder import class_kurs_ids, sibling_class_ids
@@ -159,6 +159,10 @@ async def submit_scan(body: ScanCreate, user: User = Depends(get_current_user), 
         scan = existing.scalar_one_or_none()
         if scan:
             scan.answer = body.answer
+            # Ein neuer Scan ist wieder das Original — eine fruehere Korrektur
+            # der Lehrkraft galt dem alten.
+            scan.korrigiert = False
+            scan.original = None
         else:
             scan = Scan(
                 session_id=body.session_id,
@@ -194,6 +198,68 @@ async def submit_scan(body: ScanCreate, user: User = Depends(get_current_user), 
     })
 
     return {"ok": True}
+
+
+class AntwortIn(BaseModel):
+    card_id: int
+    question_id: int
+    # "A".."D" oder "" (abgegeben, aber leer). Ignoriert bei `original`.
+    answer: str = ""
+    # True: die gescannte Antwort wiederherstellen (bzw. die nachgetragene Zeile entfernen).
+    original: bool = False
+
+
+@router.put("/sessions/{session_id}/antwort")
+async def antwort_aendern(session_id: int, body: AntwortIn, user: User = Depends(get_current_user),
+                          db: AsyncSession = Depends(get_db)):
+    """Antwort eines Kindes in der Auswertung aendern — das Original bleibt.
+
+    Der Scan wird nicht ueberschrieben, sondern merkt sich die gescannte
+    Antwort in `original` (nur beim ersten Aendern); `original: true` stellt
+    sie wieder her. Gab es keinen Scan, entsteht eine nachgetragene Zeile, die
+    beim Wiederherstellen wieder verschwindet."""
+    session = await nur_eigenes(db, Session, session_id, user)
+    if body.answer not in ("A", "B", "C", "D", ""):
+        raise HTTPException(400, "Ungültige Antwort")
+    if not session.question_set_id:
+        raise HTTPException(400, "Diese Session hat kein Quiz")
+    fragen = {it.question_id for it in await _set_items(db, session.question_set_id)}
+    if body.question_id not in fragen:
+        raise HTTPException(404, "Frage gehört nicht zu dieser Session")
+    if session.class_id:
+        karten = {s.card_id for s in await _kurs_roster(db, session.class_id)}
+        if body.card_id not in karten:
+            raise HTTPException(404, "Karte gehört zu keinem Kind dieser Klasse")
+
+    scan = (await db.execute(select(Scan).where(
+        Scan.session_id == session_id, Scan.question_id == body.question_id,
+        Scan.student_id == body.card_id))).scalar_one_or_none()
+    if body.original:
+        if scan and scan.korrigiert:
+            if scan.original is None:
+                await db.delete(scan)
+                scan = None
+            else:
+                scan.answer = scan.original
+                scan.korrigiert = False
+                scan.original = None
+    elif scan is None:
+        scan = Scan(session_id=session_id, question_id=body.question_id, student_id=body.card_id,
+                    answer=body.answer, korrigiert=True, original=None)
+        db.add(scan)
+    elif scan.answer != body.answer or scan.korrigiert:
+        if not scan.korrigiert:
+            scan.original = scan.answer
+            scan.korrigiert = True
+        scan.answer = body.answer
+        # Zurueck auf den gescannten Wert heisst: keine Korrektur mehr.
+        if scan.original is not None and scan.answer == scan.original:
+            scan.korrigiert = False
+            scan.original = None
+    await db.commit()
+    if scan is None:
+        return {"answer": None, "korrigiert": False, "original": None}
+    return {"answer": scan.answer, "korrigiert": bool(scan.korrigiert), "original": scan.original}
 
 
 @router.get("/sessions/{session_id}/results")
@@ -339,8 +405,11 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
     all_scans = result.scalars().all()
 
     scan_map = {}
+    korr_map = {}
     for scan in all_scans:
         scan_map[(scan.student_id, scan.question_id)] = scan.answer
+        if scan.korrigiert:
+            korr_map[(scan.student_id, scan.question_id)] = scan.original
 
     config = konfig_mit_vorgaben(session.eval_config, user)
     rows = []
@@ -355,11 +424,15 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
             eigene[q["id"]] = answer
             correct = q["correct_answer"]
             is_correct = answer is not None and correct is not None and answer in correct
+            key = (student["card_id"], q["id"])
             answers.append({
                 "question_id": q["id"],
                 "answer": answer,
                 "correct_answer": correct,
                 "is_correct": is_correct,
+                # Von der Lehrkraft geaendert; `original` = gescannte Antwort (None: nachgetragen).
+                "korrigiert": key in korr_map,
+                "original": korr_map.get(key),
             })
         wertung = bewerte(
             questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv, e_modus=e_modus_von(config), regel=bonus_regel_von(config),

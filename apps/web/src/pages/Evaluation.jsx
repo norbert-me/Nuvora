@@ -226,6 +226,28 @@ export default function Evaluation() {
   // Vorschlag aus der Anwesenheit (Kalender + Orga). Leer, wenn eins der beiden
   // Module fehlt — die Haken von Hand gibt es trotzdem.
   const [vorschlag, setVorschlag] = useState({});
+  // Antwort eines Kindes von Hand aendern (Original bleibt am Server wiederherstellbar).
+  const [antwortFuer, setAntwortFuer] = useState(null);   // { student, frage, antwort }
+  const [verknuepftNeu, setVerknuepftNeu] = useState(0);
+  const antwortSetzen = async (cardId, questionId, rumpf) => {
+    const r = await fetch(`${API}/sessions/${id}/antwort`, alsJson("PUT", { card_id: cardId, question_id: questionId, ...rumpf })).catch(() => null);
+    if (!r || !r.ok) return false;
+    const neu = await r.json().catch(() => null);
+    if (!neu) return false;
+    // Nur diese Zelle nachziehen — neu laden verwürfe offene Einstellungen.
+    setData((d) => ({
+      ...d,
+      students: d.students.map((st) => {
+        if (st.card_id !== cardId) return st;
+        const answers = st.answers.map((a) => a.question_id !== questionId ? a : {
+          ...a, answer: neu.answer, korrigiert: !!neu.korrigiert, original: neu.original ?? null,
+          is_correct: !!neu.answer && !!a.correct_answer && a.correct_answer.includes(neu.answer),
+        });
+        return { ...st, answers, present: answers.some((a) => a.answer != null) };
+      }),
+    }));
+    return true;
+  };
   const [gefehltFuer, setGefehltFuer] = useState(null);   // Kind, dessen Themen offen sind
   useEffect(() => {
     hol(`${API}/sessions/${id}/gefehlt-vorschlag`)
@@ -502,6 +524,14 @@ export default function Evaluation() {
     );
   }
 
+  // Dieselben Noten fuer die Uebernahme und fuer die verknuepfte Spalte.
+  const notenFuerBuch = alleAnwesend.map((st) => ({
+    card_id: st.card_id, name: st.name,
+    value: gradeMode === "tendency"
+      ? tendencyGrade(st.pct, gradeScale)
+      : Math.round(gradeFromPct(st.pct, gradeScale) * 10) / 10,
+  }));
+
   return (
     <div>
       <Link to="/cardvote/tests" style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 5 }}>
@@ -510,14 +540,17 @@ export default function Evaluation() {
       {notenDialog && (
         <NotenImport
           sessionId={Number(id)} classId={data.class_id} kursId={data.kurs_id ?? null} mehrereKurse={(data.kurse || []).length > 1} sessionName={data.session_name}
-          grades={alleAnwesend.map((st) => ({
-            card_id: st.card_id, name: st.name,
-            value: gradeMode === "tendency"
-              ? tendencyGrade(st.pct, gradeScale)
-              : Math.round(gradeFromPct(st.pct, gradeScale) * 10) / 10,
-          }))}
-          onClose={() => setNotenDialog(false)}
+          grades={notenFuerBuch}
+          onClose={() => { setNotenDialog(false); setVerknuepftNeu((n) => n + 1); }}
         />
+      )}
+      {antwortFuer && (
+        <AntwortDialog {...antwortFuer} onClose={() => setAntwortFuer(null)}
+          onWahl={async (rumpf) => {
+            const ok = await antwortSetzen(antwortFuer.student.card_id, antwortFuer.frage.id, rumpf);
+            if (ok) setAntwortFuer(null);
+            return ok;
+          }} />
       )}
       <h2 style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{session_name || t("cv.sessionFallback", { id })}
         {unbenotet && <span style={{ ...chipStyle, marginLeft: 10, fontSize: 12, verticalAlign: "middle" }}>{t("dash.unbenotetToggle")}</span>}</h2>
@@ -565,9 +598,9 @@ export default function Evaluation() {
         {/* Nur sichtbar, wenn das Notenmodul aktiv ist — sonst fuehrt der
             Knopf ins Leere (Regel 3: CardVote haengt nicht von Noten ab). */}
         {notenAktiv && data.class_id && !unbenotet && (
-          <button onClick={() => setNotenDialog(true)} style={toolbarBtn}>
-            {t("notenimp.button")}
-          </button>
+          <NotenVerknuepfung sessionId={Number(id)} classId={data.class_id} kursId={data.kurs_id ?? null}
+            neu={verknuepftNeu} bereit={!eConf.geaendert} onImport={() => setNotenDialog(true)}
+            grades={notenFuerBuch} />
         )}
         <button onClick={() => setSusAnsicht((v) => !v)} title={t("klassenarbeit.presentHint")}
           style={{ ...toolbarBtn, background: susAnsicht ? "var(--accent)" : "transparent", color: susAnsicht ? C.aufAkzent : "var(--text2)" }}>
@@ -856,10 +889,15 @@ export default function Evaluation() {
                   {student.answers.map((a, i) => (
                     <td
                       key={questions[i].id}
+                      onClick={() => setAntwortFuer({ student, frage: questions[i], antwort: a })}
+                      title={a.korrigiert ? t("eval.antwortKorrigiert", { a: a.original || t("eval.antwortNichtGescannt") }) : t("eval.antwortAendern")}
                       style={{
                         ...td,
                         textAlign: "center",
                         fontWeight: "bold",
+                        cursor: "pointer",
+                        // Geaendert: gestrichelter Rahmen innen — die Farbe bleibt die der Wertung.
+                        boxShadow: a.korrigiert ? `inset 0 0 0 2px ${C.warning}` : undefined,
                         background: a.answer == null ? "var(--bg2)"
                           : a.is_correct ? "var(--success-bg)"
                           : a.correct_answer ? "var(--danger-bg)"
@@ -871,6 +909,7 @@ export default function Evaluation() {
                       }}
                     >
                       {a.answer || "–"}
+                      {a.korrigiert && <sup style={{ fontSize: 11, color: C.warning, marginLeft: 1 }}>*</sup>}
                     </td>
                   ))}
                   <td style={{ ...td, textAlign: "center", fontWeight: "bold", background: "var(--bg2)" }}>
@@ -913,8 +952,10 @@ export default function Evaluation() {
                     {t("eval.markPresent")}
                   </button>
                 </td>
-                {questions.map((q) => (
-                  <td key={q.id} style={{ ...td, textAlign: "center", color: "var(--border2)" }}>–</td>
+                {questions.map((q, i) => (
+                  <td key={q.id} onClick={() => setAntwortFuer({ student, frage: q, antwort: student.answers[i] || { question_id: q.id, answer: null } })}
+                    title={t("eval.antwortAendern")}
+                    style={{ ...td, textAlign: "center", color: "var(--border2)", cursor: "pointer" }}>–</td>
                 ))}
                 <td style={{ ...td, textAlign: "center", color: "var(--border2)", background: "var(--bg2)" }}>–</td>
                 <td style={{ ...td, textAlign: "center", color: "var(--border2)", background: "var(--bg2)" }}>–</td>
@@ -1151,6 +1192,100 @@ function SchliessenBtn({ onClick, t }) {
 
 
 // Dialog: CardVote-Testnoten in eine Kategorie des Notenmoduls uebernehmen.
+// Antwort eines Kindes aendern. Das Original bleibt am Server liegen und ist
+// hier mit einem Griff zurueck — „korrigiert" ist eine Entscheidung, kein Verlust.
+function AntwortDialog({ student, frage, antwort, onWahl, onClose }) {
+  const { t } = useLanguage();
+  const [busy, setBusy] = useState(false);
+  const [fehler, setFehler] = useState(false);
+  const n = Math.max(2, Math.min(4, frage.num_choices || 4));
+  const buchstaben = ["A", "B", "C", "D"].slice(0, n);
+  const aktuell = antwort ? antwort.answer : null;
+  const waehle = async (rumpf) => {
+    setBusy(true); setFehler(false);
+    const ok = await onWahl(rumpf);
+    setBusy(false);
+    if (!ok) setFehler(true);
+  };
+  const richtig = frage.correct_answer || "";
+  return (
+    <Modal onClose={onClose} width={380} label={t("eval.antwortTitel")}>
+      <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{anzeigeName(student.name)}</h3>
+      <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <Latex text={frage.text || ""} />
+      </div>
+      {fehler && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{t("eval.antwortFehler")}</p>}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        {buchstaben.map((b) => (
+          <button key={b} disabled={busy} onClick={() => waehle({ answer: b })} aria-pressed={aktuell === b}
+            style={{ ...btnSecondary, minWidth: 48, fontWeight: 700,
+              background: aktuell === b ? "var(--accent)" : undefined, color: aktuell === b ? C.aufAkzent : undefined,
+              borderColor: richtig.includes(b) ? C.success : undefined }}>
+            {b}
+          </button>
+        ))}
+        <button disabled={busy} onClick={() => waehle({ answer: "" })} aria-pressed={aktuell === ""}
+          style={{ ...btnSecondary, background: aktuell === "" ? "var(--accent)" : undefined, color: aktuell === "" ? C.aufAkzent : undefined }}>
+          {t("eval.antwortLeer")}
+        </button>
+      </div>
+      {antwort && antwort.korrigiert && (
+        <button disabled={busy} onClick={() => waehle({ original: true })} style={{ ...linkBtn, display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <Icon d={ICONS.undo} size={14} />
+          {t("eval.antwortOriginal", { a: antwort.original || t("eval.antwortNichtGescannt") })}
+        </button>
+      )}
+      <div style={{ marginTop: 16 }}>
+        <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+      </div>
+    </Modal>
+  );
+}
+
+
+// Ins Notenbuch — und danach VERKNUEPFT wie bei der Klassenarbeit: jede
+// Aenderung an der Auswertung (Antwort korrigiert, Notenschluessel, krank)
+// geht von selbst in die Spalte. Gesendet wird nur der gespeicherte Stand
+// (`bereit`), nie ein offener Entwurf.
+function NotenVerknuepfung({ sessionId, classId, kursId, neu, bereit, grades, onImport }) {
+  const { t } = useLanguage();
+  const [spalten, setSpalten] = useState([]);
+  useEffect(() => {
+    let weg = false;
+    hol(`/api/noten/verknuepft-session/${sessionId}`)
+      .then((d) => { if (!weg) setSpalten(Array.isArray(d) ? d : []); })
+      .catch(() => {});
+    return () => { weg = true; };
+  }, [sessionId, neu]);
+  const schluessel = JSON.stringify(grades.map((g) => [g.card_id, g.value]));
+  const gesendet = useRef(null);
+  useEffect(() => {
+    if (!spalten.length || !bereit) return undefined;
+    // Der erste Stand nach dem Laden ist der, der schon drüben steht.
+    if (gesendet.current === null) { gesendet.current = schluessel; return undefined; }
+    if (gesendet.current === schluessel) return undefined;
+    const tm = setTimeout(() => {
+      gesendet.current = schluessel;
+      fetch(`/api/noten/verknuepft-session/${sessionId}`, alsJson("PUT", {
+        grades: JSON.parse(schluessel).map(([card_id, value]) => ({ card_id, value })),
+      })).catch(() => {});
+    }, 800);
+    return () => clearTimeout(tm);
+  }, [schluessel, spalten.length, bereit, sessionId]);
+  if (spalten.length) return (
+    <Link to={`/auswertung?tab=noten&class=${classId}${kursId ? `&kurs=${kursId}` : ""}`} title={t("notenimp.verknuepftHint")}
+      style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "var(--text2)" }}>
+      <Icon d={ICONS.link} size={14} /> {spalten.map((v) => v.section ? `${v.section} · ${v.name}` : v.name).join(", ")}
+    </Link>
+  );
+  return (
+    <button onClick={onImport} style={toolbarBtn}>
+      {t("notenimp.button")}
+    </button>
+  );
+}
+
+
 function NotenImport({ sessionId, classId, kursId = null, mehrereKurse = false, sessionName, grades, onClose }) {
   const { t } = useLanguage();
   const heute = () => { const d = new Date(); return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`; };

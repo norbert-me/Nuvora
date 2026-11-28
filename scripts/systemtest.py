@@ -2140,6 +2140,30 @@ def teste_cardvote_voll(api, b, u, sch, spuren):
         return "gefehlt speichert, Grenzfall wertet regulaer, Vorschlag antwortet leer"
 
     b.pruefe("CardVote", "Bei dem Thema gefehlt", gefehlt)
+
+    def antwort_korrigieren():
+        """Eine gescannte Antwort aendern, unabhaengig nachlesen, Original
+        zurueckholen — und danach muss die Auswertung wieder genau so aussehen."""
+        sid = zustand["sitzung"]["id"]
+        vorher = api.call("GET", f"/api/sessions/{sid}/evaluation", erwartet=(200,))
+        kind = _finde(vorher["students"], card_id=1)
+        zelle = next(a for a in kind["answers"] if a["answer"])
+        neu = "D" if zelle["answer"] != "D" else "A"
+        api.call("PUT", f"/api/sessions/{sid}/antwort",
+                 {"card_id": 1, "question_id": zelle["question_id"], "answer": neu}, erwartet=(200,))
+        mitte = _finde(api.call("GET", f"/api/sessions/{sid}/evaluation", erwartet=(200,))["students"], card_id=1)
+        z2 = next(a for a in mitte["answers"] if a["question_id"] == zelle["question_id"])
+        if (z2["answer"], z2["korrigiert"], z2["original"]) != (neu, True, zelle["answer"]):
+            raise AssertionError(f"Korrektur nicht gespeichert: {z2}")
+        api.call("PUT", f"/api/sessions/{sid}/antwort",
+                 {"card_id": 1, "question_id": zelle["question_id"], "original": True}, erwartet=(200,))
+        nachher = _finde(api.call("GET", f"/api/sessions/{sid}/evaluation", erwartet=(200,))["students"], card_id=1)
+        z3 = next(a for a in nachher["answers"] if a["question_id"] == zelle["question_id"])
+        if z3["answer"] != zelle["answer"] or z3["korrigiert"] or not gleich(nachher["pct"], kind["pct"], 0.05):
+            raise AssertionError(f"Original nicht wiederhergestellt: {z3}, {kind['pct']} -> {nachher['pct']}")
+        return f"{zelle['answer']} -> {neu} -> {zelle['answer']}, Wertung wieder wie vorher"
+
+    b.pruefe("CardVote", "Antwort korrigieren, Original zurueck", antwort_korrigieren)
     return zustand
 
 
@@ -2225,6 +2249,27 @@ def teste_noten(api, b, u, sch, spuren, cv):
         return "Note 2,0 -> 3,0 ersetzt die Zelle (kein zweiter Eintrag)"
 
     b.pruefe("Noten", "Einzelne Note aendern", note_aendern)
+
+    def verknuepft_folgt():
+        """Die uebernommene Spalte ist mit der Auswertung verknuepft: neue Noten
+        der Auswertung kommen an, ohne neu zu uebernehmen."""
+        sid = cv["sitzung"]["id"]
+        spalten = api.call("GET", f"/api/noten/verknuepft-session/{sid}", erwartet=(200,))
+        if not any(x["id"] == z["test_spalte"] for x in spalten):
+            raise AssertionError(f"uebernommene Spalte nicht verknuepft: {spalten}")
+        neu = [{"card_id": c, "value": 4.0 if c == 1 else float(g)} for c, g in cv["noten"].items()]
+        api.call("PUT", f"/api/noten/verknuepft-session/{sid}", {"grades": neu}, erwartet=(200,))
+        haben = [e for e in api.call("GET", f"/api/noten/classes/{u.class_id}/entries", erwartet=(200,))
+                 if e["category_id"] == z["test_spalte"] and e["student_id"] == u.students[0]
+                 and e.get("kind", "grade") == "grade"]
+        if len(haben) != 1 or not gleich(haben[0]["value"], 4.0):
+            raise AssertionError(f"verknuepfte Zelle {haben} statt 4,0")
+        # Zurueck auf den Stand von „Einzelne Note aendern" — die Rechnung danach baut darauf.
+        zurueck = [{"card_id": c, "value": 3.0 if c == 1 else float(g)} for c, g in cv["noten"].items()]
+        api.call("PUT", f"/api/noten/verknuepft-session/{sid}", {"grades": zurueck}, erwartet=(200,))
+        return "Auswertung -> Spalte: Note kommt ohne neue Uebernahme an"
+
+    b.pruefe("Noten", "Verknuepfte Spalte folgt der Auswertung", verknuepft_folgt)
 
     def beobachtung():
         # Beobachtung OHNE Notenwert: erlaubt, zaehlt aber nie mit.

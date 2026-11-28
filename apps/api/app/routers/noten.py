@@ -1318,15 +1318,13 @@ class VerknuepftSyncBody(BaseModel):
     nb_ids: List[int] = []
 
 
-@router.put("/verknuepft/{work_id}")
-async def verknuepft_sync(work_id: int, body: VerknuepftSyncBody, user: User = Depends(require_module),
-                          db: AsyncSession = Depends(get_db)):
-    spalten = await _verknuepfte_spalten(db, user, work_id)
-    if not spalten:
-        return {"spalten": 0}
-    werte = {g.student_id: g.value for g in body.grades}
-    nb = {s for s in body.nb_ids if s not in werte}
-    bereich = set(body.student_ids) | set(werte) | nb
+async def _spalten_folgen(db, spalten, werte: dict, bereich_ids, nb_ids, note: str = ""):
+    """Verknuepfte Spalten auf einen Stand bringen (student_id -> Note).
+
+    Eine Quelle fuer Klassenarbeit und CardVote: wer im Bereich steht und keine
+    Note mehr hat, verliert seine Zelle; NB bekommt den Vermerk ohne Wert."""
+    nb = {s for s in nb_ids if s not in werte}
+    bereich = set(bereich_ids) | set(werte) | nb
     for cat in spalten:
         # Nur Kinder dieser Klassenfamilie — eine fremde student_id faellt still heraus.
         geschwister = await sibling_class_ids(db, cat.class_id)
@@ -1339,13 +1337,13 @@ async def verknuepft_sync(work_id: int, body: VerknuepftSyncBody, user: User = D
             e = vorhanden.get(sid)
             if sid in werte:
                 if e is None:
-                    db.add(GradeEntry(category_id=cat.id, student_id=sid, kind="grade", value=werte[sid], note=body.note or ""))
+                    db.add(GradeEntry(category_id=cat.id, student_id=sid, kind="grade", value=werte[sid], note=note or ""))
                 else:
                     if e.value != werte[sid]:
                         e.value = werte[sid]
                     # NB-Vermerk und der frühere Herkunftstext „Klassenarbeit" fallen weg.
                     if (e.note or "") in ("NB", "UB", "Klassenarbeit"):
-                        e.note = body.note or ""
+                        e.note = note or ""
             elif sid in nb:
                 if e is None:
                     db.add(GradeEntry(category_id=cat.id, student_id=sid, kind="grade", value=None, note="NB"))
@@ -1355,6 +1353,80 @@ async def verknuepft_sync(work_id: int, body: VerknuepftSyncBody, user: User = D
             elif e is not None:
                 # Keine Note mehr (abwesend, Punkte geleert): die Zelle folgt.
                 await db.delete(e)
+
+
+@router.put("/verknuepft/{work_id}")
+async def verknuepft_sync(work_id: int, body: VerknuepftSyncBody, user: User = Depends(require_module),
+                          db: AsyncSession = Depends(get_db)):
+    spalten = await _verknuepfte_spalten(db, user, work_id)
+    if not spalten:
+        return {"spalten": 0}
+    await _spalten_folgen(db, spalten, {g.student_id: g.value for g in body.grades},
+                          body.student_ids, body.nb_ids, body.note)
+    await db.commit()
+    return {"spalten": len(spalten)}
+
+
+# ─── Verknuepfung CardVote-Auswertung -> Notenspalte ───
+# Wie bei der Klassenarbeit: die uebernommene Spalte (source_session_id) folgt
+# der Auswertung. Wer dort eine Antwort korrigiert, den Notenschluessel oder
+# krank/anwesend aendert, schickt die neuen Noten — gerechnet wird weiter in
+# der Auswertung (core/scoring.js), hier wird nur eingetragen.
+
+async def _session_spalten(db, user, session_id: int):
+    sess = await db.get(TestSession, session_id)
+    if not sess or sess.owner_id != user.id:
+        raise HTTPException(404, "Session nicht gefunden")
+    spalten = list((await db.execute(select(GradeCategory).where(
+        GradeCategory.owner_id == user.id, GradeCategory.source_session_id == sess.id,
+    ).order_by(GradeCategory.id))).scalars().all())
+    return sess, spalten
+
+
+@router.get("/verknuepft-session/{session_id}")
+async def verknuepft_session(session_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    _, spalten = await _session_spalten(db, user, session_id)
+    sek = {}
+    if spalten:
+        sek = {x.id: x.name for x in (await db.execute(select(GradeSection).where(
+            GradeSection.id.in_({c.section_id for c in spalten if c.section_id})))).scalars().all()}
+    return [{"id": c.id, "name": c.name, "section_id": c.section_id, "section": sek.get(c.section_id, "")} for c in spalten]
+
+
+class SessionSyncGrade(BaseModel):
+    card_id: int
+    value: float
+
+    @field_validator("value")
+    @classmethod
+    def v_ok(cls, v):
+        if v < 1.0 or v > 6.0:
+            raise ValueError("Note muss zwischen 1,0 und 6,0 liegen")
+        return round(v, 1)
+
+
+class SessionSyncBody(BaseModel):
+    grades: List[SessionSyncGrade]
+
+
+@router.put("/verknuepft-session/{session_id}")
+async def verknuepft_session_sync(session_id: int, body: SessionSyncBody, user: User = Depends(require_module),
+                                  db: AsyncSession = Depends(get_db)):
+    sess, spalten = await _session_spalten(db, user, session_id)
+    if not spalten or not sess.class_id:
+        return {"spalten": 0}
+    if sess.question_set_id:
+        quiz = await db.get(QuestionSet, sess.question_set_id)
+        if quiz and quiz.unbenotet:
+            return {"spalten": 0}
+    if (sess.eval_config or {}).get("unbenotet"):
+        return {"spalten": 0}
+    # Dieselbe Zuordnung wie bei der Uebernahme: Karte -> Zeile der Klasse.
+    zeilen = (await db.execute(select(Student).where(Student.class_id == sess.class_id))).scalars().all()
+    by_card = {st.card_id: st.id for st in zeilen}
+    werte = {by_card[g.card_id]: g.value for g in body.grades if g.card_id in by_card}
+    # Bereich = alle Kinder der Klasse: wer keine Note mehr hat (krank), verliert die Zelle.
+    await _spalten_folgen(db, spalten, werte, list(by_card.values()), [])
     await db.commit()
     return {"spalten": len(spalten)}
 

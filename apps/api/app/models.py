@@ -306,6 +306,12 @@ class Scan(Base):
     student_id: Mapped[int] = mapped_column(Integer)
     answer: Mapped[str] = mapped_column(String(1))
     scanned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Von der Lehrkraft geaendert (Auswertung). `original` haelt die gescannte
+    # Antwort, damit sie sich jederzeit wiederherstellen laesst; korrigiert ohne
+    # `original` heisst: es gab gar keinen Scan, die Zeile ist nachgetragen und
+    # verschwindet beim Wiederherstellen.
+    korrigiert: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    original: Mapped[Optional[str]] = mapped_column(String(1), nullable=True)
     session: Mapped[Session] = relationship(back_populates="scans")
 
     # Ein Kind beantwortet eine Frage genau einmal. Ohne diese Bedingung legten
