@@ -27,7 +27,7 @@ from ..database import get_db
 from ..kursmitglieder import member_student_ids
 from ..models import Kurs, Student, Topic, User, WaageAbgabe, WaageAufgabe
 from ..schueler import sortiert
-from .karten import _student_by_token
+from .karten import ZUGANG_MODULE, _student_by_token
 from .modules import modul_pflicht
 
 MODULE_KEY = "waage"
@@ -181,7 +181,14 @@ async def _kurse_des_kindes(db: AsyncSession, st: Student) -> list:
 
 @lern_router.get("/{token}/waage")
 async def schueler_aufgaben(token: str, db: AsyncSession = Depends(get_db)):
-    st = await _student_by_token(db, token, modul=(MODULE_KEY,))
+    # Gilt der Zugang (irgendein Zugangsmodul an), ist nur dieses Modul aus: leere Liste statt 401. Die
+    # Schuelerseite fragt jedes Modul ab, und jede 401 stand als roter Fehler in der Konsole; von aussen
+    # bleibt es dieselbe Auskunft wie „keine Aufgaben". Ein toter Zugang gibt weiter 401.
+    try:
+        st = await _student_by_token(db, token, modul=(MODULE_KEY,))
+    except HTTPException:
+        await _student_by_token(db, token, modul=ZUGANG_MODULE)
+        return []
     kurs_ids = await _kurse_des_kindes(db, st)
     q = select(WaageAufgabe).where(WaageAufgabe.deleted_at.is_(None))
     if kurs_ids:
