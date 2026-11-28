@@ -297,6 +297,9 @@ function Ergebnisse({ results, noten = [], t }) {
               )}
             </div>
           ))}
+          {/* Rechtlicher Vorbehalt (Wunsch des Nutzers, 28.11.2026): die Anzeige ist ein gerechneter
+              Zwischenstand, keine erteilte Note — verbindlich ist nur, was die Lehrkraft gibt. */}
+          <p style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.5, margin: 0 }}>{t("lernen.notenVorbehalt")}</p>
         </div>
       )}
       <Lernstand results={results} t={t} />

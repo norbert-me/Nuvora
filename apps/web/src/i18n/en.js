@@ -2963,6 +2963,7 @@ export default {
   "lernen.noResultHint": "Your test results appear here as soon as the first test has been evaluated.",
   "lernen.resultsTitle": "Your results",
   "lernen.aktuelleNote": "Current grade",
+  "lernen.notenVorbehalt": "Note: The grades shown are a provisional, automatically calculated interim status – not a report grade and not a binding assessment. They may be incomplete or differ from the final grade; no claim to completeness or correctness can be derived from them. Only the grade awarded by the teacher is binding.",
   "lernen.footerHint": "Your practice progress is stored under your name and visible to your teacher.",
   "lernen.sass": "This worked",
   "lernen.stand.titel": "Where you stand",

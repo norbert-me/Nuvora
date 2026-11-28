@@ -2964,6 +2964,7 @@ export default {
   "lernen.noResultHint": "Tus resultados aparecerán aquí en cuanto se evalúe la primera prueba.",
   "lernen.resultsTitle": "Tus resultados",
   "lernen.aktuelleNote": "Nota actual",
+  "lernen.notenVorbehalt": "Nota: Las notas mostradas son un estado provisional calculado automáticamente, no una nota oficial ni una evaluación vinculante. Pueden estar incompletas o diferir de la nota final; no se garantiza su integridad ni exactitud. Solo es vinculante la nota otorgada por el profesor.",
   "lernen.footerHint": "Tu progreso se guarda con tu nombre y tu profesor puede verlo.",
   "lernen.sass": "Esto salió bien",
   "lernen.stand.titel": "Tu nivel",

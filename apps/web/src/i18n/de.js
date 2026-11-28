@@ -2953,6 +2953,7 @@ export default {
   "lernen.noResultHint": "Deine Testergebnisse erscheinen hier, sobald der erste Test ausgewertet wurde.",
   "lernen.resultsTitle": "Deine Ergebnisse",
   "lernen.aktuelleNote": "Aktuelle Note",
+  "lernen.notenVorbehalt": "Hinweis: Die angezeigten Noten sind ein vorläufiger, automatisch berechneter Zwischenstand – keine Zeugnisnote und keine verbindliche Leistungsbewertung. Sie können unvollständig sein oder von der späteren Note abweichen; ein Anspruch auf Vollständigkeit oder Richtigkeit besteht nicht. Verbindlich ist allein die von der Lehrkraft erteilte Note.",
   "lernen.footerHint": "Dein Übungsstand wird unter deinem Namen gespeichert und ist für deine Lehrkraft sichtbar.",
   "lernen.sass": "Das saß",
   "lernen.stand.titel": "Dein Lernstand",
