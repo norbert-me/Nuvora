@@ -14,6 +14,14 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## 4.7.6 — 28.11.2026
+
+- **Karteikarten:** archivierte, gelöschte und Vorjahres-Kurse geben keine Stapel mehr an die Kinder aus.
+- **Karteikarten:** QR-Code unter „QR-Zugänge“ anklicken öffnet die Seite des Kindes.
+- **Karteikarten:** Diagnose in der Entwicklerkonsole — `nuvoraDebug.karten("Name")` zeigt, warum ein Kind welchen Stapel sieht.
+- **Schülerseite:** keine Noten mehr aus Vorjahres- oder archivierten Kursen; das laufende Halbjahr steht nicht doppelt neben der aktuellen Note.
+- **Schülerseite:** ist PAP-Editor oder Waage aus, keine Fehlermeldungen mehr in der Konsole.
+
 ## 4.7.5 — 28.11.2026
 
 - **Schülerseite:** unter den Noten ein Hinweis — vorläufiger, automatisch berechneter Zwischenstand, keine Zeugnisnote, ohne Anspruch auf Vollständigkeit; verbindlich ist allein die Note der Lehrkraft.
