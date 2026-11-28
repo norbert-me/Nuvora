@@ -101,6 +101,7 @@ export default function Noten() {
   const [entries, setEntries] = useState([]);
   const kurz = useKurzName();
   const [suche, setSuche] = useState("");          // Kinder in der Tabelle suchen
+  const [statOffen, setStatOffen] = useState(false); // Statistik (Endnoten) ueber der Tabelle
   const [susModus, setSusModus] = useState(false);  // alle Noten verbergen (SuS schauen mit)
   const [summary, setSummary] = useState([]);
   const [error, setError] = useState("");
@@ -701,6 +702,9 @@ export default function Noten() {
   }
 
   const cls = classes.find((c) => c.id === classId);
+  const statNoten = term === "year"
+    ? (yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))
+    : sections.length > 0 ? (summary || []).filter((s) => !s.le).map((s) => endNoteVon(s)) : [];
   const suchTreffer = (s) => !suche.trim() || String(s.name || "").toLowerCase().includes(suche.trim().toLowerCase());
 
   return (
@@ -718,8 +722,10 @@ export default function Noten() {
             <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />
           </span>
           {/* Kurze Beschriftungen („1. HJ"), die lange Form im title. */}
-          <input type="search" value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("noten.suche")} aria-label={t("noten.suche")}
-            style={{ ...toolbarInput, width: 140, minWidth: 0 }} />
+          {/* Mit Tabelle sitzt die Suche im Tabellenkopf unter „Gesamt 100 %" — dort, wo die Namen stehen. */}
+          {(term === "year" || sections.length === 0) && (
+            <input type="search" value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("noten.suche")} aria-label={t("noten.suche")}
+              style={{ ...toolbarInput, width: 140, minWidth: 0 }} />)}
           <span title={t("noten.term")}>
             <Tabs value={term} onChange={(v) => wechseln(() => setTerm(v))}
               options={[["1", t("noten.term1Short")], ["2", t("noten.term2Short")], ["year", t("noten.year")]]} />
@@ -771,6 +777,12 @@ export default function Noten() {
             && { key: "cd", label: t("noten.fromCd"), icon: ICONS.chart, onClick: () => setCdDialog(true) },
         ] : []}
       >
+        {/* Statistik als Knopf statt als eigene Zeile ueber der Tabelle: zugeklappt kostete sie eine ganze Zeile Hoehe. */}
+        {statNoten.filter((v) => v != null).length >= 2 && (
+          <button onClick={() => setStatOffen((o) => !o)} title={t("noten.statTitle")} aria-label={t("noten.statTitle")} aria-pressed={statOffen}
+            className="icon-btn" style={{ ...toolbarIconBtn, ...(statOffen ? { background: "var(--accent-bg, var(--bg2))", borderColor: "var(--accent)" } : null) }}>
+            <Icon d={ICONS.chart} size={18} color={statOffen ? "var(--accent)" : undefined} />
+          </button>)}
         {/* Mit Abschnitten sitzt das Plus im Tabellenkopf hinter dem letzten Abschnitt — dort, wo er entsteht. */}
         {term !== "year" && classId && sections.length === 0 && (
           <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
@@ -801,7 +813,7 @@ export default function Noten() {
 
       {statsCol && (() => {
         const st = colStats(statsCol.id);
-        const de1 = (n) => kommaRund(n, 2);
+        const de1 = (n) => kommaRund(n, stellen);
         return (
           <Modal title={t("noten.colStatsTitle", { name: statsCol.name })} onClose={() => setStatsCol(null)}
             overlayStyle={{ backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
@@ -838,9 +850,7 @@ export default function Noten() {
         );
       })()}
 
-      {term === "year"
-        ? (yearData.rows || []).length > 0 && <NotenStatistik noten={(yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))} stufung={stufung} t={t} />
-        : sections.length > 0 && <NotenStatistik noten={(summary || []).filter((s) => !s.le).map((s) => endNoteVon(s))} stufung={stufung} t={t} />}
+      {statOffen && <NotenStatistik noten={statNoten} stufung={stufung} stellen={stellen} t={t} />}
 
       {ladefehler && loadedOnce.current && (
         <div role="alert" style={{ fontSize: 13, color: C.danger, marginBottom: 8 }}>{t("noten.ladefehlerAlt")} <button onClick={() => load(classId)} style={linkBtn}>{t("noten.nochmalLaden")}</button></div>
@@ -973,8 +983,12 @@ export default function Noten() {
                       `table-layout: auto` haelt sich keine Zelle an ein
                       `max-width`, das unter ihrer Mindestbreite liegt — und
                       `nowrap` macht den ganzen Namen zur Mindestbreite. */}
-                  {/* Kein Klassenname mehr: er steht in der Auswahl darueber. */}
-                  <span style={{ display: "block", maxWidth: NAME_SPALTE_MAX }} />
+                  {/* Kein Klassenname mehr: er steht in der Auswahl darueber. Stattdessen die Suche
+                      (vorher ein eigenes Feld in der Werkzeugleiste). */}
+                  <span style={{ display: "block", maxWidth: NAME_SPALTE_MAX }}>
+                    <input type="search" value={suche} onChange={(e) => setSuche(e.target.value)} placeholder={t("noten.suche")} aria-label={t("noten.suche")}
+                      style={{ ...toolbarInput, width: "100%", minWidth: 0, boxSizing: "border-box", fontWeight: 400 }} />
+                  </span>
                 </th>
                 {secListe.map((sec) => {
                   const cols = zeigCats(sec);
@@ -1234,7 +1248,9 @@ export default function Noten() {
           Namen bleibt: den sieht man der Tabelle nicht an. */}
       {/* Was in eine Zelle darf — man sieht es der Tabelle nicht an (Wunsch des Nutzers). Der fruehere Satz
           „Klick auf einen Namen zeigt E-/G-Kurs und Förderbedarf" ist entfallen: der Dialog zeigt das nicht mehr. */}
-      <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 12, lineHeight: 1.6 }}>
+      {/* Negativer Rand unten: der Hinweis darf in das untere Polster des Inhalts ragen — sonst blieb
+          unter der Tabelle ein leerer Streifen, den die gemessene Tabellenhoehe frei hielt. */}
+      <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8, marginBottom: -40, lineHeight: 1.6 }}>
         {t("noten.eingaben")}
       </p>
 
@@ -1416,8 +1432,7 @@ function NotenVerteilung({ werte, stufung }) {
 // Statistische Auswertung der Halbjahresnoten — analog CardVote: Kennzahlen und
 // Notenverteilung ueber die effektiven Endnoten (manuell gesetzt schlaegt
 // Schnitt). Rein deskriptiv, keine Zeugnisnote.
-function NotenStatistik({ noten, stufung, t }) {
-  const [open, setOpen] = useState(false);
+function NotenStatistik({ noten, stufung, stellen = 2, t }) {
   noten = (noten || []).filter((v) => v != null);
   if (noten.length < 2) return null;
   const avg = mittel(noten);
@@ -1435,20 +1450,14 @@ function NotenStatistik({ noten, stufung, t }) {
   );
   return (
     <div style={{ padding: 16, background: "var(--card)", borderRadius: cardStyle.borderRadius, border: "1px solid var(--border)", marginBottom: 16 }}>
-      <button onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
-        <Icon d={open ? ICONS.minus : ICONS.plus} size={14} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{t("noten.statTitle")}</span>
-      </button>
-      {open && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-            {tile(t("noten.statAvg"), kommaRund(avg, 2))}
-            {tile(t("noten.statMedian"), kommaRund(median, 2))}
-            {tile(t("noten.statSd"), `±${kommaRund(sd, 2)}`)}
-          </div>
-          <NotenVerteilung werte={noten} stufung={stufung} />
-        </div>
-      )}
+      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 }}>{t("noten.statTitle")}</div>
+      {/* Nachkommastellen wie in der Tabelle (Ansicht) — vorher fest zwei. */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {tile(t("noten.statAvg"), kommaRund(avg, stellen))}
+        {tile(t("noten.statMedian"), kommaRund(median, stellen))}
+        {tile(t("noten.statSd"), `±${kommaRund(sd, stellen)}`)}
+      </div>
+      <NotenVerteilung werte={noten} stufung={stufung} />
     </div>
   );
 }

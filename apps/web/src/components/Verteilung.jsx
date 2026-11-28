@@ -8,7 +8,7 @@
 //   noten  Notenwerte je Kind (auch mit Tendenz, 2,3) — fehlt es, gibt es nur den Boxplot in %
 //   pct    Prozentwerte je Kind — fehlt es, gibt es den Boxplot nur in Noten
 // Beim Boxplot steht die gute Seite immer LINKS (Noten klein = gut, Prozent umgekehrt).
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Boxplot, COLORS as C, Tabs } from "./Icons.jsx";
 import { verteilung } from "../core/notenstufen.js";
 import { komma } from "../core/zahl.js";
@@ -30,6 +30,9 @@ export default function Verteilung({ noten, pct, stufung = "ganz", fein: feinAus
   const pw = pct ? zahlen(pct) : null;
   const [sicht, setSicht] = useState(nw ? "bar" : "box");
   const [feinInnen, setFeinInnen] = useState(stufung === "teil");
+  // Die Einstellung „Statistik: Teilnoten" (Ansicht) gilt auch, wenn sie umgestellt wird, waehrend das Feld
+  // schon offen ist — vorher galt nur der Stand beim ersten Zeichnen.
+  useEffect(() => { setFeinInnen(stufung === "teil"); }, [stufung]);
   const fein = feinAussen != null ? feinAussen : feinInnen;
   const setzeFein = (v) => { setFeinInnen(v); if (onFein) onFein(v); };
   const [einheit, setEinheit] = useState(pw ? "pct" : "note");
