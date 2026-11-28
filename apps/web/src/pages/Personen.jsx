@@ -10,7 +10,7 @@ import Portrait from "../components/Portrait.jsx";
 import SchuelerAngaben from "../components/SchuelerAngaben.jsx";
 import BildZuschnitt from "../components/BildZuschnitt.jsx";
 import { oeffentlicheBasis } from "../core/basis.js";
-import { dateiWaehlen, btnSecondary, btnSmall, iconBtn, inputStyle, Modal } from "../components/Icons.jsx";
+import { dateiWaehlen, btnSecondary, btnSmall, iconBtn, Modal } from "../components/Icons.jsx";
 import NamenFelder from "../components/NamenFelder.jsx";
 import { anzeigeName, nameAusEingabe } from "../core/namen.js";
 import { useLanguage } from "../i18n";

@@ -302,6 +302,7 @@ import { BEAMER_MODULE, beamerFreigeben, useBeamer } from "./core/beamer.js";
 import AppUpdate from "./components/AppUpdate.jsx";
 import WasIstNeu from "./components/WasIstNeu.jsx";
 import { notiereAufruf, notiereSeite, protokollStarten } from "./core/protokoll.js";
+import { debugEinrichten } from "./core/debug.js";
 import { btnPrimary, btnSecondary, btnSmall, Skeleton, Modal, pageForm, pageTitle, pageIntro,
   COLORS as C, Icon, ICONS, iconBtn, cardStyle, chipStyle, menuRow, popoverPanel, SHADOW, CONTROL_R } from "./components/Icons.jsx";
 
@@ -1569,6 +1570,7 @@ function Wurzel() {
 }
 
 protokollStarten();
+debugEinrichten();   // nuvoraDebug.karten("Name") in der Entwicklerkonsole
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 

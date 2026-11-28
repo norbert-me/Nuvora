@@ -698,7 +698,6 @@ export default function Klassenarbeit() {
   const aktiv = useAktiv();
   const lernpfadAktiv = aktiv("lernpfad");
   const notenAktiv = aktiv("auswertung");
-  const cardvoteAktiv = aktiv("cardvote");
   const [notenModal, setNotenModal] = useState(false);
   // Notenspalten, die mit dieser Arbeit VERKNUEPFT sind (kein Abzug): jedes
   // Speichern schickt die Noten neu, die Spalte folgt. Eine E/G-Arbeit teilt

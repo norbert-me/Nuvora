@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AddButton, Icon, ICONS, COLORS as C, CONTROL_R, badge, btnPrimary, btnSecondary, btnSmall,
-  dateiWaehlen, iconBtn, inputStyle, sectionLabel, toolbarIconBtn, toolbarInput,
+  dateiWaehlen, iconBtn, inputStyle, sectionLabel, toolbarIconBtn,
 } from "./Icons.jsx";
 import Portrait from "./Portrait.jsx";
 import SchuelerAngaben from "./SchuelerAngaben.jsx";

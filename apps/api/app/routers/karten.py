@@ -2091,3 +2091,70 @@ async def submit_review(token: str, body: ReviewIn, db: AsyncSession = Depends(g
         return {"ok": True, "interval_days": rev.interval_days}
 
     return await mit_wiederholung(db, rechnen)
+
+
+# ─── Diagnose: warum sieht ein Kind welchen Stapel? ───
+# Fuer die Entwicklerkonsole der Lehrkraft (`nuvoraDebug.karten("Name")`, core/debug.js). Die Antwort
+# entscheidet NICHT selbst, sondern fragt dieselben Filter wie die Lernseite (`_student_deck_where`,
+# `_niveau_where`, Ausrollzeit) — daneben stehen nur die Rohdaten, aus denen man den Grund abliest.
+# Gemeldet am 28.11.2026: Kinder bekamen Karten aus einem Kurs, in dem sie keine sehen sollten.
+@router.get("/debug/zugang/{token}")
+async def debug_zugang(token: str, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    st = (await db.execute(select(Student).where(Student.karten_token == token))).scalar_one_or_none()
+    if not st:
+        raise HTTPException(404, "Zugang unbekannt")
+    await _owned_class(db, user, st.class_id)
+    now = _now()
+    alle = await _student_kurs_alle(db, st)
+    aktiv = set(await _student_kurs_ids(db, st))
+    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(Kurs.id.in_(alle or {0})))).scalars().all()}
+    kurs_info = [{"id": k.id, "name": k.name, "fach": k.fach or "", "karten_aktiv": k.id in aktiv,
+                  "archiviert": k.archived_at is not None, "geloescht": k.deleted_at is not None}
+                 for k in kurse.values()]
+    dw = await _student_deck_where(db, st)
+    sichtbar = set((await db.execute(select(CardDeck.id).where(
+        dw, _niveau_where(st), CardDeck.deleted_at.is_(None),
+        CardDeck.released_at.is_not(None), CardDeck.released_at <= now))).scalars().all())
+    filter_ok = set((await db.execute(select(CardDeck.id).where(dw))).scalars().all())
+    niveau_ok = set((await db.execute(select(CardDeck.id).where(_niveau_where(st)))).scalars().all())
+    # Betrachtet werden alle Stapel, die ueberhaupt in Frage kommen: der Klasse, eines Kurses des Kindes
+    # (Herkunft oder Zuweisung) — und alle, die es tatsaechlich sieht.
+    zuw = select(CardDeckKurs.deck_id).where(CardDeckKurs.kurs_id.in_(alle or {0}))
+    decks = (await db.execute(select(CardDeck).where(or_(
+        CardDeck.class_id == st.class_id, CardDeck.kurs_id.in_(alle or {0}), CardDeck.id.in_(zuw),
+        CardDeck.id.in_(sichtbar or {0}))))).scalars().all()
+    zuweisungen = await _kurse_je_deck(db, [d.id for d in decks])
+    faecher = await _deck_faecher(db, [(d.id, d.topic_id) for d in decks])
+    def kname(kid):
+        k = kurse.get(kid)
+        return f"{k.name} (#{kid})" if k else f"#{kid} (fremder Kurs)"
+    zeilen = []
+    for d in decks:
+        z = zuweisungen.get(d.id, [])
+        gruende = []
+        if d.deleted_at is not None:
+            gruende.append("im Papierkorb")
+        if d.released_at is None:
+            gruende.append("nicht ausgerollt (Entwurf)")
+        elif d.released_at > now:
+            gruende.append(f"erst ab {d.released_at.isoformat()}")
+        if d.id not in niveau_ok:
+            gruende.append(f"Niveau des Stapels {d.niveau or '-'} passt nicht zum Kind ({st.niveau or 'ohne'})")
+        if z:
+            treffer = [k for k in z if k in aktiv]
+            gruende.append(("zugewiesen an aktiven Kurs " + ", ".join(kname(k) for k in treffer)) if treffer
+                           else ("zugewiesen nur an " + ", ".join(kname(k) for k in z) + " — dort aus oder nicht Kurs des Kindes"))
+        else:
+            if d.kurs_id is not None:
+                gruende.append(f"Herkunft Kurs {kname(d.kurs_id)}" + (" (Karten an)" if d.kurs_id in aktiv else " (Karten aus/fremd)"))
+            elif d.class_id == st.class_id:
+                gruende.append(f"haengt nur an der Klasse, Fach des Themas: {faecher.get(d.id) or 'keins'}")
+        zeilen.append({"stapel": d.name, "id": d.id, "sieht_es": d.id in sichtbar,
+                       "kursfilter": d.id in filter_ok, "zugewiesen": [kname(k) for k in z],
+                       "herkunft_kurs": kname(d.kurs_id) if d.kurs_id else None,
+                       "klasse": d.class_id, "fach": faecher.get(d.id, ""), "niveau": d.niveau or "",
+                       "ausgerollt": d.released_at.isoformat() if d.released_at else None,
+                       "grund": "; ".join(gruende)})
+    zeilen.sort(key=lambda x: (not x["sieht_es"], x["stapel"].lower()))
+    return {"kind": {"id": st.id, "name": st.name, "klasse": st.class_id, "niveau": st.niveau or ""},
+            "kurse": kurs_info, "stapel": zeilen, "version": __import__("app.admin", fromlist=["APP_VERSION"]).APP_VERSION}
