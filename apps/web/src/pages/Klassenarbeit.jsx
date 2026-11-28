@@ -2,7 +2,7 @@
 // Punkte-Raster (Zeilen = SuS, Spalten = Aufgaben, Zelle = erreichte Punkte).
 // Daraus LIVE je SuS ein Fehlerprofil nach Thema, eine Note (Punkte/Max → Skala)
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
-import { anzeigeName } from "../core/namen.js";
+import { anzeigeName, sortiereKinder, useSortierung } from "../core/namen.js";
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ANTWORT_COLORS, Boxplot, FOKUS_TON, FOKUS_TON_DECKEND, Segment, segmentBtn, COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, td as tdBase, th as thBase, toolbarBtn, toolbarIconBtn } from "../components/Icons.jsx";
@@ -832,10 +832,12 @@ export default function Klassenarbeit() {
   // haben das Blatt geschrieben, die anderen ein anderes. Ohne Niveau alle.
   // Gerechnet wird ohnehin nur ueber die eingetragenen Ergebnisse (_profile),
   // die Liste bestimmt, wer ueberhaupt zum Eintragen dasteht.
+  // Reihenfolge wie im Notenbuch (eine Einstellung, siehe useSortierung).
+  const [sortierung] = useSortierung();
   const students = useMemo(() => {
     const n = (work && work.niveau) || "";
-    return n ? alleStudents.filter((s) => (s.niveau || "") === n) : alleStudents;
-  }, [alleStudents, work]);
+    return sortiereKinder(n ? alleStudents.filter((s) => (s.niveau || "") === n) : alleStudents, sortierung);
+  }, [alleStudents, work, sortierung]);
   // Der Name bleibt: jede Geste geht weiter denselben einen Weg — nur endet er
   // jetzt im Entwurf statt beim Server.
   const persist = (next) => entwurf.setz(next);
@@ -2304,6 +2306,9 @@ export function KlassenarbeitVergleich() {
 // Gerechnet mit core/arbeitswertung.js (Wahlaufgaben ueber das jeweils andere
 // Blatt eingeschlossen) — dieselbe Note wie im Blatt selbst.
 function AlleBlaetter({ blaetter, alleStudents, scale, t, teil = "alle" }) {
+  // Dieselbe Reihenfolge wie im Raster und im Notenbuch, nicht mehr stur alphabetisch nach Vorname.
+  const [sortierung] = useSortierung();
+  const rang = new Map(sortiereKinder(alleStudents, sortierung).map((s, i) => [s.id, i]));
   const zeilen = [];
   blaetter.forEach((b, i) => {
     if (!b) return;
@@ -2323,7 +2328,7 @@ function AlleBlaetter({ blaetter, alleStudents, scale, t, teil = "alle" }) {
       zeilen.push({ id: s.id, name: s.name, stufe: b.niveau, erreicht: w.erreicht, basis: w.basis, pct: w.pct, note: d.note, wert: d.wert, grade: d.grade });
     });
   });
-  zeilen.sort((a, b) => a.name.localeCompare(b.name));
+  zeilen.sort((a, b) => (rang.get(a.id) ?? 0) - (rang.get(b.id) ?? 0));
   // Kennzahlen und Notenverteilung stehen darunter in der Auswertung „Gesamt"
   // (derselbe Block wie im einzelnen Blatt) — hier nur die Liste der Kinder.
   return (

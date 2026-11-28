@@ -29,7 +29,7 @@ import { useEinfuegen } from "../core/ziehsortieren.js";
 import { alsJson, hol } from "../core/melden.js";
 import { parseYmd, ymd } from "../core/datum.js";
 import { median as medianVon, mittel, streuung } from "../core/statistik.js";
-import { kurzName, kurzNameAn, useKurzName, anzeigeName } from "../core/namen.js";
+import { kurzName, kurzNameAn, useKurzName, useSortierung, anzeigeName } from "../core/namen.js";
 import { notenTrend, spaltenDatum, spaltenNachZeit, strichLuecken } from "../core/notentrend.js";
 import { teilen } from "../core/teilen.js";
 import { sortiereKinder } from "../core/namen.js";
@@ -629,8 +629,7 @@ export default function Noten() {
   const spaltenMitNoten = useMemo(() => new Set(summary ? summary.flatMap((r) => Object.keys(r.per_category || {})).map(Number) : []), [summary]);
   // Reihenfolge der Kinder in der Tabelle: wie gepflegt, nach Nach- oder Vornamen, bzw. nach Klasse
   // (in gemischten Kursen). Eine Anzeigeoption je Gerät, kein Eingriff in die Daten.
-  const [sortierung, setSortierung] = useState(() => { try { return localStorage.getItem("noten_sort") || "liste"; } catch { return "liste"; } });
-  const setSortierungPersist = (v) => { setSortierung(v || "liste"); try { localStorage.setItem("noten_sort", v || "liste"); } catch { /* egal */ } };
+  const [sortierung, setSortierungPersist] = useSortierung();   // gilt auch in der Klassenarbeit
   const mehrereKlassen = useMemo(() => new Set((summary || []).map((r) => r.klasse).filter(Boolean)).size > 1, [summary]);
   const wirksameSortierung = sortierung === "klasse" && !mehrereKlassen ? "liste" : sortierung;
   const zeilen = useMemo(() => sortiereKinder(summary || [], wirksameSortierung), [summary, wirksameSortierung]);

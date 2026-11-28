@@ -13,6 +13,20 @@ export function setzeKurzName(an) {
   hoerer.forEach((f) => f());
 }
 
+// Reihenfolge der Kinder (Wie gepflegt / Nachname / Vorname / Klasse) — EINE Einstellung fuer alle Listen
+// (Notenbuch, Klassenarbeit). Der Schluessel ist der alte des Notenbuchs, damit die Wahl erhalten bleibt.
+const SORT_KEY = "noten_sort";
+const sortHoerer = new Set();
+const sortierungJetzt = () => { try { return localStorage.getItem(SORT_KEY) || "liste"; } catch { return "liste"; } };
+export function setzeSortierung(art) {
+  try { localStorage.setItem(SORT_KEY, art || "liste"); } catch { /* egal */ }
+  sortHoerer.forEach((f) => f());
+}
+export function useSortierung() {
+  const art = useSyncExternalStore((f) => { sortHoerer.add(f); return () => sortHoerer.delete(f); }, sortierungJetzt, () => "liste");
+  return [art, setzeSortierung];
+}
+
 // ── Namen in Teilen: Vorname, weitere Vornamen, Nachname ──
 // Gespeichert bleibt EIN Name („Alexis Kate Geraldine Klein Müller"); die Teile ergeben sich daraus: das erste
 // Wort ist der Vorname, das letzte der Nachname, dazwischen die weiteren Vornamen. Ein Nachname aus mehreren
