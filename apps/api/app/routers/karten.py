@@ -37,7 +37,7 @@ from ..schueler import sortiert
 from ..uploads import anhang_kopf, bildtyp
 # Optimistisches Sperren (siehe app/versionierung.py).
 from ..versionierung import VersionOut, pruefe, stand
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 from ..models import (Card, CardDeck, CardDeckKurs, CardFolder, CardReview, Kurs,
                       SchoolClass, Student, User, Session, ExamDate, GradeCategory)
 from .auth import get_current_user, rate_limit
@@ -1866,9 +1866,18 @@ async def student_aktuelle_note(token: str, db: AsyncSession = Depends(get_db)):
     termine = ["2", "1"] if owner.hj2_start and owner.hj2_start <= heute else ["1", "2"]
     # Eine Note je Kurs des Kindes (Mathe, Deutsch …); Bestand ohne Kurs zaehlt als ein Eintrag.
     kurs_ids = sorted(set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id))
-    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(Kurs.id.in_(kurs_ids), Kurs.deleted_at.is_(None)))).scalars().all()} if kurs_ids else {}
+    # Nur laufende Kurse: archivierte und solche, die schon einen Nachfolger haben (Kurs des Vorjahrs),
+    # zeigen dem Kind keine Note mehr — sonst stand die Mathe-Note vom letzten Jahr unter der aktuellen.
+    nachfolger = aliased(Kurs)
+    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
+        Kurs.id.in_(kurs_ids), Kurs.deleted_at.is_(None), Kurs.archived_at.is_(None),
+        ~sa_exists().where(nachfolger.vorgaenger_id == Kurs.id, nachfolger.deleted_at.is_(None)),
+    ))).scalars().all()} if kurs_ids else {}
     klasse = await db.get(SchoolClass, st.class_id)
-    ziele = [(kid, _kurs_ohne_klasse(kurse[kid], klasse.name if klasse else "")) for kid in kurs_ids if kid in kurse] or [(None, "")]
+    ziele = [(kid, _kurs_ohne_klasse(kurse[kid], klasse.name if klasse else "")) for kid in kurs_ids if kid in kurse]
+    # Bestand ohne Kurs: nur wenn das Kind gar keinen Kurs hat — sind alle Kurse beendet, gibt es nichts zu zeigen.
+    if not kurs_ids:
+        ziele = [(None, "")]
     out = []
     for kid, name in ziele:
         for term in termine:

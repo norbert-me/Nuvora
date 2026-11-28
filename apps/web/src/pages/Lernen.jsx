@@ -271,9 +271,10 @@ function Ergebnisse({ results, noten = [], t }) {
                     style={{ marginLeft: 6, color: n.trend > 0 ? C.success : n.trend < 0 ? C.danger : "var(--text3)" }}>{n.trend > 0 ? "↗" : n.trend < 0 ? "↘" : "→"}</span>
                 )}</div>
               {/* Quartale und Halbjahre nebeneinander (Q1 · 1. HJ · Q3 · 2. HJ) — nur, was es schon gibt. */}
-              {(n.verlauf || []).length > 1 && (
+              {/* Das laufende Halbjahr fehlt: seine Note IST die aktuelle Note darueber (Wunsch des Nutzers). */}
+              {(n.verlauf || []).some((v) => v.label !== `${n.halbjahr}. HJ`) && (
                 <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 10 }}>
-                  {n.verlauf.map((v) => (
+                  {n.verlauf.filter((v) => v.label !== `${n.halbjahr}. HJ`).map((v) => (
                     <span key={v.label} style={{ border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: "4px 10px", fontSize: 13 }}>
                       <span style={{ color: "var(--text3)", marginRight: 6 }}>{v.label}</span>
                       <strong>{String(v.note).replace("-", "−")}</strong>
