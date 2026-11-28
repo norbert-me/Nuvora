@@ -1922,21 +1922,8 @@ export default function Klassenarbeit() {
       {neuOffen && <NeueArbeitModal t={t} onClose={() => setNeuOffen(false)} onAnlegen={anlegen}
         vorschlag={t("klassenarbeit.newName")} />}
       {hasRoster && works.length === 0 && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={() => setNeuOffen(true)} actionTour="ka-new" />}
-      {/* Der Themenstand stand hier einmal als ganzes Panel (mit eigener
-          SuS-Auswahl) — die falsche Stelle: eine Klassenarbeit zeigt EINEN Tag,
-          „wackelt das Thema dauerhaft?" gehoert zum Kind. Geblieben ist der
-          Hinweis; mit CardVote fuehrt er auch hin (Regel 3: ohne das Modul gibt
-          es die Seite nicht, dann bleibt der Satz stehen). */}
-      {hasRoster && !hideIndividual && classId && (
-        <div style={{ ...cardStyle, marginTop: 16, padding: "10px 14px", fontSize: 13, color: "var(--text2)" }}>
-          {t("klassenarbeit.lernstandHint")}{" "}
-          {cardvoteAktiv && (
-            <Link to={`/cardvote/class-evaluation/${classId}`} style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>
-              {t("klassenarbeit.lernstandLink")} ↗
-            </Link>
-          )}
-        </div>
-      )}
+      {/* Der Hinweis „Was diese Arbeit zeigt, ist ein Tag …" samt Link zum Lernstand ist entfernt
+          (Wunsch des Nutzers, 28.11.2026): eine Satzkarte unter jeder Arbeit fuer etwas, das man nicht sucht. */}
 
       {/* Am Bildschirm unsichtbar, auf dem Papier das Einzige. Die Komponente
           haengt sich per Portal an den <body> — der Rahmen hier gaebe ihr sonst
