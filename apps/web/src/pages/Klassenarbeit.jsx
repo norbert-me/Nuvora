@@ -1899,11 +1899,18 @@ export default function Klassenarbeit() {
             })()}
             {/* SuS-Ansicht (am Beamer): keine Namen mit Noten. */}
             {!hideIndividual && (<>
-              <div style={{ fontSize: 14, fontWeight: 700, margin: "20px 0 8px" }}>{t("klassenarbeit.notenAller")}</div>
-              <AlleBlaetter blaetter={[work, partner]} alleStudents={alleStudents} scale={scale} t={t} />
+              <div style={{ fontSize: 14, fontWeight: 700, margin: "20px 0 8px" }}>
+                {alleTeil === "alle" ? t("klassenarbeit.notenAller") : `${t("klassenarbeit.notenAller")} · ${t("klassenarbeit.kursNiveau", { n: alleTeil })}`}
+              </div>
+              <AlleBlaetter blaetter={[work, partner]} alleStudents={alleStudents} scale={scale} t={t} teil={alleTeil} />
             </>)}
           </>) : nurAuswertung ? (<>
             {zeigeAuswertung(analyse)}
+            {/* Auch ohne zweites Blatt: die Noten aller Kinder stehen in der Auswertung. */}
+            {!hideIndividual && (<>
+              <div style={{ fontSize: 14, fontWeight: 700, margin: "20px 0 8px" }}>{t("klassenarbeit.notenAller")}</div>
+              <AlleBlaetter blaetter={[work]} alleStudents={work.niveau ? alleStudents : students} scale={scale} t={t} />
+            </>)}
             {analyse && analyse.bogen.length > 0 && (
               <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
                 <button onClick={bogenOeffnen} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
@@ -2313,7 +2320,7 @@ export function KlassenarbeitVergleich() {
 // Gesamtsicht einer E/G-Arbeit: die Liste aller Kinder, jedes aus seinem Blatt.
 // Gerechnet mit core/arbeitswertung.js (Wahlaufgaben ueber das jeweils andere
 // Blatt eingeschlossen) — dieselbe Note wie im Blatt selbst.
-function AlleBlaetter({ blaetter, alleStudents, scale, t }) {
+function AlleBlaetter({ blaetter, alleStudents, scale, t, teil = "alle" }) {
   const zeilen = [];
   blaetter.forEach((b, i) => {
     if (!b) return;
@@ -2321,7 +2328,9 @@ function AlleBlaetter({ blaetter, alleStudents, scale, t }) {
     const wk = { ...b, _alt: (anderes && anderes.tasks) || [] };
     const sc = b.scale && Object.keys(b.scale).length ? b.scale : scale;
     const absent = new Set((b.absent || []).map(String));
-    alleStudents.filter((s) => (s.niveau || "") === b.niveau).forEach((s) => {
+    // Folgt der Auswahl oben (Alle | E | G); ein Blatt ohne Niveau hat alle Kinder.
+    if (teil !== "alle" && b.niveau && b.niveau !== teil) return;
+    alleStudents.filter((s) => !b.niveau || (s.niveau || "") === b.niveau).forEach((s) => {
       const r = (b.results || {})[String(s.id)];
       const abw = absent.has(String(s.id)) || r === "abwesend";
       const erfasst = !abw && r && (Array.isArray(r) || Object.values(r).some((v) => v != null && v !== ""));
