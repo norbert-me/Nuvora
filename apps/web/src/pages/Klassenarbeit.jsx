@@ -1480,7 +1480,12 @@ export default function Klassenarbeit() {
               onChange={(v) => { const w = works.find((x) => String(x.id) === v) || null; if (w) waehleAusListe(w); else wechseln(() => zeigeArbeit(null)); }}
               optionen={auswahl.map((w) => ({ wert: String(w.id), label: auswahlLabel(w) }))} />
           )}
-          mehr={work ? [{ key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true, onClick: loeschen }] : []}>
+          /* Umbenennen und Kopieren im Mehr-Menue: als eigene Knoepfe brachen sie die Leiste in eine zweite Zeile. */
+          mehr={work ? [
+            !alleAn && { key: "umbenennen", label: t("klassenarbeit.umbenennen"), icon: ICONS.edit, onClick: umbenennen },
+            { key: "kopie", label: t("klassenarbeit.copyTo"), icon: ICONS.duplicate, onClick: () => setKopieOffen(true) },
+            { key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true, onClick: loeschen },
+          ].filter(Boolean) : []}>
           {/* E | G: zwei Blaetter einer Arbeit. Fehlt eins, legt der Knopf es an. */}
           {work && (
             <Segment>
@@ -1510,18 +1515,9 @@ export default function Klassenarbeit() {
             <button onClick={teilen} disabled={!hatNiveaus} style={{ ...toolbarBtn, ...(hatNiveaus ? {} : { opacity: 0.5, cursor: "default" }) }}
               title={hatNiveaus ? t("klassenarbeit.teilen") : t("klassenarbeit.teilenOhneNiveau")}>E/G</button>
           )}
-          {/* Umbenennen hinter dem Stift: der Name steht schon im Auswahlfeld — ein zweites Feld darunter
-              war derselbe Name noch einmal. */}
-          {work && !alleAn && (
-            <button onClick={umbenennen} className="icon-btn" style={toolbarIconBtn} title={t("klassenarbeit.umbenennen")} aria-label={t("klassenarbeit.umbenennen")}>
-              <Icon d={ICONS.edit} />
-            </button>)}
           <button data-tour="ka-new" onClick={() => setNeuOffen(true)} className="icon-btn" style={toolbarIconBtn} title={t("klassenarbeit.new")} aria-label={t("klassenarbeit.new")}>
             <Icon d={ICONS.plus} color="var(--accent)" />
           </button>
-          {/* Parallelklassen schreiben dieselbe Arbeit — sie zweimal einzutippen
-              ist dieselbe Arbeit zweimal. */}
-          {work && <button onClick={() => setKopieOffen(true)} className="icon-btn" style={toolbarIconBtn} title={t("klassenarbeit.copyTo")} aria-label={t("klassenarbeit.copyTo")}><Icon d={ICONS.duplicate} /></button>}
         </Werkzeugleiste>
       )}
 
