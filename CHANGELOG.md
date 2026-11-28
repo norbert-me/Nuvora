@@ -14,6 +14,10 @@ dünner ausfällt als die der Zwischenschritte. Das war falsch: „Neu in 4.3.0"
 muss aufzählen, was in 4.3.0 neu ist. Wer 4.1.x übersprungen hat, findet die
 Notizen dieser Fassungen weiter unten — jede an ihrer Stelle, und keine zweimal.
 
+## 4.7.5 — 28.11.2026
+
+- **Schülerseite:** unter den Noten ein Hinweis — vorläufiger, automatisch berechneter Zwischenstand, keine Zeugnisnote, ohne Anspruch auf Vollständigkeit; verbindlich ist allein die Note der Lehrkraft.
+
 ## 4.7.4 — 28.11.2026
 
 - **CardVote:** Antworten in der Auswertung per Klick ändern, das gescannte Original lässt sich jederzeit zurückholen. Die übernommene Notenspalte folgt der Auswertung wie bei der Klassenarbeit.
