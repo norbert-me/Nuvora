@@ -240,7 +240,14 @@ async def _student_kurs_ids(db, st) -> list:
     ids = await _student_kurs_alle(db, st)
     if not ids:
         return []
-    aus = set((await db.execute(select(Kurs.id).where(Kurs.id.in_(ids), Kurs.karten_aktiv.is_(False)))).scalars().all())
+    # Ein beendeter Kurs gibt nichts mehr aus: archiviert, geloescht oder schon mit Nachfolger (Vorjahr).
+    # Sonst kamen die Stapel des archivierten „6.5 Mathematik" (Karten dort noch an) weiter beim Kind an,
+    # obwohl im laufenden „7.5 Mathematik" die Karten aus sind (gemeldet 28.11.2026, nuvoraDebug.karten).
+    nachfolger = aliased(Kurs)
+    aus = set((await db.execute(select(Kurs.id).where(Kurs.id.in_(ids), or_(
+        Kurs.karten_aktiv.is_(False), Kurs.archived_at.is_not(None), Kurs.deleted_at.is_not(None),
+        sa_exists().where(nachfolger.vorgaenger_id == Kurs.id, nachfolger.deleted_at.is_(None)),
+    )))).scalars().all())
     return list(ids - aus)
 
 
@@ -2109,7 +2116,8 @@ async def debug_zugang(token: str, user: User = Depends(require_module), db: Asy
     aktiv = set(await _student_kurs_ids(db, st))
     kurse = {k.id: k for k in (await db.execute(select(Kurs).where(Kurs.id.in_(alle or {0})))).scalars().all()}
     kurs_info = [{"id": k.id, "name": k.name, "fach": k.fach or "", "karten_aktiv": k.id in aktiv,
-                  "archiviert": k.archived_at is not None, "geloescht": k.deleted_at is not None}
+                  "archiviert": k.archived_at is not None, "geloescht": k.deleted_at is not None,
+                  "karten_schalter": bool(k.karten_aktiv)}
                  for k in kurse.values()]
     dw = await _student_deck_where(db, st)
     sichtbar = set((await db.execute(select(CardDeck.id).where(

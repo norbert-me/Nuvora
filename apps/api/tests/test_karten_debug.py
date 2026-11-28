@@ -42,3 +42,31 @@ async def test_diagnose_nennt_sichtbare_und_versteckte_stapel(s):
     await s.commit()
     with pytest.raises(HTTPException):
         await K.debug_zugang("tok-debug-0123456789abc", user=f, db=s)
+
+
+@pytest.mark.asyncio
+async def test_archivierter_vorjahreskurs_gibt_keine_karten_mehr_aus(s):
+    u = m.User(email="ka@s.de", password_hash="x", name="L", email_verified=True)
+    s.add(u)
+    await s.flush()
+    s.add(m.UserModule(user_id=u.id, module_key="karten"))
+    alt = m.Kurs(owner_id=u.id, name="6.5 Mathematik")          # Karten an, aber archiviert
+    neu = m.Kurs(owner_id=u.id, name="7.5 Mathematik", fach="Mathematik", karten_aktiv=False)
+    ga = m.Kurs(owner_id=u.id, name="7.5 GA")
+    s.add_all([alt, neu, ga])
+    await s.flush()
+    alt.archived_at = datetime.now(timezone.utc)
+    c = m.SchoolClass(owner_id=u.id, name="7.5")
+    s.add(c)
+    await s.flush()
+    s.add_all([m.KursTag(kurs_id=k.id, class_id=c.id) for k in (alt, neu, ga)])
+    st = m.Student(class_id=c.id, card_id=1, name="Jesus", karten_token="tok-archiv-0123456789abc")
+    s.add(st)
+    d = m.CardDeck(owner_id=u.id, class_id=c.id, kurs_id=neu.id, name="Rationale Zahlen",
+                   released_at=datetime.now(timezone.utc) - timedelta(days=1))
+    s.add(d)
+    await s.flush()
+    s.add_all([m.CardDeckKurs(deck_id=d.id, kurs_id=k.id) for k in (alt, neu)])
+    await s.commit()
+    out = await K.debug_zugang("tok-archiv-0123456789abc", user=u, db=s)
+    assert not {z["stapel"]: z for z in out["stapel"]}["Rationale Zahlen"]["sieht_es"]
