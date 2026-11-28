@@ -517,7 +517,11 @@ export default function Karten() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
             {(tokens || []).map((s) => (
               <div key={s.student_id} style={{ ...panelStyle, textAlign: "center", padding: 12, background: "#fff" }}>
-                <img src={`${API}/qr/${s.token}.png?base=${encodeURIComponent(qrBasis)}`} alt="" width={120} height={120} style={{ display: "block", margin: "0 auto 6px" }} />
+                {/* Klick oeffnet die Seite des Kindes (wie der Scan) in einem neuen Tab — zum Nachsehen ohne Handy. */}
+                <a href={`/lernen/${s.token}`} target="_blank" rel="noopener noreferrer" title={t("karten.qrOeffnen")} aria-label={`${t("karten.qrOeffnen")}: ${anzeigeName(s.name)}`}
+                  style={{ display: "block", width: 120, margin: "0 auto 6px" }}>
+                  <img src={`${API}/qr/${s.token}.png?base=${encodeURIComponent(qrBasis)}`} alt="" width={120} height={120} style={{ display: "block" }} />
+                </a>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{anzeigeName(s.name)}</div>
                 <div style={{ fontSize: 11, color: "#666" }}>#{s.card_id}</div>
               </div>
